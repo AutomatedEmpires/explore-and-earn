@@ -98,6 +98,23 @@ test.describe("admin command search", () => {
       );
       await expectNoHorizontalOverflow(page);
 
+      await page
+        .getByRole("button", { name: "Awaiting 1", exact: true })
+        .click();
+      await expect(
+        page.getByRole("heading", {
+          name: "No hosts on this page match these filters",
+        }),
+      ).toBeVisible();
+      await expect(
+        page.getByText("Try a different search or trust-review filter.", {
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect(page.locator("[data-risk]")).toHaveCount(0);
+      await page.getByRole("button", { name: "All 2", exact: true }).click();
+      await expect(page.locator("[data-risk]")).toHaveCount(1);
+
       await page.goBack();
       await expect
         .poll(() => {

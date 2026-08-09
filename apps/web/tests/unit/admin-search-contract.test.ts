@@ -7,6 +7,7 @@ import {
   readAdminQuery,
   resolveAdminSearch,
 } from "../../components/admin/adminSearch";
+import { normalizeCommandSearchValue } from "../../components/shared/CommandSearch";
 
 const APPLICATIONS_SEARCH = {
   action: "/applications",
@@ -46,6 +47,22 @@ describe("readAdminQuery", () => {
     expect(readAdminQuery([])).toBe("");
     expect(readAdminQuery("")).toBe("");
     expect(readAdminQuery("   ")).toBe("");
+  });
+});
+
+describe("normalizeCommandSearchValue", () => {
+  const oversized = `  ${"x".repeat(ADMIN_QUERY_MAX_LENGTH + 20)}  `;
+
+  it("enforces a caller-owned cap at the navigation boundary", () => {
+    expect(
+      normalizeCommandSearchValue(oversized, ADMIN_QUERY_MAX_LENGTH),
+    ).toBe("x".repeat(ADMIN_QUERY_MAX_LENGTH));
+  });
+
+  it("preserves the complete trimmed query when a caller does not set a cap", () => {
+    expect(normalizeCommandSearchValue(oversized)).toBe(
+      "x".repeat(ADMIN_QUERY_MAX_LENGTH + 20),
+    );
   });
 });
 

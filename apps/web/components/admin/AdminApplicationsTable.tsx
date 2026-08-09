@@ -255,7 +255,9 @@ export function AdminApplicationsTable({
           </span>
           <p className={styles.emptyTitle}>No matches in this view</p>
           <p className={styles.emptyHint}>
-            {hasQuery
+            {hasQuery && lane !== "all"
+              ? "No recent applications match these filters."
+              : hasQuery
               ? "No recent applications match this search."
               : "No applications match the current lane filter."}
           </p>

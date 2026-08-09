@@ -332,7 +332,9 @@ export function AdminListingsTable({
               : "No listings on this page"}
           </p>
           <p className={styles.emptyBody}>
-            {hasQuery
+            {hasQuery && filter !== "all"
+              ? "No listings on this page match these filters."
+              : hasQuery
               ? "No listings on this page match this search."
               : filter !== "all"
                 ? "No listings on this page match this status filter."

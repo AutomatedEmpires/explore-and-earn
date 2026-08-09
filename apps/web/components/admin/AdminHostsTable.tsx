@@ -293,7 +293,9 @@ export function AdminHostsTable({
             />
           </span>
           <h3 className={styles.emptyTitle}>
-            {hasQuery
+            {hasQuery && segment !== "all"
+              ? "No hosts on this page match these filters"
+              : hasQuery
               ? "No hosts on this page match this search"
               : segment === "flagged"
               ? "No hosts flagged for review"
@@ -302,7 +304,9 @@ export function AdminHostsTable({
                 : "Nothing awaiting review"}
           </h3>
           <p className={styles.emptySub}>
-            {hasQuery
+            {hasQuery && segment !== "all"
+              ? "Try a different search or trust-review filter."
+              : hasQuery
               ? "Try a different host name, safe reference, trust state, or listing count."
               : segment === "flagged"
               ? "No unreviewed host is publishing listings — every public host is trust-cleared."

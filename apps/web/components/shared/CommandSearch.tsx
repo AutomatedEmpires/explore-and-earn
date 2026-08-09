@@ -18,6 +18,15 @@ export interface CommandSearchProps {
   readonly className: string;
 }
 
+/** Keep displayed and submitted query values on the same caller-owned contract. */
+export function normalizeCommandSearchValue(
+  value: string,
+  maxLength?: number,
+): string {
+  const trimmed = value.trim();
+  return maxLength === undefined ? trimmed : trimmed.slice(0, maxLength);
+}
+
 /**
  * The shell command bar — one real, keyboard-operable search for all three OSes.
  *
@@ -45,8 +54,9 @@ export function CommandSearch({
   // back/forward, and any other external change to the URL. Without this the
   // box shows blank even though the page below it is actively filtered.
   useEffect(() => {
-    const urlValue = (searchParams.get(paramName) ?? "").trim();
-    setValue(maxLength === undefined ? urlValue : urlValue.slice(0, maxLength));
+    setValue(
+      normalizeCommandSearchValue(searchParams.get(paramName) ?? "", maxLength),
+    );
   }, [maxLength, searchParams, paramName]);
 
   // "/" focuses the command bar from anywhere in the scope (unless the user is
@@ -76,7 +86,7 @@ export function CommandSearch({
       role="search"
       onSubmit={(e) => {
         e.preventDefault();
-        const q = value.trim();
+        const q = normalizeCommandSearchValue(value, maxLength);
         router.push(q ? `${action}?${paramName}=${encodeURIComponent(q)}` : action);
       }}
     >
