@@ -22,6 +22,10 @@ import type {
 } from "@explore-and-earn/db";
 
 import { PublicHostProfileView } from "../../../host/PublicHostProfileView";
+import {
+  ListingSectionNav,
+  type ListingSectionLink,
+} from "../../../listing/ListingSectionNav";
 import { DEFAULT_CURRENCY } from "../../../../lib/format";
 
 import {
@@ -604,6 +608,15 @@ const GALLERY_CATEGORIES: readonly {
   { category: "location", label: "Location", description: "The surrounding destination" },
 ];
 
+const DEMO_LISTING_SECTION_LINKS = [
+  { href: "#demo-listing-photos", label: "Photos" },
+  { href: "#demo-listing-host", label: "Host" },
+  { href: "#demo-listing-weather", label: "Weather" },
+  { href: "#demo-listing-position", label: "Position" },
+  { href: "#demo-listing-location", label: "Location" },
+  { href: "#demo-listing-company-team", label: "Company & team" },
+] as const satisfies readonly ListingSectionLink[];
+
 function ListingNextStep({ listing }: { readonly listing: SeekerDemoListing }) {
   const { appliedIds, savedIds, save } = useDemoSeekerSession();
   const applied = appliedIds.includes(listing.id);
@@ -629,7 +642,11 @@ function ListingNextStep({ listing }: { readonly listing: SeekerDemoListing }) {
 
 function SampleWeather({ location }: { readonly location: string }) {
   return (
-    <section className={styles.detailSection} aria-labelledby="weather-heading">
+    <section
+      id="demo-listing-weather"
+      className={`${styles.detailSection} ${styles.listingAnchor}`}
+      aria-labelledby="weather-heading"
+    >
       <div className={styles.sectionHeading}>
         <div><p className={styles.eyebrow}>Weather</p><h2 id="weather-heading">10-day sample outlook</h2></div>
         <StatusChip tone="attention">Not live</StatusChip>
@@ -670,17 +687,47 @@ function ListingSurface() {
         </div>
       </section>
 
-      <section className={styles.gallerySection} aria-labelledby="gallery-heading">
+      <ListingSectionNav links={DEMO_LISTING_SECTION_LINKS} />
+
+      <section
+        id="demo-listing-photos"
+        className={`${styles.gallerySection} ${styles.listingAnchor}`}
+        aria-labelledby="gallery-heading"
+      >
         <div className={styles.sectionHeading}><div><p className={styles.eyebrow}>See the whole setup</p><h2 id="gallery-heading">Four role photo categories</h2></div><StatusChip>Sample gallery</StatusChip></div>
         <div className={styles.galleryGrid}>{GALLERY_CATEGORIES.map(({ category, label, description }) => <figure key={category}><ListingPhoto listing={listing} category={category} /><figcaption><strong>{label}</strong><span>{description}</span></figcaption></figure>)}</div>
       </section>
 
+      <section
+        id="demo-listing-host"
+        className={`${styles.hostCallout} ${styles.listingAnchor}`}
+        aria-labelledby="demo-listing-host-heading"
+      >
+        <div className={styles.hostInitials}>{seekerDemoHost.name.split(/\s+/).map((word) => word[0]).slice(0, 2).join("")}</div>
+        <div><p className={styles.eyebrow}>Your potential host</p><h2 id="demo-listing-host-heading">{seekerDemoHost.name}</h2><p>{seekerDemoHost.tagline}</p></div>
+        <Link className={styles.secondaryLink} href={`${DEMO_ROOT}/host/${seekerDemoHost.id}`}>View full host profile</Link>
+      </section>
+
+      <SampleWeather location={listing.location} />
+
       <div className={styles.detailGrid}>
-        <section className={styles.detailSection}><p className={styles.eyebrow}>About the position</p><h2>The work</h2><p>{listing.description}</p><h3>Responsibilities</h3><ul>{listing.responsibilities.map((responsibility) => <li key={responsibility}>{responsibility}</li>)}</ul><h3>What helps you thrive</h3><ul>{listing.requirements.map((requirement) => <li key={requirement}>{requirement}</li>)}</ul><h3>Training and role benefits</h3><ul>{[...listing.training, ...listing.benefits].map((item) => <li key={item}>{item}</li>)}</ul></section>
-        <section className={styles.detailSection}><p className={styles.eyebrow}>About the location</p><h2>{listing.location}</h2><p>{listing.locationDetails.summary}</p><p>{listing.locationDetails.remoteness}</p><h3>Getting around</h3><ul>{listing.locationDetails.transportation.map((item) => <li key={item}>{item}</li>)}</ul><h3>Nearby services</h3><div className={styles.skillList}>{listing.locationDetails.nearbyServices.map((item) => <span key={item}>{item}</span>)}</div><h3>Life outside work</h3><ul>{listing.locationDetails.activities.map((item) => <li key={item}>{item}</li>)}</ul><Link className={styles.textLink} href={`${DEMO_ROOT}/map`}>Place it in the spatial overview →</Link></section>
+        <section
+          id="demo-listing-position"
+          className={`${styles.detailSection} ${styles.listingAnchor}`}
+          aria-labelledby="demo-listing-position-heading"
+        ><p className={styles.eyebrow}>About the position</p><h2 id="demo-listing-position-heading">The work</h2><p>{listing.description}</p><h3>Responsibilities</h3><ul>{listing.responsibilities.map((responsibility) => <li key={responsibility}>{responsibility}</li>)}</ul><h3>What helps you thrive</h3><ul>{listing.requirements.map((requirement) => <li key={requirement}>{requirement}</li>)}</ul><h3>Training and role benefits</h3><ul>{[...listing.training, ...listing.benefits].map((item) => <li key={item}>{item}</li>)}</ul></section>
+        <section
+          id="demo-listing-location"
+          className={`${styles.detailSection} ${styles.listingAnchor}`}
+          aria-labelledby="demo-listing-location-heading"
+        ><p className={styles.eyebrow}>About the location</p><h2 id="demo-listing-location-heading">{listing.location}</h2><p>{listing.locationDetails.summary}</p><p>{listing.locationDetails.remoteness}</p><h3>Getting around</h3><ul>{listing.locationDetails.transportation.map((item) => <li key={item}>{item}</li>)}</ul><h3>Nearby services</h3><div className={styles.skillList}>{listing.locationDetails.nearbyServices.map((item) => <span key={item}>{item}</span>)}</div><h3>Life outside work</h3><ul>{listing.locationDetails.activities.map((item) => <li key={item}>{item}</li>)}</ul><Link className={styles.textLink} href={`${DEMO_ROOT}/map`}>Place it in the spatial overview →</Link></section>
       </div>
 
-      <section className={styles.detailSection} aria-labelledby="company-team-heading">
+      <section
+        id="demo-listing-company-team"
+        className={`${styles.detailSection} ${styles.listingAnchor}`}
+        aria-labelledby="company-team-heading"
+      >
         <p className={styles.eyebrow}>About the company and team</p>
         <h2 id="company-team-heading">{seekerDemoHost.name}</h2>
         {seekerDemoHost.story.split("\n\n").map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
@@ -689,13 +736,6 @@ function ListingSurface() {
         <div className={styles.teamGrid}>{seekerDemoHost.team.map((member) => <article key={member.id} className={styles.teamCard}><span className={styles.hostInitials}>{member.initials}</span><div><strong>{member.name}</strong><small>{member.role}</small><p>{member.bio}</p></div></article>)}</div>
       </section>
 
-      <section className={styles.hostCallout}>
-        <div className={styles.hostInitials}>{seekerDemoHost.name.split(/\s+/).map((word) => word[0]).slice(0, 2).join("")}</div>
-        <div><p className={styles.eyebrow}>Your potential host</p><h2>{seekerDemoHost.name}</h2><p>{seekerDemoHost.tagline}</p></div>
-        <Link className={styles.secondaryLink} href={`${DEMO_ROOT}/host/${seekerDemoHost.id}`}>View full host profile</Link>
-      </section>
-
-      <SampleWeather location={listing.location} />
       <ListingNextStep listing={listing} />
       {benefit ? <BenefitDialog listing={listing} kind={benefit} onClose={() => setBenefit(null)} /> : null}
     </div>

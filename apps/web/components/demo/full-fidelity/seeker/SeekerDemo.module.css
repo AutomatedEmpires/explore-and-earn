@@ -320,6 +320,7 @@
 
 .breadcrumbs { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-8); color: var(--text-secondary); font-size: var(--type-meta-size); }
 .breadcrumbs a { min-height: var(--tap-min); display: inline-flex; align-items: center; color: var(--color-cta); font-weight: var(--font-weight-semibold); }
+.listingAnchor { scroll-margin-top: calc(var(--space-64) + var(--space-40)); }
 .listingHero { display: grid; grid-template-columns: minmax(0, 1.04fr) minmax(0, .96fr); overflow: hidden; border: 1px solid var(--border-ink-warm); border-radius: calc(var(--radius-card) + var(--space-4)); background: var(--color-surface); box-shadow: var(--elevation-card); }
 .heroPhoto { min-height: 100%; }
 .heroBody { display: flex; flex-direction: column; justify-content: center; padding: clamp(var(--space-20), 4vw, var(--space-40)); }
