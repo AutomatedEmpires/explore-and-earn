@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { normalizeSearchQuery } from "./searchQuery";
+
 export interface CommandSearchProps {
   /** Route the query submits to (GET-style navigation with ?<param>=). */
   readonly action: string;
@@ -16,15 +18,6 @@ export interface CommandSearchProps {
   readonly maxLength?: number;
   /** Scope search class (e.g. "seekeros-search") — keeps the shell styling. */
   readonly className: string;
-}
-
-/** Keep displayed and submitted query values on the same caller-owned contract. */
-export function normalizeCommandSearchValue(
-  value: string,
-  maxLength?: number,
-): string {
-  const trimmed = value.trim();
-  return maxLength === undefined ? trimmed : trimmed.slice(0, maxLength);
 }
 
 /**
@@ -55,7 +48,7 @@ export function CommandSearch({
   // box shows blank even though the page below it is actively filtered.
   useEffect(() => {
     setValue(
-      normalizeCommandSearchValue(searchParams.get(paramName) ?? "", maxLength),
+      normalizeSearchQuery(searchParams.get(paramName) ?? "", maxLength),
     );
   }, [maxLength, searchParams, paramName]);
 
@@ -86,7 +79,7 @@ export function CommandSearch({
       role="search"
       onSubmit={(e) => {
         e.preventDefault();
-        const q = normalizeCommandSearchValue(value, maxLength);
+        const q = normalizeSearchQuery(value, maxLength);
         router.push(q ? `${action}?${paramName}=${encodeURIComponent(q)}` : action);
       }}
     >

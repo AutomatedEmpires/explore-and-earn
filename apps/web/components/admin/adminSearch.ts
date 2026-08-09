@@ -1,3 +1,5 @@
+import { normalizeSearchQuery } from "../shared/searchQuery";
+
 export const ADMIN_QUERY_MAX_LENGTH = 120;
 
 interface AdminSearchConfig {
@@ -37,7 +39,7 @@ export function readAdminQuery(
   value: string | string[] | undefined,
 ): string {
   const first = Array.isArray(value) ? value[0] : value;
-  return (first ?? "").trim().slice(0, ADMIN_QUERY_MAX_LENGTH);
+  return normalizeSearchQuery(first ?? "", ADMIN_QUERY_MAX_LENGTH);
 }
 
 function adminRouteSegment(pathname: string): string {

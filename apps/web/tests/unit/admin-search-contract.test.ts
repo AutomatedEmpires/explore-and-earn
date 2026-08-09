@@ -7,7 +7,7 @@ import {
   readAdminQuery,
   resolveAdminSearch,
 } from "../../components/admin/adminSearch";
-import { normalizeCommandSearchValue } from "../../components/shared/CommandSearch";
+import { normalizeSearchQuery } from "../../components/shared/searchQuery";
 
 const APPLICATIONS_SEARCH = {
   action: "/applications",
@@ -50,18 +50,37 @@ describe("readAdminQuery", () => {
   });
 });
 
-describe("normalizeCommandSearchValue", () => {
+describe("normalizeSearchQuery", () => {
   const oversized = `  ${"x".repeat(ADMIN_QUERY_MAX_LENGTH + 20)}  `;
 
   it("enforces a caller-owned cap at the navigation boundary", () => {
-    expect(
-      normalizeCommandSearchValue(oversized, ADMIN_QUERY_MAX_LENGTH),
-    ).toBe("x".repeat(ADMIN_QUERY_MAX_LENGTH));
+    expect(normalizeSearchQuery(oversized, ADMIN_QUERY_MAX_LENGTH)).toBe(
+      "x".repeat(ADMIN_QUERY_MAX_LENGTH),
+    );
   });
 
   it("preserves the complete trimmed query when a caller does not set a cap", () => {
-    expect(normalizeCommandSearchValue(oversized)).toBe(
+    expect(normalizeSearchQuery(oversized)).toBe(
       "x".repeat(ADMIN_QUERY_MAX_LENGTH + 20),
+    );
+  });
+
+  it("backs off a split surrogate so the limited query remains URL-safe", () => {
+    const splitAtBoundary = `${"x".repeat(ADMIN_QUERY_MAX_LENGTH - 1)}😀tail`;
+    const normalized = normalizeSearchQuery(
+      splitAtBoundary,
+      ADMIN_QUERY_MAX_LENGTH,
+    );
+
+    expect(normalized).toBe("x".repeat(ADMIN_QUERY_MAX_LENGTH - 1));
+    expect(() => encodeURIComponent(normalized)).not.toThrow();
+    expect(readAdminQuery(splitAtBoundary)).toBe(normalized);
+  });
+
+  it("retains a complete surrogate pair that fits exactly at the boundary", () => {
+    const exactBoundary = `${"x".repeat(ADMIN_QUERY_MAX_LENGTH - 2)}😀tail`;
+    expect(normalizeSearchQuery(exactBoundary, ADMIN_QUERY_MAX_LENGTH)).toBe(
+      `${"x".repeat(ADMIN_QUERY_MAX_LENGTH - 2)}😀`,
     );
   });
 });
