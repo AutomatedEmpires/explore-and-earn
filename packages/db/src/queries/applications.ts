@@ -240,13 +240,12 @@ async function legacySubmitApplication(
         .eq("listing_id", listingId)
         .eq("seeker_profile_id", seekerProfileId)
         .maybeSingle();
-      const dupId = (dup as { id?: unknown } | null)?.id;
       return {
         ok: false,
         error: "already_applied" as const,
         legacySubmission: true,
-        ...(typeof dupId === "string"
-          ? { applicationId: dupId, seekerProfileId }
+        ...(typeof dup?.id === "string"
+          ? { applicationId: dup.id, seekerProfileId }
           : {}),
       };
     }
