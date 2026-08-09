@@ -138,6 +138,7 @@ html {
 }
 
 .ui-modal__surface {
+  box-sizing: border-box;
   width: 100%;
   max-width: 28rem;
   display: flex;
