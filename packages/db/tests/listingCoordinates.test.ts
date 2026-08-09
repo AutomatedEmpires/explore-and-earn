@@ -248,14 +248,18 @@ describe("listing media ownership", () => {
   });
 
   it("preserves untouched source media after a claim is converted", async () => {
+    const inheritedCover = "https://source.example/photos/original.jpg";
+    const inheritedGallery = ["https://source.example/photos/gallery.jpg"];
     database.currentListing = {
-      cover_photo_url: "https://source.example/photos/original.jpg",
-      gallery_photo_urls: ["https://source.example/photos/gallery.jpg"],
+      cover_photo_url: inheritedCover,
+      gallery_photo_urls: inheritedGallery,
       claim_summary: "converted",
     };
 
     const result = await updateListing("token", "user-1", "listing-1", {
       locationName: "Wenatchee, WA",
+      coverPhotoUrl: inheritedCover,
+      galleryUrls: inheritedGallery,
     });
 
     expect(result).toEqual({ ok: true });

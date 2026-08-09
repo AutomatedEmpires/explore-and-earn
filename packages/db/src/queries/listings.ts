@@ -1214,6 +1214,18 @@ function listingMediaOwnershipError(
   return null;
 }
 
+function listingMediaArraysEqual(
+  left: readonly string[] | null | undefined,
+  right: readonly string[] | null | undefined,
+): boolean {
+  const normalizedLeft = left ?? [];
+  const normalizedRight = right ?? [];
+  return (
+    normalizedLeft.length === normalizedRight.length &&
+    normalizedLeft.every((url, index) => url === normalizedRight[index])
+  );
+}
+
 type ListingColumnPatch = {
   title?: string;
   category?: OpportunityCategory;
@@ -1440,9 +1452,6 @@ export async function updateListing(
   const hostProfileId = await resolveHostProfileId(clerkToken, clerkUserId);
   if (!hostProfileId) return { ok: false, error: "No host profile found for your account." };
 
-  const mediaError = listingMediaOwnershipError(fields, hostProfileId);
-  if (mediaError) return { ok: false, error: mediaError };
-
   const patch = buildListingColumnPatch(fields);
   if (Object.keys(patch).length === 0) return { ok: true };
 
@@ -1467,12 +1476,28 @@ export async function updateListing(
     claim_summary: string;
   };
   // Claim conversion deliberately preserves the sourced row's untouched media
-  // and lineage. Those inherited URLs are not new host assertions, so an
-  // unrelated edit must not force the host to erase them. Any media field the
-  // host actually submits was already validated above. Every ordinary listing
-  // validates the effective persisted values so a partial edit cannot retain a
-  // legacy cross-host reference.
-  if (persistedMedia.claim_summary !== "converted") {
+  // and lineage. The full listing form re-posts unchanged fields, so a byte-for-
+  // byte identical inherited URL is still untouched rather than a new host
+  // assertion. A changed value is validated. Every ordinary listing validates
+  // the effective persisted values so a partial edit cannot retain a legacy
+  // cross-host reference.
+  if (persistedMedia.claim_summary === "converted") {
+    const changedMedia: ListingWriteFields = {};
+    if (
+      fields.coverPhotoUrl !== undefined &&
+      fields.coverPhotoUrl !== persistedMedia.cover_photo_url
+    ) {
+      changedMedia.coverPhotoUrl = fields.coverPhotoUrl;
+    }
+    if (
+      fields.galleryUrls !== undefined &&
+      !listingMediaArraysEqual(fields.galleryUrls, persistedMedia.gallery_photo_urls)
+    ) {
+      changedMedia.galleryUrls = fields.galleryUrls;
+    }
+    const changedMediaError = listingMediaOwnershipError(changedMedia, hostProfileId);
+    if (changedMediaError) return { ok: false, error: changedMediaError };
+  } else {
     const effectiveMediaError = listingMediaOwnershipError(
       {
         coverPhotoUrl:
