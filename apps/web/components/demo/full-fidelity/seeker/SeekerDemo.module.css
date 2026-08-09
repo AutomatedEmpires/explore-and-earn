@@ -270,12 +270,12 @@
 .dialogValue { padding: var(--space-12); border-radius: var(--radius-cell); background: var(--color-action-soft); font-weight: var(--font-weight-bold); }
 .benefitPhotoSection { min-width: 0; margin-block: var(--space-18); padding: var(--space-12); border: 1px solid var(--border-ink-warm); border-radius: var(--radius-cell); background: var(--color-paper); }
 .benefitPhotoIntro { min-width: 0; margin-block-end: var(--space-12); }
-.benefitPhotoIntro h3 { margin: 0; font-family: var(--font-display); font-size: var(--type-body-size); line-height: var(--type-body-lh); overflow-wrap: anywhere; }
+.benefitPhotoIntro h3 { margin: 0; font-family: var(--font-display); font-size: var(--type-body-size); font-weight: var(--font-weight-bold); line-height: var(--type-body-lh); overflow-wrap: anywhere; }
 .benefitPhotoDisclosure { margin: var(--space-6) 0 0; color: var(--text-secondary); font-size: var(--type-meta-size); overflow-wrap: anywhere; }
 .benefitPhotoGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-8); min-width: 0; margin: 0; padding: 0; list-style: none; }
 .benefitPhotoGrid > li, .benefitPhotoFigure { min-width: 0; margin: 0; }
 .benefitPhotoFrame { min-width: 0; box-sizing: border-box; overflow: hidden; padding: var(--space-4); border: 1px solid var(--border-ink); border-radius: var(--radius-cell); background: var(--color-surface); }
-.benefitPhotoImage { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-radius: calc(var(--radius-cell) - var(--space-4)); filter: none; box-shadow: none; }
+.benefitPhotoImage { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: contain; border-radius: calc(var(--radius-cell) - var(--space-4)); background: var(--color-surface); filter: none; box-shadow: none; }
 .benefitPhotoCaption { min-width: 0; padding: var(--space-8) var(--space-4) var(--space-4); line-height: 1.35; white-space: normal; overflow-wrap: anywhere; }
 .benefitPhotoCaption strong { display: block; min-width: 0; }
 .dialogFacts { display: grid; gap: var(--space-8); margin-block: var(--space-18); }

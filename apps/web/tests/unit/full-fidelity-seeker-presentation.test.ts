@@ -18,6 +18,10 @@ const experienceSource = readFileSync(
   new URL("components/demo/full-fidelity/seeker/DemoSeekerExperience.tsx", webRoot),
   "utf8",
 );
+const demoStylesSource = readFileSync(
+  new URL("components/demo/full-fidelity/seeker/SeekerDemo.module.css", webRoot),
+  "utf8",
+);
 const profileEditRouteSource = readFileSync(
   new URL("app/[locale]/for-seekers/demo/profile/edit/page.tsx", webRoot),
   "utf8",
@@ -75,6 +79,15 @@ describe("full-fidelity seeker presentation", () => {
         }
       }
     }
+  });
+
+  it("preserves complete photos and the locked gallery-heading hierarchy", () => {
+    expect(demoStylesSource).toMatch(
+      /\.benefitPhotoImage\s*\{[^}]*object-fit:\s*contain;/,
+    );
+    expect(demoStylesSource).toMatch(
+      /\.benefitPhotoIntro h3\s*\{[^}]*font-family:\s*var\(--font-display\);[^}]*font-weight:\s*var\(--font-weight-bold\);/,
+    );
   });
 
   it("preserves the listing identity through profile editing and back to apply", () => {
