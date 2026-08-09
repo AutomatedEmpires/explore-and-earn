@@ -19,7 +19,13 @@ import {
 
 import { BucketPage } from "../../../../../components/seeker";
 import { CATEGORY_ICON } from "../../../../../components/discovery";
-import { NOT_SELECTED_ITEMS } from "../../../../../components/seeker/fixtures";
+import {
+  ACCEPTED_ITEMS,
+  DEV_ACCEPTED_APPLICATION_ID,
+  DEV_ACCEPTED_BEGINS_AT,
+  DEV_ACCEPTED_ENDS_AT,
+  NOT_SELECTED_ITEMS,
+} from "../../../../../components/seeker/fixtures";
 import { OpenConversationButton } from "../../../../../components/messaging/OpenConversationButton";
 import { InterviewScheduleCard } from "../../../../../components/scheduling/InterviewScheduleCard";
 import { isDevBenchEnabled } from "../../../../../lib/devBench";
@@ -84,17 +90,64 @@ function devApplicationDetail(): ApplicationDetailData {
   };
 }
 
+function devAcceptedApplicationDetail(): ApplicationDetailData {
+  const item = ACCEPTED_ITEMS[0];
+  if (!item) {
+    throw new Error("Application detail fixture requires an accepted item.");
+  }
+
+  const { listing } = item;
+  return {
+    application: {
+      id: DEV_ACCEPTED_APPLICATION_ID,
+      listingId: listing.id,
+      status: "accepted",
+      // This local-only application is intentionally not persisted, so it
+      // cannot truthfully open a real conversation.
+      canStartConversation: false,
+      submittedAt: "2026-05-03T17:00:00.000Z",
+      reviewedAt: "2026-05-05T17:00:00.000Z",
+      decidedAt: "2026-05-08T17:00:00.000Z",
+      coverMessage: null,
+      listing: {
+        id: listing.id,
+        title: listing.title,
+        category: listing.category,
+        location: listing.location,
+        opportunityWindow: listing.opportunityWindow,
+        status: listing.status,
+        host: {
+          name: listing.host.name,
+          verified: listing.host.verified,
+        },
+        benefits: listing.benefits,
+        coverImageUrl: listing.coverImageUrl ?? null,
+        beginsAt: DEV_ACCEPTED_BEGINS_AT,
+        endsAt: DEV_ACCEPTED_ENDS_AT,
+        conditionalBadges: listing.conditionalBadges,
+        matchScore: listing.matchScore,
+      },
+    },
+    scheduling: { available: true, request: null },
+  };
+}
+
 /**
  * React cache keeps metadata and the page on one request-scoped read. The exact
  * local fixture route returns before Clerk, Supabase, or scheduling can run.
  */
 const resolveApplicationDetail = cache(
   async (id: string): Promise<ApplicationDetailData | null> => {
-    if (id === DEV_APPLICATION_DETAIL_ID) {
+    if (
+      id === DEV_APPLICATION_DETAIL_ID ||
+      id === DEV_ACCEPTED_APPLICATION_ID
+    ) {
       if (!isDevBenchEnabled() || (await readDevRole()) !== "seeker") {
         return null;
       }
-      return devApplicationDetail();
+      return id === DEV_ACCEPTED_APPLICATION_ID
+        ? devAcceptedApplicationDetail()
+        : devApplicationDetail();
     }
     if (!isUuid(id)) return null;
 
@@ -211,14 +264,15 @@ export default async function AppliedDetailPage({ params }: Props) {
   const label = STATUS_LABEL[status] ?? "Applied";
   const variant = STATUS_VARIANT[status] ?? "neutral";
   const canWithdraw = WITHDRAWABLE_STATUSES.has(status);
+  const returnsToAccepted = status === "accepted";
   const timeline = buildTimeline(application);
 
   return (
     <BucketPage
       title={listing?.title ?? "Application"}
       description="Where your application stands."
-      backHref="/applied"
-      backLabel="Back to applications"
+      backHref={returnsToAccepted ? "/accepted" : "/applied"}
+      backLabel={returnsToAccepted ? "Back to accepted roles" : "Back to applications"}
     >
       <article
         className={styles.summary}

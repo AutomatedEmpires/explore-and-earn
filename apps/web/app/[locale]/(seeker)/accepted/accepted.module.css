@@ -2,6 +2,7 @@
 .hero {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   gap: var(--space-8);
   margin-bottom: var(--space-section);
   padding: var(--space-20);
@@ -51,6 +52,7 @@
 
 .heroTitle {
   margin: 0;
+  overflow-wrap: anywhere;
   font-family: var(--font-display);
   font-weight: var(--font-weight-bold);
   font-size: var(--type-section-size);
@@ -76,7 +78,9 @@
 .heroFact {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
   gap: var(--space-6);
+  overflow-wrap: anywhere;
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   line-height: var(--type-meta-lh);
@@ -99,6 +103,7 @@
 .triadChip {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
   gap: var(--space-6);
   padding: var(--space-4) var(--space-10);
   border-radius: var(--radius-pill);
@@ -108,6 +113,7 @@
   font-size: var(--type-meta-size);
   line-height: var(--type-meta-lh);
   color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 
 .triadChip svg {
@@ -117,7 +123,50 @@
 .grid {
   display: grid;
   grid-template-columns: 1fr;
+  min-width: 0;
   gap: var(--space-section);
+}
+
+.cardActions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  gap: var(--space-8);
+}
+
+.applicationLink {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-8) var(--space-16);
+  border: 1px solid var(--border-ink);
+  border-radius: var(--radius-button);
+  background: var(--color-surface-raised);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--type-button-lh);
+  text-align: center;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.applicationLink:hover {
+  background: var(--color-surface);
+}
+
+.applicationLink:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
 }
 
 @media (min-width: 640px) {

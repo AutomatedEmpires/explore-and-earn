@@ -62,8 +62,20 @@ export const OFFER_ITEMS: readonly OfferItem[] = [
   },
 ];
 
+/** Stable local-only identity shared by the accepted bucket and its detail route. */
+export const DEV_ACCEPTED_APPLICATION_ID = "dev-application-ski-resort-accepted";
+/** Production-shaped timestamps for the accepted walkthrough's listing window. */
+export const DEV_ACCEPTED_BEGINS_AT = "2026-11-14T17:00:00.000Z";
+export const DEV_ACCEPTED_ENDS_AT = "2027-04-18T17:00:00.000Z";
+
+const ACCEPTED_LISTING = findListing("lst_ski_resort_breck");
+
 export const ACCEPTED_ITEMS: readonly AcceptedRoleItem[] = [
-  { listing: findListing("lst_ski_resort_breck"), startDate: "Nov 18, 2026", travelPlanStatus: "not_started" },
+  {
+    listing: ACCEPTED_LISTING,
+    startDate: ACCEPTED_LISTING.begins ?? ACCEPTED_LISTING.opportunityWindow,
+    travelPlanStatus: "not_started",
+  },
 ];
 
 export const NOT_SELECTED_ITEMS: readonly NotSelectedItem[] = [

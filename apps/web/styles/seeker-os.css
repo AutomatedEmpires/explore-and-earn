@@ -214,6 +214,16 @@
 @media (max-width: 1023px) {
   .seekeros-contentwrap { padding: 16px 14px calc(var(--size-bottom-nav) + var(--space-24) + env(safe-area-inset-bottom, 0px)); }
 
+  /* Authenticated seeker pages also carry the persistent coachmark launcher
+     above the fixed dock. Reserve its full tap target plus breathing room so a
+     page's final action can always scroll clear of both controls. */
+  .seekeros-shell[data-coachmarks="true"] .seekeros-contentwrap {
+    padding-bottom: calc(
+      var(--size-bottom-nav) + var(--space-16) + var(--tap-min) + var(--space-24)
+      + env(safe-area-inset-bottom, 0px)
+    );
+  }
+
   /* Clear the fixed ScopeShellNav hamburger (top-left, 44px) so the search
      field never sits beneath it. */
   .seekeros-top {
