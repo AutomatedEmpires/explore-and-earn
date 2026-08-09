@@ -28,6 +28,7 @@ function makeChain(result: { data: unknown; error: unknown }) {
 
   chain.select = vi.fn(self);
   chain.eq = vi.fn(self);
+  chain.in = vi.fn(self);
   chain.order = vi.fn(self);
   chain.maybeSingle = terminal;
   chain.then = (
@@ -82,6 +83,14 @@ const CONVERTED_NOT_STATED_LISTING = {
   pay_evidence: "not_stated",
 };
 
+const CONFIRMED_WITHOUT_PAY_LISTING = {
+  ...LISTING_ROW,
+  compensation_summary: null,
+  compensation_min_cents: null,
+  compensation_max_cents: null,
+  pay_evidence: "confirmed",
+};
+
 function applicationRow(listing: Record<string, unknown> = LISTING_ROW) {
   return {
     id: "application-1",
@@ -122,6 +131,39 @@ describe("seeker application benefit summaries", () => {
     });
   });
 
+  it("applies lifecycle status filters at the database boundary", async () => {
+    const applicationChain = makeChain({ data: [], error: null });
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "seeker_profiles") {
+        return makeChain({ data: { id: "seeker-1" }, error: null });
+      }
+      if (table === "applications") return applicationChain;
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    await getApplicationsForSeekerWithListings(
+      "token",
+      "clerk-user-1",
+      ["offered"],
+    );
+
+    expect(applicationChain.in).toHaveBeenCalledWith("status", ["offered"]);
+    expect(applicationChain.order).toHaveBeenCalledWith("submitted_at", {
+      ascending: false,
+    });
+  });
+
+  it("returns immediately when the requested status set is empty", async () => {
+    const applications = await getApplicationsForSeekerWithListings(
+      "token",
+      "clerk-user-1",
+      [],
+    );
+
+    expect(applications).toEqual([]);
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
   it("carries persisted housing and meal descriptions through the application card query", async () => {
     const applicationChain = makeChain({
       data: [applicationRow()],
@@ -159,6 +201,7 @@ describe("seeker application benefit summaries", () => {
         provision: "provided",
         summary: "Breakfast and dinner every shift day",
       },
+      pay: { provision: "provided", summary: "$19/hour" },
     });
     expect(application?.listing).toMatchObject({
       beginsAt: "2026-08-12T17:00:00.000Z",
@@ -217,6 +260,7 @@ describe("seeker application benefit summaries", () => {
         provision: "provided",
         summary: "Breakfast and dinner every shift day",
       },
+      pay: { provision: "provided", summary: "$19/hour" },
     });
     expect(application?.listing).toMatchObject({
       beginsAt: "2026-08-12T17:00:00.000Z",
@@ -268,6 +312,29 @@ describe("seeker application benefit summaries", () => {
     });
   });
 
+  it("does not claim pay is provided on a list row without compensation", async () => {
+    const applicationChain = makeChain({
+      data: [applicationRow(CONFIRMED_WITHOUT_PAY_LISTING)],
+      error: null,
+    });
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "seeker_profiles") {
+        return makeChain({ data: { id: "seeker-1" }, error: null });
+      }
+      if (table === "applications") return applicationChain;
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    const [application] = await getApplicationsForSeekerWithListings(
+      "token",
+      "clerk-user-1",
+    );
+
+    expect(application?.listing?.benefits.pay).toEqual({
+      provision: "not_stated",
+    });
+  });
+
   it("hides every stale benefit value on a converted rich row with not-stated evidence", async () => {
     const applicationChain = makeChain({
       data: applicationRow(CONVERTED_NOT_STATED_LISTING),
@@ -300,6 +367,30 @@ describe("seeker application benefit summaries", () => {
         meals: "not_stated",
         pay: "not_stated",
       },
+    });
+  });
+
+  it("does not claim pay is provided on a rich row without compensation", async () => {
+    const applicationChain = makeChain({
+      data: applicationRow(CONFIRMED_WITHOUT_PAY_LISTING),
+      error: null,
+    });
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "seeker_profiles") {
+        return makeChain({ data: { id: "seeker-1" }, error: null });
+      }
+      if (table === "applications") return applicationChain;
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    const application = await getSeekerApplicationRichById(
+      "token",
+      "clerk-user-1",
+      "application-1",
+    );
+
+    expect(application?.listing?.benefits.pay).toEqual({
+      provision: "not_stated",
     });
   });
 

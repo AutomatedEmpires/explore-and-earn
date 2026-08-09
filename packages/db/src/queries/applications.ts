@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
+  ApplicationStatus,
   BenefitProvision,
   BenefitTriad,
   BenefitEvidenceStatus,
@@ -854,8 +855,14 @@ export function seekerApplicationListingBenefits(
     evidence?.housing === "stated" || evidence?.housing === "confirmed";
   const mealsStated =
     evidence?.meals === "stated" || evidence?.meals === "confirmed";
-  const payStated =
+  const payHasEvidence =
     evidence?.pay === "stated" || evidence?.pay === "confirmed";
+  const payHasValue =
+    (typeof row.compensation_summary === "string" &&
+      row.compensation_summary.trim().length > 0) ||
+    typeof row.compensation_min_cents === "number" ||
+    typeof row.compensation_max_cents === "number";
+  const payStated = payHasEvidence && payHasValue;
 
   const housingProvision: BenefitProvision = housingStated
     ? row.housing_included === true
@@ -964,17 +971,23 @@ function rowToSeekerApplicationListing(
 export async function getApplicationsForSeekerWithListings(
   clerkToken: string,
   clerkUserId: string,
+  statuses?: readonly ApplicationStatus[],
 ): Promise<SeekerApplicationWithListing[]> {
+  if (statuses?.length === 0) return [];
+
   const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
   if (!seekerProfileId) return [];
 
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+  const applicationQuery = untyped
+    .from("applications")
+    .select(SEEKER_APPLICATION_SELECT)
+    .eq("seeker_profile_id", seekerProfileId);
+  const filteredApplicationQuery = statuses
+    ? applicationQuery.in("status", [...statuses])
+    : applicationQuery;
   const [{ data, error }, boostedListingIds, matchScores] = await Promise.all([
-    untyped
-      .from("applications")
-      .select(SEEKER_APPLICATION_SELECT)
-      .eq("seeker_profile_id", seekerProfileId)
-      .order("submitted_at", { ascending: false }),
+    filteredApplicationQuery.order("submitted_at", { ascending: false }),
     getActiveBoostedListingIds(clerkToken),
     getMatchScoresForSeeker(clerkToken, clerkUserId),
   ]);

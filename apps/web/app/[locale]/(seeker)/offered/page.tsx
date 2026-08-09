@@ -95,7 +95,9 @@ export default async function OfferedPage() {
       );
     }
 
-    offers = await getApplicationsForSeekerWithListings(token, userId);
+    offers = await getApplicationsForSeekerWithListings(token, userId, [
+      "offered",
+    ]);
   }
 
   const items = offers.flatMap((offer) =>
