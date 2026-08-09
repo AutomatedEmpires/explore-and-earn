@@ -103,13 +103,18 @@ test.describe("host listing form on phones", () => {
     page,
   }) => {
     const serverActionPosts: string[] = [];
-    page.on("request", (request) => {
+    await page.route("**/*", async (route) => {
+      const request = route.request();
       if (
         request.method() === "POST" &&
         request.headers()["next-action"]
       ) {
         serverActionPosts.push(request.url());
+        await route.abort();
+        return;
       }
+
+      await route.continue();
     });
 
     for (const viewport of PHONE_VIEWPORTS) {

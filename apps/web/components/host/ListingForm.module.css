@@ -372,7 +372,10 @@
 /* ─── Lane picker (multi-select) ─────────────────────────────────────────── */
 .laneGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, calc(var(--space-80) + var(--space-64))), 1fr)
+  );
   gap: var(--space-8);
 }
 
