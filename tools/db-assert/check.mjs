@@ -276,6 +276,55 @@ if (!housingMigration) {
   }
 }
 
+// Listing cover/gallery ownership must be enforced on every authenticated
+// listing write, not only in the application query layer. Converted sourced
+// media is the single compatibility exception and remains exempt only while
+// byte-identical; claim revocation restores the private source snapshot.
+const listingMediaMigration = migrationFiles.find((f) => /^092_.*\.sql$/.test(f))
+if (!listingMediaMigration) {
+  hasFailure = true
+  console.error("G-LISTING-MEDIA-OWNERSHIP: expected migration 092 to be present.")
+} else {
+  const sql = stripSqlComments(fileContents.get(listingMediaMigration))
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+  const required = [
+    "create or replace function private.preserve_listing_media_truth()",
+    "security definer",
+    "'cover_photo_url', old.cover_photo_url",
+    "'gallery_photo_urls'",
+    "candidate.status = 'confirming'",
+    "lc.status = 'revoked'",
+    "create trigger trg_listings_claim_media_ownership",
+    "create or replace function private.enforce_listing_media_ownership()",
+    "security invoker",
+    "current_setting('request.headers', true)",
+    "mamosbzcbigcclafhmmr.supabase.co",
+    "new.cover_photo_url is distinct from old.cover_photo_url",
+    "new.gallery_photo_urls is distinct from old.gallery_photo_urls",
+    "from storage.objects o",
+    "o.bucket_id = 'listing-media'",
+    "listing_media_reference_not_owned",
+    "create trigger trg_listings_media_ownership before insert or update on public.listings",
+    "revoke execute on function private.preserve_listing_media_truth() from public, anon, authenticated, service_role;",
+    "revoke execute on function private.enforce_listing_media_ownership() from public, anon, authenticated, service_role;",
+  ]
+  for (const needle of required) {
+    if (!sql.includes(needle)) {
+      hasFailure = true
+      console.error(
+        `G-LISTING-MEDIA-OWNERSHIP: ${listingMediaMigration} is missing ${needle}`,
+      )
+    }
+  }
+  if (/before\s+insert\s+or\s+update\s+of\b/.test(sql)) {
+    hasFailure = true
+    console.error(
+      `G-LISTING-MEDIA-OWNERSHIP: ${listingMediaMigration} scopes the authority trigger to selected columns.`,
+    )
+  }
+}
+
 // An RLS policy on table A that sub-selects table B is permission-checked
 // against the INVOKING role, column bitmap included -- unlike a policy on its
 // own table, which is evaluated as the table owner. Migration 081 moved every
