@@ -572,25 +572,25 @@ const DEMO_HOUSING_PHOTOS = [
   {
     id: "demo_photo_housing_sleeping",
     slot: "sleeping_area",
-    photoSlug: "lodge-01",
+    photoSlug: "housing-sleeping-01",
     presentation: "illustrative_demo_scene",
   },
   {
     id: "demo_photo_housing_bathroom",
     slot: "bathroom",
-    photoSlug: "lodge-02",
+    photoSlug: "housing-bathroom-01",
     presentation: "illustrative_demo_scene",
   },
   {
     id: "demo_photo_housing_kitchen",
     slot: "kitchen",
-    photoSlug: "kitchen-01",
+    photoSlug: "housing-kitchen-01",
     presentation: "illustrative_demo_scene",
   },
   {
     id: "demo_photo_housing_common",
     slot: "dining_common",
-    photoSlug: "crew-01",
+    photoSlug: "housing-common-01",
     presentation: "illustrative_demo_scene",
   },
 ] as const satisfies readonly (DemoPhoto & { readonly slot: HousingPhotoRole })[];
@@ -605,13 +605,13 @@ const DEMO_MEALS_PHOTOS = [
   {
     id: "demo_photo_meals_prepared",
     slot: "prepared",
-    photoSlug: "kitchen-02",
+    photoSlug: "meal-prepared-01",
     presentation: "illustrative_demo_scene",
   },
   {
     id: "demo_photo_meals_dining",
     slot: "dining",
-    photoSlug: "crew-02",
+    photoSlug: "meal-dining-01",
     presentation: "illustrative_demo_scene",
   },
   {

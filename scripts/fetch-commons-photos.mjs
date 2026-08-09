@@ -111,11 +111,15 @@ const SHOT_LIST = [
   {
     category: "lodge",
     prefix: "lodge",
-    label: "Lake cabins & lodge exteriors",
+    label: "Lake cabins, staff housing & lodge interiors",
     queries: [
       "log cabin lake shore",
       "mountain lodge exterior",
       "rustic cabin forest exterior",
+      "bunkhouse bedroom interior",
+      "hostel bathroom interior",
+      "hostel shared kitchen",
+      "hostel common room",
     ],
   },
   {
@@ -147,7 +151,7 @@ const SHOT_LIST = [
   {
     category: "kitchen",
     prefix: "kitchen",
-    label: "Commercial kitchen & food service",
+    label: "Commercial kitchens, prepared meals & dining",
     // Commons' "Kitchen Scene" hits are dominated by 17th-century Dutch
     // paintings and museum prints, so the art media types are excluded
     // explicitly — this set wants working rooms, not genre painting.
@@ -157,6 +161,8 @@ const SHOT_LIST = [
       "hotel kitchen equipment -painting -print",
       "canteen cafeteria kitchen -painting -print",
       "catering kitchen preparation -painting -print",
+      "cafeteria prepared meal tray -painting -print",
+      "hostel dining room -painting -print",
     ],
   },
   {
@@ -244,7 +250,9 @@ function evaluateLicence(meta, descriptionUrl) {
   // citation target rather than inventing a deed link.
   const fromApi = String(meta.LicenseUrl?.value ?? "").trim();
   const licenseUrl =
-    fromApi || (code === "cc0" ? CC_URLS.cc0 : "") || descriptionUrl;
+    fromApi.replace(/^http:\/\//i, "https://") ||
+    (code === "cc0" ? CC_URLS.cc0 : "") ||
+    descriptionUrl;
 
   return {
     ok: true,
@@ -450,6 +458,51 @@ async function discover(onlyCategory, perCategory) {
  * To add: run --discover, review the shortlist AND the image, append here.
  */
 const SELECTION = [
+  // ── Staff housing interiors ───────────────────────────────────────────────
+  // Category-accurate sample imagery for the four housing evidence slots.
+  // Every room is empty, and none is presented as the fictional host's actual
+  // property. These replace unrelated lodge exteriors and trail-work scenes.
+  {
+    slug: "housing-sleeping-01",
+    category: "lodge",
+    title: "File:The Bunkhouse can sleep 12 people. There are 4 twin beds and 4 full beds. (d7f5ee72-7824-4d7b-b580-403775f6a98c).jpg",
+    alt: "A rustic bunkhouse sleeping room with log-framed bunk beds arranged around an open center aisle.",
+  },
+  {
+    slug: "housing-bathroom-01",
+    category: "lodge",
+    title: "File:Room with bathroom at Kabalulumana Hostel, Mount Isa, 2023, 05.jpg",
+    alt: "A simple hostel bathroom with a sink, wall mirror, toilet, tiled shower floor, and white shower curtain.",
+  },
+  {
+    slug: "housing-kitchen-01",
+    category: "lodge",
+    title: "File:Hostel Warszawa w Warszawie.jpg",
+    alt: "A shared hostel kitchen with a refrigerator, dining table, sink, microwave, and open shelving against a brick-patterned wall.",
+  },
+  {
+    slug: "housing-common-01",
+    category: "lodge",
+    title: "File:Hostel Room Common Area.jpg",
+    alt: "A bright hostel common area with black sofas and armchairs arranged around a glass coffee table near a large window.",
+  },
+
+  // ── Staff meal setup ─────────────────────────────────────────────────────
+  // Kitchen and cooking-line imagery already ship from Unsplash; these two
+  // Commons photographs fill the prepared-meal and dining-area evidence slots.
+  {
+    slug: "meal-prepared-01",
+    category: "kitchen",
+    title: "File:Value lunch A and Salad at Hino University cafeteria, -28 (30155026383).jpg",
+    alt: "A cafeteria lunch tray with rice, fried chicken, a breaded cutlet, shredded cabbage, salad, soup, and tea.",
+  },
+  {
+    slug: "meal-dining-01",
+    category: "kitchen",
+    title: "File:Youth hostel Wiltz Luxembourg 03.jpg",
+    alt: "An empty youth-hostel dining room set with long white tables, place settings, and rows of black chairs beneath a vaulted ceiling.",
+  },
+
   // ── Outdoor crews & trail work ────────────────────────────────────────────
   // Unsplash (the primary source) is thin on genuine seasonal trail-work
   // imagery, so this category is filled from Commons. These are US National

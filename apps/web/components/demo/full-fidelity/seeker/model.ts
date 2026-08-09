@@ -1,4 +1,9 @@
 import {
+  housingPhotoLabel,
+  type HousingPhotoRole,
+} from "@explore-and-earn/contracts";
+
+import {
   DEMO_APPLICATIONS,
   DEMO_ANNOUNCEMENTS,
   DEMO_CONVERSATIONS,
@@ -13,6 +18,7 @@ import {
   DEMO_TEAM,
   DEMO_WEATHER,
   type DemoConversation,
+  type DemoMealsPhotoSlot,
   type DemoNotification,
   type DemoPhoto,
   type DemoRole,
@@ -102,6 +108,24 @@ export interface SeekerDemoPhotoCategories {
   readonly location: string;
 }
 
+export interface SeekerDemoBenefitPhoto<
+  Slot extends HousingPhotoRole | DemoMealsPhotoSlot,
+> {
+  readonly id: string;
+  readonly slot: Slot;
+  readonly label: string;
+  readonly imageUrl: string;
+  readonly imageAlt: string;
+  readonly imageWidth: number;
+  readonly imageHeight: number;
+  readonly presentation: DemoPhoto["presentation"];
+}
+
+export interface SeekerDemoBenefitPhotos {
+  readonly housing: readonly SeekerDemoBenefitPhoto<HousingPhotoRole>[];
+  readonly meals: readonly SeekerDemoBenefitPhoto<DemoMealsPhotoSlot>[];
+}
+
 export interface SeekerDemoHousingDetails {
   readonly provision: SeekerDemoListing["housingProvision"];
   readonly summary: string;
@@ -162,6 +186,7 @@ export interface SeekerDemoListing {
   readonly openPositions: number;
   readonly photos: readonly string[];
   readonly photoCategories: SeekerDemoPhotoCategories;
+  readonly benefitPhotos: SeekerDemoBenefitPhotos;
   readonly housingDetails: SeekerDemoHousingDetails;
   readonly mealsDetails: SeekerDemoMealsDetails;
   readonly payDetails: SeekerDemoPayDetails;
@@ -232,6 +257,31 @@ export interface SeekerDemoAnnouncement {
 
 function photoPath(photo: DemoPhoto): string {
   return getSitePhoto(photo.photoSlug).sizes.card.src;
+}
+
+const MEALS_PHOTO_LABELS = {
+  kitchen: "Kitchen",
+  prepared: "Prepared Meal",
+  dining: "Dining Area",
+  misc: "Misc",
+} as const satisfies Readonly<Record<DemoMealsPhotoSlot, string>>;
+
+function benefitPhoto<Slot extends HousingPhotoRole | DemoMealsPhotoSlot>(
+  photo: DemoPhoto & { readonly slot: Slot },
+  label: string,
+): SeekerDemoBenefitPhoto<Slot> {
+  const source = getSitePhoto(photo.photoSlug);
+  const rendition = source.sizes.card;
+  return {
+    id: photo.id,
+    slot: photo.slot,
+    label,
+    imageUrl: rendition.src,
+    imageAlt: `${source.alt} Illustrative demo example for the ${label} category — not host-supplied evidence.`,
+    imageWidth: rendition.width,
+    imageHeight: rendition.height,
+    presentation: photo.presentation,
+  };
 }
 
 function normalizeLocation(location: (typeof DEMO_LOCATIONS)[number] | undefined): SeekerDemoLocation {
@@ -353,6 +403,14 @@ export const seekerDemoListings: readonly SeekerDemoListing[] = DEMO_ROLES
   .filter((role) => role.status === "live")
   .map((role) => {
     const photoCategories = rolePhotoCategories(role);
+    const benefitPhotos: SeekerDemoBenefitPhotos = {
+      housing: DEMO_ORGANIZATION.housingLibrary.map((photo) =>
+        benefitPhoto(photo, housingPhotoLabel(photo.slot, role.category)),
+      ),
+      meals: role.meals.photos.map((photo) =>
+        benefitPhoto(photo, MEALS_PHOTO_LABELS[photo.slot]),
+      ),
+    };
     const location = DEMO_LOCATIONS.find((entry) => entry.id === role.locationId);
     return {
     id: role.id,
@@ -381,6 +439,7 @@ export const seekerDemoListings: readonly SeekerDemoListing[] = DEMO_ROLES
     openPositions: role.openPositions,
     photos: [photoCategories.workplace, photoCategories.housing, photoCategories.meals, photoCategories.location],
     photoCategories,
+    benefitPhotos,
     housingDetails: { ...role.housing },
     mealsDetails: { ...role.meals },
     payDetails: { ...role.pay },

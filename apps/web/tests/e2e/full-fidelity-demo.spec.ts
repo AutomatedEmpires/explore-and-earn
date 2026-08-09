@@ -624,45 +624,119 @@ test.describe("full-fidelity mobile decisions and accessibility", () => {
   test("benefit dialog traps focus, closes on Escape, and landmarks remain intact", async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 768, height: 1024 });
-    await page.goto(`${SEEKER_ROOT}/listing/${seekerListing.id}`);
+    await page.setViewportSize({ width: 320, height: 844 });
+    await useEssentialOnlyConsent(page);
 
-    await expect(page.getByRole("main")).toBeVisible();
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await expect(
-      page.getByRole("navigation", { name: "Breadcrumb" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("note", { name: "Sample seeker account notice" }),
-    ).toBeVisible();
+    for (const benefit of [
+      {
+        title: "Housing",
+        labels: ["Sleeping area", "Bathroom", "Kitchen", "Dining/common area"],
+      },
+      {
+        title: "Meals",
+        labels: ["Kitchen", "Prepared Meal", "Dining Area", "Misc"],
+      },
+    ] as const) {
+      await page.goto(`${SEEKER_ROOT}/listing/${seekerListing.id}`);
 
-    const housingTrigger = page
-      .getByRole("button", { name: /^Housing\b/ })
-      .first();
-    await housingTrigger.click();
-    const dialog = page.getByRole("dialog", { name: "Housing" });
-    const close = dialog.getByRole("button", { name: "Close details" });
-    const completeListing = dialog.getByRole("link", {
-      name: /Review the complete listing/,
-    });
-    await expect(dialog).toBeVisible();
-    await expect(dialog).toHaveAttribute("aria-modal", "true");
-    await expect(dialog).toHaveAttribute(
-      "aria-labelledby",
-      "benefit-dialog-title",
-    );
-    await expect(dialog).toHaveAttribute(
-      "aria-describedby",
-      "benefit-dialog-description",
-    );
-    await expect(close).toBeFocused();
-    await page.keyboard.press("Shift+Tab");
-    await expect(completeListing).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(close).toBeFocused();
-    await page.keyboard.press("Escape");
-    await expect(dialog).toHaveCount(0);
-    await expect(housingTrigger).toBeFocused();
+      await expect(page.getByRole("main")).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(
+        page.getByRole("navigation", { name: "Breadcrumb" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("note", { name: "Sample seeker account notice" }),
+      ).toBeVisible();
+
+      const trigger = page
+        .getByRole("button", { name: new RegExp(`^${benefit.title}\\b`) })
+        .first();
+      await trigger.click();
+      const dialog = page.getByRole("dialog", {
+        name: benefit.title,
+        exact: true,
+      });
+      const close = dialog.getByRole("button", { name: "Close details" });
+      const completeListing = dialog.getByRole("link", {
+        name: /Review the complete listing/,
+      });
+      const gallery = dialog.getByRole("list", {
+        name: `${benefit.title} illustrative photo categories`,
+        exact: true,
+      });
+      const galleryItems = gallery.getByRole("listitem");
+      const galleryImages = gallery.getByRole("img");
+      const description = dialog.locator("#benefit-dialog-description");
+
+      await expect(dialog).toBeVisible();
+      await expect(dialog).toHaveAttribute("aria-modal", "true");
+      await expect(dialog).toHaveAttribute(
+        "aria-labelledby",
+        "benefit-dialog-title",
+      );
+      await expect(dialog).toHaveAttribute(
+        "aria-describedby",
+        "benefit-dialog-description",
+      );
+      await expect(close).toBeFocused();
+      await expect(description).toContainText(/illustrative/i);
+      await expect(description).toContainText(/not host-supplied evidence/i);
+      await expect(gallery).toBeVisible();
+      await expect(galleryItems).toHaveCount(4);
+      await expect(galleryImages).toHaveCount(4);
+      await expect(galleryItems).toHaveText([...benefit.labels]);
+
+      const imageAlts = await galleryImages.evaluateAll((images) =>
+        images.map((image) => image.getAttribute("alt") ?? ""),
+      );
+      expect(imageAlts).toHaveLength(4);
+      for (const alt of imageAlts) {
+        expect(alt).toMatch(/illustrative demo example/i);
+        expect(alt).toMatch(/not host-supplied evidence/i);
+      }
+
+      const lastCategory = galleryItems.last();
+      await lastCategory.scrollIntoViewIfNeeded();
+      await expect(lastCategory).toBeInViewport();
+      const [dialogBox, lastCategoryBox] = await Promise.all([
+        dialog.boundingBox(),
+        lastCategory.boundingBox(),
+      ]);
+      expect(dialogBox, `${benefit.title} dialog is missing`).not.toBeNull();
+      expect(
+        lastCategoryBox,
+        `${benefit.title} last category is missing`,
+      ).not.toBeNull();
+      expect(
+        lastCategoryBox?.y ?? -2,
+        `${benefit.title} last category scrolls above the dialog`,
+      ).toBeGreaterThanOrEqual((dialogBox?.y ?? 0) - 1);
+      expect(
+        (lastCategoryBox?.y ?? 0) + (lastCategoryBox?.height ?? 0),
+        `${benefit.title} last category stays below the dialog viewport`,
+      ).toBeLessThanOrEqual(
+        (dialogBox?.y ?? 0) + (dialogBox?.height ?? 0) + 1,
+      );
+
+      const dialogWidth = await dialog.evaluate((element) => ({
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+      }));
+      expect(
+        dialogWidth.scrollWidth,
+        `${benefit.title} dialog overflows horizontally at 320px`,
+      ).toBeLessThanOrEqual(dialogWidth.clientWidth + 1);
+      await expectNoHorizontalOverflow(page, `${benefit.title} benefit dialog at 320px`);
+
+      await expect(close).toBeFocused();
+      await page.keyboard.press("Shift+Tab");
+      await expect(completeListing).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(close).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(dialog).toHaveCount(0);
+      await expect(trigger).toBeFocused();
+    }
 
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.goto(`${SEEKER_ROOT}/seek`);
