@@ -22,6 +22,8 @@ export interface NotificationItem {
 	readonly detail: string;
 	readonly timeAgo: string;
 	readonly unread: boolean;
+	/** Normalized same-origin destination; null keeps the notification inert. */
+	readonly actionHref: string | null;
 }
 
 export const NOTIFICATIONS: readonly NotificationItem[] = [
@@ -33,6 +35,7 @@ export const NOTIFICATIONS: readonly NotificationItem[] = [
 		detail: "Cascade Bloom Orchards sent you an offer.",
 		timeAgo: "1h",
 		unread: true,
+		actionHref: null,
 	},
 	{
 		id: "ntf_invite_expiring",
@@ -42,6 +45,7 @@ export const NOTIFICATIONS: readonly NotificationItem[] = [
 		detail: "Your invite from North Pacific Fisheries expires soon.",
 		timeAgo: "3h",
 		unread: true,
+		actionHref: null,
 	},
 	{
 		id: "ntf_match",
@@ -51,6 +55,7 @@ export const NOTIFICATIONS: readonly NotificationItem[] = [
 		detail: "Remote Community Manager looks like a strong fit.",
 		timeAgo: "5h",
 		unread: true,
+		actionHref: null,
 	},
 	{
 		id: "ntf_status",
@@ -60,6 +65,7 @@ export const NOTIFICATIONS: readonly NotificationItem[] = [
 		detail: "Orchard Harvest Hand moved to Reviewing.",
 		timeAgo: "1d",
 		unread: true,
+		actionHref: null,
 	},
 	{
 		id: "ntf_saved",
@@ -69,6 +75,7 @@ export const NOTIFICATIONS: readonly NotificationItem[] = [
 		detail: "Eco-Hostel Allrounder is closing soon.",
 		timeAgo: "2d",
 		unread: false,
+		actionHref: null,
 	},
 	{
 		id: "ntf_community",
@@ -78,6 +85,7 @@ export const NOTIFICATIONS: readonly NotificationItem[] = [
 		detail: "Your trail photo received 5 reactions.",
 		timeAgo: "3d",
 		unread: false,
+		actionHref: null,
 	},
 ];
 

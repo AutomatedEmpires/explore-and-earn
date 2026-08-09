@@ -5,6 +5,9 @@ import { createTranslator } from "next-intl"
 import type { NotificationIntent } from "@explore-and-earn/contracts"
 
 import { routing } from "../../i18n/routing"
+import { normalizeNotificationActionUrl } from "../../lib/notifications/actionUrl"
+
+export { isSafeDestinationPath } from "../../lib/notifications/actionUrl"
 
 // Locale-aware rendering for notifications delivered OUTSIDE a request
 // (dispatcher/cron context, where useTranslations/getTranslations don't
@@ -111,28 +114,15 @@ export async function renderMessage(
 }
 
 /**
- * True only for safe same-app destinations: rooted, not protocol-relative,
- * no CR/LF splitting, no scheme smuggling. Everything a notification links to
- * must pass this — external URLs are rejected wholesale (no open redirects).
- */
-export function isSafeDestinationPath(path: string): boolean {
-	if (typeof path !== "string" || path.length === 0 || path.length > 2048) return false
-	if (!path.startsWith("/")) return false
-	if (path.startsWith("//")) return false
-	if (/[\r\n\\]/.test(path)) return false
-	if (path.includes("://")) return false
-	return true
-}
-
-/**
  * Localize an app-relative destination for links rendered outside the app
  * router (emails, push payloads). Mirrors routing localePrefix "as-needed":
  * the default locale is unprefixed; other catalog locales get "/<locale>".
  * Unsafe paths collapse to "/" rather than ever emitting an open redirect.
  */
 export function localizedPath(locale: string, path: string): string {
-	if (!isSafeDestinationPath(path)) return "/"
-	if (locale === routing.defaultLocale) return path
-	if (!(routing.locales as readonly string[]).includes(locale)) return path
-	return `/${locale}${path === "/" ? "" : path}`
+	const normalized = normalizeNotificationActionUrl(path)
+	if (normalized === null) return "/"
+	if (locale === routing.defaultLocale) return normalized
+	if (!(routing.locales as readonly string[]).includes(locale)) return normalized
+	return `/${locale}${normalized === "/" ? "" : normalized}`
 }

@@ -9,6 +9,9 @@ import {
   HostSectionHeading,
 } from "../../../../../components/host";
 import { NotificationList } from "../../../../../components/seeker";
+import { isDevBenchEnabled } from "../../../../../lib/devBench";
+import { devHostNotifications } from "../../../../../lib/devBench/notificationFixtures";
+import { readDevRole } from "../../../../../lib/devBench/server";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -19,12 +22,23 @@ const PAGE_DESCRIPTION =
   "Applications, interviews, offers, verification, billing, and account updates that need your attention.";
 
 export default async function HostNotificationsPage() {
-  const { userId, getToken } = await auth();
-  const token = userId ? await getToken() : null;
-  const notifications =
-    userId && token
-      ? await getNotifications(token, userId).catch(() => [] as Notification[])
-      : [];
+  let notifications: readonly Notification[];
+  let isSignedIn = false;
+  let isDevFixture = false;
+
+  // Local walkthrough only: short-circuit before Clerk or Supabase.
+  if (isDevBenchEnabled() && (await readDevRole()) === "host") {
+    notifications = devHostNotifications();
+    isSignedIn = true;
+    isDevFixture = true;
+  } else {
+    const { userId, getToken } = await auth();
+    const token = userId ? await getToken() : null;
+    isSignedIn = Boolean(userId && token);
+    // Production faults must reach the route error boundary, never impersonate
+    // an honest empty inbox.
+    notifications = userId && token ? await getNotifications(token, userId) : [];
+  }
   const items = notifications.map((notification) =>
     toNotificationItem(notification),
   );
@@ -36,7 +50,7 @@ export default async function HostNotificationsPage() {
         title="Notifications"
         description={PAGE_DESCRIPTION}
       />
-      {hasUnread ? (
+      {hasUnread && !isDevFixture ? (
         <form
           className={styles.toolbar}
           action={async () => {
@@ -51,9 +65,9 @@ export default async function HostNotificationsPage() {
       ) : null}
       <NotificationList
         items={items}
-        emptyTitle={userId ? "You're all caught up" : "Sign in to see notifications"}
+        emptyTitle={isSignedIn ? "You're all caught up" : "Sign in to see notifications"}
         emptyMessage={
-          userId
+          isSignedIn
             ? "New applicant, interview, offer, verification, and account updates will appear here."
             : "Host account updates will appear here after you sign in."
         }

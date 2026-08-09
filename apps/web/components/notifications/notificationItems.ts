@@ -1,6 +1,7 @@
 import type { Notification } from "@explore-and-earn/db";
 import type { IconKey } from "@explore-and-earn/ui";
 
+import { normalizeNotificationActionUrl } from "../../lib/notifications/actionUrl";
 import type {
   NotificationItem,
   NotificationKind,
@@ -63,5 +64,6 @@ export function toNotificationItem(
     detail: notification.body ?? "",
     timeAgo: formatNotificationTimeAgo(notification.createdAt, now),
     unread: notification.readAt === null,
+    actionHref: normalizeNotificationActionUrl(notification.actionUrl),
   };
 }
