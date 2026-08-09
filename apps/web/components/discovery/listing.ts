@@ -198,6 +198,46 @@ export function toDiscoveryCardData(listing: DiscoveryListing): DiscoveryCardDat
   };
 }
 
+const APPLICATION_CARD_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+};
+
+/**
+ * Lift an application-joined listing into the canonical discovery view-model.
+ *
+ * Application rows carry the same listing truth under DB-oriented field names
+ * (`beginsAt`, `endsAt`, nullable cover). Lifecycle surfaces need the canonical
+ * shape so they can keep using ListingCard and its shared Quick Peek, benefit,
+ * pay, host and report interactions instead of maintaining a second card path.
+ */
+export function seekerApplicationListingToDiscoveryListing(
+  listing: SeekerApplicationListing,
+): DiscoveryListing {
+  return {
+    id: listing.id,
+    title: listing.title,
+    category: listing.category,
+    location: listing.location,
+    opportunityWindow: listing.opportunityWindow,
+    status: listing.status,
+    host: listing.host,
+    benefits: listing.benefits,
+    begins: listing.beginsAt
+      ? formatDate(listing.beginsAt, APPLICATION_CARD_DATE_OPTIONS)
+      : undefined,
+    ends: listing.endsAt
+      ? formatDate(listing.endsAt, APPLICATION_CARD_DATE_OPTIONS)
+      : undefined,
+    coverImageUrl: listing.coverImageUrl ?? undefined,
+    provenanceInfo: listing.provenanceInfo,
+    conditionalBadges: listing.conditionalBadges,
+    matchScore: listing.matchScore,
+  };
+}
+
 /**
  * Maps a DB-fetched `SeekerApplicationListing` (returned by
  * `getApplicationsForSeekerWithListings`) to `DiscoveryCardData`.
@@ -210,60 +250,7 @@ export function toDiscoveryCardData(listing: DiscoveryListing): DiscoveryCardDat
 export function seekerApplicationListingToCardData(
   listing: SeekerApplicationListing,
 ): DiscoveryCardData {
-  const dateOptions: Intl.DateTimeFormatOptions = {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  };
-  const housingText = listing.benefits.housing.provision === "provided"
-    ? "Included"
-    : listing.benefits.housing.provision === "partial"
-    ? "Partial"
-    : "Not included";
-  const mealsText = listing.benefits.meals.provision === "provided"
-    ? "Included"
-    : listing.benefits.meals.provision === "partial"
-    ? "Partial"
-    : "Not included";
-  const payText = listing.benefits.pay.summary ?? (
-    listing.benefits.pay.provision === "provided"
-      ? "Included"
-      : listing.benefits.pay.provision === "partial"
-      ? "Partial"
-      : "Not included"
+  return toDiscoveryCardData(
+    seekerApplicationListingToDiscoveryListing(listing),
   );
-
-  return {
-    id: listing.id,
-    title: listing.title,
-    hostName: listing.host.name,
-    category: listing.category,
-    location: listing.location,
-    opportunityWindow: listing.opportunityWindow,
-    begins: listing.beginsAt
-      ? formatDate(listing.beginsAt, dateOptions)
-      : undefined,
-    ends: listing.endsAt
-      ? formatDate(listing.endsAt, dateOptions)
-      : undefined,
-    seasonLength:
-      formatSeasonLength(listing.beginsAt, listing.endsAt) ?? undefined,
-    coverImageUrl: listing.coverImageUrl ?? undefined,
-    triad: { housing: housingText, meals: mealsText, pay: payText },
-    benefitProvision: {
-      housing: listing.benefits.housing.provision,
-      meals: listing.benefits.meals.provision,
-      pay: listing.benefits.pay.provision,
-    },
-    housingOccupancy: inferHousingOccupancy(listing.benefits.housing.summary),
-    verifiedHost: listing.host.verified,
-    // Boosted marker must travel even off the discovery feed (founder decision):
-    // lifecycle-bucket pages map through here, so carry the badge the DB stamped
-    // on SeekerApplicationListing instead of dropping it.
-    conditionalBadges: listing.conditionalBadges,
-    // Preserve the stored per-seeker score. Lifecycle cards must never silently
-    // fall back to "Not scored" when the canonical query returned a match.
-    matchScore: listing.matchScore,
-  };
 }

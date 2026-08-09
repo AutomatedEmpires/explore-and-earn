@@ -2,23 +2,92 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-12);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .buttons {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-8);
+  width: 100%;
+  min-width: 0;
 }
 
 /* Equal-weight, ≥44px targets; full-width stack on the smallest phones. */
 .buttons > * {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: var(--tap-min);
 }
 
-@media (max-width: 380px) {
-  .buttons { flex-direction: column; }
-  .buttons > * { width: 100%; }
+.detailsLink {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-8) var(--space-16);
+  border: 1px solid var(--border-ink);
+  border-radius: var(--radius-button);
+  background: var(--color-surface-raised);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--type-button-lh);
+  text-align: center;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.detailsLink:hover {
+  background: var(--color-surface);
+}
+
+.detailsLink:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.modalText {
+  margin: 0;
+  max-width: 52ch;
+  font-family: var(--font-ui);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.modalButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  width: 100%;
+  min-width: 0;
+  margin-top: var(--space-20);
+}
+
+.modalButtons > * {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: var(--tap-min);
+}
+
+@media (max-width: 420px) {
+  .buttons,
+  .modalButtons {
+    flex-direction: column;
+  }
+
+  .buttons > *,
+  .modalButtons > * {
+    width: 100%;
+  }
 }
 
 .expiry {

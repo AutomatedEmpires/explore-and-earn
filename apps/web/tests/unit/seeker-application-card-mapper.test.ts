@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import type { SeekerApplicationListing } from "@explore-and-earn/db";
 
-import { seekerApplicationListingToCardData } from "../../components/discovery/listing";
+import {
+  seekerApplicationListingToCardData,
+  seekerApplicationListingToDiscoveryListing,
+  toDiscoveryCardData,
+} from "../../components/discovery/listing";
 
 function applicationListing(
   overrides: Partial<SeekerApplicationListing> = {},
@@ -23,12 +27,90 @@ function applicationListing(
     coverImageUrl: null,
     beginsAt: "2026-11-14T17:00:00.000Z",
     endsAt: "2027-04-18T17:00:00.000Z",
+    conditionalBadges: ["boosted"],
     matchScore: 88,
     ...overrides,
   };
 }
 
 describe("seeker application lifecycle card mapping", () => {
+  it("preserves the canonical listing truth used by interactive lifecycle cards", () => {
+    const source = applicationListing({
+      coverImageUrl: "https://example.com/ski-resort.jpg",
+      provenanceInfo: {
+        provenance: "verified",
+        claimStatus: "converted",
+        benefitEvidence: {
+          housing: "not_stated",
+          meals: "not_stated",
+          pay: "not_stated",
+        },
+      },
+    });
+    const listing = seekerApplicationListingToDiscoveryListing(source);
+    const card = toDiscoveryCardData(listing);
+
+    expect(listing).toMatchObject({
+      id: source.id,
+      begins: "Nov 14, 2026",
+      ends: "Apr 18, 2027",
+      coverImageUrl: "https://example.com/ski-resort.jpg",
+      host: source.host,
+      benefits: source.benefits,
+      provenanceInfo: source.provenanceInfo,
+      conditionalBadges: ["boosted"],
+      matchScore: 88,
+    });
+    expect(card.seasonLength).toBe("about 5 months");
+    expect(card.triad).toEqual({
+      housing: "Staff dorm room",
+      meals: "Staff cafeteria",
+      pay: "$19/hr + tips",
+    });
+    expect(card.provenance).toBe("verified");
+    expect(card.benefitEvidence).toEqual({
+      housing: "not_stated",
+      meals: "not_stated",
+      pay: "not_stated",
+    });
+  });
+
+  it("preserves sourced attribution and evidence without restoring verification", () => {
+    const source = applicationListing({
+      host: { name: "Riverbend Farms", verified: false },
+      provenanceInfo: {
+        provenance: "sourced",
+        claimStatus: "unclaimed",
+        source: {
+          sourceName: "Seasonal Work Directory",
+          sourceUrl: "https://jobs.example/riverbend",
+          sourcePostingId: "riverbend-1",
+          publishedAt: null,
+          retrievedAt: "2026-08-01T17:00:00.000Z",
+          employerName: "Riverbend Farms",
+        },
+        benefitEvidence: {
+          housing: "stated",
+          meals: "not_stated",
+          pay: "stated",
+        },
+      },
+    });
+
+    const listing = seekerApplicationListingToDiscoveryListing(source);
+    const card = toDiscoveryCardData(listing);
+
+    expect(listing.provenanceInfo).toEqual(source.provenanceInfo);
+    expect(listing.host).toEqual({ name: "Riverbend Farms", verified: false });
+    expect(card.verifiedHost).toBe(false);
+    expect(card.provenance).toBe("sourced");
+    expect(card.benefitEvidence).toEqual({
+      housing: "stated",
+      meals: "not_stated",
+      pay: "stated",
+    });
+  });
+
   it("preserves stored season dates, duration, and match truth", () => {
     const card = seekerApplicationListingToCardData(applicationListing());
 

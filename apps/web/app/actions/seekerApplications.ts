@@ -65,6 +65,7 @@ async function setOfferStatus(
 
     revalidatePath("/offered");
     revalidatePath("/accepted");
+    revalidatePath("/withdrawn");
     revalidatePath("/applied");
     revalidatePath(`/applied/${applicationId}`);
   }

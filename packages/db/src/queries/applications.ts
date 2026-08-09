@@ -4,7 +4,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   BenefitProvision,
   BenefitTriad,
+  BenefitEvidenceStatus,
   DiscoveryCardConditionalBadge,
+  ListingProvenanceInfo,
   ListingStatus,
   OpportunityCategory,
 } from "@explore-and-earn/contracts";
@@ -17,7 +19,10 @@ import {
 import { authedClient } from "../client";
 import { isSeekerResumeComplete } from "../lib/resumeCompleteness";
 import { getActiveBoostedListingIds } from "./idReaders";
-import { MEANINGFUL_MATCH_SCORE_THRESHOLD } from "./listings";
+import {
+  MEANINGFUL_MATCH_SCORE_THRESHOLD,
+  rowProvenanceInfo,
+} from "./listings";
 import { getMatchScoresForSeeker } from "./matchScores";
 import { getSeekerResume } from "./seekerResume";
 
@@ -770,6 +775,7 @@ export interface SeekerApplicationListing extends ApplicationListing {
   readonly coverImageUrl: string | null;
   readonly beginsAt: string | null;
   readonly endsAt: string | null;
+  readonly provenanceInfo?: ListingProvenanceInfo;
   /**
    * Conditional badges that must travel on the card even off the discovery
    * feed. Applications don't route through rowToDiscoveryFields, so the boosted
@@ -801,10 +807,86 @@ export type SeekerApplicationWithListing = SeekerApplication & {
 const SEEKER_APPLICATION_SELECT =
   "id, listing_id, status, cover_message, submitted_at, expires_at, reviewed_at, " +
   "listings!listing_id(id, title, category, location_display, status, " +
-  "housing_included, meals_included, compensation_summary, " +
+  "provenance, source_name, source_url, source_external_id, source_employer_name, " +
+  "source_published_at, source_last_seen_at, claim_summary, housing_evidence, " +
+  "meals_evidence, pay_evidence, " +
+  "housing_included, housing_description, meals_included, meals_description, " +
+  "compensation_summary, " +
   "compensation_min_cents, compensation_max_cents, compensation_unit, " +
   "compensation_currency, timeline_summary, cover_photo_url, begins_at, ends_at, " +
   "host_profiles(company_name, subscription_tier))";
+
+const weakestBenefitEvidence = (value: unknown): BenefitEvidenceStatus =>
+  value === "stated" || value === "confirmed" ? value : "not_stated";
+
+const nullableSourceText = (value: unknown): string | null =>
+  typeof value === "string" ? value : null;
+
+/** @internal Shared normalization before the canonical provenance mapper. */
+export function seekerApplicationListingProvenanceInfo(
+  row: Record<string, unknown>,
+): ListingProvenanceInfo | undefined {
+  return rowProvenanceInfo({
+    provenance: row.provenance === "sourced" ? "sourced" : "verified",
+    source_name: nullableSourceText(row.source_name),
+    source_url: nullableSourceText(row.source_url),
+    source_external_id: nullableSourceText(row.source_external_id),
+    source_employer_name: nullableSourceText(row.source_employer_name),
+    source_published_at: nullableSourceText(row.source_published_at),
+    source_last_seen_at: nullableSourceText(row.source_last_seen_at),
+    claim_summary:
+      typeof row.claim_summary === "string"
+        ? row.claim_summary
+        : "not_applicable",
+    housing_evidence: weakestBenefitEvidence(row.housing_evidence),
+    meals_evidence: weakestBenefitEvidence(row.meals_evidence),
+    pay_evidence: weakestBenefitEvidence(row.pay_evidence),
+  });
+}
+
+/** @internal Evidence-authoritative benefit mapping shared by list and detail. */
+export function seekerApplicationListingBenefits(
+  row: Record<string, unknown>,
+  provenanceInfo = seekerApplicationListingProvenanceInfo(row),
+): BenefitTriad {
+  const evidence = provenanceInfo?.benefitEvidence;
+  const housingStated =
+    evidence?.housing === "stated" || evidence?.housing === "confirmed";
+  const mealsStated =
+    evidence?.meals === "stated" || evidence?.meals === "confirmed";
+  const payStated =
+    evidence?.pay === "stated" || evidence?.pay === "confirmed";
+
+  const housingProvision: BenefitProvision = housingStated
+    ? row.housing_included === true
+      ? "provided"
+      : "not_provided"
+    : "not_stated";
+  const mealsProvision: BenefitProvision = mealsStated
+    ? row.meals_included === true
+      ? "provided"
+      : "not_provided"
+    : "not_stated";
+
+  return {
+    housing: {
+      provision: housingProvision,
+      ...(housingStated && typeof row.housing_description === "string"
+        ? { summary: row.housing_description }
+        : {}),
+    },
+    meals: {
+      provision: mealsProvision,
+      ...(mealsStated && typeof row.meals_description === "string"
+        ? { summary: row.meals_description }
+        : {}),
+    },
+    pay: {
+      provision: payStated ? "provided" : "not_stated",
+      ...(payStated ? { summary: embeddedCompensationSummary(row) } : {}),
+    },
+  };
+}
 
 function rowToSeekerApplicationListing(
   value: unknown,
@@ -814,28 +896,31 @@ function rowToSeekerApplicationListing(
   const row = firstOf(value);
   if (!row) return null;
 
+  const provenanceInfo = seekerApplicationListingProvenanceInfo(row);
+  const sourced = provenanceInfo?.provenance === "sourced";
   const hostRaw = firstOf(row.host_profiles);
-  const hostName =
-    hostRaw &&
-    typeof hostRaw.company_name === "string" &&
-    hostRaw.company_name.length > 0
+  const sourceEmployerName =
+    typeof row.source_employer_name === "string" &&
+    row.source_employer_name.trim().length > 0
+      ? row.source_employer_name.trim()
+      : null;
+  const sourceName =
+    typeof row.source_name === "string" && row.source_name.trim().length > 0
+      ? row.source_name.trim()
+      : null;
+  const hostName = sourced
+    ? (sourceEmployerName ?? sourceName ?? "Employer not stated")
+    : hostRaw &&
+        typeof hostRaw.company_name === "string" &&
+        hostRaw.company_name.length > 0
       ? hostRaw.company_name
       : "Unknown Host";
-  const verified = hostRaw ? hasVerifiedHostSubscription(hostRaw.subscription_tier) : false;
+  const verified =
+    !sourced && hostRaw
+      ? hasVerifiedHostSubscription(hostRaw.subscription_tier)
+      : false;
 
-  const housingProvision: BenefitProvision =
-    row.housing_included === true ? "provided" : "not_provided";
-  const mealsProvision: BenefitProvision =
-    row.meals_included === true ? "provided" : "not_provided";
-
-  const benefits: BenefitTriad = {
-    housing: { provision: housingProvision },
-    meals: { provision: mealsProvision },
-    pay: {
-      provision: "provided",
-      summary: embeddedCompensationSummary(row),
-    },
-  };
+  const benefits = seekerApplicationListingBenefits(row, provenanceInfo);
 
   return {
     id: String(row.id),
@@ -861,6 +946,7 @@ function rowToSeekerApplicationListing(
       typeof row.cover_photo_url === "string" ? row.cover_photo_url : null,
     beginsAt: typeof row.begins_at === "string" ? row.begins_at : null,
     endsAt: typeof row.ends_at === "string" ? row.ends_at : null,
+    provenanceInfo,
     conditionalBadges:
       boostedListingIds?.has(String(row.id)) ? (["boosted"] as const) : undefined,
     matchScore: (() => {
@@ -982,6 +1068,11 @@ export async function updateApplicationStatusBySeeker(
     return { ok: false, error: "invalid_status" };
   }
 
+  // Capture one instant for the advisory pre-check. The authoritative UPDATE
+  // evaluates PostgreSQL's `now` at write time so an offer that expires during
+  // the intervening profile, read, or capacity calls cannot be accepted.
+  const nowIso = new Date().toISOString();
+
   const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
   if (!seekerProfileId) {
     return { ok: false, error: "profile_not_found" };
@@ -990,7 +1081,7 @@ export async function updateApplicationStatusBySeeker(
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
   const { data: appRow, error: appError } = await untyped
     .from("applications")
-    .select("id, seeker_profile_id, status, listing_id")
+    .select("id, seeker_profile_id, status, listing_id, expires_at")
     .eq("id", applicationId)
     .maybeSingle();
 
@@ -1003,6 +1094,11 @@ export async function updateApplicationStatusBySeeker(
     return { ok: false, error: "forbidden" };
   }
   if (String(row.status) !== "offered") {
+    return { ok: false, error: "invalid_transition" };
+  }
+  const expiresAt =
+    typeof row.expires_at === "string" ? row.expires_at : null;
+  if (expiresAt !== null && Date.parse(expiresAt) <= Date.parse(nowIso)) {
     return { ok: false, error: "invalid_transition" };
   }
 
@@ -1034,6 +1130,8 @@ export async function updateApplicationStatusBySeeker(
     .update(patch)
     .eq("id", applicationId)
     .eq("seeker_profile_id", seekerProfileId)
+    .eq("status", "offered")
+    .or("expires_at.is.null,expires_at.gt.now")
     .select("id")
     .maybeSingle();
 
@@ -1048,8 +1146,8 @@ export async function updateApplicationStatusBySeeker(
     return { ok: false, error: msg || updateError.message };
   }
   // Affected-row assertion: an UPDATE that matched nothing (concurrent status
-  // change, or an RLS policy filtering the row) must surface as an error —
-  // never as a silent ok:true that leaves the UI lying about state.
+  // or expiry change, or an RLS policy filtering the row) must surface as an
+  // error — never as a silent ok:true that leaves the UI lying about state.
   if (!updated) {
     return { ok: false, error: "conflict" };
   }

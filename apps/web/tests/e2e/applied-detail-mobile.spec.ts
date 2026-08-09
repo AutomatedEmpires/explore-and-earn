@@ -166,7 +166,7 @@ test.describe("seeker application detail on phones", () => {
       const content = directSections.nth(1);
       const host = card.getByText(HOST_NAME, { exact: true });
       const back = page.getByRole("link", {
-        name: "Back to applications",
+        name: "Back to not selected",
         exact: true,
       });
       const listing = card.getByRole("link", {
@@ -193,9 +193,9 @@ test.describe("seeker application detail on phones", () => {
       await expect(host).toBeVisible();
       await expect(card.getByText("Not selected", { exact: true })).toBeVisible();
       await expect(directSections).toHaveCount(2);
-      await expect(back).toHaveAttribute("href", "/applied");
+      await expect(back).toHaveAttribute("href", "/not-selected");
       await expect(listing).toHaveAttribute("href", `/listing/${LISTING_ID}`);
-      await expectTouchTarget(back, "Back to applications");
+      await expectTouchTarget(back, "Back to not selected");
       await expectTouchTarget(listing, "View listing");
       await expect(timelineHeading).toBeVisible();
       await expect(timelineSteps).toHaveCount(3);
