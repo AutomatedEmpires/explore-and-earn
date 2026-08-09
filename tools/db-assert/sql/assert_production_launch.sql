@@ -14,6 +14,13 @@ select
     )
   ) as migration_091_applied,
   (
+    select exists (
+      select 1
+      from supabase_migrations.schema_migrations
+      where version = '092'
+    )
+  ) as migration_092_applied,
+  (
     select count(distinct p.proname) = 11
       from pg_proc p
       join pg_namespace n on n.oid = p.pronamespace
@@ -152,6 +159,51 @@ select
     )
   ) as application_submission_guards_present,
   (
+    select count(*) = 2
+       and bool_and('search_path=""' = any(coalesce(p.proconfig, '{}'::text[])))
+       and bool_and(
+         case p.proname
+           when 'preserve_listing_media_truth' then p.prosecdef
+           when 'enforce_listing_media_ownership' then not p.prosecdef
+           else false
+         end
+       )
+       and bool_and(not has_function_privilege('anon', p.oid, 'EXECUTE'))
+       and bool_and(not has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+       and bool_and(not has_function_privilege('service_role', p.oid, 'EXECUTE'))
+       and bool_and(not exists (
+         select 1
+           from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+          where a.grantee = 0
+            and a.privilege_type = 'EXECUTE'
+       ))
+       and bool_and(
+         case p.proname
+           when 'enforce_listing_media_ownership' then
+             position(
+               'mamosbzcbigcclafhmmr.supabase.co'
+               in lower(pg_get_functiondef(p.oid))
+             ) > 0
+             and position(
+               'request.headers'
+               in lower(pg_get_functiondef(p.oid))
+             ) = 0
+             and position(
+               'v_url_scheme <> ''https'''
+               in lower(pg_get_functiondef(p.oid))
+             ) > 0
+           else true
+         end
+       )
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'private'
+       and p.proname in (
+         'preserve_listing_media_truth',
+         'enforce_listing_media_ownership'
+       )
+  ) as listing_media_ownership_contract_safe,
+  (
     not has_table_privilege('authenticated', 'public.host_profiles', 'INSERT')
     and not has_table_privilege('authenticated', 'public.seeker_profiles', 'INSERT')
   ) as direct_profile_insert_closed,
@@ -169,7 +221,7 @@ select
        )
   ) as launch_constraints_valid,
   (
-    select count(*) = 4 and bool_and(t.tgenabled <> 'D')
+    select count(*) = 6 and bool_and(t.tgenabled <> 'D')
       from pg_trigger t
       join pg_class r on r.oid = t.tgrelid
       join pg_namespace n on n.oid = r.relnamespace
@@ -178,7 +230,9 @@ select
          ('public', 'listings', 'trg_listings_housing_photos'),
          ('public', 'host_profiles', 'trg_host_profiles_housing_library'),
          ('public', 'listings', 'trg_listings_claim_coordinate_ownership'),
-         ('public', 'listings', 'trg_listings_host_status_transition')
+         ('public', 'listings', 'trg_listings_host_status_transition'),
+         ('public', 'listings', 'trg_listings_claim_media_ownership'),
+         ('public', 'listings', 'trg_listings_media_ownership')
        )
   ) as launch_triggers_enabled,
   (
