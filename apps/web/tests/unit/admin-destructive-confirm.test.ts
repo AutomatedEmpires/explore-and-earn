@@ -93,6 +93,14 @@ describe("admin destructive-action confirmations", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("does not offer an unsafe replay for outcome-unknown invitation dead letters", () => {
+    const notifications = code("NotificationOps.tsx");
+    expect(notifications).toContain('row.notificationType === "invite_received"');
+    expect(notifications).toContain('row.status === "dead_letter"');
+    expect(notifications).toContain('row.failureClass === "outcome_unknown"');
+    expect(notifications).toContain("Outcome locked");
+  });
+
   /** The comment-stripper must not neuter the check it enables. */
   it("the window.confirm scan still detects a real call (negative control)", () => {
     const stripped = "/* window.confirm is bad */\nif (window.confirm('x')) go();";

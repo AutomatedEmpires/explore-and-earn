@@ -17,7 +17,10 @@ import { BoostListingPopup } from "../../host/BoostListingPopup";
 import { SeekerResumePopup } from "../../host/SeekerResumePopup";
 import { HousingFormDrawer } from "../../host/HousingFormDrawer";
 import { MealsFormDrawer } from "../../host/MealsFormDrawer";
-import { SeekerSearchDrawer } from "../../host/SeekerSearchDrawer";
+import {
+  SeekerSearchDrawer,
+  type OutreachSearchPreviewVM,
+} from "../../host/SeekerSearchDrawer";
 import {
   SeekFilterPopup,
   type SeekFilterPopupValue,
@@ -27,6 +30,7 @@ import { HeroPhotoPickerModal } from "../../seeker/HeroPhotoPickerModal";
 import { HostInterviewScheduler } from "../../scheduling/HostInterviewScheduler";
 import { InterviewScheduleCard } from "../../scheduling/InterviewScheduleCard";
 import type { SchedulingRequest } from "@explore-and-earn/db/client";
+import { OUTREACH_PREVIEW_NOTICE } from "../../../lib/hostOutreach";
 
 import {
   DEMO_HOST,
@@ -40,6 +44,21 @@ import {
   type CardSpecimen,
 } from "./specimens";
 import styles from "./CatalogClient.module.css";
+
+const CATALOG_INVITE_PREVIEW = {
+  notice: OUTREACH_PREVIEW_NOTICE,
+  unavailableQuery: "offline",
+  seekersByListingId: {
+    [DEMO_LISTING.id]: [
+      {
+        seekerProfileId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        displayName: "Avery Nguyen",
+        bio: "Harvest lead with orchard safety and guest-service experience.",
+        alreadyInvited: false,
+      },
+    ],
+  },
+} satisfies OutreachSearchPreviewVM;
 
 // ── Device presets ────────────────────────────────────────────────────────────
 
@@ -419,6 +438,7 @@ export function CatalogClient() {
         onClose={closePopup}
         listingId={DEMO_LISTING.id}
         listingTitle={DEMO_LISTING.title}
+        preview={CATALOG_INVITE_PREVIEW}
       />
       <SeekerResumePopup
         open={show("seeker-resume")}

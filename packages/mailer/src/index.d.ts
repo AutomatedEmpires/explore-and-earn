@@ -38,10 +38,26 @@ export interface SendMailOptions {
      * `"applicationStatus:<applicationId>:<newStatus>"`.
      */
     readonly idempotencyKey?: string;
+    /**
+     * Optional durable authority check invoked only at the logical provider
+     * boundary, after every local preflight guard and immediately before fetch.
+     */
+    readonly beforeProviderRequest?: () => Promise<{
+        readonly actionable: true;
+    } | {
+        readonly actionable: false;
+        readonly reason: string;
+    }>;
 }
 export interface SendMailResult {
     readonly ok: boolean;
     readonly error?: string;
+    /** True only after this call crossed the Resend HTTP boundary. */
+    readonly providerRequestStarted?: boolean;
+    /** The durable provider-boundary authority could not be established. */
+    readonly providerBoundaryUnavailable?: boolean;
+    /** Domain truth changed before provider submission. */
+    readonly cancelledReason?: string;
     /** True when the send was skipped because an identical send was already recorded within the TTL. */
     readonly isDuplicate?: boolean;
     /** Provider HTTP status when the provider responded (success or failure). */

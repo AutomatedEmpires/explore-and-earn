@@ -17,7 +17,8 @@
 -- WIDENING introduced by a later migration can be seen at all.
 --
 -- WHAT IS ASSERTED
---   * the entitled arms work: application, invite, existing conversation
+--   * full applicant detail works for application/conversation relationships;
+--     invite-only relationships resolve only the narrow display name
 --   * an unrelated seeker is invisible to a legitimate host, through EVERY
 --     projection and not just the profile one
 --   * a second real host reaches neither the applicant's profile nor resume
@@ -103,7 +104,8 @@ values ('b0d95000-0000-4000-8000-000000000004',
 insert into public.seeker_resume_experiences (seeker_profile_id, company_name, role_title)
 values
   ('b0d95000-0000-4000-8000-000000000001', 'Bridge Orchard', 'Bridge Picker'),
-  ('b0d95000-0000-4000-8000-000000000002', 'Stranger Orchard', 'Stranger Picker');
+  ('b0d95000-0000-4000-8000-000000000002', 'Stranger Orchard', 'Stranger Picker'),
+  ('b0d95000-0000-4000-8000-000000000003', 'Invite Orchard', 'Invite Worker');
 
 insert into public.seeker_resume_educations (seeker_profile_id, institution, program_or_degree)
 values
@@ -278,7 +280,7 @@ $do$;
 reset role;
 
 -- ===========================================================================
--- 4. Host B: the invite and conversation arms, and no reach into host A's.
+-- 4. Host B: invite-only name, conversation detail, and no reach into host A's.
 -- ===========================================================================
 
 set local role authenticated;
@@ -287,8 +289,18 @@ set local request.jwt.claims = '{"sub":"user_bridge_host_b","role":"authenticate
 do $do$
 begin
   perform pg_temp.expect_rows(
-    'host B reads an invited seeker (invite arm)',
+    'host B cannot read an invite-only seeker profile',
     $q$select 1 from public.get_host_applicant_profile('b0d95000-0000-4000-8000-000000000003')$q$,
+    0
+  );
+  perform pg_temp.expect_rows(
+    'host B cannot read an invite-only seeker resume',
+    $q$select 1 from public.get_host_applicant_experiences('b0d95000-0000-4000-8000-000000000003')$q$,
+    0
+  );
+  perform pg_temp.expect_rows(
+    'host B resolves an invite-only seeker display name',
+    $q$select 1 from public.get_host_applicant_display_names(array['b0d95000-0000-4000-8000-000000000003']::uuid[]) where display_name = 'Bridge Invitee'$q$,
     1
   );
   perform pg_temp.expect_rows(
@@ -322,7 +334,7 @@ begin
     0
   );
 
-  perform pg_temp.checkpoint_section('4 host B: invite and conversation arms', 7);
+  perform pg_temp.checkpoint_section('4 host B: narrow invite and conversation arms', 9);
 end;
 $do$;
 reset role;
@@ -520,7 +532,7 @@ $do$;
 
 do $do$
 begin
-  perform pg_temp.assert_suite_complete('host applicant bridge', 6, 9, 28);
+  perform pg_temp.assert_suite_complete('host applicant bridge', 6, 9, 30);
 end;
 $do$;
 

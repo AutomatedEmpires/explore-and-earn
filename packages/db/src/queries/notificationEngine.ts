@@ -221,7 +221,7 @@ export async function claimDeliveries(args: {
   readonly limit?: number;
   readonly leaseSeconds?: number;
 }): Promise<DeliveryRow[]> {
-  const { data, error } = await admin().rpc("claim_notification_deliveries", {
+  const { data, error } = await admin().rpc("claim_notification_deliveries_v2", {
     p_worker_id: args.workerId,
     p_limit: args.limit ?? 20,
     p_lease_seconds: args.leaseSeconds ?? 120,
@@ -234,6 +234,12 @@ export async function claimDeliveries(args: {
 export async function settleDelivery(args: {
   readonly id: string;
   readonly status: Exclude<DeliveryStatus, "pending" | "processing">;
+  /**
+   * Invitation deliveries must exit `processing` only for the exact v2 claim
+   * that owns the row. This prevents an expired worker from overwriting a
+   * newer provider-started claim after lease reclamation.
+   */
+  readonly workerId?: string;
   readonly providerMessageId?: string;
   readonly failureClass?: string;
   readonly failureDetail?: string;
@@ -269,11 +275,205 @@ export async function settleDelivery(args: {
     patch.collapsed_into_delivery_id = args.collapsedIntoDeliveryId;
   }
   if (args.deliveredAt !== undefined) patch.delivered_at = args.deliveredAt;
-  const { error } = await admin()
+  const update = admin()
     .from("notification_deliveries")
     .update(patch)
     .eq("id", args.id);
+  if (args.workerId !== undefined) {
+    const { data, error } = await update
+      .eq("status", "processing")
+      .eq("worker_id", args.workerId)
+      .eq("claim_authority_version", "094")
+      .select("id");
+    if (error) throw new Error(`settleDelivery failed: ${error.message}`);
+    if ((data ?? []).length !== 1) {
+      throw new Error("settleDelivery failed: delivery lease lost");
+    }
+    return;
+  }
+  const { error } = await update;
   if (error) throw new Error(`settleDelivery failed: ${error.message}`);
+}
+
+/**
+ * Atomically settle a successfully-sent invite notification with its invite.
+ *
+ * Migration 094 serializes this RPC with host withdrawal (invite row first,
+ * then the claimed delivery) and verifies the worker, event dimensions, and
+ * recipient before it can stamp either row. This release is DB-first, so
+ * missing authority, permission, validation, and database faults all fail
+ * closed; there is no delivery-only fallback that can race withdrawal.
+ */
+export async function settleInviteNotificationDelivery(args: {
+  readonly id: string;
+  readonly workerId: string;
+  readonly deliveredAt: string;
+  readonly providerMessageId?: string;
+}): Promise<"delivered" | "cancelled"> {
+  const { data, error } = await admin().rpc(
+    "settle_invite_notification_delivery",
+    {
+      p_delivery_id: args.id,
+      p_worker_id: args.workerId,
+      p_provider_message_id: args.providerMessageId ?? null,
+      p_delivered_at: args.deliveredAt,
+    },
+  );
+
+  if (error) {
+    throw new Error(
+      `settleInviteNotificationDelivery failed: ${error.message}`,
+    );
+  }
+
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("ok" in data) ||
+    data.ok !== true ||
+    !("status" in data) ||
+    (data.status !== "delivered" && data.status !== "cancelled")
+  ) {
+    throw new Error("settleInviteNotificationDelivery returned an invalid result");
+  }
+
+  return data.status;
+}
+
+/**
+ * Authoritative pre-send invite state. The 094 RPC takes a short FOR SHARE
+ * lock so this recheck and host withdrawal cannot both cross the provider-send
+ * boundary while observing stale state. There is deliberately no direct-read
+ * rollout fallback: until the locking authority RPC is visible, callers must
+ * retry before provider submission.
+ */
+export async function getInviteNotificationState(
+  args: {
+    readonly inviteId: string;
+    readonly deliveryId: string;
+    readonly workerId: string;
+  },
+): Promise<{ readonly status: string; readonly expiresAt: string | null } | null> {
+  const response = await admin().rpc("get_invite_notification_state", {
+    p_invite_id: args.inviteId,
+    p_delivery_id: args.deliveryId,
+    p_worker_id: args.workerId,
+  });
+
+  if (response.error) {
+    throw new Error(
+      `getInviteNotificationState failed: ${response.error.message}`,
+    );
+  }
+
+  if (!Array.isArray(response.data) || response.data.length > 1) {
+    throw new Error("getInviteNotificationState returned an invalid result");
+  }
+
+  const rows = response.data;
+  const row = rows[0];
+  if (!row) return null;
+  if (
+    typeof row !== "object" ||
+    row === null ||
+    !("status" in row) ||
+    typeof row.status !== "string" ||
+    !["created", "delivered", "viewed"].includes(row.status) ||
+    !("expires_at" in row) ||
+    (row.expires_at !== null &&
+      (typeof row.expires_at !== "string" ||
+        !Number.isFinite(Date.parse(row.expires_at))))
+  ) {
+    throw new Error("getInviteNotificationState returned an invalid result");
+  }
+
+  return { status: row.status, expiresAt: row.expires_at };
+}
+
+/**
+ * Cross the durable provider boundary for one worker-owned invitation row.
+ * The 094 RPC revalidates the exact delivery/event/invite relationship, marks
+ * provider_started_at, and renews the lease in the same locked transaction.
+ */
+export async function beginInviteNotificationDelivery(
+  args: {
+    readonly inviteId: string;
+    readonly deliveryId: string;
+    readonly workerId: string;
+  },
+): Promise<{ readonly status: string; readonly expiresAt: string | null } | null> {
+  const response = await admin().rpc("begin_invite_notification_delivery", {
+    p_invite_id: args.inviteId,
+    p_delivery_id: args.deliveryId,
+    p_worker_id: args.workerId,
+  });
+
+  if (response.error) {
+    throw new Error(
+      `beginInviteNotificationDelivery failed: ${response.error.message}`,
+    );
+  }
+  if (!Array.isArray(response.data) || response.data.length > 1) {
+    throw new Error("beginInviteNotificationDelivery returned an invalid result");
+  }
+  const row = response.data[0];
+  if (!row) return null;
+  if (
+    typeof row !== "object" ||
+    row === null ||
+    !("status" in row) ||
+    typeof row.status !== "string" ||
+    !["created", "delivered", "viewed"].includes(row.status) ||
+    !("expires_at" in row) ||
+    (row.expires_at !== null &&
+      (typeof row.expires_at !== "string" ||
+        !Number.isFinite(Date.parse(row.expires_at))))
+  ) {
+    throw new Error("beginInviteNotificationDelivery returned an invalid result");
+  }
+  return { status: row.status, expiresAt: row.expires_at };
+}
+
+/**
+ * Release an invitation claim that failed before any provider submission.
+ *
+ * The worker/status predicates are the authority boundary: if withdrawal or
+ * another worker already changed the row, this update affects zero rows and
+ * cannot reopen it. This also bridges the web-before-094 deploy window, where
+ * the new locking recheck RPC is intentionally not callable yet.
+ */
+export async function releaseInviteNotificationClaimKnownUnsent(args: {
+  readonly id: string;
+  readonly workerId: string;
+  readonly attemptCount: number;
+  readonly nextAttemptAt: string;
+}): Promise<boolean> {
+  const { data, error } = await admin()
+    .from("notification_deliveries")
+    .update({
+      status: "failed_retryable",
+      attempt_count: Math.max(0, args.attemptCount - 1),
+      next_attempt_at: args.nextAttemptAt,
+      failure_class: "known_unsent",
+      failure_detail: "invite authority unavailable before provider submission",
+      worker_id: null,
+      lease_expires_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", args.id)
+    .eq("notification_type", "invite_received")
+    .eq("status", "processing")
+    .eq("worker_id", args.workerId)
+    .eq("claim_authority_version", "094")
+    .is("provider_started_at", null)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    throw new Error(
+      `releaseInviteNotificationClaimKnownUnsent failed: ${error.message}`,
+    );
+  }
+  return data !== null;
 }
 
 /**
@@ -1104,10 +1304,11 @@ export async function adminPushSubscriptionSummary(): Promise<AdminPushSubscript
 }
 
 /**
- * Requeue ONE terminally-failed delivery for a fresh attempt cycle. Narrow on
- * purpose: only dead_letter / failed_terminal rows qualify (anything else is
- * either in flight or a deliberate suppression), and the WHERE carries the
- * status filter so a concurrent transition can never be clobbered.
+ * Requeue ONE terminally-failed delivery for a fresh attempt cycle. An
+ * outcome-unknown invitation dead letter is deliberately immutable: the
+ * provider may have accepted it before its response was lost. Known-unsent
+ * terminal rows remain recoverable. The database trigger is authoritative;
+ * this predicate mirrors it so direct callers fail closed without an error.
  */
 export async function adminRequeueDelivery(deliveryId: string): Promise<boolean> {
   const { data, error } = await admin()
@@ -1124,6 +1325,9 @@ export async function adminRequeueDelivery(deliveryId: string): Promise<boolean>
     })
     .eq("id", deliveryId)
     .in("status", ["dead_letter", "failed_terminal"])
+    .or(
+      "notification_type.neq.invite_received,status.neq.dead_letter,failure_class.neq.outcome_unknown,failure_class.is.null",
+    )
     .select("id")
     .maybeSingle();
   if (error) throw new Error(`adminRequeueDelivery: ${error.message}`);

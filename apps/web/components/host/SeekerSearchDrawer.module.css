@@ -3,11 +3,16 @@
 .search {
   display: flex;
   gap: var(--space-8);
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .input {
   flex: 1;
   min-width: 0;
+  min-height: var(--tap-min);
+  max-width: 100%;
+  box-sizing: border-box;
   padding: var(--space-8) var(--space-12);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-cell);
@@ -36,8 +41,13 @@
   overflow: hidden;
 }
 
+.results > li {
+  min-width: 0;
+}
+
 .resultItem {
   width: 100%;
+  min-height: var(--tap-min);
   text-align: left;
   padding: var(--space-12) var(--space-16);
   border: none;
@@ -64,10 +74,12 @@
 }
 
 .resultName {
+  min-width: 0;
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   font-weight: var(--font-weight-semibold);
   color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 
 .resultBio {
@@ -75,6 +87,7 @@
   font-size: var(--type-label-size);
   line-height: var(--type-label-lh);
   color: var(--text-secondary);
+  overflow-wrap: anywhere;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -98,6 +111,7 @@
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   color: var(--text-secondary);
+  overflow-wrap: anywhere;
 }
 
 /* ─── Compose section ────────────────────────────────────────────────────── */
@@ -121,13 +135,19 @@
   color: var(--text-primary);
 }
 
+.selectedInfo > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .clearSelected {
   margin-left: auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  flex: none;
   border: none;
   background: none;
   cursor: pointer;
@@ -194,12 +214,35 @@
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   color: var(--status-error-fg);
+  overflow-wrap: anywhere;
 }
 
 .sendRow {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-8);
+  flex-wrap: wrap;
+}
+
+.previewNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-8);
+  margin: 0;
+  padding: var(--space-12);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+  background: var(--color-surface-raised);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  overflow-wrap: anywhere;
+}
+
+.previewNotice svg {
+  flex: none;
+  color: var(--color-cta);
 }
 
 .successBanner {

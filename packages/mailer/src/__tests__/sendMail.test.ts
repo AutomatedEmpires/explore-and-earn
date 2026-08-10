@@ -38,6 +38,7 @@ describe("sendMail", () => {
     });
 
     expect(result.ok).toBe(true);
+    expect(result.providerRequestStarted).toBe(false);
     expect(result.isDuplicate).toBeFalsy();
     expect(infoSpy).toHaveBeenCalledWith(
       expect.stringMatching(/\[mailer:dev\].*dev@example\.com.*Hello/s),
@@ -49,15 +50,79 @@ describe("sendMail", () => {
     vi.stubEnv("NODE_ENV", "production");
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
+    const beforeProviderRequest = vi.fn(async () => ({ actionable: true as const }));
     const result = await sendMail({
       to: "prod@example.com",
       subject: "Hello",
       html: "<p>Hello</p>",
+      beforeProviderRequest,
     });
 
     expect(result.ok).toBe(false);
+    expect(result.providerRequestStarted).toBe(false);
     expect(result.error).toMatch(/RESEND_API_KEY/);
     expect(errorSpy).toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(beforeProviderRequest).not.toHaveBeenCalled();
+  });
+
+  it("checks durable authority immediately before the provider fetch", async () => {
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    const order: string[] = [];
+    mockFetch.mockImplementation(async () => {
+      order.push("fetch");
+      return { ok: true, status: 200, json: async () => ({ id: "mail-1" }) };
+    });
+
+    const result = await sendMail({
+      to: "user@example.com",
+      subject: "Hello",
+      html: "<p>Hello</p>",
+      beforeProviderRequest: async () => {
+        order.push("boundary");
+        return { actionable: true };
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(order).toEqual(["boundary", "fetch"]);
+  });
+
+  it("cancels before fetch or reports unavailable boundary without pretending a send", async () => {
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+
+    const cancelled = await sendMail({
+      to: "user@example.com",
+      subject: "Hello",
+      html: "<p>Hello</p>",
+      beforeProviderRequest: async () => ({
+        actionable: false,
+        reason: "invite no longer actionable",
+      }),
+    });
+    expect(cancelled).toEqual(
+      expect.objectContaining({
+        ok: false,
+        cancelledReason: "invite no longer actionable",
+        providerRequestStarted: false,
+      }),
+    );
+
+    const unavailable = await sendMail({
+      to: "user@example.com",
+      subject: "Hello",
+      html: "<p>Hello</p>",
+      beforeProviderRequest: async () => {
+        throw new Error("authority unavailable");
+      },
+    });
+    expect(unavailable).toEqual(
+      expect.objectContaining({
+        ok: false,
+        providerBoundaryUnavailable: true,
+        providerRequestStarted: false,
+      }),
+    );
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -71,6 +136,7 @@ describe("sendMail", () => {
     });
 
     expect(result.ok).toBe(false);
+    expect(result.providerRequestStarted).toBe(false);
     expect(result.error).toContain("recipient");
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -86,6 +152,7 @@ describe("sendMail", () => {
     });
 
     expect(result.ok).toBe(true);
+    expect(result.providerRequestStarted).toBe(true);
     expect(mockFetch).toHaveBeenCalledOnce();
 
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
@@ -161,6 +228,7 @@ describe("sendMail", () => {
     });
 
     expect(result.ok).toBe(false);
+    expect(result.providerRequestStarted).toBe(true);
     expect(result.error).toContain("422");
     expect(errorSpy).toHaveBeenCalled();
   });
@@ -177,8 +245,38 @@ describe("sendMail", () => {
     });
 
     expect(result.ok).toBe(false);
+    expect(result.providerRequestStarted).toBe(true);
     expect(result.error).toBe("Network timeout");
     expect(errorSpy).toHaveBeenCalled();
+  });
+
+  it("aborts a provider fetch inside the bounded mutation window", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockFetch.mockImplementation(
+      async (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            reject(new Error("aborted"));
+          });
+        }),
+    );
+
+    const pending = sendMail({
+      to: "user@example.com",
+      subject: "Hello",
+      html: "<p>Hello</p>",
+    });
+    await vi.advanceTimersByTimeAsync(25_000);
+
+    await expect(pending).resolves.toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: "aborted",
+        providerRequestStarted: true,
+      }),
+    );
   });
 
   it("deduplicates sends with the same idempotencyKey within the TTL", async () => {
@@ -202,6 +300,61 @@ describe("sendMail", () => {
     expect(second.ok).toBe(true);
     expect(second.isDuplicate).toBe(true);
     // Resend should NOT have been called a second time.
+    expect(mockFetch).toHaveBeenCalledOnce();
+  });
+
+  it("never mistakes an in-flight claim for a confirmed duplicate send", async () => {
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    mockFetch.mockResolvedValue({ ok: true, status: 200, text: async () => "" });
+    let enterBoundary!: () => void;
+    const boundaryEntered = new Promise<void>((resolve) => {
+      enterBoundary = resolve;
+    });
+    let releaseBoundary!: () => void;
+    const boundaryGate = new Promise<void>((resolve) => {
+      releaseBoundary = resolve;
+    });
+    const opts = {
+      to: "user@example.com",
+      subject: "Invitation",
+      html: "<p>Invitation</p>",
+      idempotencyKey: "invite:pending-boundary",
+    };
+    const first = sendMail({
+      ...opts,
+      beforeProviderRequest: async () => {
+        enterBoundary();
+        await boundaryGate;
+        return { actionable: true };
+      },
+    });
+    await boundaryEntered;
+
+    const secondBoundary = vi.fn(async () => ({ actionable: true as const }));
+    await expect(
+      sendMail({ ...opts, beforeProviderRequest: secondBoundary }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        ok: false,
+        providerRequestStarted: false,
+        error: expect.stringContaining("already in progress"),
+      }),
+    );
+    expect(secondBoundary).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    releaseBoundary();
+    await expect(first).resolves.toMatchObject({
+      ok: true,
+      providerRequestStarted: true,
+    });
+    expect(mockFetch).toHaveBeenCalledOnce();
+
+    await expect(sendMail(opts)).resolves.toMatchObject({
+      ok: true,
+      isDuplicate: true,
+      providerRequestStarted: true,
+    });
     expect(mockFetch).toHaveBeenCalledOnce();
   });
 

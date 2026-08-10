@@ -3,7 +3,7 @@
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/assert_rpc_grants.sql
 --
 -- Fails (raises) if any identity-sensitive SECURITY DEFINER function is executable by
--- anon, by PUBLIC, or by authenticated where forbidden (the two trigger fns);
+-- anon, by PUBLIC, or by authenticated where forbidden (the trigger fns);
 -- if a server-only table is missing RLS or exposes a client policy; or if the
 -- storage buckets still allow anon enumeration. Emits an evidence table at the
 -- end for inclusion in PR / audit artifacts.
@@ -27,6 +27,8 @@ declare
     'current_conversation_ids',
     'enforce_listing_cover_asset',
     'enforce_listing_media_override',
+    'prevent_queued_invite_digest_membership_094',
+    'prevent_invite_dead_letter_requeue_094',
     'create_my_host_profile',
     'ensure_my_seeker_profile',
     'ensure_my_application_conversation',
@@ -35,7 +37,9 @@ declare
   ];
   trigger_fns text[] := array[
     'enforce_listing_cover_asset',
-    'enforce_listing_media_override'
+    'enforce_listing_media_override',
+    'prevent_queued_invite_digest_membership_094',
+    'prevent_invite_dead_letter_requeue_094'
   ];
 begin
   for r in
@@ -89,7 +93,12 @@ declare
   t text;
   v_rls boolean;
   v_policy_count int;
-  tbls text[] := array['events', 'media_assets', 'media_buckets'];
+  tbls text[] := array[
+    'events',
+    'media_assets',
+    'media_buckets',
+    'invite_authority_rollout_094'
+  ];
 begin
   foreach t in array tbls loop
     select c.relrowsecurity into v_rls
@@ -210,12 +219,19 @@ declare
   v_fail boolean := false;
   v_found integer := 0;
   fn_names text[] := array[
-    'create_invite_with_credit',
-    'restore_invite_credit',
+    'create_host_source_invite_with_credit',
     'transition_listing_claim',
     'convert_claimed_listing',
     'claim_notification_deliveries',
-    'get_unprocessed_notification_events'
+    'claim_notification_deliveries_v2',
+    'get_unprocessed_notification_events',
+    'search_host_sourceable_seekers',
+    'get_host_sourceable_matches',
+    'deliver_seeker_invites',
+    'settle_invite_notification_delivery',
+    'get_invite_notification_state',
+    'begin_invite_notification_delivery',
+    'withdraw_host_invite'
   ];
 begin
   for r in
@@ -259,6 +275,31 @@ begin
     raise exception 'db-assert: service workflow function hardening FAILED';
   end if;
   raise notice 'db-assert: service workflow function hardening PASSED';
+end;
+$$;
+
+-- The pre-094 standalone restore is no longer a service workflow. Restoration
+-- must occur only inside withdraw_host_invite after invite/delivery locks.
+do $$
+declare
+  v_restore regprocedure := 'public.restore_invite_credit(uuid)'::regprocedure;
+begin
+  if has_function_privilege('service_role', v_restore, 'EXECUTE')
+     or has_function_privilege('anon', v_restore, 'EXECUTE')
+     or has_function_privilege('authenticated', v_restore, 'EXECUTE')
+     or exists (
+       select 1
+         from pg_proc p,
+              lateral aclexplode(
+                coalesce(p.proacl, acldefault('f', p.proowner))
+              ) a
+        where p.oid = v_restore
+          and a.grantee = 0
+          and a.privilege_type = 'EXECUTE'
+     ) then
+    raise exception 'db-assert: standalone restore_invite_credit authority remains open';
+  end if;
+  raise notice 'db-assert: standalone restore_invite_credit authority CLOSED';
 end;
 $$;
 
@@ -479,6 +520,8 @@ where n.nspname = 'public'
     'set_host_attestation', 'get_clerk_user_id', 'current_seeker_profile_ids',
     'current_host_profile_ids', 'current_host_listing_ids', 'current_conversation_ids',
     'enforce_listing_cover_asset', 'enforce_listing_media_override',
+    'prevent_queued_invite_digest_membership_094',
+    'prevent_invite_dead_letter_requeue_094',
     'create_my_host_profile', 'ensure_my_seeker_profile',
     'ensure_my_application_conversation', 'ensure_my_host_application_conversation',
     'get_my_conversation_contexts',
@@ -498,8 +541,13 @@ from pg_proc p
 join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
   and p.proname in (
-    'create_invite_with_credit', 'restore_invite_credit',
+    'create_host_source_invite_with_credit', 'restore_invite_credit',
     'transition_listing_claim', 'convert_claimed_listing',
-    'claim_notification_deliveries', 'get_unprocessed_notification_events'
+    'claim_notification_deliveries', 'claim_notification_deliveries_v2',
+    'get_unprocessed_notification_events',
+    'search_host_sourceable_seekers', 'get_host_sourceable_matches',
+    'deliver_seeker_invites', 'settle_invite_notification_delivery',
+    'get_invite_notification_state', 'begin_invite_notification_delivery',
+    'withdraw_host_invite'
   )
 order by p.proname;

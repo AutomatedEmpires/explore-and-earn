@@ -261,20 +261,50 @@ describe("host screening — cross-tenant denial", () => {
     expect(JSON.stringify(result)).not.toContain("\t");
   });
 
-  it("matched_seekers surfaces listing_not_found for a foreign listing", async () => {
-    mockDb.getMatchedSeekersForListing.mockResolvedValue(null); // ownership check inside
+  it("matched_seekers preserves the concealed foreign-listing error", async () => {
+    mockDb.getMatchedSeekersForListing.mockResolvedValue({
+      ok: false,
+      error: "listing_unavailable",
+    });
     mockDb.getInviteEntitlement.mockResolvedValue(null);
     const tools = buildHostTools(CTX);
     const result = await toolOf(tools as never, "matched_seekers").execute({
       listingId: "listing-foreign",
     });
-    expect(result).toEqual({ error: "listing_not_found" });
+    expect(result).toEqual({ error: "listing_unavailable" });
     expect(mockDb.getMatchedSeekersForListing).toHaveBeenCalledWith(
       "tok-A",
       "user_A",
       "listing-foreign",
       10,
     );
+  });
+
+  it("matched_seekers reports an entitlement outage instead of returning a false null allowance", async () => {
+    mockDb.getMatchedSeekersForListing.mockResolvedValue({
+      ok: true,
+      listingId: "listing-own",
+      seekers: [],
+    });
+    mockDb.getInviteEntitlement.mockRejectedValue(new Error("ledger unavailable"));
+    const tools = buildHostTools(CTX);
+
+    await expect(
+      toolOf(tools as never, "matched_seekers").execute({
+        listingId: "listing-own",
+      }),
+    ).resolves.toEqual({ error: "temporarily_unavailable" });
+  });
+
+  it("invite_entitlement conceals provider failures behind a stable unavailable result", async () => {
+    mockDb.getInviteEntitlement.mockRejectedValue(
+      new Error("relation invite_credit_events does not exist"),
+    );
+    const tools = buildHostTools(CTX);
+
+    await expect(
+      toolOf(tools as never, "invite_entitlement").execute({}),
+    ).resolves.toEqual({ error: "temporarily_unavailable" });
   });
 });
 

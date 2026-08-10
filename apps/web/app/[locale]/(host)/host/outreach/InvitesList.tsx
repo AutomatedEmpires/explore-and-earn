@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Icon } from "@explore-and-earn/ui";
 import type { HostInvite } from "@explore-and-earn/db/client";
-import type { ListingRow } from "@explore-and-earn/db/client";
 
-import { SeekerSearchDrawer } from "../../../../../components/host/SeekerSearchDrawer";
+import { formatDate } from "../../../../../lib/format";
+import {
+  SeekerSearchDrawer,
+  type OutreachSearchPreviewVM,
+} from "../../../../../components/host/SeekerSearchDrawer";
 import { withdrawInviteAction } from "../../../../actions/invites";
 import styles from "./InvitesList.module.css";
 
@@ -17,22 +20,30 @@ const COLD_STATUSES = new Set(["ignored", "expired", "withdrawn"]);
 
 export interface InvitesListProps {
   readonly invites: readonly HostInvite[];
-  readonly listings: readonly ListingRow[];
+  readonly listings: readonly InviteListingVM[];
+  /** Includes draft/paused/expired inventory omitted from the invite selector. */
+  readonly hasAnyListings: boolean;
+  readonly preview?: OutreachSearchPreviewVM;
+}
+
+export interface InviteListingVM {
+  readonly id: string;
+  readonly title: string;
 }
 
 /**
- * The four honest delivery stages an invite moves through, in order. Each maps
- * 1:1 to a real `status` value the query layer exposes — no fabricated steps.
+ * The three honest delivery stages backed by durable facts. There is no live
+ * writer for `viewed_at`, so this surface does not fabricate an opened stage.
  */
 const PIP_STAGES = [
   { key: "created", label: "Sent" },
   { key: "delivered", label: "Delivered" },
-  { key: "viewed", label: "Viewed" },
   { key: "applied", label: "Applied" },
 ] as const;
 
 /** How far along the delivery progression a status sits (-1 if not on it). */
 function stageIndex(status: string): number {
+  if (status === "viewed") return 1;
   return PIP_STAGES.findIndex((s) => s.key === status);
 }
 
@@ -42,10 +53,33 @@ const STATUS_LABEL: Record<string, string> = {
   delivered: "Delivered",
   viewed: "Viewed",
   applied: "Applied",
-  ignored: "Ignored",
+  ignored: "Declined",
   expired: "Expired",
   withdrawn: "Withdrawn",
 };
+
+function inviteDateDisplay(value: string): { short: string; full: string } {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return { short: "Date unavailable", full: "Date unavailable" };
+  }
+  return {
+    short: formatDate(value, {
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    }),
+    full: formatDate(value, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "UTC",
+      timeZoneName: "short",
+    }),
+  };
+}
 
 /** Up to two initials from a display name — never a raw id. */
 function initialsOf(name: string | null): string {
@@ -59,32 +93,69 @@ function initialsOf(name: string | null): string {
  * Host invites list with an inline drawer for sending new invites.
  * Listing selection allows the host to pick which listing to invite for.
  */
-export function InvitesList({ invites, listings }: InvitesListProps) {
+export function InvitesList({
+  invites,
+  listings,
+  hasAnyListings,
+  preview,
+}: InvitesListProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedListingId, setSelectedListingId] = useState(
     listings[0]?.id ?? "",
   );
   const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const [withdrawStatus, setWithdrawStatus] = useState<string | null>(null);
+  const withdrawStatusRef = useRef<HTMLParagraphElement>(null);
 
-  const selectedListing = listings.find((l) => l.id === selectedListingId);
+  useEffect(() => {
+    if (withdrawStatus) withdrawStatusRef.current?.focus();
+  }, [withdrawStatus]);
 
-  function handleWithdraw(inviteId: string) {
+  // A Server Component refresh can remove an expired or paused listing while
+  // preserving this client instance. Fall back synchronously so the controlled
+  // select and opener never point at a listing that no longer exists.
+  const selectedListing =
+    listings.find((listing) => listing.id === selectedListingId) ?? listings[0];
+
+  async function handleWithdraw(inviteId: string) {
+    if (preview || withdrawingId) return;
     setWithdrawError(null);
+    setWithdrawStatus(null);
     setWithdrawingId(inviteId);
-    startTransition(async () => {
+    try {
       const result = await withdrawInviteAction(inviteId);
-      setWithdrawingId(null);
       if (!result.ok) {
-        setWithdrawError(result.error ?? "Could not withdraw the invite.");
+		setWithdrawError(
+			result.error === "invite_delivery_in_progress"
+				? "This invite is being delivered now. Try again after delivery finishes."
+				: result.error === "invite_authority_rollout_draining"
+					? "Invite withdrawals are briefly unavailable while delivery authority finishes updating. Try again in a few minutes."
+				: "Could not withdraw the invite. Please try again.",
+		);
+      } else if (result.creditRestored) {
+		setWithdrawStatus("Invite withdrawn. Its original invite-credit charge was reversed.");
+      } else if (result.disposition === "already_withdrawn") {
+        setWithdrawStatus("This invite was already withdrawn.");
+      } else {
+        setWithdrawStatus("Invite withdrawn.");
       }
       // On success, revalidatePath('/host/outreach') refreshes this list's props.
-    });
+    } catch {
+      setWithdrawError("Could not withdraw the invite. Please try again.");
+    } finally {
+      setWithdrawingId(null);
+    }
   }
 
   return (
     <>
+      {preview ? (
+        <p className={styles.previewNotice} role="note">
+          <Icon name="system.info" size={16} aria-hidden />
+          {preview.notice}
+        </p>
+      ) : null}
       <div className={styles.toolbar}>
         {listings.length > 0 ? (
           <>
@@ -95,7 +166,7 @@ export function InvitesList({ invites, listings }: InvitesListProps) {
               <select
                 id="invite-listing-select"
                 className={styles.listingSelect}
-                value={selectedListingId}
+                value={selectedListing?.id ?? ""}
                 onChange={(e) => setSelectedListingId(e.target.value)}
               >
                 {listings.map((listing) => (
@@ -115,7 +186,7 @@ export function InvitesList({ invites, listings }: InvitesListProps) {
               variant="primary"
               icon="action.forward"
               onClick={() => setDrawerOpen(true)}
-              disabled={!selectedListingId}
+              disabled={!selectedListing}
             >
               Invite a seeker
             </Button>
@@ -123,7 +194,9 @@ export function InvitesList({ invites, listings }: InvitesListProps) {
         ) : (
           <p className={styles.noListings}>
             <Icon name="system.info" size={16} aria-hidden />
-            Create a listing first to start sending invites.
+            {hasAnyListings
+              ? "No current listings are ready for new invites. Review your listings to publish, verify, or extend one."
+              : "Create a listing first to start sending invites."}
           </p>
         )}
       </div>
@@ -137,9 +210,11 @@ export function InvitesList({ invites, listings }: InvitesListProps) {
         <ol className={styles.list}>
           {invites.map((invite) => {
             const name = invite.seekerDisplayName ?? "Anonymous seeker";
+            const displayedDate = inviteDateDisplay(invite.createdAt);
             const current = stageIndex(invite.status);
             const isCold = COLD_STATUSES.has(invite.status);
-            const canWithdraw = WITHDRAWABLE_STATUSES.has(invite.status);
+            const canWithdraw =
+              !preview && WITHDRAWABLE_STATUSES.has(invite.status);
             const withdrawing = withdrawingId === invite.id;
             return (
               <li
@@ -157,12 +232,9 @@ export function InvitesList({ invites, listings }: InvitesListProps) {
                       <time
                         className={styles.date}
                         dateTime={invite.createdAt}
-                        title={new Date(invite.createdAt).toLocaleString()}
+                        title={displayedDate.full}
                       >
-                        {new Date(invite.createdAt).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                        })}
+                        {displayedDate.short}
                       </time>
                     </div>
                     <span className={styles.listingName}>
@@ -214,8 +286,8 @@ export function InvitesList({ invites, listings }: InvitesListProps) {
                   <div className={styles.itemActions}>
                     <Button
                       variant="secondary"
-                      onClick={() => handleWithdraw(invite.id)}
-                      disabled={withdrawing}
+                      onClick={() => void handleWithdraw(invite.id)}
+                      disabled={withdrawingId !== null}
                     >
                       {withdrawing ? "Withdrawing…" : "Withdraw"}
                     </Button>
@@ -233,12 +305,25 @@ export function InvitesList({ invites, listings }: InvitesListProps) {
         </p>
       ) : null}
 
+      {withdrawStatus ? (
+        <p
+          ref={withdrawStatusRef}
+          className={styles.withdrawStatus}
+          role="status"
+          tabIndex={-1}
+        >
+          {withdrawStatus}
+        </p>
+      ) : null}
+
       {selectedListing ? (
         <SeekerSearchDrawer
-          listingId={selectedListingId}
+          key={selectedListing.id}
+          listingId={selectedListing.id}
           listingTitle={selectedListing.title}
           isOpen={drawerOpen}
           onClose={() => setDrawerOpen(false)}
+          preview={preview}
         />
       ) : null}
     </>

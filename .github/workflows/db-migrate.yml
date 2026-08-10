@@ -59,9 +59,93 @@ jobs:
         with:
           version: 2.102.0
 
-      # Vercel and GitHub Actions begin independently after a main push. The
-      # application release must land first because migration 072 contracts
-      # raw JSON access after the compatible RPC-backed UI is deployed.
+      - name: Link the production project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+      # Migration 094 is the one-time exception to the normal app-first rule.
+      # It closes legacy claim/update/RLS authority before a skewed web binary
+      # can cross the new invite refund boundary. Later migrations retain the
+      # established app-first ordering once production already records 094.
+      - name: Inspect production migration state
+        id: migration_state
+        run: |
+          set -euo pipefail
+          test -f supabase/migrations/094_host_seeker_discovery_bridge.sql
+          supabase migration list --linked
+          mapfile -t local_versions < <(
+            find supabase/migrations -maxdepth 1 -type f -name '*.sql' -printf '%f\n' |
+              sort |
+              sed -E 's/^([0-9]{3})_[a-z0-9_]+\.sql$/\1/'
+          )
+          if [[ "${#local_versions[@]}" -eq 0 ]] ||
+             printf '%s\n' "${local_versions[@]}" | grep -Ev '^[0-9]{3}$' >/dev/null ||
+             [[ -n "$(printf '%s\n' "${local_versions[@]}" | uniq -d)" ]]; then
+            echo "Local migration filenames/versions were empty, malformed, or duplicated." >&2
+            exit 1
+          fi
+          local_state="$(printf '%s\n' "${local_versions[@]}" | jq -Rsc 'split("\n")[:-1]')"
+          state="$(supabase db query --linked --output json \
+            "select version
+               from supabase_migrations.schema_migrations
+              order by version")"
+          if ! jq -e '
+            type == "array" and
+            all(.[]; type == "object" and (.version | type) == "string") and
+            ([.[].version] | length) == ([.[].version] | unique | length)
+          ' <<<"$state" >/dev/null; then
+            echo "Production migration-state response was ambiguous; refusing to choose rollout order." >&2
+            exit 1
+          fi
+          remote_state="$(jq -c '[.[].version] | sort' <<<"$state")"
+          migration_093_applied="$(jq -nr --argjson remote "$remote_state" '$remote | index("093") != null')"
+          migration_094_applied="$(jq -nr --argjson remote "$remote_state" '$remote | index("094") != null')"
+          if [[ "$migration_094_applied" == "false" && "$migration_093_applied" != "true" ]]; then
+            echo "Migration 094 is absent but prerequisite 093 is also absent; refusing a multi-migration DB-first push." >&2
+            exit 1
+          fi
+          if [[ "$migration_094_applied" == "false" ]]; then
+            pending_state="$(jq -cn \
+              --argjson local "$local_state" \
+              --argjson remote "$remote_state" \
+              '$local - $remote | sort')"
+            if ! jq -e '. == ["094"]' <<<"$pending_state" >/dev/null; then
+              echo "The one-time DB-first pending set is not exactly [\"094\"]: $pending_state" >&2
+              echo "Refusing db push so neither an older gap nor a future migration bypasses app-first ordering." >&2
+              exit 1
+            fi
+            echo "db_first_094=true" >>"$GITHUB_OUTPUT"
+            echo "Migration 094 is pending; applying its authority fence before the web deployment gate."
+          else
+            echo "db_first_094=false" >>"$GITHUB_OUTPUT"
+            echo "Migration 094 is already applied; retaining normal app-first ordering."
+          fi
+
+      - name: Push migration 094 before the web release
+        if: steps.migration_state.outputs.db_first_094 == 'true'
+        timeout-minutes: 20
+        run: supabase db push
+
+      - name: Verify migration 094 production authority immediately
+        if: steps.migration_state.outputs.db_first_094 == 'true'
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          proof="$(supabase db query \
+            --linked \
+            --output json \
+            --file tools/db-assert/sql/assert_production_launch.sql)"
+          jq -e '
+            length == 1 and
+            .[0].migration_094_applied == true and
+            .[0].host_seeker_discovery_contract_safe == true and
+            .[0].launch_rpc_grants_safe == true and
+            .[0].service_function_search_paths_pinned == true
+          ' <<<"$proof" >/dev/null
+          echo "Migration 094 catalog, ACL, and authority contract verified before waiting for Vercel."
+
+      # Vercel and GitHub Actions begin independently after a main push. Once
+      # the one-time 094 fence exists, this exact-SHA gate restores the normal
+      # application-before-schema order for 095 and every later migration.
       - name: Wait for this commit's Vercel production deployment
         timeout-minutes: 40
         env:
@@ -173,20 +257,15 @@ jobs:
             fi
 
             if [[ "$attempt" -eq 12 ]]; then
-              echo "Production readiness probe did not become healthy; migrations will not run." >&2
+              echo "Production readiness probe did not become healthy; rollout failed." >&2
               exit 1
             fi
             echo "Production readiness probe is not healthy yet; waiting."
             sleep 5
           done
 
-      - name: Link the production project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
-
-      - name: Show pending vs applied migrations
-        run: supabase migration list
-
-      - name: Push migrations
+      - name: Push migrations after the web release
+        if: steps.migration_state.outputs.db_first_094 != 'true'
         timeout-minutes: 20
         run: supabase db push
 
@@ -204,6 +283,7 @@ jobs:
             .[0].migration_091_applied == true and
             .[0].migration_092_applied == true and
             .[0].migration_093_applied == true and
+            .[0].migration_094_applied == true and
             .[0].launch_functions_present == true and
             .[0].launch_rpc_grants_safe == true and
             .[0].application_submission_rpc_safe == true and
@@ -211,13 +291,48 @@ jobs:
             .[0].application_submission_guards_present == true and
             .[0].listing_media_ownership_contract_safe == true and
             .[0].resume_experience_identity_contract_safe == true and
+            .[0].host_seeker_discovery_contract_safe == true and
             .[0].direct_profile_insert_closed == true and
             .[0].launch_constraints_valid == true and
             .[0].launch_triggers_enabled == true and
             .[0].community_bucket_listing_closed == true and
             .[0].service_function_search_paths_pinned == true
           ' <<<"$proof" >/dev/null
-          echo "Production migrations 077/091/092/093 and launch schema contract verified."
+          echo "Production migrations 077/091/092/093/094 and launch schema contract verified."
+
+      # The migration itself gates withdrawal from its final pre-COMMIT clock
+      # write. Observe that durable epoch read-only; never bypass it in CI.
+      - name: Wait for migration 094 authority drain
+        timeout-minutes: 7
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 36); do
+            state="$(supabase db query --linked --output json \
+              "select
+                 count(*) = 1
+                 and bool_and(
+                   clock_timestamp() >= applied_at + interval '330 seconds'
+                 ) as rollout_drain_complete
+               from public.invite_authority_rollout_094")"
+            if ! jq -e '
+              type == "array" and
+              length == 1 and
+              (.[0].rollout_drain_complete | type) == "boolean"
+            ' <<<"$state" >/dev/null; then
+              echo "Migration 094 rollout epoch response was ambiguous." >&2
+              exit 1
+            fi
+            if jq -e '.[0].rollout_drain_complete == true' <<<"$state" >/dev/null; then
+              echo "Migration 094 authority drain is complete."
+              break
+            fi
+            if [[ "$attempt" -eq 36 ]]; then
+              echo "Migration 094 authority drain did not complete within 360 seconds." >&2
+              exit 1
+            fi
+            echo "Migration 094 authority drain is still active; waiting."
+            sleep 10
+          done
 
       - name: Verify post-migration production runtime
         timeout-minutes: 3

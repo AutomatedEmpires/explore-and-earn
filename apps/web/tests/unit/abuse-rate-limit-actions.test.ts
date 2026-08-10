@@ -53,10 +53,11 @@ const dbMocks = vi.hoisted(() => ({
   respondToInvite: vi.fn(),
   createInviteWithEntitlement: vi.fn(),
   getHostListings: vi.fn(),
+  getInviteEntitlement: vi.fn(),
+  getMatchedSeekersForListing: vi.fn(),
   getHostClerkIdByProfileId: vi.fn(),
   isEmailSuppressed: vi.fn(),
   recordEvent: vi.fn(),
-  restoreInviteCreditForInvite: vi.fn(),
   searchSeekersForInvite: vi.fn(),
   withdrawInvite: vi.fn(),
   // applicationStatus / applications
@@ -127,7 +128,13 @@ import {
   duplicateListingAction,
   updateListingAction,
 } from "../../app/actions/listings";
-import { searchSeekersAction, sendInviteAction } from "../../app/actions/invites";
+import {
+  respondToInviteAction,
+  searchSeekersAction,
+  sendInviteAction,
+  withdrawInviteAction,
+} from "../../app/actions/invites";
+import { getMatchedSeekersAction } from "../../app/actions/hostSourcing";
 import { updateApplicationStatusAction } from "../../app/actions/applicationStatus";
 import { applyToListingAction } from "../../app/actions/applications";
 
@@ -468,34 +475,348 @@ describe("duplicateListingAction", () => {
 // ── searchSeekersAction ──────────────────────────────────────────────────────
 
 describe("searchSeekersAction", () => {
-  it("within limit: returns the db-layer results", async () => {
-    const rows = [{ seekerProfileId: "s-1", displayName: "Anna", bio: null }];
-    dbMocks.searchSeekersForInvite.mockResolvedValueOnce(rows);
-    const result = await searchSeekersAction("anna");
-    expect(result).toEqual(rows);
+  const LISTING_ID = "11111111-1111-4111-8111-111111111111";
+
+  it("within limit: returns the listing-scoped db results", async () => {
+    const rows = [
+      {
+        seekerProfileId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        displayName: "Anna",
+        bio: null,
+        alreadyInvited: false,
+      },
+    ];
+    dbMocks.searchSeekersForInvite.mockResolvedValueOnce({ ok: true, seekers: rows });
+    const result = await searchSeekersAction(LISTING_ID, "  anna   crew ");
+    expect(result).toEqual({ ok: true, seekers: rows });
     expect(checkRateLimitMock).toHaveBeenCalledWith(
       "seeker-search:user_default",
       30,
       60 * 60 * 1000,
     );
+    expect(dbMocks.searchSeekersForInvite).toHaveBeenCalledWith(
+      "tok-default",
+      "user_default",
+      LISTING_ID,
+      "anna crew",
+    );
   });
 
-  it("over limit: returns [] and never queries seeker profiles", async () => {
+  it("over limit: is distinct from an empty result and never queries", async () => {
     checkRateLimitMock.mockReturnValueOnce({ allowed: false });
-    const result = await searchSeekersAction("anna");
-    expect(result).toEqual([]);
+    const result = await searchSeekersAction(LISTING_ID, "anna");
+    expect(result).toEqual({ ok: false, error: "rate_limit_exceeded" });
     expect(dbMocks.searchSeekersForInvite).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["not-a-uuid", "anna"],
+    [LISTING_ID, "a"],
+    [LISTING_ID, "   "],
+    [LISTING_ID, "x".repeat(101)],
+  ])("rejects invalid input before auth, rate limiting, or db", async (listingId, query) => {
+    const result = await searchSeekersAction(listingId, query);
+    expect(result).toEqual({ ok: false, error: "invalid_request" });
+    expect(authMock).not.toHaveBeenCalled();
+    expect(checkRateLimitMock).not.toHaveBeenCalled();
+    expect(dbMocks.searchSeekersForInvite).not.toHaveBeenCalled();
+  });
+
+  it("preserves a listing-unavailable discovery result", async () => {
+    dbMocks.searchSeekersForInvite.mockResolvedValueOnce({
+      ok: false,
+      error: "listing_unavailable",
+    });
+    await expect(searchSeekersAction(LISTING_ID, "anna")).resolves.toEqual({
+      ok: false,
+      error: "listing_unavailable",
+    });
+  });
+
+  it("maps a thrown dependency fault to a safe temporary error", async () => {
+    dbMocks.searchSeekersForInvite.mockRejectedValueOnce(new Error("provider detail"));
+    await expect(searchSeekersAction(LISTING_ID, "anna")).resolves.toEqual({
+      ok: false,
+      error: "temporarily_unavailable",
+    });
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ action: "searchSeekersAction" }),
+    );
+  });
+
+  it("returns unauthenticated without rate or db work", async () => {
+    authMock.mockResolvedValueOnce({ userId: null, getToken: vi.fn() });
+    await expect(searchSeekersAction(LISTING_ID, "anna")).resolves.toEqual({
+      ok: false,
+      error: "unauthenticated",
+    });
+    expect(checkRateLimitMock).not.toHaveBeenCalled();
+    expect(dbMocks.searchSeekersForInvite).not.toHaveBeenCalled();
+  });
+});
+
+describe("getMatchedSeekersAction", () => {
+  const LISTING_ID = "11111111-1111-4111-8111-111111111111";
+
+  it("returns a ready bucket result within the limit", async () => {
+    const loaded = { ok: true, listingId: LISTING_ID, seekers: [] };
+    dbMocks.getMatchedSeekersForListing.mockResolvedValueOnce(loaded);
+    await expect(getMatchedSeekersAction(LISTING_ID, 12)).resolves.toEqual(loaded);
+    expect(checkRateLimitMock).toHaveBeenCalledWith(
+      "sourcing:user_default",
+      60,
+      5 * 60 * 1000,
+    );
+    expect(dbMocks.getMatchedSeekersForListing).toHaveBeenCalledWith(
+      "tok-default",
+      "user_default",
+      LISTING_ID,
+      12,
+    );
+  });
+
+  it("rejects malformed input before auth or dependency work", async () => {
+    await expect(getMatchedSeekersAction("foreign", 51)).resolves.toEqual({
+      ok: false,
+      error: "invalid_request",
+    });
+    expect(authMock).not.toHaveBeenCalled();
+    expect(checkRateLimitMock).not.toHaveBeenCalled();
+    expect(dbMocks.getMatchedSeekersForListing).not.toHaveBeenCalled();
+  });
+
+  it("returns a stable rate-limit error without loading matches", async () => {
+    checkRateLimitMock.mockReturnValueOnce({ allowed: false });
+    await expect(getMatchedSeekersAction(LISTING_ID)).resolves.toEqual({
+      ok: false,
+      error: "rate_limit_exceeded",
+    });
+    expect(dbMocks.getMatchedSeekersForListing).not.toHaveBeenCalled();
+  });
+
+  it("maps a thrown match dependency to temporary unavailability", async () => {
+    dbMocks.getMatchedSeekersForListing.mockRejectedValueOnce(
+      new Error("private provider detail"),
+    );
+    await expect(getMatchedSeekersAction(LISTING_ID)).resolves.toEqual({
+      ok: false,
+      error: "temporarily_unavailable",
+    });
   });
 });
 
 // ── sendInviteAction message cap ─────────────────────────────────────────────
 
 describe("sendInviteAction — message cap", () => {
+  const SEEKER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const LISTING_ID = "11111111-1111-4111-8111-111111111111";
+
   it("message over 500 chars: message_too_long, no profile/entitlement work", async () => {
-    const result = await sendInviteAction("seeker-1", "listing-1", "x".repeat(501));
+    const result = await sendInviteAction(SEEKER_ID, LISTING_ID, "x".repeat(501));
     expect(result).toEqual({ ok: false, error: "message_too_long" });
     expect(dbMocks.getHostProfile).not.toHaveBeenCalled();
     expect(dbMocks.createInviteWithEntitlement).not.toHaveBeenCalled();
+  });
+
+  it("accepts exactly 500 Unicode code points like Postgres char_length", async () => {
+    dbMocks.getHostProfile.mockResolvedValueOnce({
+      id: "host-profile-1",
+      subscriptionTier: "professional",
+    });
+    dbMocks.getHostListings.mockResolvedValueOnce([{ id: LISTING_ID }]);
+    dbMocks.createInviteWithEntitlement.mockResolvedValueOnce({
+      ok: true,
+      inviteId: "invite-1",
+    });
+
+    const result = await sendInviteAction(
+      SEEKER_ID,
+      LISTING_ID,
+      "😀".repeat(500),
+    );
+    expect(result).toEqual({ ok: true });
+    expect(dbMocks.createInviteWithEntitlement).toHaveBeenCalledOnce();
+  });
+
+  it("rejects 501 Unicode code points before profile or entitlement work", async () => {
+    const result = await sendInviteAction(
+      SEEKER_ID,
+      LISTING_ID,
+      "😀".repeat(501),
+    );
+    expect(result).toEqual({ ok: false, error: "message_too_long" });
+    expect(dbMocks.getHostProfile).not.toHaveBeenCalled();
+    expect(dbMocks.createInviteWithEntitlement).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed seeker/listing ids before auth, rate limiting, or db", async () => {
+    await expect(sendInviteAction("seeker-1", LISTING_ID)).resolves.toEqual({
+      ok: false,
+      error: "invalid_request",
+    });
+    expect(authMock).not.toHaveBeenCalled();
+    expect(checkRateLimitMock).not.toHaveBeenCalled();
+    expect(dbMocks.getHostProfile).not.toHaveBeenCalled();
+  });
+
+  it("keeps a host-profile read failure distinct from a missing profile", async () => {
+    dbMocks.getHostProfile.mockRejectedValueOnce(new Error("provider unavailable"));
+    await expect(sendInviteAction(SEEKER_ID, LISTING_ID)).resolves.toEqual({
+      ok: false,
+      error: "temporarily_unavailable",
+    });
+    expect(dbMocks.getHostListings).not.toHaveBeenCalled();
+
+    vi.clearAllMocks();
+    authMock.mockResolvedValue({
+      userId: "user_default",
+      getToken: vi.fn().mockResolvedValue("tok-default"),
+    });
+    checkRateLimitMock.mockReturnValue({ allowed: true });
+    dbMocks.getHostProfile.mockResolvedValueOnce(null);
+    await expect(sendInviteAction(SEEKER_ID, LISTING_ID)).resolves.toEqual({
+      ok: false,
+      error: "profile_not_found",
+    });
+  });
+
+  it("keeps a listings read failure distinct from a foreign listing", async () => {
+    const profile = { id: "host-profile-1", subscriptionTier: "professional" };
+    dbMocks.getHostProfile.mockResolvedValue(profile);
+    dbMocks.getHostListings.mockRejectedValueOnce(new Error("provider unavailable"));
+    await expect(sendInviteAction(SEEKER_ID, LISTING_ID)).resolves.toEqual({
+      ok: false,
+      error: "temporarily_unavailable",
+    });
+
+    dbMocks.getHostListings.mockResolvedValueOnce([]);
+    await expect(sendInviteAction(SEEKER_ID, LISTING_ID)).resolves.toEqual({
+      ok: false,
+      error: "forbidden",
+    });
+  });
+
+  it("returns durable success when post-commit cache invalidation fails", async () => {
+    dbMocks.getHostProfile.mockResolvedValueOnce({
+      id: "host-profile-1",
+      subscriptionTier: "professional",
+    });
+    dbMocks.getHostListings.mockResolvedValueOnce([{ id: LISTING_ID }]);
+    dbMocks.createInviteWithEntitlement.mockResolvedValueOnce({
+      ok: true,
+      inviteId: "invite-1",
+    });
+    revalidatePathMock.mockImplementationOnce(() => {
+      throw new Error("cache unavailable");
+    });
+
+    await expect(sendInviteAction(SEEKER_ID, LISTING_ID)).resolves.toEqual({
+      ok: true,
+    });
+    expect(dbMocks.createInviteWithEntitlement).toHaveBeenCalledOnce();
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        action: "createInviteForCurrentHost.revalidate",
+      }),
+    );
+  });
+
+  it("wakes notification dispatch without a post-commit invite event write", async () => {
+    dbMocks.getHostProfile.mockResolvedValueOnce({
+      id: "host-profile-1",
+      subscriptionTier: "professional",
+    });
+    dbMocks.getHostListings.mockResolvedValueOnce([{ id: LISTING_ID }]);
+    dbMocks.createInviteWithEntitlement.mockResolvedValueOnce({
+      ok: true,
+      inviteId: "invite-1",
+      source: "monthly",
+    });
+    await expect(sendInviteAction(SEEKER_ID, LISTING_ID)).resolves.toEqual({
+      ok: true,
+    });
+    expect(dbMocks.createInviteWithEntitlement).toHaveBeenCalledOnce();
+    expect(dbMocks.recordEvent).not.toHaveBeenCalled();
+    expect(afterMock).toHaveBeenCalledOnce();
+  });
+});
+
+describe("invite lifecycle post-commit truth", () => {
+  it("keeps a durable acceptance successful when cache invalidation and notification fail", async () => {
+    dbMocks.respondToInvite.mockResolvedValueOnce({
+      ok: true,
+      applicationId: "application-1",
+      listingId: "listing-1",
+      disposition: "created",
+    });
+    revalidatePathMock
+      .mockImplementationOnce(() => {
+        throw new Error("invite cache unavailable");
+      })
+      .mockImplementationOnce(() => {
+        throw new Error("application cache unavailable");
+      });
+    dbMocks.recordEvent.mockRejectedValueOnce(new Error("event store unavailable"));
+
+    await expect(
+      respondToInviteAction("invite-1", "accepted"),
+    ).resolves.toEqual({
+      ok: true,
+      applicationId: "application-1",
+      listingId: "listing-1",
+      disposition: "created",
+    });
+    expect(dbMocks.respondToInvite).toHaveBeenCalledOnce();
+    expect(dbMocks.recordEvent).toHaveBeenCalledOnce();
+    expect(revalidatePathMock).toHaveBeenNthCalledWith(1, "/invites");
+    expect(revalidatePathMock).toHaveBeenNthCalledWith(2, "/applied");
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ action: "respondToInviteAction.revalidateInvites" }),
+    );
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ action: "respondToInviteAction.notification" }),
+    );
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ action: "respondToInviteAction.revalidateApplied" }),
+    );
+  });
+
+  it("keeps a durable decline successful when its cache refresh fails", async () => {
+    dbMocks.respondToInvite.mockResolvedValueOnce({ ok: true });
+    revalidatePathMock.mockImplementationOnce(() => {
+      throw new Error("cache unavailable");
+    });
+
+    await expect(
+      respondToInviteAction("invite-1", "declined"),
+    ).resolves.toEqual({ ok: true });
+    expect(dbMocks.recordEvent).not.toHaveBeenCalled();
+  });
+
+  it("keeps an atomic withdrawal successful when its cache refresh fails", async () => {
+    dbMocks.withdrawInvite.mockResolvedValueOnce({
+      ok: true,
+      disposition: "withdrawn",
+      creditRestored: true,
+    });
+    revalidatePathMock.mockImplementationOnce(() => {
+      throw new Error("cache unavailable");
+    });
+
+    await expect(withdrawInviteAction("invite-1")).resolves.toEqual({
+      ok: true,
+      disposition: "withdrawn",
+      creditRestored: true,
+    });
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ action: "withdrawInviteAction.revalidate" }),
+    );
   });
 });
 

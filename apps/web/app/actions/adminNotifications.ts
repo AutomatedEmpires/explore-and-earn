@@ -28,7 +28,7 @@ async function requireAdmin(): Promise<string | null> {
   return isAdminUserId(userId) ? userId : null;
 }
 
-/** Requeue a dead_letter/failed_terminal delivery for a fresh attempt cycle. */
+/** Requeue a non-invitation dead_letter/failed_terminal delivery. */
 export async function requeueDeliveryAction(deliveryId: string): Promise<ActionResult> {
   try {
     const adminId = await requireAdmin();

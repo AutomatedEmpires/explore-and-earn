@@ -134,6 +134,18 @@ jobs:
           PGDATABASE: postgres
         run: node tools/db-assert/assert-interview-scheduling-concurrency.mjs
 
+      # Migration 094 serializes provider settlement and withdrawal on the
+      # invite row, then delivery rows. Drive both lock orders with separate
+      # psql sessions and observe the losing backend wait before either commit.
+      - name: Verify invite delivery and withdrawal under concurrency
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 54322
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: node tools/db-assert/assert-invite-delivery-concurrency.mjs
+
       # Migration 090 makes message persistence and its canonical notification
       # event one database transaction. Exercise real JWT role resolution,
       # direct-insert refusal, privileged-trigger coverage, body bounds, exact

@@ -508,9 +508,14 @@ describe("the card's explainers are real dialogs", () => {
     const shell = read("components/overlay/PopupShell.tsx");
     expect(shell).toContain('event.key === "Escape"');
     expect(shell).toContain('event.key !== "Tab"');
-    expect(shell).toContain("focusables()[0]?.focus()");
+    expect(shell).toContain("(focusables()[0] ?? panel).focus()");
+    expect(shell).toMatch(
+      /if \(items\.length === 0\) \{[\s\S]*?event\.preventDefault\(\);[\s\S]*?panel\.focus\(\)/,
+    );
+    expect(shell).toContain("tabIndex={-1}");
     expect(shell).toContain("restoreFocusRef.current?.focus()");
     expect(shell).toContain('setAttribute("aria-hidden", "true")');
+    expect(shell).toContain("inert={closing}");
   });
 
   it("wires all three explainers into the ONE shared popup host", () => {

@@ -6,7 +6,7 @@ import {
 	getInviteEntitlement,
 	getMatchedSeekersForListing,
 	type InviteEntitlementSummary,
-	type MatchedSeekersResult,
+	type SourcedSeeker,
 } from "@explore-and-earn/db"
 
 import {
@@ -16,6 +16,10 @@ import {
 } from "../../services/stripe"
 import { checkRateLimitDistributed } from "../../lib/rateLimit"
 import { reportError } from "../../lib/sentry"
+import {
+	isValidOutreachListingId,
+	type HostDiscoveryActionError,
+} from "../../lib/hostOutreach"
 
 /**
  * Host sourcing + invite-entitlement server actions.
@@ -36,29 +40,44 @@ async function currentUserId(): Promise<string | undefined> {
 	}
 }
 
-/**
- * Ranked matched seekers for ONE listing the caller owns (the tier-gated
- * Matched-seekers bucket). Returns null when signed out, not a host, or the
- * listing is not theirs — the UI renders its honest empty state.
- */
+export type MatchedSeekersActionResult =
+	| {
+			readonly ok: true
+			readonly listingId: string
+			readonly seekers: readonly SourcedSeeker[]
+	  }
+	| { readonly ok: false; readonly error: HostDiscoveryActionError }
+
+/** Ranked matched seekers for one eligible listing the caller owns. */
 export async function getMatchedSeekersAction(
-	listingId: string,
-	limit = 20,
-): Promise<MatchedSeekersResult | null> {
+	listingId: unknown,
+	limit: unknown = 20,
+): Promise<MatchedSeekersActionResult> {
+	if (
+		!isValidOutreachListingId(listingId) ||
+		!Number.isInteger(limit) ||
+		(limit as number) < 1 ||
+		(limit as number) > 50
+	) {
+		return { ok: false, error: "invalid_request" }
+	}
+
+	let actionUserId: string | undefined
 	try {
 		const { userId, getToken } = await auth()
-		if (!userId) return null
+		actionUserId = userId ?? undefined
+		if (!userId) return { ok: false, error: "unauthenticated" }
 		const { allowed } = await checkRateLimitDistributed(`sourcing:${userId}`, 60, 5 * 60 * 1000)
-		if (!allowed) return null
+		if (!allowed) return { ok: false, error: "rate_limit_exceeded" }
 		const token = await getToken()
-		if (!token) return null
-		return await getMatchedSeekersForListing(token, userId, listingId, limit)
+		if (!token) return { ok: false, error: "unauthenticated" }
+		return await getMatchedSeekersForListing(token, userId, listingId, limit as number)
 	} catch (error) {
 		reportError(error, {
 			action: "getMatchedSeekersAction",
-			userId: await currentUserId(),
+			userId: actionUserId,
 		})
-		return null
+		return { ok: false, error: "temporarily_unavailable" }
 	}
 }
 

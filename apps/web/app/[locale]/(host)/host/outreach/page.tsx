@@ -13,9 +13,15 @@ import { Icon, MetricCard, MetricGrid } from "@explore-and-earn/ui";
 import { HostSectionHeading } from "../../../../../components/host";
 import {
   MatchedSeekerSourcing,
+  type InviteEntitlementVM,
   type SourcingBucketVM,
 } from "../../../../../components/host/MatchedSeekerSourcing";
-import { InvitesList } from "./InvitesList";
+import type { OutreachSearchPreviewVM } from "../../../../../components/host/SeekerSearchDrawer";
+import { isDevBenchEnabled } from "../../../../../lib/devBench";
+import { devHostOutreachFixture } from "../../../../../lib/devBench/outreachFixtures";
+import { readDevRole } from "../../../../../lib/devBench/server";
+import { isSourceableOutreachListing } from "../../../../../lib/hostOutreach";
+import { InvitesList, type InviteListingVM } from "./InvitesList";
 import styles from "./page.module.css";
 
 /** How many matched seekers to source per listing bucket. */
@@ -24,7 +30,7 @@ const SEEKERS_PER_LISTING = 12;
 /**
  * NAMING (D17): the SECTION is "Outreach" — the host's outbound recruiting
  * surface, which is more than a list of invites. "Invite" stays the word for
- * the unit and its state (an invite is sent, opened, applied), and for the
+ * the unit and its state (an invite is sent, delivered, applied), and for the
  * metered credit that pays for one. Renaming the noun as well would have made
  * the allowance copy, the add-on, and the DB all read wrong.
  *
@@ -53,10 +59,8 @@ export const metadata: Metadata = { title: "Outreach" };
 // Per-host, never statically cached.
 export const dynamic = "force-dynamic";
 
-/** Statuses that mean the seeker opened/engaged the invite. */
-const OPENED_STATUSES = new Set(["viewed", "applied"]);
-/** Terminal-negative statuses — count as sent but not "in flight". */
-const COLD_STATUSES = new Set(["ignored", "expired", "withdrawn"]);
+/** Live rows awaiting a seeker decision. */
+const PENDING_STATUSES = new Set(["created", "delivered", "viewed"]);
 
 /**
  * One listing's invite funnel, grouped in memory from real `invites` rows.
@@ -67,9 +71,12 @@ interface ListingOutreach {
   readonly listingId: string;
   readonly listingTitle: string;
   readonly sent: number;
-  readonly opened: number;
+  readonly delivered: number;
   readonly applied: number;
-  readonly cold: number;
+  readonly pending: number;
+  readonly declined: number;
+  readonly expired: number;
+  readonly withdrawn: number;
   readonly latestAt: string;
 }
 
@@ -78,16 +85,22 @@ function groupByListing(invites: readonly HostInvite[]): ListingOutreach[] {
   for (const invite of invites) {
     const key = invite.listingId;
     const existing = byListing.get(key);
-    const opened = OPENED_STATUSES.has(invite.status) ? 1 : 0;
+    const delivered = invite.deliveredAt ? 1 : 0;
     const applied = invite.status === "applied" ? 1 : 0;
-    const cold = COLD_STATUSES.has(invite.status) ? 1 : 0;
+    const pending = PENDING_STATUSES.has(invite.status) ? 1 : 0;
+    const declined = invite.status === "ignored" ? 1 : 0;
+    const expired = invite.status === "expired" ? 1 : 0;
+    const withdrawn = invite.status === "withdrawn" ? 1 : 0;
     if (existing) {
       byListing.set(key, {
         ...existing,
         sent: existing.sent + 1,
-        opened: existing.opened + opened,
+        delivered: existing.delivered + delivered,
         applied: existing.applied + applied,
-        cold: existing.cold + cold,
+        pending: existing.pending + pending,
+        declined: existing.declined + declined,
+        expired: existing.expired + expired,
+        withdrawn: existing.withdrawn + withdrawn,
         latestAt:
           invite.createdAt > existing.latestAt ? invite.createdAt : existing.latestAt,
       });
@@ -96,9 +109,12 @@ function groupByListing(invites: readonly HostInvite[]): ListingOutreach[] {
         listingId: key,
         listingTitle: invite.listingTitle || "Untitled listing",
         sent: 1,
-        opened,
+        delivered,
         applied,
-        cold,
+        pending,
+        declined,
+        expired,
+        withdrawn,
         latestAt: invite.createdAt,
       });
     }
@@ -109,9 +125,10 @@ function groupByListing(invites: readonly HostInvite[]): ListingOutreach[] {
 /** Tone + label for a listing's outreach pill, driven by its real funnel. */
 function outreachTone(entry: ListingOutreach): { tone: string; label: string } {
   if (entry.applied > 0) return { tone: "hot", label: "Converting" };
-  if (entry.opened > 0) return { tone: "live", label: "Opened" };
-  if (entry.sent > entry.cold) return { tone: "live", label: "Awaiting" };
-  return { tone: "draft", label: "No response" };
+  if (entry.declined > 0) return { tone: "live", label: "Responded" };
+  if (entry.pending > 0) return { tone: "live", label: "Awaiting" };
+  if (entry.expired > 0) return { tone: "draft", label: "Expired" };
+  return { tone: "draft", label: "Withdrawn" };
 }
 
 function pct(part: number, whole: number): number {
@@ -119,10 +136,27 @@ function pct(part: number, whole: number): number {
 }
 
 export default async function HostOutreachPage() {
-  const { userId, getToken } = await auth();
-  const token = userId ? await getToken() : null;
+  let invites: readonly HostInvite[];
+  let inviteListings: readonly InviteListingVM[];
+  let entitlement: InviteEntitlementVM | null;
+  let sourcingBuckets: readonly SourcingBucketVM[];
+  let searchPreview: OutreachSearchPreviewVM | undefined;
+  let hasAnyListings = false;
+  let isDevFixture = false;
 
-  if (!userId || !token) {
+  // The exact-role local fixture must short-circuit before Clerk or database
+  // access. Any other dev role sees no host discovery data at all.
+  const devRole = isDevBenchEnabled() ? await readDevRole() : null;
+  if (devRole === "host") {
+    const fixture = devHostOutreachFixture();
+    invites = fixture.invites;
+    inviteListings = fixture.listings;
+    entitlement = fixture.entitlement;
+    sourcingBuckets = fixture.buckets;
+    searchPreview = fixture.searchPreview;
+    hasAnyListings = fixture.listings.length > 0;
+    isDevFixture = true;
+  } else if (devRole !== null) {
     return (
       <section className={styles.block}>
         <HostSectionHeading
@@ -132,48 +166,90 @@ export default async function HostOutreachPage() {
         />
       </section>
     );
+  } else {
+    const { userId, getToken } = await auth();
+    const token = userId ? await getToken() : null;
+    if (!userId || !token) {
+      return (
+        <section className={styles.block}>
+          <HostSectionHeading
+            level={1}
+            title="Outreach"
+            description="Sign in as a host to send and track your invites."
+          />
+        </section>
+      );
+    }
+
+    // Listing and invite faults reach the route error boundary. They must never
+    // impersonate an honest empty ledger or an account with no listings.
+    const [loadedInvites, listings, loadedEntitlement] = await Promise.all([
+      getHostInvites(token, userId),
+      getHostListings(token, userId),
+      getInviteEntitlement(token, userId),
+    ]);
+    invites = loadedInvites;
+    entitlement = loadedEntitlement;
+    hasAnyListings = listings.length > 0;
+
+    const nowMs = Date.now();
+    const sourceableListings = listings.filter((listing: ListingRow) =>
+      isSourceableOutreachListing(listing, nowMs),
+    );
+    inviteListings = sourceableListings.map((listing) => ({
+      id: listing.id,
+      title: listing.title || "Untitled listing",
+    }));
+
+    const bucketResults = await Promise.all(
+      sourceableListings.map(async (listing) => ({
+        listing,
+        result: await getMatchedSeekersForListing(
+          token,
+          userId,
+          listing.id,
+          SEEKERS_PER_LISTING,
+        ),
+      })),
+    );
+    sourcingBuckets = bucketResults.map(({ listing, result }) =>
+      result.ok
+        ? {
+            listingId: listing.id,
+            listingTitle: listing.title || "Untitled listing",
+            category: listing.category,
+            locationDisplay: listing.location_display,
+            state: "ready" as const,
+            seekers: result.seekers.map((seeker) => ({
+              ...seeker,
+              // Do not ask a host browser to fetch seeker-supplied photo URLs
+              // until profile media has a trusted storage/URL policy.
+              photoUrl: null,
+            })),
+          }
+        : {
+            listingId: listing.id,
+            listingTitle: listing.title || "Untitled listing",
+            category: listing.category,
+            locationDisplay: listing.location_display,
+            state: "unavailable" as const,
+          },
+    );
   }
-
-  const [invites, listings, entitlement] = await Promise.all([
-    getHostInvites(token, userId).catch(() => [] as HostInvite[]),
-    getHostListings(token, userId).catch(() => [] as ListingRow[]),
-    getInviteEntitlement(token, userId).catch(() => null),
-  ]);
-
-  // Per-listing matched-seeker buckets (ownership + discovery-safe projection
-  // enforced inside getMatchedSeekersForListing). A degraded/empty bucket never
-  // fails the page — the surface renders its honest empty state instead.
-  const bucketResults = await Promise.all(
-    listings.map(async (listing) => {
-      const result = await getMatchedSeekersForListing(
-        token,
-        userId,
-        listing.id,
-        SEEKERS_PER_LISTING,
-      ).catch(() => null);
-      return { listing, seekers: result?.seekers ?? [] };
-    }),
-  );
-  const sourcingBuckets: SourcingBucketVM[] = bucketResults.map(
-    ({ listing, seekers }) => ({
-      listingId: listing.id,
-      listingTitle: listing.title || "Untitled listing",
-      category: listing.category,
-      locationDisplay: listing.location_display,
-      seekers,
-    }),
-  );
 
   // --- Real metrics derived from the invite rows -------------------------
   const sent = invites.length;
-  const opened = invites.filter((i) => OPENED_STATUSES.has(i.status)).length;
+  const delivered = invites.filter((i) => i.deliveredAt !== null).length;
   const applied = invites.filter((i) => i.status === "applied").length;
   const byListing = groupByListing(invites);
 
   // Compact starting state: nothing sent, nothing to send to.
-  if (sent === 0 && listings.length === 0) {
+  if (sent === 0 && inviteListings.length === 0) {
     return (
-      <section className={styles.block}>
+      <section
+        className={styles.block}
+        data-dev-fixture={isDevFixture ? "host-outreach" : undefined}
+      >
         <HostSectionHeading
           level={1}
           eyebrow="Outbound recruiting"
@@ -181,16 +257,23 @@ export default async function HostOutreachPage() {
           description="Invite the seekers who fit your listings, and track every invite from sent to applied."
         />
         <div className={styles.firstRun}>
-          <h2 className={styles.firstRunTitle}>Nothing to reach out about yet</h2>
+          <h2 className={styles.firstRunTitle}>
+            {hasAnyListings
+              ? "No current listings are ready for outreach"
+              : "Nothing to reach out about yet"}
+          </h2>
           <p className={styles.firstRunLede}>
-            Outreach works from a listing: publish one and we rank the seekers
-            whose profile, timeline, and needs actually fit it. Each invite draws
-            one credit from your monthly allowance.
+            {hasAnyListings
+              ? "Outreach requires a live, verified listing with a future closing date. Review your listings to publish, verify, or extend one."
+              : "Outreach works from a listing: publish one and we rank the seekers whose profile, timeline, and needs actually fit it. Each invite draws one credit from your available invite balance."}
           </p>
           <div className={styles.firstRunActions}>
-            <Link className={styles.firstRunCta} href="/host/listings/new">
+            <Link
+              className={styles.firstRunCta}
+              href={hasAnyListings ? "/host/listings" : "/host/listings/new"}
+            >
               <Icon name="status.open" size={16} aria-hidden />
-              Create a listing
+              {hasAnyListings ? "Review listings" : "Create a listing"}
             </Link>
             <Link className={styles.firstRunGhost} href="/for-hosts/demo/outreach">
               <Icon name="action.view" size={16} aria-hidden />
@@ -203,7 +286,10 @@ export default async function HostOutreachPage() {
   }
 
   return (
-    <section className={styles.block}>
+    <section
+      className={styles.block}
+      data-dev-fixture={isDevFixture ? "host-outreach" : undefined}
+    >
       <HostSectionHeading
         level={1}
         eyebrow="Outbound recruiting"
@@ -219,10 +305,10 @@ export default async function HostOutreachPage() {
           trendTone="neutral"
         />
         <MetricCard
-          label="Opened"
-          value={`${pct(opened, sent)}%`}
-          trend={sent > 0 ? `${opened} of ${sent}` : "—"}
-          trendTone={pct(opened, sent) >= 40 ? "up" : "neutral"}
+          label="Delivered"
+          value={`${pct(delivered, sent)}%`}
+          trend={sent > 0 ? `${delivered} of ${sent}` : "—"}
+          trendTone={pct(delivered, sent) >= 40 ? "up" : "neutral"}
         />
         <MetricCard
           label="Turned into applications"
@@ -235,15 +321,35 @@ export default async function HostOutreachPage() {
       {/* --- Matched seekers: per-listing buckets + the metered invite ----- */}
       <div className={styles.section}>
         <div className={styles.sectionText}>
-          <h2 className={styles.sectionTitle}>Seekers who fit your listings</h2>
+          <h2
+            id="host-outreach-matches-heading"
+            className={styles.sectionTitle}
+          >
+            Seekers who fit your listings
+          </h2>
           <p className={styles.sectionLede}>
-            Ranked by their real match score, with the components that produced
-            it. A discovery aid, never a gate — anyone can still apply. Every
-            send draws one credit from your monthly allowance.
+            Ranked by their real aggregate match score. A discovery aid, never
+            a gate — anyone can still apply. Every
+            send uses the monthly allowance first, then purchased invite credits.
+          </p>
+          <p className={styles.sectionLede}>
+            Opted-in seekers share their display name, bio, general skills,
+            preferred categories, and match score here. Structured account
+            contact fields, exact availability, pay preferences, and résumés
+            stay private until the product&apos;s application or conversation gates
+            allow access.
           </p>
         </div>
       </div>
-      <MatchedSeekerSourcing buckets={sourcingBuckets} entitlement={entitlement} />
+      <MatchedSeekerSourcing
+        buckets={sourcingBuckets}
+        entitlement={entitlement}
+        preview={
+          isDevFixture && searchPreview
+            ? { notice: searchPreview.notice }
+            : undefined
+        }
+      />
 
       {/* --- Response tracking, grouped by listing ------------------------ */}
       {byListing.length > 0 ? (
@@ -259,14 +365,14 @@ export default async function HostOutreachPage() {
           <div className={styles.funnels}>
             {byListing.map((entry) => {
               const { tone, label } = outreachTone(entry);
-              const reach = pct(entry.opened + entry.applied, entry.sent);
+              const reach = pct(entry.delivered, entry.sent);
               return (
                 <article key={entry.listingId} className={styles.funnelCard}>
                   <div className={styles.funnelHead}>
                     <div className={styles.funnelTitles}>
                       <h3 className={styles.funnelTitle}>{entry.listingTitle}</h3>
                       <p className={styles.funnelStats}>
-                        {entry.sent} sent · {entry.opened} opened · {entry.applied}{" "}
+                        {entry.sent} sent · {entry.delivered} delivered · {entry.applied}{" "}
                         applied
                       </p>
                     </div>
@@ -280,24 +386,33 @@ export default async function HostOutreachPage() {
                     aria-valuenow={reach}
                     aria-valuemin={0}
                     aria-valuemax={100}
-                    aria-label={`${entry.listingTitle} invite engagement`}
+                    aria-label={`${entry.listingTitle} invite delivery`}
                   >
                     <span
                       className={styles.trackFill}
-                      style={{ width: `${Math.max(reach, 4)}%` }}
+                      style={{ width: `${reach}%` }}
                     />
                   </div>
                   <div className={styles.funnelTags}>
                     <span className={styles.tag}>
                       <Icon name="action.view" size={16} aria-hidden />
-                      {pct(entry.opened, entry.sent)}% opened
+                      {pct(entry.delivered, entry.sent)}% delivered
                     </span>
                     <span className={styles.tag}>
                       <Icon name="status.applied" size={16} aria-hidden />
                       {pct(entry.applied, entry.sent)}% applied
                     </span>
-                    {entry.cold > 0 ? (
-                      <span className={styles.tag}>{entry.cold} no response</span>
+                    {entry.declined > 0 ? (
+                      <span className={styles.tag}>{entry.declined} declined</span>
+                    ) : null}
+                    {entry.expired > 0 ? (
+                      <span className={styles.tag}>{entry.expired} expired</span>
+                    ) : null}
+                    {entry.withdrawn > 0 ? (
+                      <span className={styles.tag}>{entry.withdrawn} withdrawn</span>
+                    ) : null}
+                    {entry.pending > 0 ? (
+                      <span className={styles.tag}>{entry.pending} awaiting response</span>
                     ) : null}
                     <Link
                       className={styles.funnelLink}
@@ -320,12 +435,18 @@ export default async function HostOutreachPage() {
           <h2 className={styles.sectionTitle}>Sent invites</h2>
           <p className={styles.sectionLede}>
             Seekers you have invited to apply — withdraw any that are still
-            pending. A withdrawn invite returns its credit only if it was never
-            delivered.
+			pending. A withdrawal completed before delivery processing starts
+			reverses the original charge: monthly credit returns to that original
+			month, while a purchased credit returns to the reusable balance.
           </p>
         </div>
       </div>
-      <InvitesList invites={invites} listings={listings} />
+      <InvitesList
+        invites={invites}
+        listings={inviteListings}
+        hasAnyListings={hasAnyListings}
+        preview={searchPreview}
+      />
     </section>
   );
 }

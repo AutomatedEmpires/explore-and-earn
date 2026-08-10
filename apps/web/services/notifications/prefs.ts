@@ -107,6 +107,19 @@ export function overlayLegacyEmailBooleans(
 	return { ...resolved, categories }
 }
 
+/**
+ * One consent authority for both immediate delivery and digest send-time
+ * rechecks. A legacy opt-out restricts defaults only while no engine row
+ * exists; an explicit engine row supersedes the old settings surface.
+ */
+export function resolveEffectivePrefs(
+	row: EnginePrefsRow | null,
+	legacy: LegacyEmailBooleans | null,
+): ResolvedNotificationPrefs {
+	const resolved = resolvePrefs(row)
+	return row ? resolved : overlayLegacyEmailBooleans(resolved, legacy)
+}
+
 export interface ChannelPlan {
 	readonly channel: EngagementChannel
 	/** immediate → a live delivery row; daily/weekly → digest membership. */
@@ -115,8 +128,11 @@ export interface ChannelPlan {
 
 /**
  * Plan which channels an intent goes out on, honoring master switches,
- * per-category cadences, and the urgent override (a digest cadence must not
- * bury a REAL imminent expiry — those go immediate). Returns [] when the
+ * per-category cadences, and the urgent override. A digest cadence must not
+ * bury a REAL imminent expiry. Invitations never override a seeker's chosen
+ * cadence, but they also cannot enter the unclaimed digest-member send path:
+ * only an explicit immediate email preference creates invitation email.
+ * Returns [] when the
  * user has turned everything relevant off; the dispatcher then records the
  * event as processed WITHOUT creating deliveries (suppressed by preference,
  * not lost).
@@ -127,12 +143,17 @@ export function planChannels(
 ): ChannelPlan[] {
 	const cat = prefs.categories[intent.category] ?? DEFAULT_CATEGORY_PREFS[intent.category]
 	const urgent = (URGENT_NOTIFICATION_TYPES as readonly string[]).includes(intent.type)
+	const immediateOnly = intent.type === "invite_received"
 	const plans: ChannelPlan[] = []
 
 	if (prefs.inAppEnabled && cat.inApp === "on") {
 		plans.push({ channel: "in_app", cadence: "immediate" })
 	}
-	if (prefs.emailEnabled && cat.email !== "off") {
+	if (
+		prefs.emailEnabled &&
+		cat.email !== "off" &&
+		(!immediateOnly || cat.email === "immediate")
+	) {
 		plans.push({
 			channel: "email",
 			cadence: urgent ? "immediate" : cat.email,

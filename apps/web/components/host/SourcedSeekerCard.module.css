@@ -48,19 +48,6 @@
   min-width: 0;
 }
 
-.photo {
-  display: block;
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-pill);
-  background-color: var(--color-surface);
-  background-position: center;
-  background-size: cover;
-  background-repeat: no-repeat;
-  border: 1px solid var(--border-soft);
-}
-
 .avatar {
   display: inline-flex;
   align-items: center;
@@ -135,22 +122,6 @@
   opacity: 0.7;
 }
 
-.reason {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-6);
-  margin: 0;
-  color: var(--text-secondary);
-  font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  line-height: var(--type-meta-lh);
-}
-
-.reason svg {
-  flex: none;
-  color: var(--status-match-fg);
-}
-
 .bio {
   margin: 0;
   color: var(--text-primary);
@@ -175,6 +146,7 @@
 .skill {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   padding: var(--space-4) var(--space-10);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--text-muted) 10%, transparent);
@@ -184,7 +156,8 @@
   font-size: var(--type-caption-size);
   line-height: var(--type-caption-lh);
   font-weight: var(--font-weight-medium);
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .skillMore {

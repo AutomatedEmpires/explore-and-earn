@@ -531,7 +531,8 @@ describe("outreach honesty (§8)", () => {
   });
 
   it("keeps every funnel figure derived from real invite rows", () => {
-    expect(OUTREACH).toContain("invites.filter((i) => OPENED_STATUSES.has(i.status))");
+    expect(OUTREACH).toContain("invites.filter((i) => i.deliveredAt !== null)");
+    expect(OUTREACH).not.toContain("OPENED_STATUSES");
     expect(OUTREACH).toContain('invites.filter((i) => i.status === "applied")');
   });
 

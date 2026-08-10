@@ -237,6 +237,40 @@ describe("planChannels", () => {
 		expect(plans).toEqual([{ channel: "email", cadence: "immediate" }]);
 	});
 
+	it("keeps invitation email out of digest membership without overriding the chosen cadence", () => {
+		const categories = {
+			...DEFAULT_CATEGORY_PREFS,
+			offers_invites: { email: "weekly" as const, push: "off" as const, inApp: "off" as const },
+		};
+		const intent = { category: "offers_invites" as const, type: "invite_received" as const };
+
+		expect(
+			planChannels(
+				intent,
+				prefsWith({ pushEnabled: false, inAppEnabled: false, categories }),
+			),
+		).toEqual([]);
+		expect(
+			planChannels(
+				intent,
+				prefsWith({
+					pushEnabled: false,
+					inAppEnabled: false,
+					categories: {
+						...categories,
+						offers_invites: { ...categories.offers_invites, email: "immediate" },
+					},
+				}),
+			),
+		).toEqual([{ channel: "email", cadence: "immediate" }]);
+		expect(
+			planChannels(
+				intent,
+				prefsWith({ emailEnabled: false, pushEnabled: false, inAppEnabled: false, categories }),
+			),
+		).toEqual([]);
+	});
+
 	it("returns [] when everything is off", () => {
 		const prefs = prefsWith({
 			emailEnabled: false,

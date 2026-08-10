@@ -7,6 +7,7 @@ import {
 	collapseDeliveriesInto,
 	getDeliveryByDedupKey,
 	getEnginePrefsMap,
+	getLegacySeekerEmailBooleans,
 	getExpiringLiveListings,
 	getExpiringOfferedApplications,
 	getQueuedDigestMemberships,
@@ -28,7 +29,7 @@ import { getClerkContact } from "../../lib/clerkUser"
 import { reportError } from "../../lib/sentry"
 import { enqueueScheduleDerived } from "./dispatcher"
 import { resolveEngineStage, stageGateForSend } from "./stage"
-import { resolvePrefs } from "./prefs"
+import { planChannels, resolveEffectivePrefs, type EnginePrefsRow } from "./prefs"
 import { localizedPath, renderMessage } from "./render"
 import type { PreIntent } from "./taxonomy"
 import { createUnsubscribeToken } from "./unsubscribe"
@@ -105,6 +106,34 @@ interface DigestItem {
 	readonly membershipId: string
 	readonly deliveryId: string | null
 	readonly intent: NotificationIntent | null
+}
+
+const DIGEST_CONSENT_WITHDRAWN = "digest preference withdrawn before send"
+
+function isDigestIntentPlanned(
+	intent: NotificationIntent | null,
+	prefs: ReturnType<typeof resolveEffectivePrefs>,
+	cadence: "daily" | "weekly",
+): boolean {
+	return (
+		intent !== null &&
+		planChannels(intent, prefs).some(
+			(plan) => plan.channel === "email" && plan.cadence === cadence,
+		)
+	)
+}
+
+async function loadEffectivePrefsForRecipient(
+	recipientClerkUserId: string,
+): Promise<ReturnType<typeof resolveEffectivePrefs>> {
+	const prefsMap = await getEnginePrefsMap([recipientClerkUserId])
+	const row = (prefsMap.get(recipientClerkUserId) as EnginePrefsRow | undefined) ?? null
+	const legacy = row
+		? null
+		: ((await getLegacySeekerEmailBooleans([recipientClerkUserId])).get(
+				recipientClerkUserId,
+			) ?? null)
+	return resolveEffectivePrefs(row, legacy)
 }
 
 async function sendDigestForRecipient(args: {
@@ -233,6 +262,7 @@ async function sendDigestForRecipient(args: {
 		? `${escapeHtml(footerNote)} <a href="${escapeHtml(unsubscribeUrl)}" style="color:inherit;">${escapeHtml(unsubscribeLabel)}</a>`
 		: escapeHtml(footerNote)
 
+	let consentWithdrawnMembershipIds: readonly string[] = []
 	const result = await sendEmail({
 		to: contact.email,
 		subject,
@@ -249,9 +279,35 @@ async function sendDigestForRecipient(args: {
 		}${unsubscribeUrl ? `\n\n${unsubscribeLabel}: ${unsubscribeUrl}` : ""}`,
 		template: `engine:digest:${cadence}`,
 		idempotencyKey: dedupKey,
+		beforeProviderRequest: async () => {
+			// The recipient loop can run for minutes. Re-read the exact recipient's
+			// effective engine + legacy preferences at the provider boundary so an
+			// opt-out made after the batch snapshot cannot be emailed.
+			const latestPrefs = await loadEffectivePrefsForRecipient(
+				recipientClerkUserId,
+			)
+			consentWithdrawnMembershipIds = items
+				.filter((item) => !isDigestIntentPlanned(item.intent, latestPrefs, cadence))
+				.map((item) => item.membershipId)
+			return consentWithdrawnMembershipIds.length === 0
+				? { actionable: true }
+				: { actionable: false, reason: DIGEST_CONSENT_WITHDRAWN }
+		},
 		...(unsubscribeHeaders ? { headers: unsubscribeHeaders } : {}),
 	})
 
+	if (result.cancelledReason === DIGEST_CONSENT_WITHDRAWN) {
+		await cancelDigestMemberships(consentWithdrawnMembershipIds)
+		// Keep the window reusable for any still-consented memberships. A later
+		// run rebuilds the digest from the authoritative queued set; it must not
+		// mark unsent items delivered or reuse the stale rendered body.
+		await settleDelivery({
+			id: digestRow.id,
+			status: "deferred",
+			nextAttemptAt: "9999-01-01T00:00:00.000Z",
+		})
+		return "skipped"
+	}
 	if (!result.ok) return "failed" // memberships stay queued; retried next run
 
 	await settleDelivery({
@@ -299,6 +355,13 @@ export async function runDigests(
 	if (byRecipient.size === 0) return stats
 
 	const prefsMap = await getEnginePrefsMap([...byRecipient.keys()])
+	const withoutPrefsRow = [...byRecipient.keys()].filter(
+		(recipient) => !prefsMap.has(recipient),
+	)
+	const legacyPrefsMap =
+		withoutPrefsRow.length > 0
+			? await getLegacySeekerEmailBooleans(withoutPrefsRow)
+			: new Map()
 	for (const [recipient, allRows] of byRecipient) {
 		// Per-recipient stage gate (internal_preview/limited): gated recipients
 		// are skipped entirely — memberships stay queued, windows unconsumed.
@@ -311,14 +374,29 @@ export async function runDigests(
 		// CONSENT RE-CHECK at send time: memberships can queue for days —
 		// categories (or email entirely) the user has since turned off are
 		// cancelled here, never sent. resolvePrefs on the CURRENT row.
-		const currentPrefs = resolvePrefs(prefsRow)
+		const currentPrefs = resolveEffectivePrefs(
+			prefsRow as EnginePrefsRow | null,
+			legacyPrefsMap.get(recipient) ?? null,
+		)
 		const withdrawn: string[] = []
 		const rows: QueuedDigestMembership[] = []
 		for (const row of allRows) {
-			const category = row.category as keyof typeof currentPrefs.categories
-			const categoryPrefs = currentPrefs.categories[category]
+			const rawIntent = row.delivery?.intent
+			const intent =
+				rawIntent &&
+				typeof rawIntent === "object" &&
+				"category" in rawIntent &&
+				"type" in rawIntent &&
+				typeof rawIntent.category === "string" &&
+				typeof rawIntent.type === "string"
+					? (rawIntent as NotificationIntent)
+					: null
+			const categoryPrefs = intent
+				? currentPrefs.categories[intent.category]
+				: undefined
 			const consented =
-				currentPrefs.emailEnabled && categoryPrefs !== undefined && categoryPrefs.email !== "off"
+				categoryPrefs !== undefined &&
+				isDigestIntentPlanned(intent, currentPrefs, cadence)
 			if (consented) rows.push(row)
 			else withdrawn.push(row.id)
 		}
