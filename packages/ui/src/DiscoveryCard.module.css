@@ -781,24 +781,6 @@ button.metaRow:focus-visible {
   margin: 0;
 }
 
-/* The four facts a seeker needs to decide whether a role is workable. This
-   block never collapses when data is missing; the value says "Not stated". */
-.glanceFacts {
-  gap: var(--space-6);
-  padding-block: var(--space-4);
-}
-
-.glanceFacts .factItem:first-child {
-  justify-content: flex-start;
-  gap: var(--space-8);
-}
-
-.glanceFacts .factItem:first-child .factValue {
-  font-size: var(--type-card-size);
-  line-height: var(--type-card-lh);
-  font-weight: var(--font-weight-bold);
-}
-
 .factItem {
   display: flex;
   align-items: baseline;
@@ -825,27 +807,11 @@ button.metaRow:focus-visible {
   font-weight: var(--font-weight-semibold);
   color: var(--text-primary);
   text-align: right;
-  /* Host summaries are free text of any length; two lines then ellipsis, with
-     the full text in the Housing/Meals popover. */
+  /* Host-entered facts can be long; keep this supporting row compact. */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-.factValue:is([data-state="not_stated"], [data-state="not_scored"]) {
-  color: var(--text-muted);
-  font-weight: var(--font-weight-medium);
-}
-
-/* The Match row is intentionally emphasized only when it carries a score.
-   Match the first-row selector's specificity so its bold weight cannot win for
-   an honest "Not scored" value. */
-.glanceFacts .factItem:first-child .factValue:is(
-  [data-state="not_stated"],
-  [data-state="not_scored"]
-) {
-  font-weight: var(--font-weight-medium);
 }
 
 .perks {
@@ -869,7 +835,7 @@ button.metaRow:focus-visible {
   padding: var(--space-4) var(--space-10);
 }
 
-/* ── DECISION META (why it matched · when it closes · what's missing) ─────── */
+/* ── INCOMPLETE-RECORD DISCLOSURE ────────────────────────────────────────── */
 
 .decisionMeta {
   display: flex;
@@ -877,8 +843,6 @@ button.metaRow:focus-visible {
   gap: var(--space-6);
 }
 
-.reasons,
-.closes,
 .missing {
   display: flex;
   align-items: flex-start;
@@ -889,40 +853,9 @@ button.metaRow:focus-visible {
   line-height: var(--type-meta-lh);
 }
 
-.reasons {
-  color: var(--text-secondary);
-}
-
-.reasons :global(svg),
-.closes :global(svg),
 .missing :global(svg) {
   flex-shrink: 0;
   margin-top: 2px;
-}
-
-.reasonsMore {
-  appearance: none;
-  background: none;
-  border: none;
-  padding: 0;
-  margin-left: auto;
-  font: inherit;
-  font-weight: var(--font-weight-bold);
-  color: var(--color-cta);
-  text-decoration: underline;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.reasonsMore:focus-visible {
-  outline: none;
-  border-radius: var(--radius-control);
-  box-shadow: var(--ui-focus-ring);
-}
-
-.closes {
-  color: var(--status-warning-fg);
-  font-weight: var(--font-weight-semibold);
 }
 
 /* The gap disclosure. Muted by default; when enough is unanswered that the card

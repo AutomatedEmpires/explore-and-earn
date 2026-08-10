@@ -81,40 +81,18 @@ export interface DiscoveryCardData {
 	}
 	readonly fillPercent?: number
 
-	// ── Card v2 (V2-G) ────────────────────────────────────────────────────────
+	// ── Self-omitting card facts ───────────────────────────────────────────────
 	//
-	// Every field below is OPTIONAL and self-omitting, and the card renders each
-	// one ONLY when it is present. That is the whole design: a listing whose host
-	// never answered a question shows the question as unanswered (see the
-	// "what's missing" line below), never a plausible default. Display strings
-	// arrive pre-formatted from the host app so this package stays locale-free.
+	// These optional facts stay compact. Season length, full housing/meals copy,
+	// listing-close timing and match explanations belong to the detail experience,
+	// not to a repeated footer on every discovery card.
 
-	/** Derived from begins/ends by formatSeasonLength, e.g. "about 12 weeks". */
-	readonly seasonLength?: string
-	/**
-	 * Pre-formatted `listings.expires_at`. Rendered as "Listing closes …" and
-	 * NEVER as an application deadline: the schema stores no deadline, and
-	 * promoting an expiry into one would invent a commitment.
-	 */
-	readonly closesOn?: string
 	/** Host-stated `experience_level_required`. */
 	readonly experienceLevel?: string
 	/** Host-stated `physical_demand`, 0–3. Absent = unstated (never 0). */
 	readonly physicalDemand?: number
 	/** Host-stated listing perks (060). Up to three are shown. */
 	readonly perks?: readonly string[]
-	/** Host's free-text housing summary (`housing_description`). */
-	readonly housingSummary?: string
-	/** Host's free-text meals summary (`meals_description`). */
-	readonly mealsSummary?: string
-	/**
-	 * Render-time match reasons, computed from the stored component scores. Shown
-	 * only beside a shown match score — an explanation of a hidden number is an
-	 * explanation of nothing.
-	 */
-	readonly matchReasons?: readonly { readonly label: string }[]
-	/** ADR-040 confidence (data quality), distinct from the score. */
-	readonly matchConfidence?: number
 	/** Employer logo/mark for the info-zone chip (`host_profiles.photo_url`). */
 	readonly employerLogoUrl?: string
 
@@ -268,44 +246,6 @@ const SECONDARY_TONE_CLASS: Record<SecondaryTone, string> = {
 	warning: styles.toneWarning,
 	muted: styles.toneMuted,
 	error: styles.toneError,
-}
-
-// The card's benefit state is decided by benefitCardState() in contracts —
-// pure, tested, and shared, because the private version of this inference is
-// what let the card announce "Housing: included" for a listing nobody had
-// answered.
-/**
- * Resolve one seeker-facing benefit value without turning silence into a
- * promise. Evidence/provision wins over stale summary text; once the benefit is
- * known to be answered, prefer the host's concise summary and then the triad
- * fallback already carried by the canonical card contract.
- */
-function benefitTruthValue(
-	provision: BenefitProvision | undefined,
-	evidence: BenefitEvidenceStatus | undefined,
-	summary: string | undefined,
-	fallback: string,
-): string {
-	const state = benefitCardState(provision, evidence)
-	if (state === "not_stated") {
-		return NOT_STATED_LABEL
-	}
-	// An explicit NO is authoritative. Old summary copy can survive a host
-	// changing the provision, so it must never override the current decision.
-	if (state === "not_provided") {
-		return "Not provided"
-	}
-	const statedSummary = summary?.trim()
-	// `benefitCardState` intentionally folds partial into its positive state for
-	// card color semantics. Preserve the finer provision truth in visible copy,
-	// including when the host also supplied a useful summary.
-	if (provision === "partial") {
-		return statedSummary ? `Partial — ${statedSummary}` : "Partial"
-	}
-	if (statedSummary) {
-		return statedSummary
-	}
-	return fallback.trim() || "Provided"
 }
 
 // ─── Benefit triad cell (housing / meals / pay) ────────────────────────────
@@ -629,34 +569,7 @@ export function DiscoveryCard({
 	})
 	const missingSentence = missingFactsSentence(record.missing)
 
-	// The primary decision snapshot is always present on seeker listing cards.
-	// Unanswered fields say so directly instead of disappearing and making the
-	// card look complete. The stored match is never recomputed here.
-	const matchValue =
-		typeof data.matchScore === "number" && Number.isFinite(data.matchScore)
-			? `${clampPct(data.matchScore)}%`
-			: "Not scored"
-	const glanceFacts = [
-		{ key: "match", label: "Match", value: matchValue },
-		{
-			key: "season",
-			label: "Season length",
-			value: data.seasonLength?.trim() || NOT_STATED_LABEL,
-		},
-		{
-			key: "housing",
-			label: "Housing",
-			value: benefitTruthValue(hp, ev?.housing, data.housingSummary, data.triad.housing),
-		},
-		{
-			key: "meals",
-			label: "Meals",
-			value: benefitTruthValue(mp, ev?.meals, data.mealsSummary, data.triad.meals),
-		},
-	] as const
-
-	// Additional stored facts stay self-omitting: unlike the core snapshot above,
-	// these are not required to decide whether a seeker can take the role.
+	// Additional stored facts stay self-omitting.
 	const DEMAND_LABEL = ["Light", "Moderate", "Demanding", "Very demanding"] as const
 	const facts: { key: string; label: string; value: string }[] = []
 	if (data.experienceLevel) facts.push({ key: "experience", label: "Experience", value: data.experienceLevel })
@@ -669,13 +582,6 @@ export function DiscoveryCard({
 		facts.push({ key: "demand", label: "Physical demand", value: DEMAND_LABEL[data.physicalDemand] })
 	}
 	const topPerks = (data.perks ?? []).slice(0, 3)
-	const reasonLabels = (data.matchReasons ?? []).map((reason) => reason.label)
-	// The reasons row explains a number the card is SHOWING. When the score is
-	// below the display threshold there is no number on screen, so there is
-	// nothing to explain and the row is not rendered.
-	const showReasons = reasonLabels.length > 0 && matchCenterEligible
-	const lowConfidence =
-		typeof data.matchConfidence === "number" && data.matchConfidence < 55
 
 	const hostCircleClass = [
 		styles.hostCircle,
@@ -1104,36 +1010,9 @@ export function DiscoveryCard({
 					</div>
 				)}
 
-				{/* Core decision snapshot — Match, season length and the host's own
-				    Housing/Meals wording remain visible on every seeker listing card.
-				    Missing values are explicit, never silently omitted. */}
-				{!isApplicantReview && !isAdminReview ? (
-					<dl className={`${styles.factList} ${styles.glanceFacts}`} aria-label="Opportunity at a glance">
-						{glanceFacts.map((fact) => (
-							<div key={fact.key} className={styles.factItem}>
-								<dt className={styles.factLabel}>{fact.label}</dt>
-								<dd
-									className={styles.factValue}
-									data-state={
-										fact.key === "match" && fact.value === "Not scored"
-											? "not_scored"
-											: fact.value === NOT_STATED_LABEL
-												? "not_stated"
-												: undefined
-									}
-								>
-									{fact.value}
-								</dd>
-							</div>
-						))}
-					</dl>
-				) : null}
-
 				{/* ── 8. STATED FACTS (V2-G info zone) ──────────────────────────────
-				    Season length, experience, physical demand, and the host's own
-				    housing/meals summaries. Rendered ONLY where a host actually filled
-				    the column in — an empty list produces no section, because a row of
-				    em-dashes is a worse answer than no row. */}
+				    Experience, physical demand and perks are rendered ONLY where a host
+				    actually filled them in. */}
 				{!isApplicantReview && (facts.length > 0 || topPerks.length > 0) ? (
 					<div className={styles.facts}>
 						{facts.length > 0 ? (
@@ -1158,52 +1037,19 @@ export function DiscoveryCard({
 					</div>
 				) : null}
 
-				{/* ── 9. DECISION META ──────────────────────────────────────────────
-				    Why this matched, when the listing closes, and what the host has
-				    left unanswered. All three are decision inputs, so they sit
-				    immediately above the decision itself. */}
-				{!isApplicantReview && !isAdminReview &&
-				(showReasons || data.closesOn || missingSentence) ? (
+				{/* ── 9. RECORD DISCLOSURE ──────────────────────────────────────────
+				    Keep incomplete records honest without repeating detail-page facts. */}
+				{!isApplicantReview && !isAdminReview && missingSentence ? (
 					<div className={styles.decisionMeta}>
-						{showReasons ? (
-							<p className={styles.reasons}>
-								<Icon name="status.match" size={14} aria-hidden />
-								<span>
-									Strong on {reasonLabels.join(" · ")}
-									{lowConfidence ? " — based on a partly-filled profile" : ""}
-								</span>
-								{onMatchClick ? (
-									<button
-										type="button"
-										className={styles.reasonsMore}
-										onClick={() => onMatchClick(data.id)}
-									>
-										Why?
-									</button>
-								) : null}
-							</p>
-						) : null}
-
-						{data.closesOn ? (
-							/* "Listing closes", never "apply by": the schema stores an
-							   expiry, not a deadline, and the two make different promises. */
-							<p className={styles.closes}>
-								<Icon name="status.ends" size={14} aria-hidden />
-								Listing closes {data.closesOn}
-							</p>
-						) : null}
-
-						{missingSentence ? (
-							<p
-								className={styles.missing}
-								data-reduced={record.reducedConfidence ? "true" : undefined}
-							>
-								<Icon name="system.info" size={14} aria-hidden />
-								<span>
-									{missingSentence}. {record.completeness}% of this listing is answered.
-								</span>
-							</p>
-						) : null}
+						<p
+							className={styles.missing}
+							data-reduced={record.reducedConfidence ? "true" : undefined}
+						>
+							<Icon name="system.info" size={14} aria-hidden />
+							<span>
+								{missingSentence}. {record.completeness}% of this listing is answered.
+							</span>
+						</p>
 					</div>
 				) : null}
 

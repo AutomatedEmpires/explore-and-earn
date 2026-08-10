@@ -237,7 +237,7 @@ test.describe("offered application navigation on phones", () => {
           exact: true,
         }),
       ).toBeVisible();
-      await expect(card.getByText("about 3 months", { exact: true })).toBeVisible();
+      await expect(card.getByText("about 3 months", { exact: true })).toHaveCount(0);
       await expect(
         card.getByRole("button", { name: "Housing: included", exact: true }),
       ).toBeVisible();
@@ -250,10 +250,10 @@ test.describe("offered application navigation on phones", () => {
       await expect(
         card.getByRole("button", { name: "Pay — $17/hr", exact: true }),
       ).toBeVisible();
-      await expect(card.getByText("Shared bunkhouse", { exact: true })).toBeVisible();
+      await expect(card.getByText("Shared bunkhouse", { exact: true })).toHaveCount(0);
       await expect(
         card.getByText("Partial — Lunch on shift", { exact: true }),
-      ).toBeVisible();
+      ).toHaveCount(0);
       await expect(applicationLink).toHaveAttribute("href", APPLICATION_PATH);
 
       await expectTouchTarget(applicationLink, "View application");

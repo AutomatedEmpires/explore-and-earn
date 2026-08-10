@@ -5,7 +5,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import {
-  NOT_STATED_LABEL,
   cardRecordCompleteness,
   formatSeasonLength,
   missingFactsSentence,
@@ -29,9 +28,9 @@ import {
  * included" rendering identical text — both passed a prop-level test suite,
  * because a prop being set says nothing about what a seeker sees.
  *
- * The negative cases are the real tests. A card that CAN show a season length
- * proves nothing; a card that REFUSES to invent one when the host gave only a
- * start date is the whole point.
+ * The negative cases are the real tests. Detail-only values can still travel
+ * through older fixture objects, but the shared card must refuse to grow the
+ * removed metadata footer back on any surface.
  */
 
 const webRoot = new URL("../../", import.meta.url);
@@ -139,38 +138,34 @@ describe("card state matrix", () => {
 // ── 2. Fields the card renders, and the ones it refuses to invent ──────────
 
 describe("stated facts come from stored columns only", () => {
-  it("renders a season length when the host gave both dates", () => {
-    const html = render({
-      data: base({ seasonLength: "about 12 weeks" }),
-    });
-    expect(html).toContain("Season length");
-    expect(html).toContain("about 12 weeks");
-  });
+  it("omits the detail metadata footer while preserving the compact card signals", () => {
+    // These properties model a stale caller compiled against the retired card
+    // footer contract. Runtime input must still be harmless: one shared card
+    // powers demo, search, map, saved, lifecycle, and preview surfaces.
+    const data = {
+      ...base({ matchScore: 86 }),
+      seasonLength: "about 2 months",
+      closesOn: "Aug 22",
+      housingSummary: "Optional shared staff cabin",
+      mealsSummary: "One staff meal per shift; two on double shifts",
+      matchReasons: [{ label: "availability" }],
+      matchConfidence: 42,
+    } as DiscoveryCardData;
+    const html = render({ data });
 
-  it("keeps the core decision snapshot visible and names missing values", () => {
-    const html = render({
-      data: base({
-        triad: { housing: "", meals: "", pay: "" },
-        benefitProvision: {
-          housing: "not_stated",
-          meals: "not_stated",
-          pay: "not_stated",
-        },
-      }),
-    });
-    for (const label of ["Match", "Season length", "Housing", "Meals", "Pay"]) {
-      expect(html).toContain(label);
-    }
-    expect(html).toContain("Not scored");
-    expect(html).toContain('data-state="not_scored"');
-    expect(html.match(new RegExp(NOT_STATED_LABEL, "g"))?.length ?? 0).toBeGreaterThanOrEqual(4);
-  });
+    expect(html).not.toContain('aria-label="Opportunity at a glance"');
+    expect(html).not.toContain("about 2 months");
+    expect(html).not.toContain("Optional shared staff cabin");
+    expect(html).not.toContain("One staff meal per shift; two on double shifts");
+    expect(html).not.toContain("Listing closes Aug 22");
+    expect(html).not.toContain("Strong on availability");
 
-  it("labels the expiry as a listing close, NEVER as an application deadline", () => {
-    const html = render({ data: base({ closesOn: "Sep 4" }) });
-    expect(html).toContain("Listing closes Sep 4");
-    expect(html.toLowerCase()).not.toContain("apply by");
-    expect(html.toLowerCase()).not.toContain("deadline");
+    // The request removes the pictured lower metadata block, not the concise
+    // match pill or the locked Housing / Meals / Pay decision strip above it.
+    expect(html).toContain('aria-label="Match 86 percent"');
+    expect(html).toContain('aria-label="Housing: included"');
+    expect(html).toContain('aria-label="Meals: included"');
+    expect(html).toContain('aria-label="Pay — $18/hr"');
   });
 
   it("renders experience level and physical demand only when stored", () => {
@@ -196,61 +191,6 @@ describe("stated facts come from stored columns only", () => {
     expect(render({ data: base({ physicalDemand: 0 }) })).toContain("Light");
   });
 
-  it("renders the host's own housing and meals summaries", () => {
-    const html = render({
-      data: base({
-        housingSummary: "Private cabin, shared bath",
-        mealsSummary: "Three crew meals daily",
-      }),
-    });
-    expect(html).toContain("Private cabin, shared bath");
-    expect(html).toContain("Three crew meals daily");
-  });
-
-  it("lets an explicit not-provided decision override stale summary copy", () => {
-    const html = render({
-      data: base({
-        housingSummary: "Stale private cabin copy",
-        benefitProvision: {
-          housing: "not_provided",
-          meals: "provided",
-          pay: "provided",
-        },
-      }),
-    });
-    expect(html).toContain("Not provided");
-    expect(html).not.toContain("Stale private cabin copy");
-  });
-
-  it("preserves partial benefit truth alongside a host summary", () => {
-    const partial = render({
-      data: base({
-        housingSummary: "Weekday breakfast only",
-        benefitProvision: {
-          housing: "partial",
-          meals: "provided",
-          pay: "provided",
-        },
-      }),
-    });
-    expect(partial).toContain("Partial — Weekday breakfast only");
-  });
-
-  it("lets not-stated evidence override stale benefit summary copy", () => {
-    const unstated = render({
-      data: base({
-        mealsSummary: "Stale crew dinner copy",
-        benefitProvision: {
-          housing: "provided",
-          meals: "not_stated",
-          pay: "provided",
-        },
-      }),
-    });
-    expect(unstated).toContain(NOT_STATED_LABEL);
-    expect(unstated).not.toContain("Stale crew dinner copy");
-  });
-
   it("lets explicit not-provided pay override a stale rate everywhere", () => {
     const html = render({
       data: base({
@@ -265,32 +205,6 @@ describe("stated facts come from stored columns only", () => {
     expect(html).toContain(">Not provided<");
     expect(html).toContain('aria-label="Pay: not provided"');
     expect(html).not.toContain("$99/hr stale");
-  });
-
-  it("keeps an unscored Match value muted despite first-row emphasis", () => {
-    const css = readFileSync(
-      new URL("../../../../packages/ui/src/DiscoveryCard.module.css", import.meta.url),
-      "utf8",
-    );
-    expect(css).toMatch(
-      /\.glanceFacts \.factItem:first-child \.factValue:is\([\s\S]*?\[data-state="not_scored"\][\s\S]*?\)\s*\{[\s\S]*?font-weight: var\(--font-weight-medium\);/,
-    );
-  });
-
-  it("renders stored match, season, housing and meals together at a glance", () => {
-    const html = render({
-      data: base({
-        matchScore: 88,
-        seasonLength: "about 3 months",
-        housingSummary: "Shared bunkhouse",
-        mealsSummary: "Lunch on shift",
-      }),
-    });
-    expect(html).toContain("88%");
-    expect(html).toContain("about 3 months");
-    expect(html).toContain("Shared bunkhouse");
-    expect(html).toContain("Lunch on shift");
-    expect(html).toContain('aria-label="Opportunity at a glance"');
   });
 
   it("shows at most three perks even when the host listed more", () => {
@@ -527,39 +441,14 @@ describe("the card's explainers are real dialogs", () => {
   });
 });
 
-// ── 6. Match explanation is derived, never stored (G34) ───────────────────
+// ── 6. Match explanation stays in the detail experience ───────────────────
 
 describe("match reasons", () => {
-  it("renders the reasons beside a shown score", () => {
-    const html = render({
-      data: base({
-        matchScore: 88,
-        matchReasons: [{ label: "availability" }, { label: "pay" }],
-      }),
-    });
-    expect(html).toContain("Strong on availability · pay");
-  });
-
-  it("shows NO reasons when the score is below the display threshold", () => {
-    // Explaining a number the card is not showing is an explanation of nothing.
-    const html = render({
-      data: base({
-        matchScore: 40,
-        matchReasons: [{ label: "availability" }],
-      }),
-    });
-    expect(html).not.toContain("Strong on");
-  });
-
-  it("flags a low-confidence score rather than presenting it as settled", () => {
-    const html = render({
-      data: base({
-        matchScore: 88,
-        matchConfidence: 30,
-        matchReasons: [{ label: "pay" }],
-      }),
-    });
-    expect(html).toContain("partly-filled profile");
+  it("keeps match reasons and confidence in the accessible detail explainer", () => {
+    const popover = read("components/discovery/CardDetailPopover.tsx");
+    expect(popover).toContain("listing.matchReasons");
+    expect(popover).toContain("listing.matchConfidence");
+    expect(popover).toContain("Why this matched you");
   });
 
   it("derives reason text at map time and stores none of it", () => {

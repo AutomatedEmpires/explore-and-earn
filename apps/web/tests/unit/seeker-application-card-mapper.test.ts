@@ -61,7 +61,7 @@ describe("seeker application lifecycle card mapping", () => {
       conditionalBadges: ["boosted"],
       matchScore: 88,
     });
-    expect(card.seasonLength).toBe("about 5 months");
+    expect(card).not.toHaveProperty("seasonLength");
     expect(card.triad).toEqual({
       housing: "Staff dorm room",
       meals: "Staff cafeteria",
@@ -111,12 +111,12 @@ describe("seeker application lifecycle card mapping", () => {
     });
   });
 
-  it("preserves stored season dates, duration, and match truth", () => {
+  it("preserves stored season dates and match truth without card-only duration copy", () => {
     const card = seekerApplicationListingToCardData(applicationListing());
 
     expect(card.begins).toBe("Nov 14, 2026");
     expect(card.ends).toBe("Apr 18, 2027");
-    expect(card.seasonLength).toBe("about 5 months");
+    expect(card).not.toHaveProperty("seasonLength");
     expect(card.matchScore).toBe(88);
   });
 
@@ -127,7 +127,7 @@ describe("seeker application lifecycle card mapping", () => {
 
     expect(card.begins).toBeUndefined();
     expect(card.ends).toBeUndefined();
-    expect(card.seasonLength).toBeUndefined();
+    expect(card).not.toHaveProperty("seasonLength");
     expect(card.matchScore).toBeUndefined();
   });
 });
