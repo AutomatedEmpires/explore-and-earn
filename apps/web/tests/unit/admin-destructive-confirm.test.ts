@@ -98,6 +98,8 @@ describe("admin destructive-action confirmations", () => {
     expect(notifications).toContain('row.notificationType === "invite_received"');
     expect(notifications).toContain('row.status === "dead_letter"');
     expect(notifications).toContain('row.failureClass === "outcome_unknown"');
+    expect(notifications).toContain("!isOutcomeUnknownInvite(row)");
+    expect(notifications).toContain("{isOutcomeUnknownInvite(row) ? (");
     expect(notifications).toContain("Outcome locked");
   });
 

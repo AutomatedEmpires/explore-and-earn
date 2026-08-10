@@ -57,20 +57,21 @@ function isTerminalFailure(status: string): boolean {
   return status === "dead_letter" || status === "failed_terminal";
 }
 
+function isOutcomeUnknownInvite(row: NotificationDeliveryRowView): boolean {
+  return (
+    row.notificationType === "invite_received" &&
+    row.status === "dead_letter" &&
+    row.failureClass === "outcome_unknown"
+  );
+}
+
 /**
  * An outcome-unknown invitation dead letter is immutable: the provider may
  * have accepted it before its response was lost. Known-unsent terminal rows
  * remain recoverable by an operator.
  */
 function isRequeueable(row: NotificationDeliveryRowView): boolean {
-  return (
-    isTerminalFailure(row.status) &&
-    !(
-      row.notificationType === "invite_received" &&
-      row.status === "dead_letter" &&
-      row.failureClass === "outcome_unknown"
-    )
-  );
+  return isTerminalFailure(row.status) && !isOutcomeUnknownInvite(row);
 }
 
 /** Statuses the cancel verb accepts (mirrors adminCancelDelivery's WHERE). */
@@ -150,7 +151,7 @@ function DeliveryTable({
                       onConfirm={() => onRequeue(row.id)}
                     />
                   ) : null}
-                  {row.status === "dead_letter" && row.notificationType === "invite_received" ? (
+                  {isOutcomeUnknownInvite(row) ? (
                     <span title="Invitation delivery outcomes cannot be replayed safely.">
                       Outcome locked
                     </span>
