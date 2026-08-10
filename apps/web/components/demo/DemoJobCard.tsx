@@ -33,19 +33,6 @@ function dateLabel(iso: string): string {
   });
 }
 
-function seasonLengthLabel(beginsOn: string, endsOn: string): string {
-  const days = Math.max(
-    1,
-    Math.round(
-      (new Date(`${endsOn}T12:00:00.000Z`).getTime() -
-        new Date(`${beginsOn}T12:00:00.000Z`).getTime()) /
-        86_400_000,
-    ),
-  );
-  const months = Math.max(1, Math.round(days / 30.4));
-  return `about ${months} month${months === 1 ? "" : "s"}`;
-}
-
 const cardData: DiscoveryCardData = {
   id: role.id,
   hostName: DEMO_ORGANIZATION.name,
@@ -55,14 +42,9 @@ const cardData: DiscoveryCardData = {
   opportunityWindow: `${dateLabel(role.season.beginsOn)} – ${dateLabel(role.season.endsOn)}`,
   begins: dateLabel(role.season.beginsOn),
   ends: dateLabel(role.season.endsOn),
-  seasonLength: seasonLengthLabel(role.season.beginsOn, role.season.endsOn),
-  closesOn: role.season.applicationDeadline
-    ? dateLabel(role.season.applicationDeadline)
-    : undefined,
   coverImageUrl: cover,
   verifiedHost: true,
   matchScore: match?.score,
-  matchConfidence: match?.confidence,
   triad: {
     housing: role.housing.summary,
     meals: role.meals.summary,
@@ -73,8 +55,6 @@ const cardData: DiscoveryCardData = {
     meals: role.meals.provision,
     pay: role.pay.provision,
   },
-  housingSummary: role.housing.summary,
-  mealsSummary: role.meals.summary,
   perks: role.benefits.slice(0, 3),
 };
 

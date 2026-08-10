@@ -239,6 +239,49 @@ test.describe("full-fidelity public walkthrough route inventory", () => {
   });
 });
 
+test.describe("discovery card detail boundary", () => {
+  test("keeps rich listing facts off cards and available on the detail page", async ({
+    page,
+  }, testInfo) => {
+    await useEssentialOnlyConsent(page);
+
+    for (const viewport of [
+      { width: 320, height: 800 },
+      { width: 1440, height: 900 },
+    ] as const) {
+      await page.setViewportSize(viewport);
+      await page.goto(`${SEEKER_ROOT}/seek`);
+
+      const card = page
+        .getByRole("article")
+        .filter({ has: page.getByText(seekerListing.title, { exact: true }) })
+        .first();
+      await expect(card).toBeVisible();
+      await expect(card.locator('[aria-label="Opportunity at a glance"]')).toHaveCount(0);
+      await expect(card.getByText("Season length", { exact: true })).toHaveCount(0);
+      await expect(card.getByText("Listing closes", { exact: false })).toHaveCount(0);
+      await expect(card.getByText(seekerListing.housing, { exact: true })).toHaveCount(0);
+      await expect(card.getByText(seekerListing.meals, { exact: true })).toHaveCount(0);
+      await expect(card.getByText(/^Strong on /)).toHaveCount(0);
+      await expectNoHorizontalOverflow(
+        page,
+        `${SEEKER_ROOT}/seek at ${viewport.width}px`,
+      );
+
+      await testInfo.attach(`discovery-card-${viewport.width}.png`, {
+        body: await card.screenshot({ animations: "disabled", caret: "hide" }),
+        contentType: "image/png",
+      });
+    }
+
+    await page.goto(`${SEEKER_ROOT}/listing/${seekerListing.id}`);
+    await expect(page.getByText("Season length", { exact: true })).toBeVisible();
+    await expect(page.getByText("Listing closes", { exact: true })).toBeVisible();
+    await expect(page.getByText(seekerListing.housing, { exact: true })).toBeVisible();
+    await expect(page.getByText(seekerListing.meals, { exact: true })).toBeVisible();
+  });
+});
+
 test.describe("full-fidelity session-local behavior", () => {
   test("host edits validate dates and the seeker preview never links mismatched details", async ({
     page,

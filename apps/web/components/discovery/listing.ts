@@ -1,4 +1,4 @@
-import { NOT_STATED_LABEL, formatDate, formatSeasonLength } from "@explore-and-earn/contracts";
+import { NOT_STATED_LABEL, formatDate } from "@explore-and-earn/contracts";
 import type {
   BenefitProvision,
   ImageSelection,
@@ -137,37 +137,22 @@ function inferHousingOccupancy(
  * name is the card's display title.
  */
 /**
- * Pre-format the card's V2-G display strings.
- *
- * packages/ui carries no locale seam by design, so every date/duration string
- * the card renders is built HERE, through the shared contract formatters. A
- * value the listing does not carry produces `undefined`, and the card then
- * renders nothing for it — the one behaviour that keeps a blank column from
- * turning into a confident-looking default.
+ * Select the self-omitting supporting facts that still belong on the card.
+ * Season length, listing-close timing, housing/meals summaries, and match
+ * explanations stay on the richer listing-detail and explainer surfaces.
  */
-function cardDetailFields(listing: DiscoveryListing) {
+function cardSupportingFields(listing: DiscoveryListing) {
   return {
-    seasonLength: formatSeasonLength(listing.begins, listing.ends) ?? undefined,
-    // `expires_at` is a LISTING expiry. The card labels it "Listing closes"; it
-    // must never be relabelled as an application deadline, which the schema
-    // does not store.
-    closesOn: listing.expiresAt
-      ? formatDate(listing.expiresAt, { month: "short", day: "numeric" })
-      : undefined,
     experienceLevel: listing.experienceLevel,
     physicalDemand: listing.physicalDemand,
     perks: listing.perks,
-    housingSummary: listing.benefits.housing.summary,
-    mealsSummary: listing.benefits.meals.summary,
-    matchReasons: listing.matchReasons,
-    matchConfidence: listing.matchConfidence,
     employerLogoUrl: listing.host.logoUrl,
   } as const;
 }
 
 export function toDiscoveryCardData(listing: DiscoveryListing): DiscoveryCardData {
   return {
-    ...cardDetailFields(listing),
+    ...cardSupportingFields(listing),
     id: listing.id,
     title: listing.title,
     hostName: listing.host.name,

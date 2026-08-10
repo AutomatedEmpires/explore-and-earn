@@ -382,8 +382,6 @@ function DiscoveryListingCard({ listing, onAfterAction }: {
     opportunityWindow: `${formatDemoDate(listing.startDate, { month: "short", day: "numeric" })} – ${formatDemoDate(listing.endDate, { month: "short", day: "numeric" })}`,
     begins: formatDemoDate(listing.startDate, { month: "short", day: "numeric", year: "numeric" }),
     ends: formatDemoDate(listing.endDate, { month: "short", day: "numeric", year: "numeric" }),
-    closesOn: formatDemoDate(listing.deadline, { month: "short", day: "numeric" }),
-    seasonLength: seasonLength(listing),
     coverImageUrl: listing.photos[0],
     verifiedHost: seekerDemoHost.verified,
     matchScore: listing.matchScore,
@@ -397,8 +395,6 @@ function DiscoveryListingCard({ listing, onAfterAction }: {
       meals: listing.mealsProvision,
       pay: listing.payProvision,
     },
-    housingSummary: listing.housing,
-    mealsSummary: listing.meals,
   };
   const cardState = appliedIds.includes(listing.id)
     ? "applied" as const

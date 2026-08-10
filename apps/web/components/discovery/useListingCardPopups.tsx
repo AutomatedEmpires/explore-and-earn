@@ -54,7 +54,7 @@ export interface ListingCardHandlers {
   readonly onDatesClick: ListingCardActionHandler;
   /** Opens the "what Verified Host means" popover (default) — badge tap. */
   readonly onVerificationClick: ListingCardActionHandler;
-  /** Opens the match explanation popover (default) — match pill / "Why?" tap. */
+  /** Opens the match explanation popover (default) from the match pill. */
   readonly onMatchClick: ListingCardActionHandler;
   /** Share the listing. Present only when a surface supplies it. */
   readonly onShare?: ListingCardActionHandler;

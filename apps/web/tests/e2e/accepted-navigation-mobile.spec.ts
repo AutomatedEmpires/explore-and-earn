@@ -173,7 +173,7 @@ test.describe("accepted application navigation on phones", () => {
         cardActions.getByText("Accepted", { exact: true }),
       ).toBeVisible();
       await expect(card.getByText(LISTING_START, { exact: true })).toBeVisible();
-      await expect(card.getByText("about 5 months", { exact: true })).toBeVisible();
+      await expect(card.getByText("about 5 months", { exact: true })).toHaveCount(0);
       await expect(applicationLink).toHaveAttribute("href", APPLICATION_PATH);
       await expectTouchTarget(applicationLink, "View application");
       await expectContained(departure, page.locator("body"), "next departure");
