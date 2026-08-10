@@ -89,6 +89,10 @@ function bodyFingerprint(source: string, functionName: string): string {
   return createHash("md5").update(normalized).digest("hex");
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 describe("migration 094 host seeker discovery bridge", () => {
   const search = functionDefinition(
     MIGRATION,
@@ -329,7 +333,7 @@ describe("migration 094 host seeker discovery bridge", () => {
     ]) {
       expect(MIGRATION).toMatch(
         new RegExp(
-          `revoke execute on function ${signature.replace(/[()]/g, "\\$&")}\\s+from public, anon, authenticated;[\\s\\S]*?grant execute on function ${signature.replace(/[()]/g, "\\$&")}\\s+to service_role`,
+          `revoke execute on function ${escapeRegExp(signature)}\\s+from public, anon, authenticated;[\\s\\S]*?grant execute on function ${escapeRegExp(signature)}\\s+to service_role`,
           "i",
         ),
       );
@@ -878,7 +882,7 @@ describe("migration 094 host seeker discovery bridge", () => {
     ]) {
       expect(MIGRATION).toMatch(
         new RegExp(
-          `revoke execute on function ${signature.replace(/[()]/g, "\\$&")}\\s+from public, anon, authenticated;[\\s\\S]*?grant execute on function ${signature.replace(/[()]/g, "\\$&")}\\s+to service_role`,
+          `revoke execute on function ${escapeRegExp(signature)}\\s+from public, anon, authenticated;[\\s\\S]*?grant execute on function ${escapeRegExp(signature)}\\s+to service_role`,
           "i",
         ),
       );
