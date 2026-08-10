@@ -36,25 +36,34 @@ export function BuyMoreInvitesPopup({ isOpen, onClose }: BuyMoreInvitesPopupProp
     setSelected(credits);
     setNotice(null);
     startPurchase(async () => {
-      const result = await purchaseInviteCreditsAction(credits);
-      if (result.ok && result.url) {
-        window.location.href = result.url;
-        return;
-      }
-      if (result.error === "billing_unavailable" || result.error === "checkout_unavailable") {
-        setNotice(
-          "Invite-credit checkout isn't live yet — packs will be purchasable here soon. Your monthly allowance still works today.",
-        );
-      } else if (result.error === "rate_limit_exceeded") {
-        setNotice("Too many attempts just now — please try again in a few minutes.");
-      } else {
+      try {
+        const result = await purchaseInviteCreditsAction(credits);
+        if (result.ok && result.url) {
+          window.location.href = result.url;
+          return;
+        }
+        if (
+          result.error === "billing_unavailable" ||
+          result.error === "checkout_unavailable"
+        ) {
+          setNotice(
+            "Invite-credit checkout isn't live yet — packs will be purchasable here soon. No purchase was completed and no charge was made.",
+          );
+        } else if (result.error === "rate_limit_exceeded") {
+          setNotice("Too many attempts just now — please try again in a few minutes.");
+        } else {
+          setNotice("Couldn't start checkout. Please try again.");
+        }
+      } catch {
         setNotice("Couldn't start checkout. Please try again.");
+      } finally {
+        setSelected(null);
       }
-      setSelected(null);
     });
   }
 
   function handleClose() {
+    if (pending) return;
     setNotice(null);
     setSelected(null);
     onClose();
@@ -73,9 +82,10 @@ export function BuyMoreInvitesPopup({ isOpen, onClose }: BuyMoreInvitesPopupProp
           <span>Invite credits</span>
         </>
       }
-      headerMeta={<span>Top up beyond your monthly allowance — packs never expire monthly.</span>}
+      headerMeta={<span>Invite-credit pack balances carry over month to month.</span>}
       size="compact"
       closeLabel="Close buy invites popup"
+      closeDisabled={pending}
     >
       <ul className={styles.packs} aria-label="Invite credit packs">
         {INVITE_CREDIT_PACKS.map((pack) => {

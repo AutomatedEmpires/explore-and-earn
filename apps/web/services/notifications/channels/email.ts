@@ -10,7 +10,7 @@ import { classifyHttpFailure, isRetryable } from "../backoff"
 import { localizedPath, renderMessage, renderNotification } from "../render"
 import { createUnsubscribeToken } from "../unsubscribe"
 import { buildListUnsubscribeHeaders } from "../unsubscribeHeaders"
-import type { ChannelSendResult } from "./inApp"
+import type { BeforeProviderSubmission, ChannelSendResult } from "./inApp"
 
 /**
  * Email channel: recipient address comes from Clerk (profiles hold no email),
@@ -22,6 +22,7 @@ export async function sendNotificationEmail(
 	intent: NotificationIntent,
 	engineDedupKey: string,
 	nowMs: number,
+	beforeProviderSubmission?: BeforeProviderSubmission,
 ): Promise<ChannelSendResult & { readonly suppressed?: string }> {
 	const contact = await getClerkContact(intent.recipientClerkUserId)
 	if (!contact.email) {
@@ -32,10 +33,11 @@ export async function sendNotificationEmail(
 			ok: false,
 			retryable: true,
 			failureClass: "transient",
-			detail: "no recipient email resolved (missing address or Clerk lookup failure)",
+			 detail: "no recipient email resolved (missing address or Clerk lookup failure)",
 		}
 	}
-	if (await isEmailSuppressed(contact.email)) {
+	const recipientEmail = contact.email
+	if (await isEmailSuppressed(recipientEmail)) {
 		return { ok: false, suppressed: "email_suppressed" }
 	}
 
@@ -75,17 +77,36 @@ export async function sendNotificationEmail(
 	const text = `${rendered.title}\n\n${rendered.body}\n\n${destination}${
 		unsubscribeUrl ? `\n\n${unsubscribeLabel}: ${unsubscribeUrl}` : ""
 	}`
-
-	const result = await sendEmail({
-		to: contact.email,
-		subject: rendered.title,
-		html,
-		text,
-		template: `engine:${intent.type}`,
-		// The engine's dedup_key IS the logical send identity.
-		idempotencyKey: engineDedupKey,
-		...(unsubscribeHeaders ? { headers: unsubscribeHeaders } : {}),
-	})
+	let result: Awaited<ReturnType<typeof sendEmail>>
+	try {
+		result = await sendEmail({
+				to: recipientEmail,
+				subject: rendered.title,
+				html,
+				text,
+				template: `engine:${intent.type}`,
+				// The engine's dedup_key IS the logical send identity.
+				idempotencyKey: engineDedupKey,
+				beforeProviderRequest: beforeProviderSubmission,
+				...(unsubscribeHeaders ? { headers: unsubscribeHeaders } : {}),
+			})
+	} catch {
+		// The request crossed the provider boundary. A thrown transport response
+		// cannot prove whether the provider accepted the idempotent message.
+		return {
+			ok: false,
+			retryable: true,
+			outcomeUnknown: true,
+			failureClass: "transient",
+			detail: "email provider outcome unknown",
+		}
+	}
+	if (result.providerBoundaryUnavailable) {
+		throw new Error("email provider boundary unavailable")
+	}
+	if (result.cancelledReason) {
+		return { ok: false, cancelled: result.cancelledReason }
+	}
 
 	if (result.ok) {
 		return { ok: true, providerMessageId: result.providerMessageId }
@@ -94,6 +115,11 @@ export async function sendNotificationEmail(
 	return {
 		ok: false,
 		retryable: isRetryable(failureClass),
+		// No response or a provider-side 5xx can arrive after acceptance. The
+		// dispatcher must never turn that uncertainty into a refundable invite.
+		outcomeUnknown:
+			result.providerRequestStarted === true &&
+			(result.status === undefined || result.status >= 500),
 		failureClass,
 		detail: result.error ?? "email send failed",
 	}

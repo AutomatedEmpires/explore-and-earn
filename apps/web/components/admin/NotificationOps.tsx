@@ -53,9 +53,25 @@ function stageBadgeVariant(stage: string): "success" | "info" | "neutral" {
   return "info";
 }
 
-/** Statuses the requeue verb accepts (mirrors adminRequeueDelivery's WHERE). */
-function isRequeueable(status: string): boolean {
+function isTerminalFailure(status: string): boolean {
   return status === "dead_letter" || status === "failed_terminal";
+}
+
+function isOutcomeUnknownInvite(row: NotificationDeliveryRowView): boolean {
+  return (
+    row.notificationType === "invite_received" &&
+    row.status === "dead_letter" &&
+    row.failureClass === "outcome_unknown"
+  );
+}
+
+/**
+ * An outcome-unknown invitation dead letter is immutable: the provider may
+ * have accepted it before its response was lost. Known-unsent terminal rows
+ * remain recoverable by an operator.
+ */
+function isRequeueable(row: NotificationDeliveryRowView): boolean {
+  return isTerminalFailure(row.status) && !isOutcomeUnknownInvite(row);
 }
 
 /** Statuses the cancel verb accepts (mirrors adminCancelDelivery's WHERE). */
@@ -111,7 +127,7 @@ function DeliveryTable({
               <td>{humanizeToken(row.notificationType)}</td>
               <td>{humanizeToken(row.channel)}</td>
               <td className={styles.mono}>{row.recipientClerkUserId}</td>
-              <td className={isRequeueable(row.status) ? styles.failed : undefined}>
+              <td className={isTerminalFailure(row.status) ? styles.failed : undefined}>
                 {humanizeToken(row.status)}
               </td>
               <td className={styles.mono}>{row.attemptCount}</td>
@@ -123,7 +139,7 @@ function DeliveryTable({
               </td>
               <td>
                 <span className={styles.actionsCell}>
-                  {isRequeueable(row.status) ? (
+                  {isRequeueable(row) ? (
                     <ConfirmAction
                       label="Requeue"
                       question="Requeue this delivery? If the original send actually succeeded and was only recorded as failed, the recipient gets it twice."
@@ -134,6 +150,11 @@ function DeliveryTable({
                       busy={pendingId === row.id}
                       onConfirm={() => onRequeue(row.id)}
                     />
+                  ) : null}
+                  {isOutcomeUnknownInvite(row) ? (
+                    <span title="Invitation delivery outcomes cannot be replayed safely.">
+                      Outcome locked
+                    </span>
                   ) : null}
                   {isCancellable(row.status) ? (
                     <ConfirmAction

@@ -105,7 +105,7 @@ export function PopupShell({
 			panel
 				? Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
 				: [];
-		focusables()[0]?.focus();
+		(focusables()[0] ?? panel).focus();
 
 		const onKeyDown = (event: KeyboardEvent) => {
 			if (event.key === "Escape") {
@@ -120,14 +120,20 @@ export function PopupShell({
 			}
 			const items = focusables();
 			if (items.length === 0) {
+				event.preventDefault();
+				panel.focus();
 				return;
 			}
 			const first = items[0];
 			const last = items[items.length - 1];
-			if (event.shiftKey && document.activeElement === first) {
+			const active = document.activeElement;
+			if (!items.includes(active as HTMLElement)) {
+				event.preventDefault();
+				(event.shiftKey ? last : first).focus();
+			} else if (event.shiftKey && active === first) {
 				event.preventDefault();
 				last.focus();
-			} else if (!event.shiftKey && document.activeElement === last) {
+			} else if (!event.shiftKey && active === last) {
 				event.preventDefault();
 				first.focus();
 			}
@@ -174,6 +180,7 @@ export function PopupShell({
 		<div
 			className={`${styles.scrim}${closing ? ` ${styles.closing}` : ""}`}
 			aria-hidden={closing || undefined}
+			inert={closing}
 			onClick={(event) => {
 				if (
 					!closing &&
@@ -186,6 +193,7 @@ export function PopupShell({
 		>
 			<div
 				ref={panelRef}
+				tabIndex={-1}
 				className={`${styles.panel}${sizeClass ? ` ${sizeClass}` : ""}${closing ? ` ${styles.closing}` : ""}`}
 				role="dialog"
 				aria-modal={true}

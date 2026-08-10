@@ -5,24 +5,23 @@ import { MONTHLY_INVITE_QUOTA } from "@explore-and-earn/contracts";
 
 import { adminClient } from "../adminClient";
 import { authedClient } from "../client";
-import { createInvite, type CreateInviteParams } from "./invites";
-import { getHostSubscriptionTier, type HostSubscriptionTier } from "./hostProfiles";
+import type { CreateInviteParams } from "./invites";
+import type { HostSubscriptionTier } from "./hostProfiles";
 
 /**
  * Invite entitlements over the invite_credit_events ledger (migration 061).
  *
  * ENFORCEMENT LAW (founder charter 2026-07-14): the SERVER decides whether an
- * invite may be sent — the monthly allowance comes from the host's REAL
- * subscription tier (MONTHLY_INVITE_QUOTA, resolved server-side), consumption
+ * invite may be sent — the authority RPC derives the monthly allowance from
+ * the host's current database subscription inside its locked transaction;
+ * consumption
  * is atomic + idempotent (one ledger row per invite, advisory-lock serialized
  * in SQL), and purchased packs extend the monthly bucket. UI checks are
  * presentation only.
  *
- * PRE-MIGRATION DEGRADATION: until 061 is applied, the ledger table/functions
- * don't exist. Reads degrade to `ledgerAvailable: false` and creation falls
- * back to the legacy unmetered createInvite() — i.e. exactly today's
- * production behavior, never a hard failure. Once 061 lands the gate becomes
- * hard automatically.
+ * PRE-MIGRATION DEGRADATION: until 061 is applied, ledger reads degrade to
+ * `ledgerAvailable: false`. Invite creation fails closed when its authority RPC
+ * is unavailable; it must never bypass entitlement or eligibility enforcement.
  */
 
 /* ------------------------------------------------------------- pure pieces */
@@ -56,8 +55,8 @@ export interface InviteEntitlementSummary {
 	readonly periodKey: string;
 	/**
 	 * False before migration 061 is applied (or on a read fault): balances are
-	 * unknown and creation falls back to the legacy unmetered path. Surfaces
-	 * MUST NOT render an upsell off an unavailable ledger.
+	 * unknown and invite creation must fail closed until its authority is
+	 * available. Surfaces MUST NOT render an upsell off an unavailable ledger.
 	 */
 	readonly ledgerAvailable: boolean;
 }
@@ -109,6 +108,30 @@ const UNDEFINED_TABLE = "42P01";
 /** PostgREST "function not found" (schema cache) + Postgres undefined function. */
 const MISSING_FUNCTION_CODES = new Set(["PGRST202", "42883"]);
 
+function isHostSubscriptionTier(value: unknown): value is HostSubscriptionTier {
+	return (
+		value === "none" ||
+		value === "starter" ||
+		value === "professional" ||
+		value === "enterprise"
+	);
+}
+
+/** Read migration 083's authoritative subscription row before UI gating. */
+async function getAuthoritativeHostTier(
+	clerkUserId: string,
+): Promise<HostSubscriptionTier> {
+	const admin = adminClient() as unknown as SupabaseClient;
+	const { data, error } = await admin.rpc(
+		"host_subscription_tier_for_clerk_user",
+		{ p_clerk_user_id: clerkUserId },
+	);
+	if (error || !isHostSubscriptionTier(data)) {
+		throw new Error("getInviteEntitlement: subscription authority unavailable");
+	}
+	return data;
+}
+
 /**
  * The authed host's current invite entitlement. Reads the host's own ledger
  * rows (RLS + explicit host scoping). `clerkUserId` MUST come from
@@ -131,7 +154,7 @@ export async function getInviteEntitlement(
 	if (!hostRow) return null;
 	const hostProfileId = String((hostRow as { id: string }).id);
 
-	const tier = await getHostSubscriptionTier(clerkToken, clerkUserId);
+	const tier = await getAuthoritativeHostTier(clerkUserId);
 
 	const { data, error } = await db
 		.from("invite_credit_events")
@@ -140,7 +163,7 @@ export async function getInviteEntitlement(
 
 	if (error) {
 		if (error.code === UNDEFINED_TABLE) {
-			// Pre-061: balances unknown; legacy unmetered behavior applies.
+			// Pre-061: balances are unknown; expose that state without guessing.
 			return summarizeInviteLedger([], tier, periodKey, false);
 		}
 		throw new Error(`getInviteEntitlement: ${error.message}`);
@@ -160,13 +183,43 @@ export async function getInviteEntitlement(
 
 /* ------------------------------------------------------------------ writes */
 
-export interface CreateInviteWithEntitlementResult {
-	readonly ok: boolean;
-	readonly inviteId?: string;
-	/** Which bucket paid for the invite ('monthly' | 'purchased'), when metered. */
-	readonly source?: "monthly" | "purchased";
-	/** 'invite_credits_required' | 'already_invited' | transport errors. */
-	readonly error?: string;
+export type CreateInviteWithEntitlementError =
+	| "invalid_request"
+	| "host_not_eligible"
+	| "listing_not_actionable"
+	| "seeker_not_sourceable"
+	| "already_applied"
+	| "already_invited"
+	| "invite_credits_required"
+	| "invite_authority_unavailable"
+	| "temporarily_unavailable";
+
+export type CreateInviteWithEntitlementResult =
+	| {
+			readonly ok: true;
+			readonly inviteId: string;
+			/** Which bucket paid for the invite. */
+			readonly source: "monthly" | "purchased";
+	  }
+	| { readonly ok: false; readonly error: CreateInviteWithEntitlementError };
+
+const CREATE_INVITE_DOMAIN_ERRORS = new Set<CreateInviteWithEntitlementError>([
+	"invalid_request",
+	"host_not_eligible",
+	"listing_not_actionable",
+	"seeker_not_sourceable",
+	"already_applied",
+	"already_invited",
+	"invite_credits_required",
+]);
+
+function isCreateInviteDomainError(
+	value: unknown,
+): value is CreateInviteWithEntitlementError {
+	return (
+		typeof value === "string" &&
+		CREATE_INVITE_DOMAIN_ERRORS.has(value as CreateInviteWithEntitlementError)
+	);
 }
 
 /**
@@ -175,79 +228,61 @@ export interface CreateInviteWithEntitlementResult {
  * function enforces the ENTITLEMENT, the caller enforces OWNERSHIP, and the
  * SQL function serializes CONCURRENCY per host.
  *
- * `monthlyAllowance` must be resolved server-side from the host's real tier
- * (MONTHLY_INVITE_QUOTA[tier]) — never accepted from a client or a model.
- *
- * Falls back to the legacy unmetered createInvite() only when migration 061
- * has not been applied yet.
+ * Missing authority fails closed. A partially deployed environment must never
+ * regain the legacy unmetered direct-table write path.
  */
 export async function createInviteWithEntitlement(
-	clerkToken: string,
+	_clerkToken: string,
 	params: CreateInviteParams,
-	monthlyAllowance: number,
 ): Promise<CreateInviteWithEntitlementResult> {
-	const admin = adminClient() as unknown as SupabaseClient;
-
-	// invited_by_user_id is a uuid column; Clerk ids are not uuids. Pass only
-	// well-formed uuids, mirroring the legacy path's effective behavior.
-	const UUID_RE =
-		/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-	const invitedBy =
-		params.invitedByUserId && UUID_RE.test(params.invitedByUserId)
-			? params.invitedByUserId
-			: null;
-
-	const { data, error } = await admin.rpc("create_invite_with_credit", {
-		p_host_profile_id: params.hostProfileId,
-		p_seeker_profile_id: params.seekerProfileId,
-		p_listing_id: params.listingId,
-		p_message: params.message ?? null,
-		p_invited_by_user_id: invitedBy,
-		p_monthly_allowance: monthlyAllowance,
-	});
-
-	if (error) {
-		if (MISSING_FUNCTION_CODES.has(error.code ?? "")) {
-			// Pre-061: preserve today's unmetered behavior rather than hard-failing.
-			const legacy = await createInvite(clerkToken, params);
-			return legacy.ok
-				? { ok: true, inviteId: legacy.inviteId }
-				: { ok: false, error: legacy.error };
-		}
-		return { ok: false, error: error.message };
-	}
-
-	const result = data as {
-		ok?: boolean;
-		invite_id?: string;
-		source?: "monthly" | "purchased";
-		error?: string;
-	} | null;
-
-	if (!result || result.ok !== true) {
-		return { ok: false, error: result?.error ?? "invite_create_failed" };
-	}
-	return { ok: true, inviteId: result.invite_id, source: result.source };
-}
-
-/**
- * Restore the credit consumed by an invite (idempotent — at most one restore
- * per invite, enforced in SQL). Caller decides eligibility; the shipped policy
- * restores only when a host withdraws an invite that was never delivered.
- * Returns false (never throws) pre-061 or when already restored.
- */
-export async function restoreInviteCreditForInvite(
-	inviteId: string,
-): Promise<boolean> {
 	try {
 		const admin = adminClient() as unknown as SupabaseClient;
-		const { data, error } = await admin.rpc("restore_invite_credit", {
-			p_invite_id: inviteId,
+		const UUID_RE =
+			/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+		const { data, error } = await admin.rpc("create_host_source_invite_with_credit", {
+			p_host_profile_id: params.hostProfileId,
+			p_seeker_profile_id: params.seekerProfileId,
+			p_listing_id: params.listingId,
+			p_message: params.message ?? null,
 		});
-		if (error) return false;
-		return data === true;
+
+		if (error) {
+			return {
+				ok: false,
+				error: MISSING_FUNCTION_CODES.has(error.code ?? "")
+					? "invite_authority_unavailable"
+					: "temporarily_unavailable",
+			};
+		}
+		if (typeof data !== "object" || data === null || Array.isArray(data)) {
+			return { ok: false, error: "temporarily_unavailable" };
+		}
+
+		const result = data as Record<string, unknown>;
+		if (result.ok !== true) {
+			return {
+				ok: false,
+				error: isCreateInviteDomainError(result.error)
+					? result.error
+					: "temporarily_unavailable",
+			};
+		}
+
+		if (
+			typeof result.invite_id !== "string" ||
+			!UUID_RE.test(result.invite_id) ||
+			(result.source !== "monthly" && result.source !== "purchased")
+		) {
+			return { ok: false, error: "temporarily_unavailable" };
+		}
+		return {
+			ok: true,
+			inviteId: result.invite_id,
+			source: result.source,
+		};
 	} catch {
-		return false;
+		return { ok: false, error: "temporarily_unavailable" };
 	}
 }
 

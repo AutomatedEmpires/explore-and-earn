@@ -243,7 +243,7 @@
 				},
 				"offers_invites": {
 					"label": "Offers & invites",
-					"description": "Offers, invitations, and expiring-offer reminders."
+					"description": "Offers, invitations, and expiring-offer reminders. Invitation emails are sent only with Instant; Daily and Weekly still apply to other updates."
 				},
 				"messages": {
 					"label": "Messages",

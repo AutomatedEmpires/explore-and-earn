@@ -268,10 +268,13 @@
 }
 
 .meta {
+	min-width: 0;
+	max-width: 100%;
 	font-family: var(--font-ui);
 	font-size: var(--type-body-size);
 	line-height: var(--type-body-lh);
 	color: var(--text-secondary);
+	overflow-wrap: anywhere;
 }
 
 .tags {

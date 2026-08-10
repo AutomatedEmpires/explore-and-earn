@@ -141,7 +141,6 @@ export function buildAccountGroups(email: string | null): readonly SettingGroup[
 			title: "Privacy and sharing",
 			description: "Who can see your profile and contact details.",
 			rows: [
-				{ id: "visibility", icon: "nav.profile", label: "Profile visibility", value: "Hosts I apply to" },
 				{ id: "contact", icon: "action.message", label: "Contact visibility", value: "After offer" },
 				{ id: "community", icon: "system.success", label: "Community activity", value: "On" },
 			],

@@ -9,7 +9,9 @@ const revalidatePathMock = vi.hoisted(() => vi.fn());
 const reportErrorMock = vi.hoisted(() => vi.fn());
 const queueRecomputeMock = vi.hoisted(() => vi.fn());
 const dbMocks = vi.hoisted(() => ({
+  getSeekerHostDiscoverySetting: vi.fn(),
   saveSeekerProfile: vi.fn(),
+  setSeekerHostDiscoverySetting: vi.fn(),
   updateNotificationPrefs: vi.fn(),
 }));
 
@@ -22,6 +24,8 @@ vi.mock("../../lib/matchRecompute", () => ({
 vi.mock("../../lib/sentry", () => ({ reportError: reportErrorMock }));
 
 import {
+  getHostDiscoverySettingAction,
+  updateHostDiscoverySettingAction,
   updateScheduleAction,
   updateTravelAction,
 } from "../../app/actions/seekerSettings";
@@ -55,6 +59,16 @@ beforeEach(() => {
   vi.clearAllMocks();
   authAs("user-seeker");
   dbMocks.saveSeekerProfile.mockResolvedValue({ ok: true });
+  dbMocks.getSeekerHostDiscoverySetting.mockResolvedValue({
+    ok: true,
+    enabled: false,
+  });
+  dbMocks.setSeekerHostDiscoverySetting.mockImplementation(
+    async (_token: string, _userId: string, enabled: boolean) => ({
+      ok: true,
+      enabled,
+    }),
+  );
 });
 
 describe("canonical seeker settings contracts", () => {
@@ -72,6 +86,76 @@ describe("canonical seeker settings contracts", () => {
       "remote_only",
       "flexible",
     ]);
+  });
+});
+
+describe("host discovery consent actions", () => {
+  it("loads an explicit false value without converting it to unavailable", async () => {
+    await expect(getHostDiscoverySettingAction()).resolves.toEqual({
+      ok: true,
+      enabled: false,
+    });
+    expect(dbMocks.getSeekerHostDiscoverySetting).toHaveBeenCalledWith(
+      "session-token",
+      "user-seeker",
+    );
+  });
+
+  it("rejects non-boolean updates before auth or database work", async () => {
+    await expect(updateHostDiscoverySettingAction("true")).resolves.toEqual({
+      ok: false,
+      error: "validation",
+    });
+    expect(authMock).not.toHaveBeenCalled();
+    expect(dbMocks.setSeekerHostDiscoverySetting).not.toHaveBeenCalled();
+  });
+
+  it("persists explicit opt-in and confirms only the returned durable value", async () => {
+    await expect(updateHostDiscoverySettingAction(true)).resolves.toEqual({
+      ok: true,
+      enabled: true,
+    });
+    expect(dbMocks.setSeekerHostDiscoverySetting).toHaveBeenCalledWith(
+      "session-token",
+      "user-seeker",
+      true,
+    );
+    expect(revalidatePathMock).toHaveBeenCalledWith("/settings");
+    expect(queueRecomputeMock).not.toHaveBeenCalled();
+  });
+
+  it("conceals provider failures and does not report success or revalidate", async () => {
+    dbMocks.setSeekerHostDiscoverySetting.mockResolvedValueOnce({
+      ok: false,
+      error: "raw provider detail",
+    });
+    await expect(updateHostDiscoverySettingAction(true)).resolves.toEqual({
+      ok: false,
+      error: "temporarily_unavailable",
+    });
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        action: "updateHostDiscoverySettingAction.persist",
+      }),
+    );
+  });
+
+  it("keeps durable success when settings cache invalidation fails", async () => {
+    revalidatePathMock.mockImplementationOnce(() => {
+      throw new Error("cache unavailable");
+    });
+    await expect(updateHostDiscoverySettingAction(false)).resolves.toEqual({
+      ok: true,
+      enabled: false,
+    });
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        action: "updateHostDiscoverySettingAction.postPersistRevalidate",
+      }),
+    );
   });
 });
 

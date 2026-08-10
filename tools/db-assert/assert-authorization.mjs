@@ -38,6 +38,7 @@ runSqlFiles(
     join(here, "sql", "assert_application_submission_authority.sql"),
     join(here, "sql", "assert_listing_media_ownership.sql"),
     join(here, "sql", "assert_resume_experience_identity.sql"),
+    join(here, "sql", "assert_host_seeker_discovery.sql"),
   ],
   "assert-authorization",
 )

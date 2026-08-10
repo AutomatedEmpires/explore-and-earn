@@ -25,9 +25,14 @@ export {
 
 // Type-only re-exports needed by client components.
 export type { Message } from "./queries/messages";
-export type { InviteResponse, HostInvite } from "./queries/invites";
+export type {
+  HostDiscoveryError,
+  HostInvite,
+  InviteResponse,
+  SeekerSearchLoadResult,
+  SeekerSearchResult,
+} from "./queries/invites";
 export type { ListingRow } from "./queries/listings";
-export type { SeekerSearchResult } from "./queries/invites";
 export type { SavedListingDetail } from "./queries/savedListings";
 export type { NotificationPrefs, NotificationPrefsPatch } from "./queries/notificationPrefs";
 export type { HostSettableStatus } from "./queries/applications";

@@ -35,6 +35,7 @@ const dbMocks = vi.hoisted(() => ({
 	getDeliveryByDedupKey: vi.fn(),
 	getDeliveryIdsByDedupKeys: vi.fn(),
 	getEnginePrefsMap: vi.fn(),
+	getInviteNotificationState: vi.fn(),
 	getExpiringLiveListings: vi.fn(),
 	getExpiringOfferedApplications: vi.fn(),
 	getLegacySeekerEmailBooleans: vi.fn(),
@@ -52,6 +53,7 @@ const dbMocks = vi.hoisted(() => ({
 	recordPushOutcome: vi.fn(),
 	revokePushSubscription: vi.fn(),
 	settleDelivery: vi.fn(),
+	settleInviteNotificationDelivery: vi.fn(),
 	adminClient: vi.fn(),
 }));
 vi.mock("@explore-and-earn/db", () => dbMocks);

@@ -417,6 +417,81 @@ export async function getSeekerAvailability(
   return result.ok ? result.availability : unsetAvailability();
 }
 
+export type SeekerHostDiscoverySettingResult =
+  | { readonly ok: true; readonly enabled: boolean }
+  | { readonly ok: false; readonly error: string };
+
+/** Read the signed-in seeker's explicit host-discovery consent. */
+export async function getSeekerHostDiscoverySetting(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<SeekerHostDiscoverySettingResult> {
+  try {
+    const db = authedClient(clerkToken) as unknown as SupabaseClient;
+    const { data, error } = await db
+      .from(SEEKER_PROFILES)
+      .select("host_discovery_enabled")
+      .eq("clerk_user_id", clerkUserId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    // A missing profile has the schema default: discovery is off. Do not turn
+    // that confirmed absence into an unavailable control; the write path below
+    // creates the caller-owned profile through the canonical RPC if needed.
+    if (!data) return { ok: true, enabled: false };
+    const enabled = (data as Record<string, unknown>).host_discovery_enabled;
+    return typeof enabled === "boolean"
+      ? { ok: true, enabled }
+      : { ok: false, error: "invalid_host_discovery_setting" };
+  } catch (caught) {
+    return {
+      ok: false,
+      error: caught instanceof Error ? caught.message : "unknown_error",
+    };
+  }
+}
+
+/** Persist explicit owner consent; migration 094 grants only this new column. */
+export async function setSeekerHostDiscoverySetting(
+  clerkToken: string,
+  clerkUserId: string,
+  enabled: unknown,
+): Promise<SeekerHostDiscoverySettingResult> {
+  if (typeof enabled !== "boolean") {
+    return { ok: false, error: "invalid_host_discovery_setting" };
+  }
+
+  try {
+    const db = authedClient(clerkToken) as unknown as SupabaseClient;
+    const { data: ensuredId, error: ensureError } = await db.rpc(
+      "ensure_my_seeker_profile",
+    );
+    if (ensureError) return { ok: false, error: ensureError.message };
+    if (typeof ensuredId !== "string" || ensuredId.length === 0) {
+      return { ok: false, error: "seeker_profile_create_failed" };
+    }
+    const { data, error } = await db
+      .from(SEEKER_PROFILES)
+      .update({ host_discovery_enabled: enabled })
+      .eq("id", ensuredId)
+      .eq("clerk_user_id", clerkUserId)
+      .is("deleted_at", null)
+      .select("host_discovery_enabled")
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    if (!data) return { ok: false, error: "profile_not_found" };
+    const persisted = (data as Record<string, unknown>).host_discovery_enabled;
+    return persisted === enabled
+      ? { ok: true, enabled: persisted }
+      : { ok: false, error: "host_discovery_update_not_confirmed" };
+  } catch (caught) {
+    return {
+      ok: false,
+      error: caught instanceof Error ? caught.message : "unknown_error",
+    };
+  }
+}
+
 /**
  * Batch-resolve applicant display names for a host, by seeker_profiles.id.
  *

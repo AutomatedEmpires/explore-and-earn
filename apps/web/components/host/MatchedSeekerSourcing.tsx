@@ -1,12 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Icon } from "@explore-and-earn/ui";
 
 import { createInviteAction } from "../../app/actions/invites";
 import { captureFunnelEvent } from "../../lib/analytics/capture";
 import { HOST_WORKSPACE_EVENTS } from "../../lib/analytics/events";
+import {
+  inviteErrorMessage,
+  OUTREACH_PREVIEW_STATUS,
+} from "../../lib/hostOutreach";
 import { CATEGORY_ICON, CATEGORY_LABEL } from "../discovery";
 import { BuyMoreInvitesPopup } from "./BuyMoreInvitesPopup";
 import { SourcedSeekerCard, type SourcedSeekerVM } from "./SourcedSeekerCard";
@@ -27,17 +31,27 @@ export interface InviteEntitlementVM {
   readonly ledgerAvailable: boolean;
 }
 
-export interface SourcingBucketVM {
+interface SourcingBucketBase {
   readonly listingId: string;
   readonly listingTitle: string;
   readonly category: string;
   readonly locationDisplay: string | null;
-  readonly seekers: readonly SourcedSeekerVM[];
+}
+
+export type SourcingBucketVM = SourcingBucketBase &
+  (
+    | { readonly state: "ready"; readonly seekers: readonly SourcedSeekerVM[] }
+    | { readonly state: "unavailable" }
+  );
+
+export interface OutreachMatchesPreviewVM {
+  readonly notice: string;
 }
 
 export interface MatchedSeekerSourcingProps {
   readonly buckets: readonly SourcingBucketVM[];
   readonly entitlement: InviteEntitlementVM | null;
+  readonly preview?: OutreachMatchesPreviewVM;
 }
 
 const TIER_LABEL: Record<Tier, string> = {
@@ -51,90 +65,120 @@ function isCategoryKey(value: string): value is keyof typeof CATEGORY_LABEL {
   return Object.prototype.hasOwnProperty.call(CATEGORY_LABEL, value);
 }
 
-/**
- * Host "Matched seekers" sourcing surface: per-listing buckets of the ranked,
- * discovery-safe seeker projection with their REAL ADR-040 match scores, plus
- * the metered "Invite to apply" action.
- *
- * VALUE IS NEVER HIDDEN, THE ACTION IS GATED: when the host is out of invite
- * credits (metered ledger, totalRemaining ≤ 0) the buckets and scores still
- * render in full — only the send is blocked, swapped for an upsell that opens
- * the buy-more packs. The SERVER is the source of truth (createInviteAction
- * enforces the entitlement atomically); the remaining count and blocked state
- * here are presentation, reconciled from the server after every send.
- */
-export function MatchedSeekerSourcing({ buckets, entitlement }: MatchedSeekerSourcingProps) {
+/** Ranked, discovery-safe seeker cards with truthful per-listing load states. */
+export function MatchedSeekerSourcing({
+  buckets,
+  entitlement,
+  preview,
+}: MatchedSeekerSourcingProps) {
   const router = useRouter();
   const metered = entitlement?.ledgerAvailable === true;
-
-  const [remaining, setRemaining] = useState<number>(entitlement?.totalRemaining ?? 0);
+  const [remaining, setRemaining] = useState<number>(
+    entitlement?.totalRemaining ?? 0,
+  );
   const [invited, setInvited] = useState<ReadonlySet<string>>(() => new Set());
   const [sendingKey, setSendingKey] = useState<string | null>(null);
   const [errorByKey, setErrorByKey] = useState<Record<string, string>>({});
+  const [statusByKey, setStatusByKey] = useState<Record<string, string>>({});
   const [buyOpen, setBuyOpen] = useState(false);
+  const sendInFlight = useRef(false);
 
-  // Re-sync the authoritative remaining count whenever the server refreshes the
-  // entitlement (after revalidatePath). Keeps optimistic math from drifting.
   useEffect(() => {
     setRemaining(entitlement?.totalRemaining ?? 0);
   }, [entitlement?.totalRemaining, entitlement?.periodKey]);
 
-  const blocked = metered && remaining <= 0;
+  const blocked = !preview && metered && remaining <= 0;
+  const hasMonthlyAllowance = (entitlement?.monthlyAllowance ?? 0) > 0;
 
   const handleInvite = useCallback(
-    (bucketId: string, seeker: SourcedSeekerVM) => {
+    async (bucketId: string, seeker: SourcedSeekerVM) => {
       const key = `${bucketId}:${seeker.seekerProfileId}`;
-      if (invited.has(key) || seeker.alreadyInvited || sendingKey) return;
-      // Gate (never hide): out of credits → send the host to the upsell.
+      if (
+        invited.has(key) ||
+        seeker.alreadyInvited ||
+        sendInFlight.current
+      ) {
+        return;
+      }
       if (blocked) {
         setBuyOpen(true);
         return;
       }
+
+      sendInFlight.current = true;
       setSendingKey(key);
-      setErrorByKey((prev) => {
-        const next = { ...prev };
+      setErrorByKey((previous) => {
+        const next = { ...previous };
         delete next[key];
         return next;
       });
-      void createInviteAction(seeker.seekerProfileId, bucketId).then((result) => {
+      setStatusByKey((previous) => {
+        const next = { ...previous };
+        delete next[key];
+        return next;
+      });
+
+      try {
+        if (preview) {
+          setInvited((previous) => new Set(previous).add(key));
+          setStatusByKey((previous) => ({
+            ...previous,
+            [key]: OUTREACH_PREVIEW_STATUS,
+          }));
+          return;
+        }
+
+        const result = await createInviteAction(seeker.seekerProfileId, bucketId);
         if (result.ok) {
-          // Only after the server debited a credit and wrote the invite. The
-          // band tells us whether hosts invite the matches we rank highest;
-          // the seeker is never identified.
           captureFunnelEvent(HOST_WORKSPACE_EVENTS.inviteSent, {
             band: seeker.band,
             metered,
             surface: "matched_seekers",
           });
-          setInvited((prev) => new Set(prev).add(key));
-          if (metered) setRemaining((r) => Math.max(0, r - 1));
-          // Reconcile the "Sent invites" list + entitlement from the server.
+          setInvited((previous) => new Set(previous).add(key));
+          if (metered) setRemaining((value) => Math.max(0, value - 1));
           router.refresh();
-        } else if (result.error === "already_invited") {
-          setInvited((prev) => new Set(prev).add(key));
-        } else if (result.error === "invite_credits_required") {
+          return;
+        }
+        if (result.error === "already_invited") {
+          setInvited((previous) => new Set(previous).add(key));
+          return;
+        }
+        if (result.error === "invite_credits_required") {
           setRemaining(0);
           setBuyOpen(true);
-        } else {
-          setErrorByKey((prev) => ({
-            ...prev,
-            [key]:
-              result.error === "rate_limit_exceeded"
-                ? "You've hit the hourly invite limit. Try again shortly."
-                : "Couldn't send the invite. Please try again.",
-          }));
+          router.refresh();
+          return;
         }
+        setErrorByKey((previous) => ({
+          ...previous,
+          [key]: inviteErrorMessage(result.error),
+        }));
+      } catch {
+        setErrorByKey((previous) => ({
+          ...previous,
+          [key]: inviteErrorMessage("temporarily_unavailable"),
+        }));
+      } finally {
         setSendingKey(null);
-      });
+        sendInFlight.current = false;
+      }
     },
-    [blocked, invited, metered, router, sendingKey],
+    [blocked, invited, metered, preview, router],
   );
 
-  const totalSeekers = buckets.reduce((sum, b) => sum + b.seekers.length, 0);
-
   return (
-    <section className={styles.wrap}>
-      {/* --- Quota meter + buy-more ------------------------------------------ */}
+    <section
+      className={styles.wrap}
+      aria-labelledby="host-outreach-matches-heading"
+    >
+      {preview ? (
+        <p className={styles.previewNotice} role="note">
+          <Icon name="system.info" size={16} aria-hidden />
+          {preview.notice}
+        </p>
+      ) : null}
+
       {entitlement ? (
         <div className={styles.quota} data-blocked={blocked ? "true" : undefined}>
           {metered ? (
@@ -156,8 +200,12 @@ export function MatchedSeekerSourcing({ buckets, entitlement }: MatchedSeekerSou
                   role="meter"
                   aria-valuenow={entitlement.monthlyUsed}
                   aria-valuemin={0}
-                  aria-valuemax={Math.max(entitlement.monthlyAllowance, 1)}
-                  aria-label="Monthly invites used"
+                  aria-valuemax={Math.max(
+                    entitlement.monthlyAllowance,
+                    entitlement.monthlyUsed,
+                    1,
+                  )}
+                  aria-label={`${entitlement.monthlyUsed} monthly invites used against the current allowance of ${entitlement.monthlyAllowance}`}
                 >
                   <span
                     className={styles.meterFill}
@@ -166,7 +214,9 @@ export function MatchedSeekerSourcing({ buckets, entitlement }: MatchedSeekerSou
                         entitlement.monthlyAllowance > 0
                           ? Math.min(
                               100,
-                              (entitlement.monthlyUsed / entitlement.monthlyAllowance) * 100,
+                              (entitlement.monthlyUsed /
+                                entitlement.monthlyAllowance) *
+                                100,
                             )
                           : 0
                       }%`,
@@ -174,15 +224,21 @@ export function MatchedSeekerSourcing({ buckets, entitlement }: MatchedSeekerSou
                   />
                 </div>
               </div>
-              <Button variant="secondary" icon="status.boosted" onClick={() => setBuyOpen(true)}>
-                Buy more
-              </Button>
+              {!preview ? (
+                <Button
+                  variant="secondary"
+                  icon="status.boosted"
+                  onClick={() => setBuyOpen(true)}
+                >
+                  Buy more
+                </Button>
+              ) : null}
             </>
           ) : (
             <p className={styles.quotaUnmetered}>
               <Icon name="system.info" size={16} aria-hidden />
-              Invite metering activates soon — your matched-seeker buckets and scores are live
-              now.
+              Invite metering is unavailable. Matched seekers and scores remain
+              visible, but the server still decides whether an invite can send.
             </p>
           )}
         </div>
@@ -192,99 +248,156 @@ export function MatchedSeekerSourcing({ buckets, entitlement }: MatchedSeekerSou
         <div className={styles.blocked} role="status">
           <Icon name="system.lock" size={18} aria-hidden />
           <div className={styles.blockedText}>
-            <strong>You&apos;re out of invite credits this month.</strong>
+            <strong>
+              {hasMonthlyAllowance
+                ? "You've used all available invite credits."
+                : "This account has no invite credits."}
+            </strong>
             <span>
-              Every matched seeker and score below stays visible — top up to send invites, or wait
-              for next month&apos;s allowance.
+              {hasMonthlyAllowance
+                ? "Every matched seeker and score below stays visible. Check Buy more for pack availability, or wait for your next included monthly allowance."
+                : "Every matched seeker and score below stays visible. Check Buy more for pack availability, or choose a plan with a monthly allowance."}
             </span>
           </div>
-          <Button variant="primary" icon="status.boosted" onClick={() => setBuyOpen(true)}>
+          <Button
+            variant="primary"
+            icon="status.boosted"
+            onClick={() => setBuyOpen(true)}
+          >
             Buy more
           </Button>
         </div>
       ) : null}
 
-      {/* --- Per-listing buckets -------------------------------------------- */}
-      {totalSeekers === 0 ? (
+      {buckets.length === 0 ? (
         <div className={styles.empty}>
           <Icon name="status.match" size={24} aria-hidden />
           <p>
-            No matched seekers to source yet. As seekers complete profiles that fit your published
-            listings, your ranked buckets appear here with their match scores.
+            No current listings are ready for matched-seeker sourcing. Publish
+            and verify a listing with a future closing date to start.
           </p>
         </div>
       ) : (
         <div className={styles.buckets}>
           {buckets.map((bucket) => {
-            if (bucket.seekers.length === 0) return null;
-            const cat = isCategoryKey(bucket.category) ? bucket.category : null;
+            const category = isCategoryKey(bucket.category)
+              ? bucket.category
+              : null;
             return (
               <div key={bucket.listingId} className={styles.bucket}>
                 <div className={styles.bucketHead}>
                   <div className={styles.bucketTitles}>
                     <h3 className={styles.bucketTitle}>
-                      {cat ? <Icon name={CATEGORY_ICON[cat]} size={18} aria-hidden /> : null}
+                      {category ? (
+                        <Icon
+                          name={CATEGORY_ICON[category]}
+                          size={18}
+                          aria-hidden
+                        />
+                      ) : null}
                       {bucket.listingTitle}
                     </h3>
                     <p className={styles.bucketSub}>
-                      {bucket.seekers.length} matched
-                      {bucket.locationDisplay ? ` · ${bucket.locationDisplay}` : ""}
+                      {bucket.state === "ready"
+                        ? `${bucket.seekers.length} shown`
+                        : "Match data unavailable"}
+                      {bucket.locationDisplay
+                        ? ` · ${bucket.locationDisplay}`
+                        : ""}
                     </p>
                   </div>
                 </div>
-                <div className={styles.grid}>
-                  {bucket.seekers.map((seeker) => {
-                    const key = `${bucket.listingId}:${seeker.seekerProfileId}`;
-                    const isInvited = invited.has(key) || seeker.alreadyInvited;
-                    const isSending = sendingKey === key;
-                    const error = errorByKey[key];
-                    return (
-                      <SourcedSeekerCard
-                        key={seeker.seekerProfileId}
-                        seeker={seeker}
-                        action={
-                          <div className={styles.action}>
-                            {isInvited ? (
-                              <span className={styles.invited}>
-                                <Icon name="system.success" size={16} aria-hidden />
-                                Invited
-                              </span>
-                            ) : blocked ? (
-                              <Button
-                                variant="secondary"
-                                icon="system.lock"
-                                onClick={() => setBuyOpen(true)}
-                              >
-                                Unlock invite
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="primary"
-                                icon="action.forward"
-                                onClick={() => handleInvite(bucket.listingId, seeker)}
-                                disabled={isSending}
-                              >
-                                {isSending ? "Inviting…" : "Invite to apply"}
-                              </Button>
-                            )}
-                            {error ? (
-                              <span className={styles.error} role="alert">
-                                {error}
-                              </span>
-                            ) : null}
-                          </div>
-                        }
-                      />
-                    );
-                  })}
-                </div>
+
+                {bucket.state === "unavailable" ? (
+                  <div className={styles.loadError} role="alert">
+                    <strong>
+                      Matched seekers are temporarily unavailable for this
+                      listing.
+                    </strong>
+                    <span>
+                      Refresh the page to try again. Your other outreach data is
+                      unchanged.
+                    </span>
+                  </div>
+                ) : bucket.seekers.length === 0 ? (
+                  <div className={styles.bucketEmpty} role="status">
+                    <strong>No sourceable matches for this listing yet.</strong>
+                    <span>
+                      New matches will appear after eligible seekers complete
+                      visible profiles.
+                    </span>
+                  </div>
+                ) : (
+                  <div className={styles.grid}>
+                    {bucket.seekers.map((seeker) => {
+                      const key = `${bucket.listingId}:${seeker.seekerProfileId}`;
+                      const isInvited = invited.has(key) || seeker.alreadyInvited;
+                      const isSending = sendingKey === key;
+                      const isAnySending = sendingKey !== null;
+                      const error = errorByKey[key];
+                      const status = statusByKey[key];
+                      return (
+                        <SourcedSeekerCard
+                          key={seeker.seekerProfileId}
+                          seeker={seeker}
+                          action={
+                            <div className={styles.action}>
+                              {isInvited ? (
+                                <Button
+                                  variant="secondary"
+                                  icon="system.success"
+                                  disabled
+                                >
+                                  {status ? "Previewed" : "Already invited"}
+                                </Button>
+                              ) : blocked ? (
+                                <Button
+                                  variant="secondary"
+                                  icon="system.lock"
+                                  onClick={() => setBuyOpen(true)}
+                                >
+                                  Unlock invite
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="primary"
+                                  icon="action.forward"
+                                  onClick={() => handleInvite(bucket.listingId, seeker)}
+                                  disabled={isAnySending}
+                                >
+                                  {isSending
+                                    ? "Inviting…"
+                                    : preview
+                                      ? "Preview invite"
+                                      : "Invite to apply"}
+                                </Button>
+                              )}
+                              {error ? (
+                                <span className={styles.error} role="alert">
+                                  {error}
+                                </span>
+                              ) : null}
+                              {status ? (
+                                <span className={styles.previewStatus} role="status">
+                                  {status}
+                                </span>
+                              ) : null}
+                            </div>
+                          }
+                        />
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       )}
 
-      <BuyMoreInvitesPopup isOpen={buyOpen} onClose={() => setBuyOpen(false)} />
+      {!preview ? (
+        <BuyMoreInvitesPopup isOpen={buyOpen} onClose={() => setBuyOpen(false)} />
+      ) : null}
     </section>
   );
 }

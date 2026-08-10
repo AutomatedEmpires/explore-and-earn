@@ -36,6 +36,8 @@ export { SeekerResumeCard } from "./SeekerResumeCard";
 export type { SeekerResumeCardProps } from "./SeekerResumeCard";
 export { SettingsPanel } from "./SettingsPanel";
 export type { SettingsPanelProps } from "./SettingsPanel";
+export { HostDiscoveryVisibilitySetting } from "./HostDiscoveryVisibilitySetting";
+export type { HostDiscoveryVisibilitySettingProps } from "./HostDiscoveryVisibilitySetting";
 export { AppearanceControl } from "./AppearanceControl";
 export { PaletteControl } from "./PaletteControl";
 export { BadgeGallery } from "./BadgeGallery";

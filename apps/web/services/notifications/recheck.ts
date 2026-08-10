@@ -2,8 +2,10 @@ import "server-only"
 
 import type { NotificationIntent } from "@explore-and-earn/contracts"
 import {
+	beginInviteNotificationDelivery,
 	getApplicationOfferState,
 	adminSchedulingContext,
+	getInviteNotificationState,
 	getListingLiveState,
 	getResumeCompletionByProfileId,
 } from "@explore-and-earn/db"
@@ -17,12 +19,51 @@ export type RecheckOutcome =
 	| { readonly actionable: true }
 	| { readonly actionable: false; readonly reason: string }
 
+export interface InviteDeliveryRecheckContext {
+	readonly deliveryId: string
+	readonly workerId: string
+	/** Persist the provider-start marker immediately before channel mutation. */
+	readonly providerBoundary?: boolean
+}
+
 export async function recheckIntent(
 	intent: Pick<NotificationIntent, "type" | "entity" | "expiresAt"> & {
 		readonly values?: NotificationIntent["values"]
 	},
 	nowMs: number,
+	inviteDelivery?: InviteDeliveryRecheckContext,
 ): Promise<RecheckOutcome> {
+	// Invitation work must renew and prove its exact worker-owned lease before
+	// ANY downstream settlement or provider call. A malformed intent or missing
+	// context cannot safely identify that authority row, so fail closed and let
+	// the caller leave it untouched for the database lease fence.
+	if (intent.type === "invite_received") {
+		if (intent.entity?.type !== "invite" || !inviteDelivery) {
+			throw new Error("invite delivery recheck context required")
+		}
+		const readState = inviteDelivery.providerBoundary
+			? beginInviteNotificationDelivery
+			: getInviteNotificationState
+		const state = await readState({
+			inviteId: intent.entity.id,
+			deliveryId: inviteDelivery.deliveryId,
+			workerId: inviteDelivery.workerId,
+		})
+		if (!state || !["created", "delivered", "viewed"].includes(state.status)) {
+			return { actionable: false, reason: "invite no longer actionable" }
+		}
+		if (intent.expiresAt) {
+			const intentExpiresMs = Date.parse(intent.expiresAt)
+			if (Number.isFinite(intentExpiresMs) && intentExpiresMs <= nowMs) {
+				return { actionable: false, reason: "intent expired before delivery" }
+			}
+		}
+		if (!state.expiresAt || Date.parse(state.expiresAt) <= nowMs) {
+			return { actionable: false, reason: "invite already expired" }
+		}
+		return { actionable: true }
+	}
+
 	// Universal: an intent past its own expiry is dead on arrival.
 	if (intent.expiresAt) {
 		const expiresMs = Date.parse(intent.expiresAt)

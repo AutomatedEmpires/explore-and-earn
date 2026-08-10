@@ -3,7 +3,9 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import {
+  getSeekerHostDiscoverySetting,
   saveSeekerProfile,
+  setSeekerHostDiscoverySetting,
   updateNotificationPrefs,
   type NotificationPrefsPatch,
   type SeekerProfileUpdate,
@@ -24,6 +26,16 @@ export interface SettingsActionResult {
 /** Stable, serializable result consumed by the schedule and travel forms. */
 export type SeekerSettingsSaveResult =
   | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly error:
+        | "validation"
+        | "unauthenticated"
+        | "temporarily_unavailable";
+    };
+
+export type HostDiscoverySettingActionResult =
+  | { readonly ok: true; readonly enabled: boolean }
   | {
       readonly ok: false;
       readonly error:
@@ -166,7 +178,10 @@ async function settingsSession(
   actionName: string,
 ): Promise<
   | { readonly ok: true; readonly session: SettingsSession }
-  | { readonly ok: false; readonly result: SeekerSettingsSaveResult }
+  | {
+      readonly ok: false;
+      readonly result: Extract<SeekerSettingsSaveResult, { readonly ok: false }>;
+    }
 > {
   try {
     const { userId, getToken } = await auth();
@@ -294,6 +309,71 @@ export async function updateTravelAction(
     "/travel",
     "/home",
   ]);
+}
+
+/** Load explicit host-discovery consent without guessing false on a read fault. */
+export async function getHostDiscoverySettingAction(): Promise<HostDiscoverySettingActionResult> {
+  const authenticated = await settingsSession("getHostDiscoverySettingAction");
+  if (!authenticated.ok) {
+    return { ok: false, error: authenticated.result.error };
+  }
+  const { token, userId } = authenticated.session;
+
+  try {
+    const result = await getSeekerHostDiscoverySetting(token, userId);
+    if (result.ok) return result;
+    reportSettingsError(new Error(result.error), {
+      action: "getHostDiscoverySettingAction.load",
+      userId,
+    });
+  } catch (error) {
+    reportSettingsError(error, {
+      action: "getHostDiscoverySettingAction.load",
+      userId,
+    });
+  }
+  return TEMPORARILY_UNAVAILABLE_FAILURE;
+}
+
+/** Persist the seeker's explicit opt-in; false remains the database default. */
+export async function updateHostDiscoverySettingAction(
+  enabled: unknown,
+): Promise<HostDiscoverySettingActionResult> {
+  if (typeof enabled !== "boolean") return VALIDATION_FAILURE;
+
+  const authenticated = await settingsSession("updateHostDiscoverySettingAction");
+  if (!authenticated.ok) {
+    return { ok: false, error: authenticated.result.error };
+  }
+  const { token, userId } = authenticated.session;
+
+  try {
+    const result = await setSeekerHostDiscoverySetting(token, userId, enabled);
+    if (!result.ok) {
+      reportSettingsError(new Error(result.error), {
+        action: "updateHostDiscoverySettingAction.persist",
+        userId,
+      });
+      return TEMPORARILY_UNAVAILABLE_FAILURE;
+    }
+
+    try {
+      revalidatePath("/settings");
+    } catch (error) {
+      reportSettingsError(error, {
+        action: "updateHostDiscoverySettingAction.postPersistRevalidate",
+        route: "/settings",
+        userId,
+      });
+    }
+    return { ok: true, enabled: result.enabled };
+  } catch (error) {
+    reportSettingsError(error, {
+      action: "updateHostDiscoverySettingAction.persist",
+      userId,
+    });
+    return TEMPORARILY_UNAVAILABLE_FAILURE;
+  }
 }
 
 /**

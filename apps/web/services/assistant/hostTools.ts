@@ -17,7 +17,6 @@ import {
 import {
   hasResumeExperienceIdentity,
   normalizeResumeExperienceIdentity,
-  topMatchReasons,
 } from "@explore-and-earn/contracts";
 
 import { checkRateLimit } from "../../lib/rateLimit";
@@ -30,7 +29,7 @@ import { checkRateLimit } from "../../lib/rateLimit";
  * dashboard uses, so it can only ever see this host's own listings/applicants;
  * applicant resume access is additionally gated in the database by migration
  * 084, which derives the host from the JWT and returns rows only for a seeker
- * who applied to, was invited by, or converses with them. All tools are read-only —
+ * who applied to or has an application-derived conversation with them. All tools are read-only —
  * screening is ASSISTIVE: the Guide summarizes, compares, and prioritizes for
  * review; it never decides, never rejects, and never reveals anything to the
  * candidate. Protected characteristics play no role anywhere: every signal is
@@ -238,11 +237,19 @@ export function buildHostTools(ctx: HostToolContext): ToolSet {
         "Ranked matched seekers for ONE of this host's listings (by id) from real persisted ADR-040 scores, with the host's current invite allowance. Use for 'who should I invite / find candidates'. A shortlist, not the whole market — the full seeker search still exists.",
       inputSchema: z.object({ listingId: z.string() }),
       execute: async ({ listingId }) => {
-        const [sourced, entitlement] = await Promise.all([
+        const [sourced, entitlementResult] = await Promise.all([
           getMatchedSeekersForListing(ctx.token, ctx.userId, listingId, 10),
-          getInviteEntitlement(ctx.token, ctx.userId).catch(() => null),
+          getInviteEntitlement(ctx.token, ctx.userId).then(
+            (entitlement) => ({ ok: true as const, entitlement }),
+            () => ({ ok: false as const }),
+          ),
         ]);
-        if (!sourced) return { error: "listing_not_found" as const };
+        if (!sourced.ok) return { error: sourced.error };
+        if (!entitlementResult.ok) {
+          return { error: "temporarily_unavailable" as const };
+        }
+        const entitlement = entitlementResult.entitlement;
+        if (!entitlement) return { error: "not_a_host" as const };
         return {
           seekers: sourced.seekers.map((seeker) => ({
             seekerProfileId: seeker.seekerProfileId,
@@ -251,18 +258,15 @@ export function buildHostTools(ctx: HostToolContext): ToolSet {
             skills: seeker.generalSkills,
             matchBand: seeker.band,
             matchScore: seeker.score,
-            topReasons: topMatchReasons(seeker.components).map((r) => r.label),
             alreadyInvited: seeker.alreadyInvited,
           })),
-          invites: entitlement
-            ? {
-                monthlyAllowance: entitlement.monthlyAllowance,
-                remainingThisMonth: entitlement.monthlyRemaining,
-                purchasedBalance: entitlement.purchasedBalance,
-                totalRemaining: entitlement.totalRemaining,
-                metered: entitlement.ledgerAvailable,
-              }
-            : null,
+          invites: {
+            monthlyAllowance: entitlement.monthlyAllowance,
+            remainingThisMonth: entitlement.monthlyRemaining,
+            purchasedBalance: entitlement.purchasedBalance,
+            totalRemaining: entitlement.totalRemaining,
+            metered: entitlement.ledgerAvailable,
+          },
         };
       },
     }),
@@ -272,7 +276,12 @@ export function buildHostTools(ctx: HostToolContext): ToolSet {
         "THIS host's current invite allowance: monthly included invites (by their real plan), used/remaining this month, and purchased credit balance. Use for 'how many invites do I have left'.",
       inputSchema: z.object({}),
       execute: async () => {
-        const entitlement = await getInviteEntitlement(ctx.token, ctx.userId);
+        const entitlement = await getInviteEntitlement(ctx.token, ctx.userId).catch(
+          () => undefined,
+        );
+        if (entitlement === undefined) {
+          return { error: "temporarily_unavailable" as const };
+        }
         if (!entitlement) return { error: "not_a_host" as const };
         return {
           tier: entitlement.tier,

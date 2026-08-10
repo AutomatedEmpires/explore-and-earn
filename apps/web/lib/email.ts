@@ -51,10 +51,18 @@ export interface SendEmailOptions {
    * verbatim to the transport.
    */
   readonly headers?: Readonly<Record<string, string>>;
+  readonly beforeProviderRequest?: () => Promise<
+    | { readonly actionable: true }
+    | { readonly actionable: false; readonly reason: string }
+  >;
 }
 
 export interface SendEmailResult {
   readonly ok: boolean;
+  /** True only after this call crossed the provider HTTP boundary. */
+  readonly providerRequestStarted?: boolean;
+  readonly providerBoundaryUnavailable?: boolean;
+  readonly cancelledReason?: string;
   /** Provider HTTP status when the provider responded. */
   readonly status?: number;
   /** Provider message id on success, when available. */
@@ -137,6 +145,7 @@ export async function sendEmail(
     text: opts.text,
     headers: opts.headers,
     idempotencyKey,
+    beforeProviderRequest: opts.beforeProviderRequest,
   });
 
   // Deduplicated sends: the original send was already logged. Skipping the
@@ -156,6 +165,9 @@ export async function sendEmail(
   return {
     ok: result.ok,
     status: result.status,
+    providerRequestStarted: result.providerRequestStarted,
+    providerBoundaryUnavailable: result.providerBoundaryUnavailable,
+    cancelledReason: result.cancelledReason,
     providerMessageId: result.providerMessageId,
     error: result.error,
   };

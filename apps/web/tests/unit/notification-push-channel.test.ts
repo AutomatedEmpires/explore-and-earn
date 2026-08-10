@@ -181,6 +181,37 @@ describe("sendPush — 429 rate limited", () => {
 	})
 })
 
+describe("sendPush — ambiguous provider outcome", () => {
+	it("marks a network failure after submission as outcome-unknown", async () => {
+		setVapidEnv()
+		const sub = makeSubscription()
+		dbMocks.getActivePushSubscriptions.mockResolvedValue([sub])
+		webpushMocks.sendNotification.mockRejectedValue(new Error("connection reset"))
+
+		const result = await sendPush(baseIntent())
+
+		expect(result.ok).toBe(false)
+		expect(result.outcomeUnknown).toBe(true)
+		expect(result.failureClass).toBe("transient")
+	})
+
+	it("retains an earlier unknown outcome when a later endpoint is definitively gone", async () => {
+		setVapidEnv()
+		dbMocks.getActivePushSubscriptions.mockResolvedValue([
+			makeSubscription({ id: "sub-unknown" }),
+			makeSubscription({ id: "sub-gone" }),
+		])
+		webpushMocks.sendNotification
+			.mockRejectedValueOnce(new Error("connection reset"))
+			.mockRejectedValueOnce({ statusCode: 410 })
+
+		const result = await sendPush(baseIntent())
+
+		expect(result.ok).toBe(false)
+		expect(result.outcomeUnknown).toBe(true)
+	})
+})
+
 describe("sendPush — partial success across multiple subscriptions", () => {
 	it("reports ok:true when at least one of several subscriptions succeeds, and still revokes the dead one", async () => {
 		setVapidEnv()
@@ -196,6 +227,32 @@ describe("sendPush — partial success across multiple subscriptions", () => {
 		expect(result.ok).toBe(true)
 		expect(dbMocks.revokePushSubscription).toHaveBeenCalledTimes(1)
 		expect(dbMocks.revokePushSubscription).toHaveBeenCalledWith(deadSub.id)
+	})
+
+	it("starts every provider mutation together so none can begin after the outer timeout", async () => {
+		setVapidEnv()
+		dbMocks.getActivePushSubscriptions.mockResolvedValue([
+			makeSubscription({ id: "sub-a" }),
+			makeSubscription({ id: "sub-b" }),
+		])
+		const releases: Array<() => void> = []
+		webpushMocks.sendNotification.mockImplementation(
+			() =>
+				new Promise<void>((resolve) => {
+					releases.push(resolve)
+				}),
+		)
+
+		const pending = sendPush(baseIntent())
+		await vi.waitFor(() => {
+			expect(webpushMocks.sendNotification).toHaveBeenCalledTimes(2)
+		})
+		for (const release of releases) release()
+
+		await expect(pending).resolves.toEqual({ ok: true })
+		for (const call of webpushMocks.sendNotification.mock.calls) {
+			expect(call[2]).toEqual(expect.objectContaining({ timeout: 25_000 }))
+		}
 	})
 })
 

@@ -3,9 +3,7 @@ import { Badge, Icon } from "@explore-and-earn/ui";
 import {
   MATCH_BANDS,
   matchBandFor,
-  matchReasonPhrase,
   type MatchBand,
-  type MatchComponentScores,
 } from "@explore-and-earn/contracts";
 
 import { CATEGORY_ICON, CATEGORY_LABEL } from "../discovery";
@@ -22,13 +20,12 @@ export interface SourcedSeekerVM {
   readonly seekerProfileId: string;
   readonly displayName: string | null;
   readonly shortBio: string | null;
-  readonly photoUrl: string | null;
+  /** Intentionally null until seeker-uploaded profile media has a trusted URL policy. */
+  readonly photoUrl: null;
   readonly generalSkills: readonly string[];
   readonly desiredCategories: readonly string[];
   readonly score: number;
   readonly band: MatchBand;
-  readonly confidence: number;
-  readonly components: MatchComponentScores;
   readonly alreadyInvited: boolean;
 }
 
@@ -65,33 +62,24 @@ function isCategoryKey(value: string): value is keyof typeof CATEGORY_LABEL {
  * categories) shown BEFORE any application. No availability, pay, contact, or
  * resume data is exposed here (that unlocks only through an application or
  * conversation — enforced server-side). The match score is the persisted
- * ADR-040 value, never a fabricated signal; reasons are computed at render
- * time from the numeric components (G34).
+ * ADR-040 aggregate value, never a fabricated signal. Sensitive component
+ * telemetry (including pay and availability alignment) never crosses the
+ * pre-application discovery boundary.
  */
 export function SourcedSeekerCard({ seeker, action }: SourcedSeekerCardProps) {
   const roundedScore = Math.round(seeker.score);
   const name = seeker.displayName ?? "Seeker";
-  const reasonPhrase = matchReasonPhrase(seeker.components);
   const skills = seeker.generalSkills.slice(0, MAX_SKILLS);
   const extraSkills = seeker.generalSkills.length - skills.length;
   const categories = seeker.desiredCategories.filter(isCategoryKey);
 
   return (
-    <article className={styles.card}>
+    <article className={styles.card} aria-label={`${name} seeker profile`}>
       <div className={styles.meta}>
         <div className={styles.who}>
-          {seeker.photoUrl ? (
-            <span
-              className={styles.photo}
-              style={{ backgroundImage: `url(${seeker.photoUrl})` }}
-              role="img"
-              aria-label={`${name} profile photo`}
-            />
-          ) : (
-            <span className={styles.avatar} aria-hidden>
-              {initials(name)}
-            </span>
-          )}
+          <span className={styles.avatar} aria-hidden>
+            {initials(name)}
+          </span>
           <div className={styles.whoText}>
             <span className={styles.name}>{name}</span>
             {categories.length > 0 ? (
@@ -120,13 +108,6 @@ export function SourcedSeekerCard({ seeker, action }: SourcedSeekerCardProps) {
           </span>
         </div>
       </div>
-
-      {reasonPhrase ? (
-        <p className={styles.reason}>
-          <Icon name="status.match" size={14} aria-hidden />
-          {reasonPhrase}
-        </p>
-      ) : null}
 
       {seeker.shortBio ? <p className={styles.bio}>{seeker.shortBio}</p> : null}
 

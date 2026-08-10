@@ -27,6 +27,13 @@ const MIGRATION_PATH = new URL(
 );
 
 const migration = readFileSync(MIGRATION_PATH, "utf8");
+const hardeningMigration = readFileSync(
+  new URL(
+    "../../../supabase/migrations/094_host_seeker_discovery_bridge.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 
 /** Migration text with `--` comments stripped, so prose never satisfies a check. */
 function sqlWithoutComments(sql: string): string {
@@ -89,6 +96,9 @@ const BRIDGE_FUNCTIONS = [
   "get_host_applicant_educations",
   "get_host_applicant_certifications",
 ] as const;
+const DETAIL_BRIDGE_FUNCTIONS = BRIDGE_FUNCTIONS.filter(
+  (name) => name !== "get_host_applicant_display_names",
+);
 
 describe("host applicant bridge — the entitled projection", () => {
   const cases: ReadonlyArray<[string, readonly string[]]> = [
@@ -140,23 +150,50 @@ describe("host applicant bridge — host identity is never an argument", () => {
   }
 
   it("derives host identity from the JWT helper, not from a parameter", () => {
-    const body = sqlWithoutComments(migration);
+    const body = sqlWithoutComments(hardeningMigration);
     expect(body).toContain("public.current_host_profile_ids()");
-    // The predicate must consult the caller's own host profiles in all three arms.
+    // Detail has application/conversation arms; narrow names additionally have
+    // the invite arm. Every arm derives the requesting host from the JWT.
     const arms = body.match(/public\.current_host_profile_ids\(\)/g) ?? [];
-    expect(arms.length).toBeGreaterThanOrEqual(3);
+    expect(arms.length).toBeGreaterThanOrEqual(5);
   });
 });
 
 describe("host applicant bridge — entitlement and grants stay in the migration", () => {
   const body = sqlWithoutComments(migration);
 
-  it("gates every projection on host_can_view_seeker", () => {
-    for (const fn of BRIDGE_FUNCTIONS) {
+  it("gates every full-detail projection on host_can_view_seeker", () => {
+    for (const fn of DETAIL_BRIDGE_FUNCTIONS) {
       const start = body.indexOf(`create or replace function public.${fn}(`);
       const end = body.indexOf("revoke execute on function", start);
       expect(body.slice(start, end)).toContain("public.host_can_view_seeker(");
     }
+  });
+
+  it("keeps invite-only access inside the narrow display-name lookup", () => {
+    const hardened = sqlWithoutComments(hardeningMigration);
+    const predicateStart = hardened.indexOf(
+      "create or replace function public.host_can_view_seeker(",
+    );
+    const predicate = hardened.slice(
+      predicateStart,
+      hardened.indexOf("revoke execute on function", predicateStart),
+    );
+    expect(predicate).toContain("from public.applications a");
+    expect(predicate).toContain("from public.conversations c");
+    expect(predicate).not.toContain("from public.invites i");
+
+    const namesStart = hardened.indexOf(
+      "create or replace function public.get_host_applicant_display_names(",
+    );
+    const names = hardened.slice(
+      namesStart,
+      hardened.indexOf("revoke execute on function", namesStart),
+    );
+    expect(names).toContain("from public.applications a");
+    expect(names).toContain("from public.invites i");
+    expect(names).toContain("from public.conversations c");
+    expect(names).not.toContain("public.host_can_view_seeker(");
   });
 
   it("keeps the predicate itself unreachable by any client role", () => {

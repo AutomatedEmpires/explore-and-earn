@@ -22,17 +22,21 @@ const db = vi.hoisted(() => ({
 	adminListingContext: vi.fn(),
 	adminSeekerClerkId: vi.fn(),
 	adminSchedulingContext: vi.fn(),
+	beginInviteNotificationDelivery: vi.fn(),
 	claimDeliveries: vi.fn(),
 	countRecentOutboundDeliveries: vi.fn(),
 	findOpenCollapsibleDeliveries: vi.fn(),
 	getDeliveryIdsByDedupKeys: vi.fn(),
 	getEnginePrefsMap: vi.fn(),
+	getInviteNotificationState: vi.fn(),
 	getLegacySeekerEmailBooleans: vi.fn(),
 	getUnprocessedEvents: vi.fn(),
 	insertDeliveries: vi.fn(),
 	insertDigestMemberships: vi.fn(),
 	markEventProcessed: vi.fn(),
+	releaseInviteNotificationClaimKnownUnsent: vi.fn(),
 	settleDelivery: vi.fn(),
+	settleInviteNotificationDelivery: vi.fn(),
 	getApplicationOfferState: vi.fn(),
 	getListingLiveState: vi.fn(),
 	getResumeCompletionByProfileId: vi.fn(),
@@ -54,10 +58,11 @@ const sendEmailMock = vi.hoisted(() =>
 		status?: number;
 		providerMessageId?: string;
 		error?: string;
+		providerRequestStarted?: boolean;
 	}),
 );
 vi.mock("../../lib/email", () => ({
-	sendEmail: (...args: unknown[]) => sendEmailMock(...(args as [])),
+	sendEmail: (...args: unknown[]) => sendEmailMock(...args),
 	absoluteUrl: (path: string) => `https://exploreandearn.com${path}`,
 }));
 
@@ -103,6 +108,31 @@ function wireHappyResolvers() {
 
 const NOW = Date.parse("2026-07-14T15:00:00.000Z");
 
+function mockEmailResult(
+	result: Record<string, unknown>,
+	mode: "once" | "persistent" = "persistent",
+): void {
+	const implementation = async (...args: unknown[]) => {
+		const options = (args[0] ?? {}) as {
+			beforeProviderRequest?: () => Promise<
+				| { readonly actionable: true }
+				| { readonly actionable: false; readonly reason: string }
+			>
+		}
+		const boundary = await options.beforeProviderRequest?.()
+		if (boundary && !boundary.actionable) {
+			return {
+				ok: false,
+				cancelledReason: boundary.reason,
+				providerRequestStarted: false,
+			}
+		}
+		return result
+	}
+	if (mode === "once") sendEmailMock.mockImplementationOnce(implementation)
+	else sendEmailMock.mockImplementation(implementation)
+}
+
 function claimedDelivery(overrides: Record<string, unknown> = {}) {
 	return {
 		id: "del-1",
@@ -144,12 +174,18 @@ beforeEach(() => {
 	db.insertDigestMemberships.mockResolvedValue(0);
 	db.getDeliveryIdsByDedupKeys.mockResolvedValue(new Map());
 	db.markEventProcessed.mockResolvedValue(undefined);
+	db.releaseInviteNotificationClaimKnownUnsent.mockResolvedValue(true);
 	db.settleDelivery.mockResolvedValue(undefined);
+	db.settleInviteNotificationDelivery.mockResolvedValue("delivered");
+	db.beginInviteNotificationDelivery.mockResolvedValue({
+		status: "created",
+		expiresAt: "2026-07-15T15:00:00.000Z",
+	});
 	db.countRecentOutboundDeliveries.mockResolvedValue(0);
 	db.findOpenCollapsibleDeliveries.mockResolvedValue([]);
 	db.isEmailSuppressed.mockResolvedValue(false);
 	db.insertEngineNotification.mockResolvedValue({ inserted: true, duplicate: false });
-	sendEmailMock.mockResolvedValue({ ok: true, status: 200, providerMessageId: "msg_1" });
+	mockEmailResult({ ok: true, status: 200, providerMessageId: "msg_1" })
 	wireHappyResolvers();
 });
 
@@ -297,6 +333,403 @@ describe("expansion — exactly-once materialization", () => {
 });
 
 describe("delivery — quiet hours, throttle, collapse, staleness", () => {
+	it("settles invite delivery and invite truth through the atomic authority", async () => {
+		const settledAt = NOW + 120_000;
+		const nowSpy = vi.spyOn(Date, "now").mockReturnValue(settledAt);
+		db.getInviteNotificationState.mockResolvedValue({
+			status: "created",
+			expiresAt: "2026-07-15T15:00:00.000Z",
+		});
+		db.claimDeliveries.mockResolvedValue([
+			claimedDelivery({
+				recipient_clerk_user_id: "clerk_seeker",
+				category: "offers_invites",
+				notification_type: "invite_received",
+				intent: {
+					...claimedDelivery().intent,
+					recipientClerkUserId: "clerk_seeker",
+					category: "offers_invites",
+					type: "invite_received",
+					entity: { type: "invite", id: "invite-1" },
+				},
+			}),
+		]);
+
+		const stats = await processDueDeliveries(NOW).finally(() =>
+			nowSpy.mockRestore(),
+		);
+
+		expect(stats.delivered).toBe(1);
+		expect(db.getInviteNotificationState).toHaveBeenCalledWith({
+			inviteId: "invite-1",
+			deliveryId: "del-1",
+			workerId: db.claimDeliveries.mock.calls[0][0].workerId,
+		});
+		expect(db.beginInviteNotificationDelivery).toHaveBeenCalledWith({
+			inviteId: "invite-1",
+			deliveryId: "del-1",
+			workerId: db.claimDeliveries.mock.calls[0][0].workerId,
+		});
+		expect(db.settleInviteNotificationDelivery).toHaveBeenCalledWith({
+			id: "del-1",
+			workerId: db.claimDeliveries.mock.calls[0][0].workerId,
+			deliveredAt: new Date(settledAt).toISOString(),
+			providerMessageId: "msg_1",
+		});
+		expect(db.settleDelivery).not.toHaveBeenCalled();
+	});
+
+	it("never downgrades a sent invitation to retryable when atomic settlement fails", async () => {
+		db.getInviteNotificationState.mockResolvedValue({
+			status: "created",
+			expiresAt: "2026-07-15T15:00:00.000Z",
+		});
+		db.settleInviteNotificationDelivery.mockRejectedValueOnce(
+			new Error("settlement unavailable"),
+		);
+		db.claimDeliveries.mockResolvedValue([
+			claimedDelivery({
+				recipient_clerk_user_id: "clerk_seeker",
+				category: "offers_invites",
+				notification_type: "invite_received",
+				intent: {
+					...claimedDelivery().intent,
+					recipientClerkUserId: "clerk_seeker",
+					category: "offers_invites",
+					type: "invite_received",
+					entity: { type: "invite", id: "invite-1" },
+				},
+			}),
+		]);
+
+		const stats = await processDueDeliveries(NOW);
+
+		expect(sendEmailMock).toHaveBeenCalledOnce();
+		expect(stats.failed).toBe(1);
+		expect(db.settleDelivery).not.toHaveBeenCalled();
+	});
+
+	it("dead-letters an ambiguous invite provider result instead of making it refundable", async () => {
+		db.getInviteNotificationState.mockResolvedValue({
+			status: "created",
+			expiresAt: "2026-07-15T15:00:00.000Z",
+		});
+		mockEmailResult({
+			ok: false,
+			status: 503,
+			error: "provider unavailable",
+			providerRequestStarted: true,
+		}, "once")
+		db.claimDeliveries.mockResolvedValue([
+			claimedDelivery({
+				recipient_clerk_user_id: "clerk_seeker",
+				category: "offers_invites",
+				notification_type: "invite_received",
+				intent: {
+					...claimedDelivery().intent,
+					recipientClerkUserId: "clerk_seeker",
+					category: "offers_invites",
+					type: "invite_received",
+					entity: { type: "invite", id: "invite-1" },
+				},
+			}),
+		]);
+
+		const stats = await processDueDeliveries(NOW);
+
+		expect(stats.failed).toBe(1);
+		expect(db.settleDelivery).toHaveBeenCalledWith({
+			id: "del-1",
+			workerId: db.claimDeliveries.mock.calls[0][0].workerId,
+			status: "dead_letter",
+			failureClass: "outcome_unknown",
+			failureDetail: "invite delivery adapter outcome unknown",
+		});
+		expect(db.settleInviteNotificationDelivery).not.toHaveBeenCalled();
+	});
+
+	it("keeps a preflight email configuration failure known-unsent and refundable", async () => {
+		db.getInviteNotificationState.mockResolvedValue({
+			status: "created",
+			expiresAt: "2026-07-15T15:00:00.000Z",
+		});
+		// The real mailer returns before invoking its provider-boundary callback
+		// when production configuration is missing.
+		sendEmailMock.mockResolvedValueOnce({
+			ok: false,
+			error: "RESEND_API_KEY is not set",
+			providerRequestStarted: false,
+		})
+		db.claimDeliveries.mockResolvedValue([
+			claimedDelivery({
+				attempt_count: 5,
+				recipient_clerk_user_id: "clerk_seeker",
+				category: "offers_invites",
+				notification_type: "invite_received",
+				intent: {
+					...claimedDelivery().intent,
+					recipientClerkUserId: "clerk_seeker",
+					category: "offers_invites",
+					type: "invite_received",
+					entity: { type: "invite", id: "invite-1" },
+				},
+			}),
+		]);
+
+		const stats = await processDueDeliveries(NOW);
+
+		expect(stats.failed).toBe(1);
+		expect(db.settleDelivery).toHaveBeenCalledWith(
+			expect.objectContaining({
+				id: "del-1",
+				status: "dead_letter",
+				failureClass: "known_unsent",
+			}),
+		);
+	});
+
+	it("CAS-releases a known-unsent invite claim when its pre-send authority is unavailable", async () => {
+		db.getInviteNotificationState.mockRejectedValueOnce(
+			new Error("delivery_not_recheckable"),
+		);
+		db.claimDeliveries.mockResolvedValue([
+			claimedDelivery({
+				recipient_clerk_user_id: "clerk_seeker",
+				category: "offers_invites",
+				notification_type: "invite_received",
+				intent: {
+					...claimedDelivery().intent,
+					recipientClerkUserId: "clerk_seeker",
+					category: "offers_invites",
+					type: "invite_received",
+					entity: { type: "invite", id: "invite-1" },
+				},
+			}),
+		]);
+
+		const stats = await processDueDeliveries(NOW);
+
+		expect(stats.failed).toBe(1);
+		expect(sendEmailMock).not.toHaveBeenCalled();
+		expect(db.settleDelivery).not.toHaveBeenCalled();
+		expect(db.settleInviteNotificationDelivery).not.toHaveBeenCalled();
+		expect(db.releaseInviteNotificationClaimKnownUnsent).toHaveBeenCalledWith({
+			id: "del-1",
+			workerId: db.claimDeliveries.mock.calls[0][0].workerId,
+			attemptCount: 1,
+			nextAttemptAt: new Date(NOW + 60_000).toISOString(),
+		});
+	});
+
+	it("cancels before the provider when the final provider-boundary check turns stale", async () => {
+		db.getInviteNotificationState.mockResolvedValue({
+			status: "created",
+			expiresAt: "2026-07-15T15:00:00.000Z",
+		});
+		db.beginInviteNotificationDelivery.mockResolvedValueOnce(null);
+		db.claimDeliveries.mockResolvedValue([
+			claimedDelivery({
+				recipient_clerk_user_id: "clerk_seeker",
+				category: "offers_invites",
+				notification_type: "invite_received",
+				intent: {
+					...claimedDelivery().intent,
+					recipientClerkUserId: "clerk_seeker",
+					category: "offers_invites",
+					type: "invite_received",
+					entity: { type: "invite", id: "invite-1" },
+				},
+			}),
+		]);
+
+		const stats = await processDueDeliveries(NOW);
+
+		expect(stats.cancelled).toBe(1);
+		expect(sendEmailMock).toHaveBeenCalledOnce();
+		expect(db.beginInviteNotificationDelivery).toHaveBeenCalledOnce();
+		expect(db.settleDelivery).toHaveBeenCalledWith({
+			id: "del-1",
+			workerId: db.claimDeliveries.mock.calls[0][0].workerId,
+			status: "cancelled",
+			suppressionReason: "invite no longer actionable",
+		});
+	});
+
+	it("rechecks current consent at the provider boundary after the batch snapshot", async () => {
+		db.getInviteNotificationState.mockResolvedValue({
+			status: "created",
+			expiresAt: "2026-07-15T15:00:00.000Z",
+		});
+		db.getEnginePrefsMap
+			.mockResolvedValueOnce(new Map())
+			.mockResolvedValueOnce(
+				new Map([
+					[
+						"clerk_seeker",
+						{
+							email_enabled: true,
+							push_enabled: false,
+							in_app_enabled: true,
+							category_prefs: {
+								offers_invites: {
+									email: "off",
+									push: "off",
+									in_app: "on",
+								},
+							},
+							quiet_hours_enabled: false,
+							quiet_start_minute: null,
+							quiet_end_minute: null,
+							timezone: "UTC",
+							locale: "en",
+						},
+					],
+				]),
+			)
+		db.claimDeliveries.mockResolvedValue([
+			claimedDelivery({
+				recipient_clerk_user_id: "clerk_seeker",
+				category: "offers_invites",
+				notification_type: "invite_received",
+				intent: {
+					...claimedDelivery().intent,
+					recipientClerkUserId: "clerk_seeker",
+					category: "offers_invites",
+					type: "invite_received",
+					entity: { type: "invite", id: "invite-1" },
+				},
+			}),
+		])
+
+		const stats = await processDueDeliveries(NOW)
+
+		expect(stats.cancelled).toBe(1)
+		expect(sendEmailMock).toHaveBeenCalledOnce()
+		expect(db.getEnginePrefsMap).toHaveBeenCalledTimes(2)
+		expect(db.beginInviteNotificationDelivery).not.toHaveBeenCalled()
+		expect(db.settleDelivery).toHaveBeenCalledWith({
+			id: "del-1",
+			workerId: db.claimDeliveries.mock.calls[0][0].workerId,
+			status: "cancelled",
+			suppressionReason: "preference withdrawn before send",
+		})
+	})
+
+	it("does not send a stale immediate row after the user switches that category to digest", async () => {
+		db.getEnginePrefsMap
+			.mockResolvedValueOnce(new Map())
+			.mockResolvedValueOnce(
+				new Map([
+					[
+						"clerk_host",
+						{
+							email_enabled: true,
+							push_enabled: false,
+							in_app_enabled: true,
+							category_prefs: {
+								applications: {
+									email: "daily",
+									push: "off",
+									in_app: "on",
+								},
+							},
+							quiet_hours_enabled: false,
+							quiet_start_minute: null,
+							quiet_end_minute: null,
+							timezone: "UTC",
+							locale: "en",
+						},
+					],
+				]),
+			)
+		db.claimDeliveries.mockResolvedValue([claimedDelivery()])
+
+		const stats = await processDueDeliveries(NOW)
+
+		expect(stats.cancelled).toBe(1)
+		expect(sendEmailMock).toHaveBeenCalledOnce()
+		expect(db.settleDelivery).toHaveBeenCalledWith({
+			id: "del-1",
+			status: "cancelled",
+			suppressionReason: "preference withdrawn before send",
+		})
+	})
+
+	it("releases every claimed invite when recipient preference resolution fails", async () => {
+		db.getEnginePrefsMap.mockRejectedValueOnce(new Error("prefs unavailable"));
+		db.claimDeliveries.mockResolvedValue([
+			claimedDelivery({
+				id: "del-1",
+				notification_type: "invite_received",
+			}),
+			claimedDelivery({
+				id: "del-2",
+				notification_type: "invite_received",
+				attempt_count: 2,
+			}),
+		]);
+
+		const stats = await processDueDeliveries(NOW);
+
+		expect(stats.failed).toBe(2);
+		expect(sendEmailMock).not.toHaveBeenCalled();
+		expect(db.releaseInviteNotificationClaimKnownUnsent).toHaveBeenCalledTimes(2);
+		expect(db.releaseInviteNotificationClaimKnownUnsent).toHaveBeenNthCalledWith(
+			1,
+			expect.objectContaining({ id: "del-1", attemptCount: 1 }),
+		);
+		expect(db.releaseInviteNotificationClaimKnownUnsent).toHaveBeenNthCalledWith(
+			2,
+			expect.objectContaining({ id: "del-2", attemptCount: 2 }),
+		);
+	});
+
+	it("marks a malformed invitation intent as known-unsent before any provider call", async () => {
+		db.claimDeliveries.mockResolvedValue([
+			claimedDelivery({
+				recipient_clerk_user_id: "clerk_seeker",
+				category: "offers_invites",
+				notification_type: "invite_received",
+				intent: { garbage: true },
+			}),
+		]);
+
+		const stats = await processDueDeliveries(NOW);
+
+		expect(stats.failed).toBe(1);
+		expect(sendEmailMock).not.toHaveBeenCalled();
+		expect(db.settleDelivery).toHaveBeenCalledWith({
+			id: "del-1",
+			workerId: db.claimDeliveries.mock.calls[0][0].workerId,
+			status: "dead_letter",
+			failureClass: "known_unsent",
+			failureDetail: "invalid persisted intent payload",
+		});
+	});
+
+	it("dead-letters a persisted intent whose recipient does not match its delivery row", async () => {
+		db.claimDeliveries.mockResolvedValue([
+			claimedDelivery({
+				recipient_clerk_user_id: "clerk_seeker",
+				intent: {
+					...claimedDelivery().intent,
+					recipientClerkUserId: "clerk_other",
+				},
+			}),
+		]);
+
+		const stats = await processDueDeliveries(NOW);
+
+		expect(stats.failed).toBe(1);
+		expect(sendEmailMock).not.toHaveBeenCalled();
+		expect(db.settleDelivery).toHaveBeenCalledWith({
+			id: "del-1",
+			status: "dead_letter",
+			failureClass: "terminal",
+			failureDetail: "persisted intent does not match delivery authority",
+		});
+	});
+
 	it("defers outbound sends inside the user's quiet hours (DST-safe local)", async () => {
 		db.getEnginePrefsMap.mockResolvedValue(
 			new Map([
@@ -366,7 +799,7 @@ describe("delivery — quiet hours, throttle, collapse, staleness", () => {
 		db.findOpenCollapsibleDeliveries.mockResolvedValue([]);
 		db.isEmailSuppressed.mockResolvedValue(false);
 		db.settleDelivery.mockResolvedValue(undefined);
-		sendEmailMock.mockResolvedValue({ ok: true, status: 200 });
+		mockEmailResult({ ok: true, status: 200 })
 		db.claimDeliveries.mockResolvedValue([
 			claimedDelivery({
 				intent: { ...claimedDelivery().intent, urgent: true },
@@ -401,10 +834,12 @@ describe("delivery — quiet hours, throttle, collapse, staleness", () => {
 		db.getApplicationOfferState.mockResolvedValue({ status: "accepted", expires_at: null });
 		db.claimDeliveries.mockResolvedValue([
 			claimedDelivery({
+				category: "offers_invites",
 				notification_type: "offer_expiring",
 				intent: {
 					...claimedDelivery().intent,
 					type: "offer_expiring",
+					category: "offers_invites",
 					entity: { type: "application", id: "app-1" },
 					urgent: true,
 				},
@@ -425,7 +860,12 @@ describe("delivery — quiet hours, throttle, collapse, staleness", () => {
 	});
 
 	it("retryable failures back off; the attempt budget dead-letters", async () => {
-		sendEmailMock.mockResolvedValue({ ok: false, status: 503, error: "unavailable" });
+		mockEmailResult({
+			ok: false,
+			status: 503,
+			error: "unavailable",
+			providerRequestStarted: true,
+		})
 		db.claimDeliveries.mockResolvedValue([claimedDelivery({ attempt_count: 1 })]);
 		await processDueDeliveries(NOW);
 		let settle = db.settleDelivery.mock.calls[0][0];
@@ -439,7 +879,12 @@ describe("delivery — quiet hours, throttle, collapse, staleness", () => {
 		db.findOpenCollapsibleDeliveries.mockResolvedValue([]);
 		db.isEmailSuppressed.mockResolvedValue(false);
 		db.settleDelivery.mockResolvedValue(undefined);
-		sendEmailMock.mockResolvedValue({ ok: false, status: 503, error: "unavailable" });
+		mockEmailResult({
+			ok: false,
+			status: 503,
+			error: "unavailable",
+			providerRequestStarted: true,
+		})
 		db.claimDeliveries.mockResolvedValue([claimedDelivery({ attempt_count: 5 })]);
 		await processDueDeliveries(NOW);
 		settle = db.settleDelivery.mock.calls[0][0];
@@ -447,7 +892,7 @@ describe("delivery — quiet hours, throttle, collapse, staleness", () => {
 	});
 
 	it("terminal failures never retry", async () => {
-		sendEmailMock.mockResolvedValue({ ok: false, status: 422, error: "bad request" });
+		mockEmailResult({ ok: false, status: 422, error: "bad request", providerRequestStarted: true })
 		db.claimDeliveries.mockResolvedValue([claimedDelivery()]);
 		await processDueDeliveries(NOW);
 		expect(db.settleDelivery.mock.calls[0][0].status).toBe("failed_terminal");
@@ -596,6 +1041,7 @@ describe("staged activation (NOTIFICATION_ENGINE_STAGE)", () => {
 		db.getApplicationOfferState.mockResolvedValue(null);
 		db.claimDeliveries.mockResolvedValue([
 			claimedDelivery({
+				category: "offers_invites",
 				notification_type: "offer_expiring",
 				intent: {
 					...claimedDelivery().intent,

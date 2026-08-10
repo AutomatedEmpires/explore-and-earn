@@ -12,6 +12,7 @@ const db = vi.hoisted(() => ({
 	collapseDeliveriesInto: vi.fn(),
 	getDeliveryByDedupKey: vi.fn(),
 	getEnginePrefsMap: vi.fn(),
+	getLegacySeekerEmailBooleans: vi.fn(),
 	getExpiringLiveListings: vi.fn(),
 	getExpiringOfferedApplications: vi.fn(),
 	getQueuedDigestMemberships: vi.fn(),
@@ -41,11 +42,7 @@ const mocks = vi.hoisted(() => ({
 		title: "A new opportunity",
 		body: "Review the details.",
 	})),
-	sendEmail: vi.fn(async () => ({
-		ok: true,
-		status: 200,
-		providerMessageId: "msg_1",
-	})),
+	sendEmail: vi.fn(),
 }));
 
 vi.mock("../../lib/clerkUser", () => ({
@@ -106,6 +103,26 @@ const INTENT: NotificationIntent = {
 	urgent: false,
 };
 
+const INVITE_INTENT: NotificationIntent = {
+	...INTENT,
+	sourceEventId: "event-invite",
+	category: "offers_invites",
+	type: "invite_received",
+	destinationPath: "/invites",
+	titleKey: "Notifications.types.invite_received.title",
+	bodyKey: "Notifications.types.invite_received.body",
+};
+
+const APPLICATION_INTENT: NotificationIntent = {
+	...INTENT,
+	sourceEventId: "event-application",
+	category: "applications",
+	type: "application_received",
+	destinationPath: "/host/applicants/application-1",
+	titleKey: "Notifications.types.application_received.title",
+	bodyKey: "Notifications.types.application_received.body",
+};
+
 async function runDailyDigest(): Promise<void> {
 	db.getQueuedDigestMemberships.mockResolvedValue([
 		{
@@ -131,6 +148,7 @@ beforeEach(() => {
 		status: "deferred",
 	});
 	db.getEnginePrefsMap.mockResolvedValue(new Map());
+	db.getLegacySeekerEmailBooleans.mockResolvedValue(new Map());
 	db.insertDeliveries.mockResolvedValue(1);
 	db.isEmailSuppressed.mockResolvedValue(false);
 	db.markDigestMembershipsSent.mockResolvedValue(undefined);
@@ -140,10 +158,26 @@ beforeEach(() => {
 		email: "seeker@example.com",
 		name: "Seeker",
 	});
-	mocks.sendEmail.mockResolvedValue({
-		ok: true,
-		status: 200,
-		providerMessageId: "msg_1",
+	mocks.sendEmail.mockImplementation(async (options: {
+		beforeProviderRequest?: () => Promise<
+			| { readonly actionable: true }
+			| { readonly actionable: false; readonly reason: string }
+		>;
+	}) => {
+		const boundary = await options.beforeProviderRequest?.();
+		if (boundary && !boundary.actionable) {
+			return {
+				ok: false,
+				cancelledReason: boundary.reason,
+				providerRequestStarted: false,
+			};
+		}
+		return {
+			ok: true,
+			status: 200,
+			providerMessageId: "msg_1",
+			providerRequestStarted: true,
+		};
 	});
 });
 
@@ -183,9 +217,183 @@ describe("notification email one-click headers", () => {
 
 		expect(mocks.sendEmail.mock.calls[0]?.[0]).not.toHaveProperty("headers");
 	});
+
+	it("classifies a thrown provider response as outcome-unknown", async () => {
+		mocks.sendEmail.mockRejectedValueOnce(new Error("connection reset"));
+
+		await expect(
+			sendNotificationEmail(INTENT, "engine-dedup-unknown", NOW),
+		).resolves.toMatchObject({
+			ok: false,
+			retryable: true,
+			outcomeUnknown: true,
+			failureClass: "transient",
+		});
+	});
 });
 
 describe("digest email one-click headers", () => {
+	it("cancels queued invitation digest members before any provider call", async () => {
+		db.getQueuedDigestMemberships.mockResolvedValue([
+			{
+				id: "membership-invite",
+				delivery_id: "source-delivery-invite",
+				recipient_clerk_user_id: "clerk_seeker",
+				category: "offers_invites",
+				delivery: { intent: INVITE_INTENT },
+			},
+		]);
+		db.getEnginePrefsMap.mockResolvedValue(
+			new Map([
+				[
+					"clerk_seeker",
+					{
+						email_enabled: true,
+						push_enabled: false,
+						in_app_enabled: true,
+						category_prefs: {
+							offers_invites: { email: "daily", push: "off", in_app: "on" },
+						},
+						quiet_hours_enabled: false,
+						quiet_start_minute: null,
+						quiet_end_minute: null,
+						timezone: "UTC",
+						locale: "en",
+					},
+				],
+			]),
+		);
+
+		await expect(runDigests("daily", NOW)).resolves.toMatchObject({
+			digestsSent: 0,
+			digestsFailed: 0,
+		});
+		expect(db.cancelDigestMemberships).toHaveBeenCalledWith(["membership-invite"]);
+		expect(db.insertDeliveries).not.toHaveBeenCalled();
+		expect(mocks.sendEmail).not.toHaveBeenCalled();
+	});
+
+	it("cancels a digest member when the seeker changed that category to another cadence", async () => {
+		db.getQueuedDigestMemberships.mockResolvedValue([
+			{
+				id: "membership-old-daily",
+				delivery_id: "source-delivery-old-daily",
+				recipient_clerk_user_id: "clerk_seeker",
+				category: "matches",
+				delivery: { intent: INTENT },
+			},
+		]);
+		db.getEnginePrefsMap.mockResolvedValue(
+			new Map([
+				[
+					"clerk_seeker",
+					{
+						email_enabled: true,
+						push_enabled: false,
+						in_app_enabled: true,
+						category_prefs: {
+							matches: { email: "weekly", push: "off", in_app: "on" },
+						},
+						quiet_hours_enabled: false,
+						quiet_start_minute: null,
+						quiet_end_minute: null,
+						timezone: "UTC",
+						locale: "en",
+					},
+				],
+			]),
+		);
+
+		await runDigests("daily", NOW);
+
+		expect(db.cancelDigestMemberships).toHaveBeenCalledWith(["membership-old-daily"]);
+		expect(mocks.sendEmail).not.toHaveBeenCalled();
+	});
+
+	it("preserves a legacy application-email opt-out when no engine preference row exists", async () => {
+		db.getQueuedDigestMemberships.mockResolvedValue([
+			{
+				id: "membership-legacy-opt-out",
+				delivery_id: "source-delivery-legacy-opt-out",
+				recipient_clerk_user_id: "clerk_seeker",
+				category: "applications",
+				delivery: { intent: APPLICATION_INTENT },
+			},
+		]);
+		db.getLegacySeekerEmailBooleans.mockResolvedValue(
+			new Map([
+				[
+					"clerk_seeker",
+					{
+						email_on_invite: true,
+						email_on_status_change: false,
+						email_on_message: true,
+					},
+				],
+			]),
+		);
+
+		await runDigests("daily", NOW);
+
+		expect(db.getLegacySeekerEmailBooleans).toHaveBeenCalledWith(["clerk_seeker"]);
+		expect(db.cancelDigestMemberships).toHaveBeenCalledWith([
+			"membership-legacy-opt-out",
+		]);
+		expect(mocks.sendEmail).not.toHaveBeenCalled();
+	});
+
+	it("rechecks effective consent at the provider boundary and does not send a stale digest", async () => {
+		db.getQueuedDigestMemberships.mockResolvedValue([
+			{
+				id: "membership-consent-race",
+				delivery_id: "source-delivery-consent-race",
+				recipient_clerk_user_id: "clerk_seeker",
+				category: "matches",
+				delivery: { intent: INTENT },
+			},
+		]);
+		const daily = {
+			email_enabled: true,
+			push_enabled: false,
+			in_app_enabled: true,
+			category_prefs: {
+				matches: { email: "daily", push: "off", in_app: "on" },
+			},
+			quiet_hours_enabled: false,
+			quiet_start_minute: null,
+			quiet_end_minute: null,
+			timezone: "UTC",
+			locale: "en",
+		};
+		const optedOut = {
+			...daily,
+			category_prefs: {
+				matches: { email: "off", push: "off", in_app: "on" },
+			},
+		};
+		db.getEnginePrefsMap
+			.mockResolvedValueOnce(new Map([["clerk_seeker", daily]]))
+			.mockResolvedValueOnce(new Map([["clerk_seeker", optedOut]]));
+
+		await expect(runDigests("daily", NOW)).resolves.toMatchObject({
+			digestsSent: 0,
+			digestsSkipped: 1,
+			digestsFailed: 0,
+		});
+
+		expect(db.getEnginePrefsMap).toHaveBeenCalledTimes(2);
+		expect(db.cancelDigestMemberships).toHaveBeenCalledWith([
+			"membership-consent-race",
+		]);
+		expect(db.settleDelivery).toHaveBeenCalledWith({
+			id: "digest-delivery-1",
+			status: "deferred",
+			nextAttemptAt: "9999-01-01T00:00:00.000Z",
+		});
+		expect(db.markDigestMembershipsSent).not.toHaveBeenCalled();
+		expect(db.collapseDeliveriesInto).not.toHaveBeenCalled();
+	});
+
 	it("attaches the exact pair when the configured origin is HTTPS", async () => {
 		await runDailyDigest();
 

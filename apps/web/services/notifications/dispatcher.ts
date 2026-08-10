@@ -24,7 +24,9 @@ import {
 	insertDeliveries,
 	insertDigestMemberships,
 	markEventProcessed,
+	releaseInviteNotificationClaimKnownUnsent,
 	settleDelivery,
+	settleInviteNotificationDelivery,
 	type DeliveryRow,
 	type NewDeliveryInput,
 	type NewDigestMembership,
@@ -33,13 +35,16 @@ import {
 import { reportError } from "../../lib/sentry"
 import { MAX_DELIVERY_ATTEMPTS, nextAttemptAtMs, type FailureClass } from "./backoff"
 import { sendNotificationEmail } from "./channels/email"
-import { sendInApp, type ChannelSendResult } from "./channels/inApp"
+import {
+	sendInApp,
+	type BeforeProviderSubmission,
+	type ChannelSendResult,
+} from "./channels/inApp"
 import { sendPush } from "./channels/push"
 import { resolveEngineStage, stageGateForSend, type NotificationEngineStage } from "./stage"
 import {
-	overlayLegacyEmailBooleans,
 	planChannels,
-	resolvePrefs,
+	resolveEffectivePrefs,
 	type EnginePrefsRow,
 } from "./prefs"
 import { recheckIntent } from "./recheck"
@@ -93,7 +98,7 @@ function makeResolvers(): TaxonomyResolvers {
 }
 
 interface RecipientContext {
-	readonly prefs: ReturnType<typeof resolvePrefs>
+	readonly prefs: ReturnType<typeof resolveEffectivePrefs>
 	readonly locale: string
 }
 
@@ -117,10 +122,10 @@ async function resolveRecipients(
 			: new Map<string, never>()
 	for (const clerkId of unique) {
 		const row = prefsMap.get(clerkId) ?? null
-		let prefs = resolvePrefs(row as EnginePrefsRow | null)
-		if (!row) {
-			prefs = overlayLegacyEmailBooleans(prefs, legacyMap.get(clerkId) ?? null)
-		}
+		const prefs = resolveEffectivePrefs(
+			row as EnginePrefsRow | null,
+			legacyMap.get(clerkId) ?? null,
+		)
 		out.set(clerkId, { prefs, locale: row?.locale ?? "en" })
 	}
 	return out
@@ -292,14 +297,20 @@ async function sendViaChannel(
 	delivery: DeliveryRow,
 	intent: NotificationIntent,
 	nowMs: number,
+	beforeProviderSubmission?: BeforeProviderSubmission,
 ): Promise<ChannelSendResult & { readonly suppressed?: string }> {
 	switch (delivery.channel) {
 		case "in_app":
-			return sendInApp(intent, delivery.dedup_key)
+			return sendInApp(intent, delivery.dedup_key, beforeProviderSubmission)
 		case "email":
-			return sendNotificationEmail(intent, delivery.dedup_key, nowMs)
+			return sendNotificationEmail(
+				intent,
+				delivery.dedup_key,
+				nowMs,
+				beforeProviderSubmission,
+			)
 		case "push":
-			return sendPush(intent)
+			return sendPush(intent, beforeProviderSubmission)
 		default:
 			return {
 				ok: false,
@@ -314,6 +325,7 @@ async function settleFailure(
 	delivery: DeliveryRow,
 	result: { failureClass?: string; detail?: string; retryable?: boolean },
 	nowMs: number,
+	workerId?: string,
 ): Promise<void> {
 	const failureClass = (result.failureClass ?? "terminal") as FailureClass
 	if (result.retryable) {
@@ -325,6 +337,7 @@ async function settleFailure(
 		if (nextAt !== null) {
 			await settleDelivery({
 				id: delivery.id,
+				workerId,
 				status: "failed_retryable",
 				failureClass,
 				failureDetail: result.detail,
@@ -332,17 +345,24 @@ async function settleFailure(
 			})
 			return
 		}
-		// Attempt budget exhausted → retained for investigation, never retried.
+		// Attempt budget exhausted. For an invitation this branch is reached only
+		// after a provider result proved the send did not happen (unknown outcomes
+		// are terminalized separately), so preserve that refund/recovery truth.
 		await settleDelivery({
 			id: delivery.id,
+			workerId,
 			status: "dead_letter",
-			failureClass,
+			failureClass:
+				delivery.notification_type === "invite_received"
+					? "known_unsent"
+					: failureClass,
 			failureDetail: `${result.detail ?? "failed"} (attempts=${delivery.attempt_count}/${MAX_DELIVERY_ATTEMPTS})`,
 		})
 		return
 	}
 	await settleDelivery({
 		id: delivery.id,
+		workerId,
 		status: "failed_terminal",
 		failureClass,
 		failureDetail: result.detail,
@@ -377,15 +397,43 @@ export async function processDueDeliveries(nowMs: number): Promise<DeliveryStats
 	const stats = { claimed: claimed.length, delivered: 0, deferred: 0, cancelled: 0, suppressed: 0, failed: 0 }
 	if (claimed.length === 0) return stats
 
-	const recipients = await resolveRecipients(claimed.map((d) => d.recipient_clerk_user_id))
+	let recipients: Awaited<ReturnType<typeof resolveRecipients>>
+	try {
+		recipients = await resolveRecipients(
+			claimed.map((d) => d.recipient_clerk_user_id),
+		)
+	} catch (err) {
+		reportError(err, { action: "notifications.resolveRecipients" })
+		await Promise.allSettled(
+			claimed
+				.filter((delivery) => delivery.notification_type === "invite_received")
+				.map((delivery) =>
+					releaseInviteNotificationClaimKnownUnsent({
+						id: delivery.id,
+						workerId,
+						attemptCount: delivery.attempt_count,
+						nextAttemptAt: new Date(nowMs + 60_000).toISOString(),
+					}),
+				),
+		)
+		stats.failed = claimed.length
+		return stats
+	}
 
 	for (const delivery of claimed) {
+		const invitationWorkerId =
+			delivery.notification_type === "invite_received" ? workerId : undefined
+		const settleClaim = (
+			args: Omit<Parameters<typeof settleDelivery>[0], "workerId">,
+		): Promise<void> => settleDelivery({ ...args, workerId: invitationWorkerId })
+		let inviteOutcomeCannotRetry = false
+		let inviteLeaseFenced = delivery.notification_type !== "invite_received"
 		try {
 			// Digest envelope rows are sent by the digest run's own atomic claim,
 			// never by this loop — if one is ever claimed here (e.g. after a
 			// digest-run crash mutated its next_attempt), put it back on hold.
 			if (delivery.notification_type === "digest") {
-				await settleDelivery({
+				await settleClaim({
 					id: delivery.id,
 					status: "deferred",
 					nextAttemptAt: DIGEST_HOLD_ISO,
@@ -397,20 +445,47 @@ export async function processDueDeliveries(nowMs: number): Promise<DeliveryStats
 
 			const intent = delivery.intent
 			if (!isValidIntent(intent)) {
-				await settleDelivery({
+				await settleClaim({
 					id: delivery.id,
 					status: "dead_letter",
-					failureClass: "terminal",
+					failureClass:
+						delivery.notification_type === "invite_received"
+							? "known_unsent"
+							: "terminal",
 					failureDetail: "invalid persisted intent payload",
+				})
+				stats.failed += 1
+				continue
+			}
+			if (
+				intent.type !== delivery.notification_type ||
+				intent.category !== delivery.category ||
+				intent.recipientClerkUserId !== delivery.recipient_clerk_user_id
+			) {
+				await settleClaim({
+					id: delivery.id,
+					status: "dead_letter",
+					failureClass:
+						delivery.notification_type === "invite_received"
+							? "known_unsent"
+							: "terminal",
+					failureDetail: "persisted intent does not match delivery authority",
 				})
 				stats.failed += 1
 				continue
 			}
 
 			// 1. Staleness re-check (offer/listing/résumé reality, intent expiry).
-			const recheck = await recheckIntent(intent, nowMs)
+			const recheck = await recheckIntent(
+				intent,
+				nowMs,
+				delivery.notification_type === "invite_received"
+					? { deliveryId: delivery.id, workerId }
+					: undefined,
+			)
+			inviteLeaseFenced = true
 			if (!recheck.actionable) {
-				await settleDelivery({
+				await settleClaim({
 					id: delivery.id,
 					status: "cancelled",
 					suppressionReason: recheck.reason,
@@ -426,10 +501,12 @@ export async function processDueDeliveries(nowMs: number): Promise<DeliveryStats
 			const consentCtx = recipients.get(delivery.recipient_clerk_user_id)
 			if (consentCtx) {
 				const stillPlanned = planChannels(intent, consentCtx.prefs).some(
-					(plan) => plan.channel === delivery.channel,
+					(plan) =>
+						plan.channel === delivery.channel &&
+						plan.cadence === delivery.cadence,
 				)
 				if (!stillPlanned) {
-					await settleDelivery({
+					await settleClaim({
 						id: delivery.id,
 						status: "suppressed",
 						suppressionReason: "preference withdrawn before send",
@@ -450,7 +527,7 @@ export async function processDueDeliveries(nowMs: number): Promise<DeliveryStats
 				})
 				const newer = open.find((o) => o.created_at > delivery.created_at)
 				if (newer) {
-					await settleDelivery({
+					await settleClaim({
 						id: delivery.id,
 						status: "cancelled",
 						suppressionReason: "collapsed into newer notification",
@@ -475,7 +552,7 @@ export async function processDueDeliveries(nowMs: number): Promise<DeliveryStats
 						`[notifications:dry_run] would send ${delivery.channel}/${delivery.notification_type} to ${delivery.recipient_clerk_user_id} (delivery ${delivery.id})`,
 					)
 				}
-				await settleDelivery({
+				await settleClaim({
 					id: delivery.id,
 					status: "suppressed",
 					suppressionReason: gate.reason,
@@ -493,7 +570,7 @@ export async function processDueDeliveries(nowMs: number): Promise<DeliveryStats
 				if (ctx) {
 					const quiet = evaluateQuietHours(ctx.prefs.quietHours, nowMs)
 					if (quiet.quiet && quiet.resumeAtMs !== null) {
-						await settleDelivery({
+						await settleClaim({
 							id: delivery.id,
 							status: "deferred",
 							nextAttemptAt: new Date(quiet.resumeAtMs).toISOString(),
@@ -514,7 +591,7 @@ export async function processDueDeliveries(nowMs: number): Promise<DeliveryStats
 						new Date(nowMs - 3_600_000).toISOString(),
 					)
 					if (recent >= OUTBOUND_HOURLY_CAP) {
-						await settleDelivery({
+						await settleClaim({
 							id: delivery.id,
 							status: "deferred",
 							nextAttemptAt: new Date(nowMs + THROTTLE_DEFER_MS).toISOString(),
@@ -526,37 +603,139 @@ export async function processDueDeliveries(nowMs: number): Promise<DeliveryStats
 				}
 			}
 
-			// 5. The actual send — outside any DB transaction; the lease covers us.
-			const result = await sendViaChannel(delivery, intent, nowMs)
-			if (result.ok) {
-				await settleDelivery({
-					id: delivery.id,
-					status: "delivered",
-					deliveredAt: new Date(nowMs).toISOString(),
-					providerMessageId: result.providerMessageId,
+			// 5. Every adapter performs all lookup/render/preflight work first, then
+			// invokes this callback immediately before its actual provider/database
+			// mutation. The RPC durably marks provider_started_at and renews the
+			// exact worker lease; a crash before this callback remains known-unsent.
+			const beforeProviderSubmission: BeforeProviderSubmission = async () => {
+				// Consent is authority at submission time, not at batch-claim time.
+				// Re-read this recipient after every potentially slow prior delivery.
+				const latestRecipients = await resolveRecipients([
+					delivery.recipient_clerk_user_id,
+				])
+				const latest = latestRecipients.get(delivery.recipient_clerk_user_id)
+				const stillPlanned = latest
+					? planChannels(intent, latest.prefs).some(
+							(plan) =>
+								plan.channel === delivery.channel &&
+								plan.cadence === delivery.cadence,
+						)
+					: false
+				if (!stillPlanned) {
+					return {
+						actionable: false,
+						reason: "preference withdrawn before send",
+					}
+				}
+
+				if (delivery.notification_type !== "invite_received") {
+					return { actionable: true }
+				}
+				inviteLeaseFenced = false
+				const finalRecheck = await recheckIntent(intent, nowMs, {
+					deliveryId: delivery.id,
+					workerId,
+					providerBoundary: true,
 				})
-				stats.delivered += 1
+				inviteLeaseFenced = true
+				return finalRecheck
+			}
+
+			// 6. The mutation itself is bounded inside the channel adapter.
+			const result = await sendViaChannel(
+				delivery,
+				intent,
+				nowMs,
+				beforeProviderSubmission,
+			)
+			if (result.ok) {
+				const deliveredAt = new Date(Date.now()).toISOString()
+				if (delivery.notification_type === "invite_received") {
+					// Once an external/in-app send succeeds, this delivery's outcome can
+					// never be treated as safely retryable or refundable. If the atomic
+					// settlement below is unavailable, leave its lease in `processing`;
+					// migration 094 converts an expired invite lease directly to
+					// delivery-unknown dead-letter instead of resending it.
+					inviteOutcomeCannotRetry = true
+					const outcome = await settleInviteNotificationDelivery({
+						id: delivery.id,
+						workerId,
+						deliveredAt,
+						providerMessageId: result.providerMessageId,
+					})
+					if (outcome === "delivered") stats.delivered += 1
+					else stats.cancelled += 1
+				} else {
+					await settleClaim({
+						id: delivery.id,
+						status: "delivered",
+						deliveredAt,
+						providerMessageId: result.providerMessageId,
+					})
+					stats.delivered += 1
+				}
+			} else if (result.cancelled) {
+				await settleClaim({
+					id: delivery.id,
+					status: "cancelled",
+					suppressionReason: result.cancelled,
+				})
+				stats.cancelled += 1
 			} else if (result.suppressed) {
-				await settleDelivery({
+				await settleClaim({
 					id: delivery.id,
 					status: "suppressed",
 					suppressionReason: result.suppressed,
 				})
 				stats.suppressed += 1
+			} else if (
+				delivery.notification_type === "invite_received" &&
+				result.outcomeUnknown
+			) {
+				// An adapter request can commit even when its response is lost. Mark
+				// that invite delivery outcome unknown in one terminal step; retrying
+				// could duplicate the notification, while a refundable status could
+				// recycle an invite credit after the seeker was already contacted.
+				inviteOutcomeCannotRetry = true
+				await settleClaim({
+					id: delivery.id,
+					status: "dead_letter",
+					failureClass: "outcome_unknown",
+					failureDetail: "invite delivery adapter outcome unknown",
+				})
+				stats.failed += 1
 			} else {
-				await settleFailure(delivery, result, nowMs)
+				await settleFailure(delivery, result, nowMs, invitationWorkerId)
 				stats.failed += 1
 			}
 		} catch (err) {
 			reportError(err, { action: "notifications.processDueDeliveries" })
-			try {
-				await settleFailure(
-					delivery,
-					{ failureClass: "transient", retryable: true, detail: "dispatcher exception" },
-					nowMs,
-				)
-			} catch {
-				// Lease expiry will return the row to the pool.
+			if (
+				delivery.notification_type === "invite_received" &&
+				!inviteOutcomeCannotRetry &&
+				!inviteLeaseFenced
+			) {
+				try {
+					await releaseInviteNotificationClaimKnownUnsent({
+						id: delivery.id,
+						workerId,
+						attemptCount: delivery.attempt_count,
+						nextAttemptAt: new Date(nowMs + 60_000).toISOString(),
+					})
+				} catch {
+					// The original lease remains authoritative and can be reclaimed.
+				}
+			} else if (!inviteOutcomeCannotRetry && inviteLeaseFenced) {
+				try {
+					await settleFailure(
+						delivery,
+						{ failureClass: "transient", retryable: true, detail: "dispatcher exception" },
+						nowMs,
+						invitationWorkerId,
+					)
+				} catch {
+					// Lease expiry will return the row to the pool.
+				}
 			}
 			stats.failed += 1
 		}

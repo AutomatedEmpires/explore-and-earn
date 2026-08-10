@@ -13,7 +13,8 @@
     "assert:founding-host": "node ./assert-founding-host-program.mjs",
     "assert:interview-scheduling": "node ./assert-interview-scheduling.mjs",
     "assert:interview-concurrency": "node ./assert-interview-scheduling-concurrency.mjs",
+    "assert:invite-delivery-concurrency": "node ./assert-invite-delivery-concurrency.mjs",
     "assert:message-delivery": "node ./assert-message-delivery-atomic.mjs",
-    "verify:security": "node ./check.mjs && node ./assert-grants.mjs && node ./assert-authorization.mjs && node ./assert-applicant-bridge.mjs && node ./assert-listing-slot-concurrency.mjs && node ./assert-founding-host-program.mjs && node ./assert-interview-scheduling.mjs && node ./assert-interview-scheduling-concurrency.mjs && node ./assert-message-delivery-atomic.mjs"
+    "verify:security": "node ./check.mjs && node ./assert-grants.mjs && node ./assert-authorization.mjs && node ./assert-applicant-bridge.mjs && node ./assert-listing-slot-concurrency.mjs && node ./assert-founding-host-program.mjs && node ./assert-interview-scheduling.mjs && node ./assert-interview-scheduling-concurrency.mjs && node ./assert-invite-delivery-concurrency.mjs && node ./assert-message-delivery-atomic.mjs"
   }
 }

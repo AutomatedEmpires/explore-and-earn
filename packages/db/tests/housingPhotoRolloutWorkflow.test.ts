@@ -24,7 +24,16 @@ function assertExactProductionDeploymentGate(source: string): void {
     return index;
   };
 
-  const waitStep = locate("- name: Wait for this commit's Vercel production deployment");
+  const dbFirstStep = locate("- name: Push migration 094 before the web release");
+  const dbFirstPush = locate("run: supabase db push", dbFirstStep);
+  const immediateProof = locate(
+    "- name: Verify migration 094 production authority immediately",
+    dbFirstPush,
+  );
+  const waitStep = locate(
+    "- name: Wait for this commit's Vercel production deployment",
+    immediateProof,
+  );
   const statusLookup = locate(
     '"repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/status"',
     waitStep,
@@ -46,10 +55,16 @@ function assertExactProductionDeploymentGate(source: string): void {
   );
   const vercelCheck = locate('.creator.login == "vercel[bot]"', productionCheck);
   locate("deployments/${deployment_id}/statuses", vercelCheck);
-  const pushStep = locate("- name: Push migrations", successBreak);
+  const pushStep = locate("- name: Push migrations after the web release", successBreak);
   const dbPush = locate("run: supabase db push", pushStep);
 
-  expect(source.indexOf("run: supabase db push")).toBe(dbPush);
+  expect(source.indexOf("run: supabase db push")).toBe(dbFirstPush);
+  expect(source.slice(dbFirstStep, immediateProof)).toContain(
+    "if: steps.migration_state.outputs.db_first_094 == 'true'",
+  );
+  expect(source.slice(immediateProof, waitStep)).toContain(
+    "assert_production_launch.sql",
+  );
   expect(source).toContain("deployments: read");
   expect(source).toContain("statuses: read");
   expect(vercelContext).toBeGreaterThan(statusLookup);
@@ -96,7 +111,10 @@ describe("housing-photo migration deploy ordering", () => {
     const waitStep = workflow.indexOf(
       "- name: Wait for this commit's Vercel production deployment",
     );
-    const pushStep = workflow.indexOf("- name: Push migrations", waitStep);
+    const pushStep = workflow.indexOf(
+      "- name: Push migrations after the web release",
+      waitStep,
+    );
     const gate = workflow.slice(waitStep, pushStep);
 
     expect(gate).toContain('if ! combined_status="$(gh api');

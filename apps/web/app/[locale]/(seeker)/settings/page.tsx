@@ -5,6 +5,7 @@ import { getTranslations } from "next-intl/server";
 import {
 	AppearanceControl,
 	EngagementNotificationSettings,
+	HostDiscoveryVisibilitySetting,
 	PaletteControl,
 	SectionHeading,
 	SeekerPage,
@@ -15,6 +16,7 @@ import {
 } from "../../../../components/seeker";
 import { getClerkContact } from "../../../../lib/clerkUser";
 import { getEngineNotificationSettingsAction } from "../../../actions/notificationEngine";
+import { getHostDiscoverySettingAction } from "../../../actions/seekerSettings";
 import styles from "./settings.module.css";
 
 export const metadata: Metadata = {
@@ -35,8 +37,9 @@ async function resolveEmail(): Promise<string | null> {
 }
 
 export default async function SettingsPage() {
-	const [engineSettings, email, t] = await Promise.all([
+	const [engineSettings, hostDiscovery, email, t] = await Promise.all([
 		getEngineNotificationSettingsAction(),
+		getHostDiscoverySettingAction(),
 		resolveEmail(),
 		getTranslations("Notifications.settings"),
 	]);
@@ -67,6 +70,7 @@ export default async function SettingsPage() {
 						title="Account & privacy"
 						description="Your details and who can see them."
 					/>
+					<HostDiscoveryVisibilitySetting initial={hostDiscovery} />
 					<SettingsPanel groups={groups} />
 				</section>
 
