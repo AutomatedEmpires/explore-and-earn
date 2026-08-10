@@ -36,14 +36,13 @@ export function normalizeSeekerSearchRequest(
   if (
     typeof listingId !== "string" ||
     !UUID_PATTERN.test(listingId) ||
-    typeof query !== "string" ||
-    query.length > 100
+    typeof query !== "string"
   ) {
     return { ok: false, error: "invalid_request" };
   }
 
   const normalizedQuery = query.replace(/\s+/g, " ").trim();
-  if (normalizedQuery.length < 2) {
+  if (normalizedQuery.length < 2 || normalizedQuery.length > 100) {
     return { ok: false, error: "invalid_request" };
   }
 

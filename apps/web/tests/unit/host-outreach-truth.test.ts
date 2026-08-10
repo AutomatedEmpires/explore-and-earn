@@ -33,6 +33,17 @@ describe("host outreach request and listing truth", () => {
       ok: false,
       error: "invalid_request",
     });
+    expect(
+      normalizeSeekerSearchRequest(LISTING_ID, `${" ".repeat(101)}Avery`),
+    ).toEqual({
+      ok: true,
+      listingId: LISTING_ID,
+      query: "Avery",
+    });
+    expect(normalizeSeekerSearchRequest(LISTING_ID, "a".repeat(101))).toEqual({
+      ok: false,
+      error: "invalid_request",
+    });
   });
 
   it("only treats live, verified, future, non-null expiry listings as sourceable", () => {

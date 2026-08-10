@@ -13,7 +13,7 @@ vi.mock("../src/adminClient", () => ({
 }));
 
 import {
-	adminRequeueDelivery,
+  adminRequeueDelivery,
   beginInviteNotificationDelivery,
   getInviteNotificationState,
   releaseInviteNotificationClaimKnownUnsent,
@@ -315,24 +315,24 @@ describe("releaseInviteNotificationClaimKnownUnsent", () => {
 });
 
 describe("adminRequeueDelivery", () => {
-	it("keeps only outcome-unknown invite dead letters immutable at the query boundary", async () => {
-		const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-		const select = vi.fn().mockReturnValue({ maybeSingle });
-		const or = vi.fn().mockReturnValue({ select });
-		const inStatuses = vi.fn().mockReturnValue({ or });
-		const eq = vi.fn().mockReturnValue({ in: inStatuses });
-		const update = vi.fn().mockReturnValue({ eq });
-		mocks.from.mockReturnValue({ update });
+  it("keeps only outcome-unknown invite dead letters immutable at the query boundary", async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    const select = vi.fn().mockReturnValue({ maybeSingle });
+    const or = vi.fn().mockReturnValue({ select });
+    const inStatuses = vi.fn().mockReturnValue({ or });
+    const eq = vi.fn().mockReturnValue({ in: inStatuses });
+    const update = vi.fn().mockReturnValue({ eq });
+    mocks.from.mockReturnValue({ update });
 
-		await expect(adminRequeueDelivery(DELIVERY_ID)).resolves.toBe(false);
+    await expect(adminRequeueDelivery(DELIVERY_ID)).resolves.toBe(false);
 
-		expect(mocks.from).toHaveBeenCalledWith("notification_deliveries");
-		expect(inStatuses).toHaveBeenCalledWith("status", [
-			"dead_letter",
-			"failed_terminal",
-		]);
-		expect(or).toHaveBeenCalledWith(
-			"notification_type.neq.invite_received,status.neq.dead_letter,failure_class.neq.outcome_unknown,failure_class.is.null",
-		);
-	});
+    expect(mocks.from).toHaveBeenCalledWith("notification_deliveries");
+    expect(inStatuses).toHaveBeenCalledWith("status", [
+      "dead_letter",
+      "failed_terminal",
+    ]);
+    expect(or).toHaveBeenCalledWith(
+      "notification_type.neq.invite_received,status.neq.dead_letter,failure_class.neq.outcome_unknown,failure_class.is.null",
+    );
+  });
 });

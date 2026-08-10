@@ -487,7 +487,10 @@ describe("searchSeekersAction", () => {
       },
     ];
     dbMocks.searchSeekersForInvite.mockResolvedValueOnce({ ok: true, seekers: rows });
-    const result = await searchSeekersAction(LISTING_ID, "  anna   crew ");
+    const result = await searchSeekersAction(
+      LISTING_ID,
+      `${" ".repeat(101)}anna   crew `,
+    );
     expect(result).toEqual({ ok: true, seekers: rows });
     expect(checkRateLimitMock).toHaveBeenCalledWith(
       "seeker-search:user_default",

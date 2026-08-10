@@ -65,7 +65,7 @@ function resolveFrom(override) {
 export async function sendMail(opts) {
     const { to, subject, html, text, headers, idempotencyKey, beforeProviderRequest, } = opts;
     const from = resolveFrom(opts.from);
-    const checkProviderBoundary = async (logicalProviderRequestStarted) => {
+    const checkProviderBoundary = async () => {
         if (!beforeProviderRequest)
             return null;
         try {
@@ -75,7 +75,7 @@ export async function sendMail(opts) {
                 : {
                     ok: false,
                     cancelledReason: boundary.reason,
-                    providerRequestStarted: logicalProviderRequestStarted,
+                    providerRequestStarted: false,
                 };
         }
         catch {
@@ -83,7 +83,7 @@ export async function sendMail(opts) {
                 ok: false,
                 error: "provider boundary unavailable",
                 providerBoundaryUnavailable: true,
-                providerRequestStarted: logicalProviderRequestStarted,
+                providerRequestStarted: false,
             };
         }
     };
@@ -102,13 +102,10 @@ export async function sendMail(opts) {
                     providerRequestStarted: false,
                 };
             }
-            const boundaryFailure = await checkProviderBoundary(true);
-            if (boundaryFailure)
-                return boundaryFailure;
             return {
                 ok: true,
                 isDuplicate: true,
-                providerRequestStarted: true,
+                providerRequestStarted: false,
             };
         }
         if (existing)
@@ -128,7 +125,7 @@ export async function sendMail(opts) {
     // Local-dev fallback: no key → log and return ok so callers are unblocked.
     if (!apiKey) {
         if (process.env.NODE_ENV !== "production") {
-            const boundaryFailure = await checkProviderBoundary(false);
+            const boundaryFailure = await checkProviderBoundary();
             if (boundaryFailure) {
                 if (idempotencyKey)
                     _sentKeys.delete(idempotencyKey);
@@ -146,7 +143,7 @@ export async function sendMail(opts) {
         console.error(`[mailer] ${error}`);
         return { ok: false, error, providerRequestStarted: false };
     }
-    const boundaryFailure = await checkProviderBoundary(false);
+    const boundaryFailure = await checkProviderBoundary();
     if (boundaryFailure) {
         if (idempotencyKey)
             _sentKeys.delete(idempotencyKey);

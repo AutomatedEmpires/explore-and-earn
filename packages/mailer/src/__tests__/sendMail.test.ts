@@ -350,11 +350,18 @@ describe("sendMail", () => {
     });
     expect(mockFetch).toHaveBeenCalledOnce();
 
-    await expect(sendMail(opts)).resolves.toMatchObject({
+    const duplicateBoundary = vi.fn(async () => ({
+      actionable: false as const,
+      reason: "invite withdrawn",
+    }));
+    await expect(
+      sendMail({ ...opts, beforeProviderRequest: duplicateBoundary }),
+    ).resolves.toMatchObject({
       ok: true,
       isDuplicate: true,
-      providerRequestStarted: true,
+      providerRequestStarted: false,
     });
+    expect(duplicateBoundary).not.toHaveBeenCalled();
     expect(mockFetch).toHaveBeenCalledOnce();
   });
 
