@@ -21,7 +21,7 @@
 		"@explore-and-earn/mailer": "workspace:*",
 		"@explore-and-earn/ui": "workspace:*",
 		"@modelcontextprotocol/sdk": "1.26.0",
-		"@sentry/nextjs": "^10.63.0",
+		"@sentry/nextjs": "^10.75.2",
 		"@supabase/supabase-js": "^2.110.0",
 		"ai": "^7.0.14",
 		"import-in-the-middle": "^3.3.0",
