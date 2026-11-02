@@ -1,6 +1,8 @@
-# GitHub issue index
+# Historical GitHub issue index and local V1 extensions
 
-Created in **AutomatedEmpires/explore-earn** on 2026-11-02. All 25 issues were open at creation; follow GitHub for current status. Titles carry phase and stable dependency keys; no assignees, labels or milestones were invented. [Delivery plan](07-delivery-plan.md) contains scope, acceptance, validation and dependency contracts. These are implementation tasks; no application features have been built by this documentation work.
+The baseline recorded 25 issues created under the then-used **AutomatedEmpires/explore-earn** name. The active clone now points to **AutomatedEmpires/explore-and-earn**; the user identifies `explore-earn` as archived. The exact historical URLs below are retained for provenance, **not verified current issue locations/status**. Repository renames can change where old URLs lead; this task did not follow, rewrite, create or update any remote issues. Do not use this table to make changes in the archived repository.
+
+Before future issue synchronization, resolve each EE key against the active repository by its title/body and preserve any existing discussion. Do not blindly replace the repository name in URLs or recreate all 25 issues. [Delivery plan](07-delivery-plan.md) is the current local scope/acceptance source and includes changes beyond those historical issue bodies. No assignees, labels or milestones are assumed. No app has been built.
 
 | Phase | Key | GitHub issue |
 | --- | --- | --- |
@@ -30,5 +32,17 @@ Created in **AutomatedEmpires/explore-earn** on 2026-11-02. All 25 issues were o
 | 5 | EE-024 | [#24 · Verify cross-mode UX, accessibility and performance](https://github.com/AutomatedEmpires/explore-earn/issues/24) |
 | 5 | EE-025 | [#25 · Complete security, business and pilot release gate](https://github.com/AutomatedEmpires/explore-earn/issues/25) |
 
-Phase gates and launch decisions remain in [the delivery plan](07-delivery-plan.md) and [decision register](08-sources-and-decisions.md). Creating an issue does not authorize expanding V1 scope or activating live paid services.
+## Local expanded-V1 proposals (not created on GitHub)
+
+| Key | Proposed task | Spec |
+| --- | --- | --- |
+| EE-026 | Explicit role onboarding and responsive screen contracts | [10](10-screen-inventory.md), [13](13-journeys-and-acceptance.md) |
+| EE-027 | Reviewed resume import and persistent availability | [11](11-resume-availability-privacy.md) |
+| EE-028 | Granular audiences, highlights, affiliations and scoped credentials | [11](11-resume-availability-privacy.md) |
+| EE-029 | Moderated seeker Photos, reactions and privacy | [12](12-community-and-campaigns.md) |
+| EE-030 | Announcements and deduplicated Feed | [12](12-community-and-campaigns.md) |
+| EE-031 | Paid campaigns and enforceable caps | [12](12-community-and-campaigns.md) |
+| EE-032 | Expanded-V1 integrated acceptance and operations | [13](13-journeys-and-acceptance.md) |
+
+Phase gates and unresolved decisions remain in [delivery plan](07-delivery-plan.md) and [decision register](08-sources-and-decisions.md). Future GitHub writes are separate work; this local documentation commit does not activate services or payments.
 

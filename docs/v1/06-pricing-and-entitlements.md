@@ -4,7 +4,7 @@
 
 All prices are **proposed USD launch hypotheses**, carried forward from brainstorming for validation. No checkout, vendor account, promotion or subscription is activated by this documentation. Product/business approval, payment-provider configuration, tax/terms review and a completed test lifecycle are required before charging anyone. Do not reuse earlier competitor prices as current market facts.
 
-Employer-funded marketplace: seekers pay **$0** for discovery, profiles, basic matching, resumes, saving and applications. No application fee, mandatory paid qualification check or charge to access basic job terms. Business verification is a trust process available without a paid upgrade; payment never purchases the badge.
+**Confirmed: seekers free forever.** Recommend an employer-funded marketplace: seekers pay **$0** for discovery, profiles, basic matching, resume building/import/export, saving, applications and seeker community. Any optional future optimizer must preserve this promise; recommend host/platform funding rather than a seeker upsell. No application fee, mandatory paid qualification check or charge to access basic job terms. Business verification is a trust process available without a paid upgrade; payment never purchases the badge.
 
 ## 2. V1 plan contract (proposed)
 
@@ -19,9 +19,9 @@ All plans share security, moderation, application-history access, required acces
 
 Prices and limits live in immutable `PlanVersion` records with effective dates, currency, provider product/price IDs and terms version. A subscription references the agreed plan version. Do not hardcode amounts in browser checks or mutate historic invoices when changing prices. Upgrades to limits do not grant broader access to applicant data than role permissions.
 
-## 3. Later offers, not V1 checkout products
+## 3. Commercial ideas and activation status
 
-Earlier brainstorm hypotheses retained for later validation:
+The following earlier assistant price hypotheses are **unapproved**, not current market evidence. Expanded V1 includes sponsored jobs and employer announcement campaigns as a capability; final price/model is open and these old featured prices do not price the new campaigns. Campaign delivery and caps are defined in [community](12-community-and-campaigns.md).
 
 | Offer | Proposed price | Required work before launch |
 | --- | --- | --- |
@@ -32,7 +32,7 @@ Earlier brainstorm hypotheses retained for later validation:
 | Extra active listing | $10 / month | Quantity/grant reconciliation and downgrade rules |
 | Enterprise | Custom | Quote/contract, integrations and custom provisioning workflow |
 
-V1 prices page may show a non-purchasable “Contact us” enterprise note, but must not advertise sourcing, ATS integration or advanced analytics as delivered. No pay comparison slider or paid fit manipulation. Standalone/promotion/add-on products remain disabled until separate issues define full grant behavior and deliverability.
+V1 prices page may show a non-purchasable “Contact us” enterprise note, but must not advertise sourcing, ATS integration or advanced analytics as delivered. No pay comparison slider or paid fit manipulation. Standalone/add-on products remain later. Sponsored jobs/employer campaigns are planned in expanded V1 but stay disabled until EE-030/031, price/refund approval, moderation and delivery evidence pass. Recommend flat-duration reserved inventory for the pilot; auction/CPC/CPM remain open. Payment buys eligible visibility only, never verification, fit, guaranteed applicants or hires.
 
 ## 4. Billing state and authoritative entitlements
 

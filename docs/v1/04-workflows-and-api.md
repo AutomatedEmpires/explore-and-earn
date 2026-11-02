@@ -2,11 +2,15 @@
 
 These are proposed application contracts, not implemented endpoints. All writes authenticate, authorize at object/organization scope, validate input, apply version checks and append relevant audit/outbox events in the same transaction. Public schemas are allowlists. Never trust organization IDs, seeker IDs, status, price, verification or asset ownership supplied by a browser.
 
+## 0. Contract status and extensions
+
+These inherited endpoint and state defaults remain recommendations until adopted through [decisions](08-sources-and-decisions.md). [Journeys and acceptance](13-journeys-and-acceptance.md) adds explicit role onboarding, resume import/consent, privacy revocation, certification verification, community publishing/moderation and campaign delivery. Community/campaign endpoints use the same ownership, version, idempotency, outbox and no-store rules; they do not bypass moderation or tenant isolation.
+
 ## 1. End-to-end seeker workflow
 
 1. Browse Seek/Swipe/Map as guest with common filters. View host/storefront and listing details without signup.
 2. Save/skip/apply requests sign-in if needed. Restore the exact intended listing/mode; revalidate its availability. Email verification is required for account writes involving host contact or application submission.
-3. Create private profile or enter minimum contact and upload/build a resume. Optional fields do not block applying. A blocked/unscanned resume cannot be selected.
+3. Build the persistent native profile manually or upload/import and review extracted fields, then confirm minimum native name/contact fields. Select/build a resume without making every optional native section mandatory. A blocked/unscanned resume cannot be selected. Import never silently edits profile or application snapshots.
 4. For internal apply, fetch current published revision and questions, select one resume version and credential metadata, answer questions, optionally write cover letter, and review exact shared contents.
 5. Explicit Submit transacts one application, immutable snapshots, initial status and outbox event. Show server-confirmed receipt/application ID; analytics/email failure cannot roll it back.
 6. Track status and application-linked messages under Profile. Withdraw is an explicit action; withdrawing does not unsend already viewed material. Application remains in private history subject to retention.
@@ -76,7 +80,7 @@ Version prefix `/api/v1`; JSON request/response envelopes, UTC timestamps, reque
 | `POST /me/resumes/:id/export` | Own queued PDF render; poll job, authorized download on completion |
 | `POST /uploads`; `POST /uploads/:id/complete` | Purpose/owner/quota-checked signed upload then scan; no direct public asset |
 | `GET /assets/:id/download` | Reauthorize purpose/context and issue short-lived link; no generic object-store listing |
-| `GET /media/:id/:derivative` | Stream approved public image only with current active publication reference; no-store; no public bucket bypass |
+| `GET /media/:id/:derivative` | Host/listing public images need current active public reference. Community media additionally requires authenticated viewer, specific post audience/revision/moderation/block checks; asset purpose prevents cross-publication bypass. No-store, no direct bucket URL |
 | `POST /jobs/:id/applications` | Seeker; current revision, resume_version, answers, consent version; idempotency required |
 | `GET /me/applications[/:id]` | Own application list/snapshot/status, never host notes |
 | `POST /me/applications/:id/withdraw` | Owner of application, expected state/version |

@@ -160,7 +160,7 @@ Maritime/Farm may be seasonal; Seasonal may be remote. Exactly one primary categ
 | `ApplicationStatusEvent` | Append-only actor, old/new state, reason, time, version; no overwritten history |
 | `Message` | Application/thread FK, sender, plain text <=5,000, moderation/deletion marker, created_at; no attachments in V1 |
 | `CandidateNote` | Application FK, org FK, author, text <=3,000; host hiring team only; not messaged to seeker |
-| `ResumeVersion` | User FK, immutable content/version, source `manual|upload`, clean asset, label, published_to_application count; see profile spec |
+| `ResumeVersion` | User FK, immutable content/version, source `manual|upload|reviewed_import`, clean asset, label, published_to_application count; see profile spec |
 | `Report`, `ModerationAction`, `Appeal` | Reporter private, subject reference, evidence references, reason code, scoped status, assigned reviewer, decision history |
 | `AuditEvent` | Actor, capability, target IDs, organization, time, request ID, reason, minimized before/after metadata; append-only restricted access |
 | `PlanVersion`, `Subscription`, `EntitlementGrant` | Effective time, provider refs, status, limits, source and expiry; no card data |
@@ -168,7 +168,11 @@ Maritime/Farm may be seasonal; Seasonal may be remote. Exactly one primary categ
 
 Indexes: live listing lifecycle/category/location/expiry; geographic public anchor; full-text title/description/occupation; applications `(organization_id,status,submitted_at)` and `(seeker_user_id,submitted_at)`; membership unique pair; disposition unique pair; message application/time; outbox status/retry; audit target/time. Protect reference integrity in the database. Keep structured fields queryable; bounded versioned JSON can hold category modules/snapshots, but not unvalidated arbitrary host metadata.
 
-## 9. Example field semantics across categories
+## 9. Extension ownership
+
+The normalized profile/import/availability/credential/affiliation entities and constraints in [11](11-resume-availability-privacy.md), and content/campaign/reaction entities in [12](12-community-and-campaigns.md), extend this model. They reference the same User, MediaAsset, HostOrganization, JobListing and moderation records. No community post or promotion owns a second copy of a job; campaign creative is revisioned separately and points to the canonical job/host. Shared-content audience checks apply at feed, detail, count, reaction and media endpoints. ApplicationSnapshot includes only reviewed selected native fields/resume version; import staging and social metadata are excluded.
+
+## 10. Example field semantics across categories
 
 | Example (fictional) | Canonical choices | Card display |
 | --- | --- | --- |

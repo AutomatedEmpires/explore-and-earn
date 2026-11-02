@@ -1,6 +1,6 @@
 # Phased GitHub issue backlog and acceptance gates
 
-This is the authoritative issue-body source for the V1 implementation backlog. [The issue index](09-github-issues.md) links the 25 created GitHub issues. Stable IDs `EE-001` etc. are dependency keys, not GitHub issue numbers. Phases describe order, not calendar promises. Each issue requires a documentation/spec update if implementation changes a contract. No app work is included in the documentation commit.
+This is the living V1 implementation backlog. [The issue index](09-github-issues.md) preserves 25 historical issue links that require reconciliation after the repository rename; this revision does not assert their current location/status or update GitHub. EE-026–EE-032 below are local proposals, not created GitHub issues. Stable IDs `EE-001` etc. are dependency keys, not GitHub issue numbers. Phases describe order, not calendar promises. Each issue requires a documentation/spec update if implementation changes a contract. No app work is included in the documentation commit.
 
 Suggested labels: `phase:0` through `phase:5`, `area:platform`, `area:domain`, `area:discovery`, `area:hiring`, `area:trust`, `area:billing`, `area:quality`, `type:feature`, `type:decision`. Labels are suggestions, not assumed to exist. Until labels/milestones are configured, phase and stable ID in the title are sufficient. Dependencies below are mandatory gates even if GitHub does not enforce them.
 
@@ -68,7 +68,7 @@ Implement first-host review, scoped business verification badge, reports/evidenc
 
 ### EE-008 · Build host listing wizard and publication lifecycle
 
-**Dependencies:** EE-005, EE-006, EE-007; EE-020 provides confirmed paid limits later. **Spec:** [publication workflow](04-workflows-and-api.md), [quota semantics](06-pricing-and-entitlements.md).
+**Dependencies:** EE-005, EE-006, EE-007; EE-020 provides adopted paid limits after commercial decisions. **Spec:** [publication workflow](04-workflows-and-api.md), [quota semantics](06-pricing-and-entitlements.md).
 
 Implement stepwise drafts/preview, review routing, publish/edit/pause/renew/close/archive, expiry/reservations and Starter entitlement usage; use the same entitlement interface later needed for subscriptions.
 
@@ -126,7 +126,7 @@ Category icon/color markers, bounds query/clusters, Search this area, draggable/
 
 **Dependencies:** EE-003, EE-004. **Spec:** [seeker profile](03-profiles-and-host-workspace.md).
 
-Manual history/skills/education/credentials/preferences, privacy settings and host-view preview. No public directory or sensitive identity-document collection.
+Manual history/skills/education/credentials/preferences, availability presets/exact date, granular field visibility, highlighted badges and host-view preview. Optional affiliation semantics and credential verification extend through EE-028. No public directory or sensitive identity-document collection.
 
 **Acceptance:** all optional preferences optional; stable entry IDs; date validation; private fields absent from host/public schemas; no employability/completion score to host. **Validation:** owner/nonowner access, field-level sharing tests and form accessibility.
 
@@ -134,7 +134,7 @@ Manual history/skills/education/credentials/preferences, privacy settings and ho
 
 **Dependencies:** EE-004, EE-014. **Spec:** [resume studio](03-profiles-and-host-workspace.md).
 
-Multiple labeled uploads/structured variants, explicit profile refresh, immutable versions, preview and one accessible PDF template; no AI parsing.
+Multiple labeled uploads/structured variants, explicit profile refresh, immutable versions, preview and accessible PDF export; reviewed import is delivered by EE-027 before complete V1. Default template recommended; alternatives remain D07. AI is not required.
 
 **Acceptance:** edits never rewrite old versions; pending/blocked files not selectable; PDF export not blank/clipped; failed DOCX conversion safely handled; selected data only in host preview. **Validation:** render representative multi-page resumes, download ownership and version-isolation tests.
 
@@ -226,6 +226,64 @@ Review object/tenant access, session revocation, uploads, webhooks, private cach
 
 **Acceptance:** no unresolved critical/high access/data risks; all launch gates resolved with owners/evidence; public claims match built features/prices; moderation/appeal channels staffed; no production sample applicants; pilot cohort and rollback owner named. **Validation:** end-to-end evidence register with pass/fail/exception and an explicit go/no-go decision.
 
+## Expanded V1 delivery sequence (proposed; no calendar promise)
+
+The original phases describe a useful technical foundation, not a complete release for the current brief. Recommended order: EE-026 at phase 0; EE-027/028 alongside phase 3; EE-029 after trust/media; EE-030/031 after EE-029 and billing; EE-032 as final expanded-V1 verification. An earlier core-only private pilot must be labeled incomplete and requires an explicit scope decision; it does not silently drop community/import from V1. Existing EE-025 is now a foundation gate, not sufficient to claim expanded V1 complete.
+
+### EE-026 · Role onboarding and complete responsive screen contracts
+
+**Dependencies:** EE-002, EE-003. **Spec:** [screens](10-screen-inventory.md), [journeys](13-journeys-and-acceptance.md).
+
+Deliver explicit seeker/host selection, resumable setup, dual-role switch (if D01 adopted), secondary community entry and nested Profile/host/admin routes.
+
+**Acceptance:** all screen IDs resolve to a route, sheet or documented conditional feature; seeker tabs remain exactly four; role choice does not publish contact info or buy anything; guest/auth return paths preserve intent without submitting. **Validation:** desktop/mobile deep-link, Back, switch and interrupted onboarding walkthrough.
+
+### EE-027 · Reviewed resume import and persistent availability
+
+**Dependencies:** EE-004, EE-014, EE-015. **Spec:** [resume](11-resume-availability-privacy.md).
+
+Extraction staging, source preview, per-field review/merge, conflicts/deduplication, cancellation/deletion; Now/1/3/Beyond plus exact date and stale availability handling. Provider choice D06 precedes vendor processing; manual build always available.
+
+**Acceptance:** no auto-merge; malicious document instructions inert; concurrent native edits preserved; missing dates/credentials stay unknown; clean uploaded resume still requires native name/contact confirmation; precise resolved dates shown and do not drift. **Validation:** multilingual/poor-layout/empty/source-conflict fixtures, scanner/provider outage, import cancel/retry, Jan-31 month-clamping and past-date rollover scenarios.
+
+### EE-028 · Field audiences, skill highlights, affiliations and scoped credentials
+
+**Dependencies:** EE-007, EE-014, EE-016; decisions D08–D11. **Spec:** [privacy/credential contracts](11-resume-availability-privacy.md).
+
+Selected-application audiences, social separation, ordered badge cap, optional professional affiliations and manual verification pilot with expiry/revocation. If issuer-check service is unavailable, self-reported credentials remain usable and pending cases labeled honestly.
+
+**Acceptance:** a private field cannot leak through PDF/upload/preview mismatch; review flags contact embedded in original file; social identity reveals no resume; badge cap server enforced; affiliation is not platform endorsement; evidence private; verification expires/revokes accurately. **Validation:** adversarial field/document sharing matrix, clock-driven expiry/revocation and scoped reviewer tests.
+
+### EE-029 · Moderated seeker Photos with reactions and privacy
+
+**Dependencies:** EE-004, EE-007, EE-023, EE-026; D13–D16. **Spec:** [community](12-community-and-campaigns.md).
+
+Photo upload/alt text, <=3 tags, optional coarse place/feeling, audience preview, review states, reactions, reporting, blocking, deletion and appeals. Caption setting follows explicit decision; no comments API.
+
+**Acceptance:** seekers-only publishing; no contact/GPS leak; pending/restricted photos inaccessible via media/deep link; fourth tag rejected; no comment flow; blocked content removed from feed/detail/count/reactions. **Validation:** upload/review/report/delete/reinstate journey and cross-account authorization.
+
+### EE-030 · Announcements and deduplicated Community Feed
+
+**Dependencies:** EE-006, EE-007, EE-029. **Spec:** [content relationships](12-community-and-campaigns.md).
+
+Single content identities with platform/employer author types, revisions, approval/scheduling/expiry, safe canonical links and curated cross-tab projection. Moderated unpaid eligibility follows D18.
+
+**Acceptance:** each item occurs once per feed page/session; same announcement ID opens across tabs; no text-post/comment composer smuggled in; suspended/expired targets stop serving; failures in sponsored supply do not block organic pages. **Validation:** cursor/dedup, schedule/timezone, revision review and takedown propagation.
+
+### EE-031 · Paid campaigns with enforceable delivery caps
+
+**Dependencies:** EE-020, EE-021, EE-030; D17–D21 and commercial approval. **Spec:** [campaign lifecycle](12-community-and-campaigns.md).
+
+Inventory reservations, eligibility, moderation-before-activation, payment state, labeled render, session/day/host caps, stop/refund/make-good records and aggregate reporting.
+
+**Acceptance:** no charge beyond approved quote; no delivery before payment+review+target gates; cap enforcement across concurrent tabs; no pay-to-verify; creative edit re-reviewed; frequency-cap loss fails closed for ads; blocked host not reintroduced by sponsorship; no PII or protected-trait targeting. **Validation:** concurrent slots/caps, duplicate webhook, target closure and underdelivery/refund scenarios.
+
+### EE-032 · Expanded V1 acceptance and operational readiness
+
+**Dependencies:** EE-025, EE-026–EE-031; all relevant open decisions resolved before the affected UI launches. **Spec:** [journey scenarios](13-journeys-and-acceptance.md).
+
+**Acceptance:** scenario A01–A18 has evidence/owner/pass-or-exception; no unresolved privacy/moderation/cap critical failure; every confirmed requirement traced; proposed prices/templates/captions never marketed as approved; seekers can complete all flows free. **Validation:** four-category desktop/mobile role lifecycle, consent/export/delete and moderation/campaign exercises with staffed escalation and rollback.
+
 ## Deferred backlog boundary
 
-New issues are required for AI resume import/editing, numerical fit, reverse sourcing/opt-in public profiles, pay-market comparisons, reviews, ATS integrations, native apps, companion linking, unpaid opportunities, promotion inventory, standalone listing grants, add-ons and enterprise provisioning. They must not be bundled into V1 under the label “polish”. No issue in this backlog authorizes copying the legacy application wholesale.
+Separate future scope decisions/issues are required for optional AI optimizer, numerical fit, reverse sourcing/opt-in public professional profiles, pay-market comparisons, reviews, ATS integrations, native apps, companion linking, unpaid opportunities, standalone listing grants, add-ons and enterprise provisioning. Reviewed resume import and moderated campaign inventory are expanded V1 items above, not deferred. Alternative resume templates, caption policy and affiliations remain open decisions rather than silently committed designs. They must not be bundled into V1 under the label “polish”. No issue in this backlog authorizes copying the legacy application wholesale.

@@ -1,6 +1,6 @@
 # Explore&Earn V1 — product and scope
 
-Specification version: **1.0 · 2026-11-02**. Status: implementation baseline with explicitly proposed commercial and operational defaults. Audience: product, design, engineering, QA and marketplace operations.
+Specification version: **1.1 · 2026-11-02**. Status: living V1 vision; confirmed scope plus recommended/inherited contracts and explicitly open decisions. No application is implemented. Audience: product, design, engineering, QA and marketplace operations.
 
 ## 1. Product promise and non-negotiable rules
 
@@ -13,7 +13,21 @@ Explore&Earn helps people evaluate both a job and the life arrangement around it
 5. A right swipe saves; it never submits an application. Applications require a review screen and explicit submission.
 6. Housing and meals have structured detail sheets with four predefined photo slots each. Unknown information is labeled, never treated as free or unavailable.
 7. Host logo and name open the public host storefront. A verified mark represents a defined verification scope, never an employment guarantee.
-8. Core seeking is free. Prices below are proposals, not commitments from the user or live offers.
+8. **Confirmed:** seekers are **free forever**. Discovery, native profile, resume building/import/export, applying and seeker community must not require seeker payment. Host-funded monetization is recommended; exact host prices are open.
+
+Rules 1–3 and the core of 6–7 reflect confirmed requirements. Dual-role identity (4), exact gesture mappings (5), fixed photo-slot labels and numerical-match deferral are recommended/inherited implementation choices; see [decision status](08-sources-and-decisions.md). The user confirmed four predefined photo fields per sheet, but the final field labels are still a recommendation.
+
+### Living vision and product principles
+
+Build a trusted way to choose a job **and the life around it**. Seekers should understand the work, when it begins, what it pays, where they will stay/eat, and who is hosting before applying. Hosts should present an honest destination/workplace and manage intentional applicants with clear consent.
+
+**Confirmed additions:** persistent native seeker profile with in-app building and reviewed upload/import autofill; availability presets Now / 1 month / 3 months / Beyond and exact date; experience, education, bio, location, granular contact visibility, certifications and highlighted skill badges; seeker community with Feed / Photos / Announcements, reactions and no photo comments; moderated, labeled, limited paid host content; explicit seeker/host onboarding.
+
+**Recommended principles:** no empty-profile wall before browsing; no fabricated qualifications, match percentages or housing claims; progressive details without hiding costs; private professional data separated from social identity; paid visibility cannot purchase trust or fit; preserve seekers' ability to complete all core flows for free. Resume template alternatives, AI optimizer, groups/organizations and final brand copy remain brainstorm decisions.
+
+Illustrative needs, not research findings: a first-season worker comparing included housing; a mariner checking rotation and credential expiry; a farm worker aligning a harvest start with availability; a remote worker checking eligible countries/timezones; a small host publishing one honest job; a multi-site host managing roles and applicants. Validate these with real seekers/hosts before claiming demand.
+
+Brand direction: **“Seekers free forever”** is confirmed positioning. **“Built for seekers, by seekers”** is a proposed tagline, to use only if the team can substantiate it. Creative alternatives for discussion: “Find your next place to work and live” or “Work worth going somewhere for”; the latter needs Remote-inclusive supporting copy. Never imply all jobs include housing or meals.
 
 ## 2. V1 boundary
 
@@ -22,14 +36,14 @@ Explore&Earn helps people evaluate both a job and the life arrangement around it
 | Responsive web experience; all four categories and all three discovery modes | Native app packages and offline applications |
 | Public published listings/storefronts; authenticated save, skip, profile and apply | Public seeker directory, reverse sourcing and talent pools |
 | Internal applications and clearly disclosed external apply links | ATS integrations, automatic external status synchronization |
-| Structured seeker history; resume upload and manual structured resume builder; multiple variants and downloadable PDF | AI resume parsing/editing; automatic credential validation |
+| Structured native profile; manual builder and upload/import with field review; availability; private certification records; variants and PDF export | Optional AI optimizer; automated issuer verification beyond approved manual scope; final template count open |
 | Host multi-location storefront, team roles, listings, applicant pipeline and application-linked text messaging | Video interviews, calendar scheduling integrations, payroll, contracts and payments to workers |
 | Explainable rules-based fit hints, never automated hiring decisions | AI percentages, candidate scoring, market pay comparison slider |
-| Admin verification, reports, takedowns, appeals, audit logs and billing support | Reviews, ratings, social feed, public testimonials without verification |
-| Starter, Growth, Pro entitlement architecture; paid checkout only after gates pass | Enterprise automation, promotions, add-on seats/listings and one-off listings |
+| Admin verification/reports/takedowns/appeals; seeker Feed/Photos/Announcements with moderation and privacy | Comments, seeker text-post discussions, reviews/ratings and public testimonials pending separate decisions |
+| Proposed host entitlement architecture; limited sponsored jobs/employer campaigns in complete V1, activated only after inventory/moderation/payment gates | Enterprise automation, add-on seats/listings and one-off listings; prices and commercial launch sequence open |
 | Optional weather widget that can fail independently | Rich destination intelligence and companion account linking |
 
-Only paid employment and paid contract opportunities are in V1. Volunteer/work-exchange listings and unpaid roles are excluded pending separate product and jurisdiction review. This choice does not imply the four categories are employment classifications. Baseline launch assumptions are English, adult users, a US-only pilot and USD host subscriptions. Listing currency is explicit and need not equal subscription currency, but supported pilot currencies must be configured before publication. These assumptions require business/legal approval before launch, not before documentation or implementation.
+**Inherited recommendation, pending D22:** only paid employment and paid contract opportunities are in V1. Volunteer/work-exchange listings and unpaid roles are excluded pending separate product and jurisdiction review. This choice does not imply the four categories are employment classifications. Baseline launch assumptions are English, adult users, a US-only pilot and USD host subscriptions. Listing currency is explicit and need not equal subscription currency, but supported pilot currencies must be configured before publication. These assumptions require business/legal approval before launch, not before documentation or implementation.
 
 ## 3. Information architecture
 
@@ -37,7 +51,8 @@ Only paid employment and paid contract opportunities are in V1. Volunteer/work-e
 | --- | --- | --- |
 | Public/seeker discovery | `/seek`, `/swipe`, `/map`, `/jobs/:id/:slug?`, `/hosts/:slug` | Seek, Swipe, Map, Profile; desktop equivalent top links |
 | Seeker workspace | `/profile`, `/profile/edit`, `/profile/resumes`, `/profile/saved`, `/profile/skipped`, `/profile/applications`, `/profile/messages`, `/profile/settings` | Pinned four-tab nav; Profile section links |
-| Auth | `/sign-in`, `/sign-up`, `/verify-email`, `/recover` | Return to validated internal destination |
+| Community | `/community/feed`, `/community/photos`, `/community/announcements`, `/community/photos/:id`, `/community/announcements/:id` | Secondary entry from Seek header and Profile; four pinned tabs unchanged (recommended entry placement) |
+| Auth/onboarding | `/welcome`, `/sign-in`, `/sign-up`, `/verify-email`, `/recover`, `/onboarding/seeker`, `/onboarding/host`, `/workspaces` | Explicit “I’m a seeker” / “I’m a host”; validated return destination |
 | Host workspace | `/host/:orgId/overview`, `/listings`, `/applicants`, `/messages`, `/storefront`, `/locations`, `/team`, `/analytics`, `/billing`, `/settings` under that prefix | Desktop sidebar; mobile Overview, Listings, Applicants, More; messaging in More and contextual links |
 | Admin | `/admin/queue`, `/hosts`, `/users`, `/listings`, `/reports`, `/appeals`, `/billing`, `/taxonomy`, `/audit`, `/settings` under `/admin` | Separate role-limited admin sidebar |
 
@@ -77,10 +92,13 @@ Logical module ownership:
 | Hiring | Applications, snapshots, status history, messages | Listings and seeker snapshot read interfaces |
 | Billing | Provider references, plan versions, entitlement ledger | Identity and organization; never applicant content |
 | Trust/operations | Verification, reports, sanctions, appeals, audit | Narrow permissioned access to other modules |
+| Community | Photo posts, announcement content/revisions, reactions, visibility and feed projections | Identity, media, trust; read-only approved host/listing projections |
+| Campaigns | Paid inventory reservations, campaign delivery, disclosure and accounting | Community, billing adapter, trust; no private resume or matching data |
+| Import/credentials | Private extraction proposals, review decisions and verification cases | Seekers, private media, scoped trust; never direct public publication |
 
 Modules use shared transactions where necessary, with named domain services rather than direct arbitrary table writes. Database constraints enforce tenant relationships. The database is authoritative for permissions, publication, quotas and submission; cached search is never authoritative. Search may start with database full-text/geographic indexes. Separate search infrastructure is deferred until measured need.
 
-Images are publicly readable only after explicit publication and scanning; resumes, credentials and application attachments are private. All storage buckets remain private: a server media route checks current publication references before streaming approved public derivatives. V1 listing/storefront/discovery HTML and JSON and user-uploaded media use `Cache-Control: no-store`; only static application assets use CDN caching. This makes new requests honor takedowns without waiting for cache expiry. Previously downloaded bytes cannot be recalled. Vendor adapters isolate maps, weather, billing, email and storage. No resume/profile content is sent to an AI provider in V1. Use environment-specific databases, buckets, provider credentials and webhook secrets.
+Host/listing images are publicly readable only after explicit publication and scanning; community images additionally require authenticated audience/block checks on every read; resumes, credentials and application attachments are private. All storage buckets remain private: a server media route checks current publication references and purpose-specific audience/authorization before streaming approved derivatives. V1 listing/storefront/discovery HTML and JSON and user-uploaded media use `Cache-Control: no-store`; only static application assets use CDN caching. This makes new requests honor takedowns without waiting for cache expiry. Previously downloaded bytes cannot be recalled. Vendor adapters isolate maps, weather, billing, email and storage. Reviewed import is in scope; AI is not mandatory. Recommend local deterministic extraction first. No resume/profile content goes to an external parser/AI vendor without a documented provider decision, data-handling review and explicit import consent; optional optimizer is a separate open feature. Import text is untrusted data and cannot trigger tools, follow embedded instructions or publish profile changes. Use environment-specific databases, buckets, provider credentials and webhook secrets.
 
 ## 5. Launch quality and success measures
 

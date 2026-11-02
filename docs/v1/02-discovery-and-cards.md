@@ -2,7 +2,7 @@
 
 ## 1. Wireframe mapping
 
-The uploaded `image(20261102-202439).png` was visually reviewed. Its central card has a company cover, overlapping circular logo with verification mark, match/category badges, job title, host name, location, Begins/Ends row, House/Meals/Pay strip, and Skip/Apply/Save footer. Labels outside the card are annotations, not additional UI. Preserve this hierarchy, adapting the footer by mode and responsive size. The sketch's date and pay units are examples, not fixed product values.
+The earlier baseline records a visual review of `image(20261102-202439).png`. This revision uses that recorded interpretation and the current user brief; the original image was not re-accessed in this session. Its central card has a company cover, overlapping circular logo with verification mark, match/category badges, job title, host name, location, Begins/Ends row, House/Meals/Pay strip, and Skip/Apply/Save footer. Labels outside the card are annotations, not additional UI. Preserve this hierarchy, adapting the footer by mode and responsive size. The sketch's date and pay units are examples, not fixed product values.
 
 | Wireframe element | V1 treatment |
 | --- | --- |
@@ -37,9 +37,17 @@ Housing sheet shows cost/deposit/basis, room type/occupancy, utilities, pets/cou
 
 Persistent search and filter controls lead to a vertically scrolling, cursor-paginated feed. Page size defaults to 20, maximum 50. Filters: keywords/occupation, four categories (match primary or secondary), city/region/radius, onsite/hybrid/remote, remote eligible regions, earliest/latest start or date overlap, employment type, commitment, housing availability/cost status, meals availability, and currency/basis-specific minimum pay. Advanced requirement filters may reference curated skills/credentials. Never expose protected-trait filters.
 
-Sorts: Relevant (default), Newest, Start date; Distance only with a chosen location; Pay only with a comparable currency/basis. Relevant V1 is deterministic: keyword match, selected categories/location/timing, then published time, then ID as tie-breaker. No commercial boosting in launch V1. Filter changes reset pagination, preserve scroll only on Back, and show applied-filter chips/result count. Search queries and safe filters are URL-addressable; private profile evidence and exact geolocation are not put in URLs or analytics.
+Sorts: Relevant (default), Newest, Start date; Distance only with a chosen location; Pay only with a comparable currency/basis. Relevant V1 is deterministic: keyword match, selected categories/location/timing, then published time, then ID as tie-breaker. Limited labeled sponsored listings are in expanded V1 scope. Recommend activating community placements first; whether to add discovery placements remains D21. Until approved, Seek/Swipe/Map organic ranking stays unboosted. Any later discovery placements must use the same cap/label/safety contract as community and cannot alter fit. Filter changes reset pagination, preserve scroll only on Back, and show applied-filter chips/result count. Search queries and safe filters are URL-addressable; private profile evidence and exact geolocation are not put in URLs or analytics.
 
 Empty results show which filters are active and offer explicit removal. Never silently broaden geography, eligibility or pay. Loading, retry, offline and no-more-results states are distinct. A saved or applied badge follows the listing across modes. Skip removes from default discovery, not from direct URLs or the user's Skipped list. “Include skipped” is explicit and off by default.
+
+### Begins-within and comparison semantics (recommended D12)
+
+Expose quick chips Begins within 1 / 3 / 6 months and a custom N (recommend 1–12). Resolve today in the chosen workplace/search timezone and add **calendar months**, clamping end-of-month days; show the actual inclusive date window. Fixed/window starts match only if a permissible start lies in `[today, cutoff]`; ASAP matches if accepting now. Rolling/flexible starts require a known overlapping start window or a separately selected “Include flexible/unknown starts” option. A job already started is not assumed open unless the host marks a continuing/rolling intake. An expired deadline remains ineligible.
+
+User availability is a separate private input, never a silent rewrite of this filter. Include `begins_within_months`, `resolved_from`, `resolved_through`, `timezone` in the query contract; paging freezes this resolution until refresh. Define precedence: explicit start range replaces relative begins-within; date-overlap asks about work duration and is labeled separately.
+
+Pay filter requires a currency, basis and minimum threshold. Recommend “minimum guaranteed pay at least X” (lower bound >= threshold); negotiable/share/piece roles without comparable guarantee appear only through an explicit include-variable option. Show original pay beside every result; no guessed annualization. Housing distinguishes available vs free; meals distinguishes available vs included/free, with unknown opt-in. Sort labels: Relevant, Newest, Begins soonest (unknown last), Distance with an anchor, Pay high to low with comparable basis/currency. Stable ID breaks ties. Housing/meals are filters, not an invented monetary value in ranking.
 
 ## 4. Swipe — exploration with intentional submission
 
