@@ -105,3 +105,7 @@ Index imports by owner/state/expiry; credentials by owner/expiry; proposals by j
 ## 9. Definition of done
 
 Manual build and reviewed import converge on the same native schema. Every proposed value has a review decision before merge. Availability labels and dates agree across editor, profile, hints and chosen application snapshot. Skills/affiliations/credentials carry honest provenance. User can predict exactly what hosts and community see. Import/template/optimizer/verification failures never rewrite prior application records. Acceptance evidence is specified in EE-027/028 and A05–A09 in [journeys](13-journeys-and-acceptance.md).
+
+## 10. Dashboard identity versus resume presentation
+
+The latest user brainstorm includes seeker cover and headshot-or-avatar (D26). Recommend optional owner-only dashboard media, with independent professional-photo selection for each resume/application. No cover sent to hosts by default; community handle/avatar remains separately consented. Native resume editing stays a modern structured section editor with reviewed autofill; a decorative profile cover does not turn the private native record into a public professional directory.

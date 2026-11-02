@@ -70,7 +70,7 @@ Implement first-host review, scoped business verification badge, reports/evidenc
 
 **Dependencies:** EE-005, EE-006, EE-007; EE-020 provides adopted paid limits after commercial decisions. **Spec:** [publication workflow](04-workflows-and-api.md), [quota semantics](06-pricing-and-entitlements.md).
 
-Implement stepwise drafts/preview, review routing, publish/edit/pause/renew/close/archive, expiry/reservations and Starter entitlement usage; use the same entitlement interface later needed for subscriptions.
+Implement stepwise drafts/preview, review routing, publish/edit/pause/renew/close/archive, expiry/reservations and approved test publication grants; production publication requires adopted subscription entitlements, with no assumed free Starter allowance.
 
 **Acceptance:** autosave conflict visible; pending edit retains live content; material change review; no quota race; expiry/deadline enforced synchronously; closure preserves applications. **Validation:** concurrent publication and revision tests, clock-driven expiry and pending-reservation release.
 
@@ -110,13 +110,13 @@ Gesture-first card deck, help, left skip/right save/up application-entry, tap de
 
 **Acceptance:** no gesture submits; no permanent action footer by default; nested sheet/scroll gestures safe; successful Undo restores prior disposition; saved/applied excluded; deck state restores after host detail. **Validation:** touch devices, keyboard, reduced motion, offline/error rollback. Up entry can use a disabled integration boundary until EE-016, but launch gate requires working review.
 
-### EE-013 · Build Map clusters, selected card and pull-up list
+### EE-013 · Build host/location Map pins and public-host navigation
 
 **Dependencies:** EE-009, EE-010, EE-011. **Spec:** [Map](02-discovery-and-cards.md).
 
-Category icon/color markers, bounds query/clusters, Search this area, draggable/list-button sheet states, synchronized selection and separate Remote-eligible section.
+Working D25: host-logo/category pins grouped by actual published host/worksite anchor, bounds/clusters, Search this area, matching-job counts, public host-page links with matching location/filter context, Back restoration, optional preview/list and separate Remote-eligible section. Final preview/direct-navigation choice remains open.
 
-**Acceptance:** no fake Remote pins; maritime home port labeled; list usable on map failure; stale bounds discarded; capped counts labeled; private coordinates absent; map state restored after details. **Validation:** coincident pins, date-line bounds, low zoom, keyboard/list access and denied geolocation.
+**Acceptance:** no fake Remote pins; maritime home port labeled; list usable on map failure; stale bounds discarded; host/location counts distinguished from jobs; several jobs share appropriate pin without merging distant locations; private coordinates absent; context and map state restored after public host/job details. **Validation:** coincident pins, date-line bounds, low zoom, keyboard/list access and denied geolocation.
 
 **Phase gate:** Seek/Swipe/Map operate over the same IDs/revisions/filters, with independent mode presentation and preserved pinned nav.
 
@@ -178,9 +178,9 @@ Opt-in deterministic met/not-met/unknown checks, preference reasons and rule ver
 
 **Dependencies:** EE-001 (commercial approval), EE-003, EE-008. **Spec:** [pricing](06-pricing-and-entitlements.md).
 
-Starter/Growth/Pro plan versions, provider checkout/portal, verified webhook processing, usage/seat limits, reconciliation and invoices. Deferred offers remain disabled.
+Monthly Starter/Professional/Enterprise plan versions after D27 adopts prices/limits; provider checkout/portal, verified webhooks, active-listing capacity/seat limits, reconciliation and invoices. No free Starter assumption; deferred capacity packs/invitation credits remain disabled.
 
-**Acceptance:** 1/5/25 slots and 1/3/10 seats (or newly approved documented limits); no browser-granted paid access; duplicate/out-of-order webhooks safe; two tabs with different checkout keys converge on one org operation/agreement; duplicate provider agreement quarantined for Finance; invitation/publication races bounded; no card data stored. **Validation:** provider test lifecycle and usage reconciliation under concurrency.
+**Acceptance:** adopted versioned slot/seat/analytics limits (no inherited numeric defaults), explicit unsubscribed fallback, no accumulated lifetime listing credit charge unless separately adopted; no browser-granted paid access; duplicate/out-of-order webhooks safe; two tabs with different checkout keys converge on one org operation/agreement; duplicate provider agreement quarantined for Finance; invitation/publication races bounded; no card data stored. **Validation:** provider test lifecycle and usage reconciliation under concurrency.
 
 ### EE-021 · Implement upgrades, cancellation, dunning and downgrades
 
@@ -234,7 +234,7 @@ The original phases describe a useful technical foundation, not a complete relea
 
 **Dependencies:** EE-002, EE-003. **Spec:** [screens](10-screen-inventory.md), [journeys](13-journeys-and-acceptance.md).
 
-Deliver explicit seeker/host selection, resumable setup, dual-role switch (if D01 adopted), secondary community entry and nested Profile/host/admin routes.
+Deliver explicit seeker/host selection, resumable setup, dual-role switch (if D01 adopted), secondary community entry and nested Profile/host/admin routes; D26 private cover/avatar, pipeline-filter shortcuts and recipient-scoped notification views. Interview scheduling remains D28 open.
 
 **Acceptance:** all screen IDs resolve to a route, sheet or documented conditional feature; seeker tabs remain exactly four; role choice does not publish contact info or buy anything; guest/auth return paths preserve intent without submitting. **Validation:** desktop/mobile deep-link, Back, switch and interrupted onboarding walkthrough.
 
@@ -287,3 +287,7 @@ Inventory reservations, eligibility, moderation-before-activation, payment state
 ## Deferred backlog boundary
 
 Separate future scope decisions/issues are required for optional AI optimizer, numerical fit, reverse sourcing/opt-in public professional profiles, pay-market comparisons, reviews, ATS integrations, native apps, companion linking, unpaid opportunities, standalone listing grants, add-ons and enterprise provisioning. Reviewed resume import and moderated campaign inventory are expanded V1 items above, not deferred. Alternative resume templates, caption policy and affiliations remain open decisions rather than silently committed designs. They must not be bundled into V1 under the label “polish”. No issue in this backlog authorizes copying the legacy application wholesale.
+
+## Latest refinement acceptance additions
+
+EE-013 must resolve D25 before final Map implementation; its host/location grouping never changes canonical job IDs/terms. EE-014/026/018 cover D26 identity header, pipeline views, Not selected copy and private notifications without duplicating application states. EE-020/021 must resolve D27 plan allowances, unsubscribed capacity and analytics before commercial launch; retired free-Starter/numeric defaults must not survive in fixtures. EE-031 can use one campaign system for Boosted job and Announcement, with each enabled placement explicitly adopted. Recruitment invitation credits remain open/deferred and cannot reuse team invitation tokens or grant a seeker directory. EE-024/032 verify host-pin context, status-count consistency, notification access and cancellation without losing hiring history. These are local issue-body refinements, not remote GitHub edits.

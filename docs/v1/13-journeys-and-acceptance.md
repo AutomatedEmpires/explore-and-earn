@@ -72,7 +72,7 @@ Record owner, date, device/browser/assistive mode, fixtures, observed pass/fail/
 
 | ID | Scenario | Required outcome |
 | --- | --- | --- |
-| A01 | All four categories through Seek/Swipe/Map, change filters and modes | Same IDs/terms, four pinned tabs, honest Remote representation; provider failure leaves list |
+| A01 | Four categories/modes; multiple matching jobs and worksites per host; pin to host page then Back | Same canonical IDs/terms; host/worksite grouping and matching/all-job counts honest; filter/location context preserved, no fabricated Remote pin; provider failure leaves list |
 | A02 | Open logo/housing/meals in each mode then Back | Same host/revision/four slots/costs/unknowns; mode state restored |
 | A03 | Guest gesture/apply, sign in, cancel | No application; accessible review/exit, retained job, explicit role setup |
 | A04 | Duplicate submit/retry, edit/close/deadline/resume revocation race | One receipt or safe conflict; no stale or unauthorized snapshot/lost draft |
@@ -88,7 +88,7 @@ Record owner, date, device/browser/assistive mode, fixtures, observed pass/fail/
 | A14 | Late/duplicate payment, expired review/hold, cap/ad outage | No double charge/expired activation; re-quote if needed; organic works, ads fail closed |
 | A15 | Target closure, paid creative change, misleading benefit claim | Delivery stops/re-review; canonical terms and labels authoritative; approved refund/make-good path |
 | A16 | Report paid host, urgent privacy issue, appeal | Trust can stop despite payment; reporter private, audited review and safe reinstatement |
-| A17 | Switch seeker/host/org-A/org-B/Billing/Listing manager; cancel plan | No tenant/private cache leak; role boundaries, hiring history retained/capacity reconciled |
+| A17 | Switch seeker/host/orgs/Billing/Listing manager; open notifications/status filters; cancel monthly plan | Private cover/avatar and recipient notifications scoped; Interviews/Not selected/Hired counts agree with source records; no tenant leak; approved unsubscribed capacity and analytics enforced without losing hiring history |
 | A18 | Export/delete with imports/photos/evidence/apps; restore backup | Redacted export, ownership resolved, serving withdrawn, purge/holds transparent, deletion replay; no seeker charge |
 
 ## 7. Creative recommendations for discussion
@@ -100,3 +100,9 @@ Record owner, date, device/browser/assistive mode, fixtures, observed pass/fail/
 - **Low-pressure community:** photos and optional feeling without follower scores or required career performance; reactions stay lightweight.
 
 Suggested decision order: D01/02 roles/entry; D13–16 captions/audience/moderation/reactions; D06/07 import/optimizer/templates; D08–11 highlights/availability/credentials/affiliations; D17–21 commercial inventory/caps. Record explicit user choices in 08 and update affected contracts/screens/acceptance before implementation. Open questions do not block this documentation commit.
+
+## 8. Latest working product flow
+
+Seek remains deliberate job-card browsing; Swipe uses gestures to Skip/Save/start Apply review, never submit silently; Map now favors host discovery at real places, leading to that host's relevant canonical jobs. A host-summary card has View host / matching-job count, while each job variant retains the primary category/cover/logo/verification/position/company/location/housing/meals/pay/actions plus earlier timing/fit fields. Exact gesture mapping and host-preview/map-collapse behavior remain D23/D25.
+
+Recommended commercial story: a host subscribes monthly to Starter/Professional/Enterprise with an adopted concurrent-active-job allowance; drafts do not consume lifetime credits. One existing campaign system sells a Boosted job or Announcement where placement is enabled. Invitation credits do not launch without an explicitly opted-in recipient/consent model and separate scope; they are unrelated to inviting staff to a host team. Seeker remains free. Analytics tier differences affect aggregate depth, never applicant privacy or access to necessary records. All prices/counts remain D27.

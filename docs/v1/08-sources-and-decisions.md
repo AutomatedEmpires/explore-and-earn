@@ -1,6 +1,6 @@
 # Sources, authority, decisions and open questions
 
-Version 1.1 · 2026-11-02. Living register for product/design/engineering/operations. This is vision and proposed contracts, not implemented features, vendor approval or market validation.
+Version 1.2 · 2026-11-02. Living register for product/design/engineering/operations. This is vision and proposed contracts, not implemented features, vendor approval or market validation.
 
 ## 1. Current repository and sources
 
@@ -40,12 +40,13 @@ Earlier MUST/SHOULD describe strength within a proposed contract, not provenance
 | C15 | Platform/employer announcements including paid moderated campaigns, canonical host/job links and frequency limits | 12; values/prices D17–21; EE-030/031; A13–16 |
 | C16 | Explicit “I’m a seeker” / “I’m a host” onboarding | 10/13; dual-role D01; EE-026; A03/17 |
 | C17 | Docs only in NEW clone; inspect/protect edits, branch/commit/report; no archived-repo changes | Documentation delivery; no app/config/migration changes |
+| C18 | Latest commercial direction: monthly host subscriptions Starter / Professional / Enterprise | 06; prices/allowances/analytics/upsells D27; no free Starter assumed |
 
 Open brainstorms preserved: template alternatives, optional AI optimizer, groups/organizations meaning, 15 vs 20 highlights, no vs short caption, final tagline, pay-comparison popup/slider. User examples inform proposals without locking design.
 
 ## 4. Decision register
 
-**No unresolved recommendation below has user adoption as of this revision.**
+**Confirmed choices appear above; recommendations and open questions below remain unadopted unless a row explicitly records a directional user preference.**
 
 | ID / status | Recommendation / question | Alternatives and implications | Proposed owner / gate |
 | --- | --- | --- | --- |
@@ -70,9 +71,13 @@ Open brainstorms preserved: template alternatives, optional AI optimizer, groups
 | D19 R | Proposed Feed 1/10; announcements 1/5; campaign 2/day+1/session; host 3/day+1/session | Values need validation; cross-surface atomic caps required whatever values | Product/engineering/trust before paid delivery |
 | D20 O | Aggregate viewable/click reporting; quote attribution/refund/make-good | Duration vs delivery guarantee and attribution window undefined; no hires promise | Finance/product before inventory sale |
 | D21 O | Start ads in Community; discovery boosts only after explicit decision | User requested sponsored jobs in Feed; Seek/Swipe/Map paid slots not assumed | Product before discovery ads |
-| D22 I/O | English adult US paid-work pilot; proposed Starter/Growth/Pro $0/$49/$129, slots 1/5/25, seats 1/3/10 | Geography/language/age/work-exchange/prices/limits inherited, not immutable | Business/legal/product before live pilot |
+| D22 I/O | English adult US paid-work pilot remains inherited/open | Old free-Starter/Growth/Pro prices/quotas superseded by C18/D27, not retained defaults | Business/legal/product before live pilot |
 | D23 I/O | Left skip/right save/up review, Undo 10s, one app per seeker/listing, renewed season new job ID | Gesture mapping/undo/reapplication cycles need validation | Product before gestures/hiring freeze |
 | D24 O | “Built for seekers, by seekers” proposed tagline | Use only if team story supports it; seekers free forever confirmed | Product/brand before public copy |
+| D25 Directional/O | User currently prefers host-logo/category pins leading to host public profile/jobs; recommend host/worksite grouping and direct relevant-jobs navigation | Job-card pin vs compact host preview vs collapsing map remain alternatives; no approved screen percentage; preserve Remote eligibility honesty | Product/design before Map final design |
+| D26 R/O | Seeker cover/headshot-or-avatar, resume/application shortcuts, notifications; host public profile/listings/applicants/billing/tier analytics | Dashboard areas are brainstorms; recommend pipeline filters rather than separate status collections, private images, Not selected UI label for rejected state | Product/design before dashboard final design |
+| D27 O | Monthly tier names/model C18; recommend concurrent active listing capacity and only Boosted job/Announcement upsells initially | Prices/slots/seats/analytics splits open; no free Starter default; lifetime totals, capacity packs and recruitment invitation credits unresolved/deferred | Business/product before paid plan/upsell launch |
+| D28 O | Interviews as a pipeline view in V1 | Scheduler/calendar/reminders/rescheduling are additional scope, not implied by a dashboard tab | Product before interview scheduling |
 
 ## 5. Live launch gates
 
@@ -105,3 +110,5 @@ No current competitor pricing, market demand, specific provider capability or le
 2026-11-02 v1.1: corrected active repo names; expanded reviewed import and community/campaigns from earlier deferrals into current V1; preserved open brainstorms; added responsive inventory, privacy/availability/credential/affiliation semantics, full lifecycles, A01–18 and local EE-026–032 proposals. Historical 25 issue URLs remain unverified, not recreated remotely. Earlier independent-review claims belonged to v1.0; actual v1.1 checks belong in the delivery report.
 
 Update this register, owning contract, screen IDs, acceptance and roadmap together after a product decision. Record validation with scope/limits. User answers override recommendations without turning all inherited detail into approved policy.
+
+2026-11-02 v1.2: latest user brainstorm reaffirms core categories/navigation/card/resume/community; names monthly Starter/Professional/Enterprise; expresses preference for host-page-linked Map pins and explores dashboard/pipeline areas. Updated 02/03/06/10 and dependent domain/API/backlog/journey contracts. D25 records preference without locking preview/height; D26–28 preserve dashboard, capacity/upsell and interview-scheduling unknowns. Old free-Starter/Growth/Pro numeric proposals retired. Rechecked the same new repository on `docs/v1-product-vision` at `2d9bfc6`, clean before this revision; archived repo untouched. No new external research or market-price claims.

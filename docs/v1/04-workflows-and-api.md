@@ -70,9 +70,9 @@ Version prefix `/api/v1`; JSON request/response envelopes, UTC timestamps, reque
 | Endpoint / method | Capability / contract |
 | --- | --- |
 | `GET /discovery/jobs` | Public projection; query contract, cursor, counts; no-store, current visibility rechecked |
-| `GET /discovery/map` | Same filtered visibility; bounds/clusters, capped markers, separate remote results |
+| `GET /discovery/map` | Working D25 host/location grouping after current filtered listing visibility; capped pins/clusters, matching-job and host/location counts, canonical IDs, separate remote eligibility results |
 | `GET /jobs/:id` | Current approved public revision + availability; restricted generic response |
-| `GET /hosts/:slug` | Public storefront projection + active listings cursor |
+| `GET /hosts/:slug` | Public storefront + active listings cursor; safe optional location/discovery context labels matching jobs vs all jobs, no private filters or automatic broadening |
 | `GET /me/discovery-state` | Private saved/skipped/applied overlays for bounded listing IDs |
 | `PUT/DELETE /me/jobs/:id/disposition` | Own save/skip/clear; expected version, reversible; never apply |
 | `GET/PATCH /me/profile` | Own private schema; PATCH allowlisted fields and expected version |
@@ -128,3 +128,7 @@ Events: `listing.published/changed/unavailable`, `application.submitted/status_c
 Every minute run idempotent expiry/deadline visibility maintenance, every 5 minutes repair failed projections and reconcile reservations, daily reconcile billing usage and orphan assets. Authorization remains synchronous. Public search results require an authoritative visibility filter at response time so stale internal candidate caches cannot expose takedowns. All dynamic public/private responses and user-uploaded media use no-store in V1, including unavailable/tombstone responses. No CDN/service-worker path may bypass visibility checks. Revalidation occurs on page focus/navigation and at least every 60 seconds on an open discovery screen; restricted content already downloaded cannot be recalled, but every new detail/media/apply request is denied immediately.
 
 A resume scanner or renderer outage leaves assets pending and explains why submission is blocked; no bypass to unscanned files. Billing outage blocks new paid checkout, not existing applications. Map/weather outage preserves text discovery. Browser/network timeout after submission uses same idempotency key to retrieve outcome rather than submitting again. Store idempotency keys per actor/endpoint plus request hash for 24 hours; same key/different payload is conflict. Application uniqueness protects beyond key expiry. Frontend local application draft storage excludes file bytes and is cleared on sign-out, submission and account switch.
+
+## 8. Dashboard notification contracts (recommended D26)
+
+`GET /me/notifications`, `POST /me/notifications/:id/read` and `POST /me/notifications/read-all` act only on the recipient. `GET /organizations/:orgId/notifications` and equivalent `POST .../:id/read` / `POST .../read-all` require active membership and event-specific capability; server returns only that member's authorized notifications, never a shared org-wide read flag. Page/read actions do not mutate application status. Stable event+recipient dedup, minimized safe text, validated internal deep link, no-store and version-aware concurrent read flags apply. Invalid/revoked target shows a safe unavailable state. Export/delete/retention follows recipient data policy; proposed notification retention is 90 days unless the underlying required business record has a different retention class (G4). Outbox failure may delay a notice but cannot roll back its application/payment source event.

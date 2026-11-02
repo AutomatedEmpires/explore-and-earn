@@ -57,6 +57,7 @@ Proposed retention schedule (policy versioned; jurisdiction review may override)
 | Reports/appeals and sensitive evidence | 12 months after final case resolution, with access restricted throughout |
 | Security/audit metadata | 12 months; minimize personal content; required longer periods must be documented |
 | Raw analytics | 90 days; aggregate counts can persist without reidentifiable data |
+| Private notification read-model entries | Proposed 90 days; underlying application/security/billing source records follow their own retention/hold class; recipient/org capability checked on read |
 | Billing records | Provider/legal retention schedule established at launch; no invented universal period |
 | Backups | Rolling 35 days; access limited to restore procedures |
 

@@ -1,42 +1,47 @@
-# Pricing, entitlements and billing lifecycle
+# Monthly host subscriptions, capacity and focused upsells
 
-## 1. Commercial status
+## 1. Commercial direction and status
 
-All prices are **proposed USD launch hypotheses**, carried forward from brainstorming for validation. No checkout, vendor account, promotion or subscription is activated by this documentation. Product/business approval, payment-provider configuration, tax/terms review and a completed test lifecycle are required before charging anyone. Do not reuse earlier competitor prices as current market facts.
+**Current user direction:** host monthly subscriptions named **Starter / Professional / Enterprise**. **Confirmed:** seekers free forever, including discovery, native resume build/reviewed import/export, applications and seeker community. Exact host prices, tier allowances, free host preview/trial, analytics split and optional credit products remain Open D27. Earlier free-Starter/Growth/Pro dollar amounts and numeric quotas are superseded assistant proposals; none are current defaults.
 
-**Confirmed: seekers free forever.** Recommend an employer-funded marketplace: seekers pay **$0** for discovery, profiles, basic matching, resume building/import/export, saving, applications and seeker community. Any optional future optimizer must preserve this promise; recommend host/platform funding rather than a seeker upsell. No application fee, mandatory paid qualification check or charge to access basic job terms. Business verification is a trust process available without a paid upgrade; payment never purchases the badge.
+Recommend monthly plans sell **concurrent active listing capacity**. Example only: an allowance of N active jobs permits replacing a closed job without paying a new lifetime posting credit, while never exceeding N live/reserved slots. Drafts and hiring history do not consume live capacity. A job freshness/review expiry is independent from the subscription renewal date. This interpretation is recommended, not a locked answer to the user's “sell total listings?” question.
 
-## 2. V1 plan contract (proposed)
+Security, reporting, accessibility, honest job terms and necessary existing application/history access are available across tiers; payment never buys broader private-profile access or verification. No application fee, paid seeker boost or mandatory seeker qualification fee. Business verification is a trust process, not an upsell. No service/checkout/pricing is activated by this specification.
 
-| Plan | Monthly price | Concurrent publication slots | Active team seats (owner included) | Included V1 capabilities |
-| --- | --- | --- | --- | --- |
-| Seeker | $0 | Not applicable | Not applicable | All core seeker flows |
-| Host Starter | $0 | 1 | 1 | Storefront, multiple location records, internal/external apply, applicant pipeline, messages, basic counts |
-| Host Growth | $49 | 5 | 3 | Starter + team collaboration, aggregate recruiting analytics |
-| Host Pro | $129 | 25 | 10 | Growth + higher capacity; no unbuilt sourcing/integration claims |
+## 2. Proposed tier differentiation — values not set
 
-All plans share security, moderation, application-history access, required accessibility and support/reporting. A single Starter owner can recruit and publish. Additional draft listings/locations do not consume paid slots. V1 has no location count charge; each active listing still identifies one worksite. Usage includes live unexpired listings and pending new-publication reservations; pending edits of an existing live job do not consume another slot. Paused/closed/expired/archived listings do not consume concurrent subscription slots. Seats include active memberships and unexpired pending invitations to prevent race-based overbooking.
+| Plan | Monthly price / active-job allowance / seats | Recommended role | Analytics proposal |
+| --- | --- | --- | --- |
+| Starter | All TBD | Small host; public profile, posting, applicant pipeline, interview-state tracking, messages | Basic per-listing views, applications and external exits with honest definitions |
+| Professional | All TBD | Higher active-job capacity and collaboration, built team controls | Starter + per-listing comparisons, trends and conversion summaries where implemented |
+| Enterprise | Quote and agreed monthly allowance/seats; no assumed unlimited use | Larger/multi-location operation with agreed service/capacity terms | Professional + organization/location comparisons and reporting where implemented |
 
-Prices and limits live in immutable `PlanVersion` records with effective dates, currency, provider product/price IDs and terms version. A subscription references the agreed plan version. Do not hardcode amounts in browser checks or mutate historic invoices when changing prices. Upgrades to limits do not grant broader access to applicant data than role permissions.
+Do not advertise integrations, scheduling, sourcing, custom SLAs, exports or “advanced AI” as delivered merely to differentiate Enterprise. Higher tiers primarily scale capacity and team/reporting needs; actual delivered entitlements must be enumerated and versioned. Basic applicant/status/message access is not a paid analytics report. Whether Starter is priced, trialed or has a free preview is still open; the previous $0 Starter live-listing entitlement is retired, not silently carried forward.
 
-## 3. Commercial ideas and activation status
+Recommended unsubscribed baseline: owner may draft/preview and access required historical applications/messages/billing/privacy controls, with **0 new/live listing slots**, **1 owner operational seat**, and no paid campaign grant. Whether an already-approved public host page persists with no jobs remains a product policy; recommend yes while active/clear, labeled No active listings. Trial/support publication grants, if adopted, are explicit time-bounded records rather than a hidden free Starter plan. More seats for continuing obligations require an explicit approved policy/credit, not unauthorized access.
 
-The following earlier assistant price hypotheses are **unapproved**, not current market evidence. Expanded V1 includes sponsored jobs and employer announcement campaigns as a capability; final price/model is open and these old featured prices do not price the new campaigns. Campaign delivery and caps are defined in [community](12-community-and-campaigns.md).
+Usage counts live unexpired listings plus pending new-publication reservations; pending edits of a live job do not consume another slot. Paused/closed/expired/archived jobs release capacity. Active memberships plus pending invitations count toward seats. Retain owner on downgrade. Multi-location records need not add another fee unless separately chosen. A paid monthly renewal does not silently republish stale jobs. Plan allowance updates never rewrite prior invoices/terms.
 
-| Offer | Proposed price | Required work before launch |
+## 3. Keep the launch catalog small
+
+| Product idea | Recommendation / status | Meaning |
 | --- | --- | --- |
-| Standalone listing | $29 / 30 days | Explicit listing-bound grant, purchase/expiry/refund policy, no unlimited rotation through jobs |
-| Featured job | $19 / 7 days | Promotion inventory, eligibility, labeling, fair-placement and analytics design |
-| Featured host | $49 / 30 days | Same safeguards; paid placement never changes verification/fit |
-| Extra recruiter seat | $9 / month | Quantity billing and effective-date seat ledger |
-| Extra active listing | $10 / month | Quantity/grant reconciliation and downgrade rules |
-| Enterprise | Custom | Quote/contract, integrations and custom provisioning workflow |
+| Monthly subscription | Current business direction; exact values Open | Core active-job capacity, team and implemented reporting entitlements |
+| Boosted job | Initial upsell recommended, price/term/placement Open | Labeled promotion of a canonical eligible job through the existing campaign system; no better fit/verification |
+| Announcement campaign | Initial upsell recommended, price/term Open | Moderated employer notice linking to public host/jobs; shared caps with other paid formats |
+| Extra active-listing capacity | Optional later; Open | If adopted, favor clear recurring slot packs or upgrade, rather than a parallel ambiguous “total postings” credit wallet |
+| Recruitment invitation credits | Open/deferred; not V1 dependency | New seeker outreach needs opted-in recipients, consent, safe targeting/rate limits and accept/decline/block/report. No public seeker directory or outreach API is implied |
 
-V1 prices page may show a non-purchasable “Contact us” enterprise note, but must not advertise sourcing, ATS integration or advanced analytics as delivered. No pay comparison slider or paid fit manipulation. Standalone/add-on products remain later. Sponsored jobs/employer campaigns are planned in expanded V1 but stay disabled until EE-030/031, price/refund approval, moderation and delivery evidence pass. Recommend flat-duration reserved inventory for the pilot; auction/CPC/CPM remain open. Payment buys eligible visibility only, never verification, fit, guaranteed applicants or hires.
+Host **team invitations** add staff memberships and consume seats; they are not recruitment invitation credits. A candidate recruitment invitation, if ever adopted, is not an application and cannot expose an entire seeker profile. Define what consumes/refunds a credit, expiry, failed/duplicate delivery, opt-out and subscription-cancel effects before selling it. Keep this out of the initial paid catalog unless user explicitly promotes the feature.
+
+Boost and announcement share creative review, payment, inventory, frequency caps, cancellation and aggregate reporting from [community/campaigns](12-community-and-campaigns.md). “Boosted” need not imply Seek/Swipe/Map ad placement: Community Feed placements are planned; discovery placements remain D21. Avoid a separate featured-host product until needed. No extra recurring seat fee, pay-per-application, independent listing token wallet or standalone listing purchase is assumed. Old one-off prices are not current market evidence or checkout products.
+
+Version price/currency/limits/analytics/terms in immutable PlanVersion records. Adopt values, unsubscription behavior, taxes/refunds and a tested payment lifecycle before accepting money. Prices and conversion/revenue forecasts require future validation; this recommendation is based on product simplicity, not external market research.
+
 
 ## 4. Billing state and authoritative entitlements
 
-`Subscription` fields: organization_id, plan_version_id, provider_customer_id, provider_subscription_id unique, status `pending|active|past_due|canceled|ended`, current_period_start/end, paid_through_at, cancellation_at_period_end, pending_plan_version_id/effective_at, last_reconciled_at. Store invoices/provider references, never card numbers. `EntitlementGrant` fields: organization_id, source `starter|subscription|support_credit`, source_ref, slot_limit, seat_limit, valid_from/until, state, reason, actor. For V1 subscription replaces Starter limits; do not accidentally sum Starter+Growth+Pro. Support credits are explicit time-bounded overrides, audited and reconciled, not new hidden plans.
+`Subscription` fields: organization_id, plan_version_id, provider_customer_id, provider_subscription_id unique, status `pending|active|past_due|canceled|ended`, current_period_start/end, paid_through_at, cancellation_at_period_end, pending_plan_version_id/effective_at, last_reconciled_at. Store invoices/provider references, never card numbers. `EntitlementGrant` fields: organization_id, source `unsubscribed_baseline|subscription|trial|support_credit`, source_ref, slot_limit, seat_limit, valid_from/until, state, reason, actor. One adopted Starter/Professional/Enterprise subscription replaces the unsubscribed baseline; never sum multiple paid plan allowances. Trial and support grants require explicit scope/expiry; there is no default free-Starter publication grant. Support credits are explicit time-bounded overrides, audited and reconciled, not new hidden plans.
 
 Checkout requires owner/billing capability, server-selected plan version, correct organization/customer mapping, idempotency and allowed return URLs. Enforce one `OrganizationBillingAccount` per org, one current non-ended provider agreement and at most one pending `BillingOperation` (checkout or change). Serialize creation with an org-scoped lock/constraint; stable operation IDs supply provider idempotency keys. Two tabs with different browser request keys reuse the same pending same-plan session. A different-plan request returns conflict until the existing operation is canceled/expired/reconciled. Provider calls run outside the DB transaction through the recorded operation/outbox; network retries reuse its key. Upgrades/downgrades update the adopted agreement rather than opening a second subscription. If provider behavior still yields a competing agreement/charge, quarantine it, grant nothing extra, stop new checkout and alert Finance to resolve/cancel/refund the duplicate according to approved policy while preserving the valid agreement.
 
@@ -46,7 +51,7 @@ Upgrade: show total price, currency, current/next renewal dates, effective limit
 
 Cancel: stop auto-renewal, retain paid capacity through paid_through_at, display exact effective date. At term end use downgrade procedure. No deletion of applicants/resumes/messages because a host cancels. Hosts can still review existing applications and meet privacy/support obligations, subject to sanctions. Closing organization is a separate owner workflow, not cancellation.
 
-Payment failure: notify billing contact, retry per provider configuration and offer portal. Proposed grace: 7 days after paid period end for existing publications, no new paid-capacity publication/invites; after grace fall back to Starter limits. Admin may extend a specific case with recorded expiry. During grace existing applicants remain accessible and messaging works. Unknown provider state triggers reconciliation, not automatic destructive downgrade.
+Payment failure: notify billing contact, retry per provider configuration and offer portal. Proposed grace: 7 days after paid period end for existing publications, no new paid-capacity publication/invites; after grace fall back to the adopted unsubscribed baseline (proposed 0 live slots, owner operational access retained), not a free Starter plan. Admin may extend a specific case with recorded expiry. During grace existing applicants remain accessible and messaging works. Unknown provider state triggers reconciliation, not automatic destructive downgrade.
 
 ## 5. Downgrades and over-limit behavior
 

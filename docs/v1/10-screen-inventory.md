@@ -1,6 +1,6 @@
 # V1 screen inventory and sitemap
 
-Version 1.1, 2026-11-02. **Confirmed** requirements are identified in [decisions](08-sources-and-decisions.md). Routes, layout, control choices and conditional screens below are **recommended contracts**, not approved visual designs. No app exists yet. This inventory covers complete V1, including operational and failure screens; conditional open features must not be shipped merely because a route is listed.
+Version 1.2, 2026-11-02. **Confirmed** requirements are identified in [decisions](08-sources-and-decisions.md). Routes, layout, control choices and conditional screens below are **recommended contracts**, not approved visual designs. No app exists yet. This inventory covers complete V1, including operational and failure screens; conditional open features must not be shipped merely because a route is listed.
 
 ## 1. Navigation and responsive rules
 
@@ -53,7 +53,7 @@ flowchart TD
 | P05 `/onboarding/seeker` | Native name/contact minimum, optional location/category interests, availability, build/import choice, privacy summary; Skip optional setup | Stepper / one step at a time; save/resume; optional fields do not gate browsing; importing always leads to review |
 | P06 `/onboarding/host` | Organization create/join invitation, business/public identity, verification context, storefront draft, later listing step | Stepper with draft status; email/legal data private; no automatic paid plan or publication |
 | P07 `/workspaces` | Current seeker identity and host memberships; Add seeker role / Create or join host | Menu or dedicated page; explicit org label and permissions; preserve previous seeker tab, clear cross-role private caches |
-| P08 `/pricing`, `/help`, `/policies/:slug` | Approved pricing only, contact/report help, privacy/community/terms/refund policies and policy version | Readable responsive content; unapproved $49/$129 hypotheses never shown as live offers; help accessible logged out |
+| P08 `/pricing`, `/help`, `/policies/:slug` | Approved pricing only, contact/report help, privacy/community/terms/refund policies and policy version | Readable responsive content; monthly Starter/Professional/Enterprise names, only adopted prices/allowances shown as live offers; help accessible logged out |
 
 ## 4. Discovery, listing and host public screens
 
@@ -61,7 +61,7 @@ flowchart TD
 | --- | --- | --- |
 | D01 `/seek` | Indeed-like canonical card feed, keyword/location search, filter chips, sort, Community shortcut | Filter rail + feed / pinned search and full-screen filter sheet; Skip/Apply/Save explicit; preserve scroll on Back |
 | D02 `/swipe` | Canonical card deck, progress/exhaustion, gesture coaching, Undo, accessible Actions | Centered deck / touch deck; no permanent Apply/Save/Skip footer; keyboard actions available; gestures never submit |
-| D03 `/map` | Category legend/pins/clusters, region search, selected card, pull-up viewport list, Remote eligible section | Map/list split / draggable collapsed, preview, half/full list states; button expansion; category icon+text, not color alone |
+| D03 `/map` | Working D25 host-logo/category pins per real host/worksite, clusters, matching job count, region search, public-host/location/jobs links and Remote eligible section | Direct host page favored by user; optional preview/collapsed map percentage open; pull-up host-group/job list with button alternative and full Back restoration |
 | D04 discovery filter/sort surface | Pay basis/currency/min, begins within N months, exact range/overlap, category, housing, meals, eligibility, location, reset/apply count | Side panel / sheet; draft filters apply atomically, Cancel restores prior query; incompatible pay sort explains required inputs |
 | D05 `/jobs/:id/:slug?` | Cover/logo/host, verification scope, match reasons, category, location, dates, pay/housing/meals, description, requirements, schedule, category fields, host preview; Apply/Save/Skip/Report/Share | Reading column + actions / full page with sticky action above bottom nav; stale/closed/restricted states authoritative |
 | D06 housing sheet | Terms, costs/deposit, occupancy, commute/policies; four labeled photo fields | Dialog/panel / bottom-to-full sheet; recommended Bedroom/Bathroom/Kitchen/Exterior; labels still D04 |
@@ -77,7 +77,7 @@ Remote remains one of four categories and legend options. Recommended representa
 
 | ID / route | Contents and actions | Desktop / mobile behavior and acceptance |
 | --- | --- | --- |
-| S01 `/profile` | Readiness checklist, availability summary, Saved/Skipped/Applications/Messages, Resume studio, edit/privacy, Community, workspace switch | Hub cards / stacked shortcuts above pinned nav; completeness is private and never a hiring score |
+| S01 `/profile` | D26 optional private cover/headshot-or-avatar, readiness/availability, Resume, Applied/Interviews/Not selected/Hired views, Saved/Skipped, Messages/Notifications, settings, Community/workspace | Dashboard grouping proposed; application views derive canonical states; images not automatically public/shared; four pinned tabs unchanged |
 | S02 `/profile/edit` | Bio, name/photo, coarse location, contact, experience, education, skills/highlights, credentials, languages, optional affiliations; field audiences | Section sidebar + editor / section list and focused forms; native fields persist independently of resume files |
 | S03 `/profile/availability` | Now / 1 month / 3 months / Beyond, exact date, optional latest date/duration, timezone and last confirmed | Show resolved date inline; Beyond asks approximate/date rather than inventing day; past dates need reconfirmation |
 | S04 `/profile/resumes` | Native-profile summary, uploaded sources, labeled resume variants, build/import/export/archive actions | Grid/list / stacked cards; scan/render/import states separate; no file implies complete native profile |
@@ -93,7 +93,7 @@ Remote remains one of four categories and legend options. Recommended representa
 | S14 `/jobs/:id/apply/review` | Exact resume/document/contact/answers, listing revision and sharing notice; explicit Submit | Review page; stale job revision requires fresh review; embedded PDF contact flagged for user review |
 | S15 application receipt | Confirmed ID/time, next actions Track/View host | Receipt derived from server commit; network timeout uses same key, not a second application |
 | S16 external exit interstitial | Employer domain, off-platform notice, Continue/Cancel | Responsive dialog/page; click is an external exit, never a claimed submission |
-| S17 `/profile/applications` | Internal status vs external activity, filters and safe job summary | Table/list / cards; clearly self-reported outcomes; no combined misleading “Applied” count |
+| S17 `/profile/applications` | Internal status vs external activity; All applied/In progress/Interviews/Offers/Hired/Not selected/Withdrawn filters | Same canonical records and counts; rejected displays Not selected; Skipped is unrelated; scheduler not assumed; no misleading external “Applied” count |
 | S18 `/profile/applications/:id` | Submitted snapshot, terms, status timeline, conversation, withdraw/report/block | Detail+timeline / stacked; host internal notes never present; withdrawal does not retract previous downloads |
 | S19 `/profile/messages`, `/:applicationId` | Application-linked inbox and thread, unread, text composer/block/report | Inbox+thread / two pages; no unsolicited host directory messaging |
 | S20 `/profile/settings` | Email/recovery/sessions, fit opt-in, notification preferences, accessibility, export/delete | Settings sections / focused pages; save independent per section, safe account switching |
@@ -125,13 +125,13 @@ All routes below are prefixed `/host/:orgId`; server checks membership and capab
 | H03 `/listings/:id/edit` | Wizard: Basics/category, worksite/remote, timing, pay, housing, meals, requirements/modules, apply method, media, preview | Step nav / one section at a time; autosave and conflicts, all four photo slots on relevant steps |
 | H04 `/listings/:id/preview` | Public-only candidate revision, validation errors, submit/publish | Full card/detail preview / full page; cannot publish via preview GET; caps/review enforced |
 | H05 `/listings/:id/history` | Live vs draft/review diff, material-change reasons, pause/renew/close/archive confirmations | Compare / section-by-section diff; existing applicants retain original snapshot |
-| H06 `/applicants` | Own-org applications by job/status; sort time, manual pipeline, bulk action selection | Table/board / list with status controls; no fit auto-rejection; per-item bulk errors |
+| H06 `/applicants` | Own-org pipeline with Interviews/Offered/Hired/Not selected views and job filter; manual transitions/bulk selection | Filtered canonical applications, no duplicate collections or automatic interview calendar; no score rejection; per-item bulk errors |
 | H07 `/applicants/:id` | Received snapshot, authorized resume download, history, private notes, status, message | Detail+notes / tabs with clear Private note vs Message; no native private profile fetch |
 | H08 `/messages`, `/:applicationId` | Application-linked hiring inbox | Split / list then thread; permission/suspension changes revoke immediately |
 | H09 `/storefront` | Cover/logo, About, team consent, photos/alt text, FAQs, locations, weather switch, public preview | Section editor+preview / edit/preview toggle; private business data excluded |
 | H10 `/locations`, `/:id` | Worksite/port/HQ, private vs public locality/coordinate, affected listing draft prompts | Table/map / forms; modifying location never silently moves live jobs |
 | H11 `/team` | Members/invites/roles, seats, revoke and ownership transfer | Table / member cards; last owner protected, seat race bounded |
-| H12 `/analytics` | Views, submissions, exits, response times, aggregate sponsored delivery | Charts/tables / metric stack with text alternatives; no identities of savers/viewers/reactors |
+| H12 `/analytics` | Basic per-listing views/submissions/exits; proposed Professional comparisons/trends and Enterprise multi-location aggregates only if built/adopted D27 | Tier gate aggregate report depth, never hiring history/security; date/attribution explicit; no saver/viewer/reactor identities |
 | H13 `/billing` | Approved plan/version, limits, renewal/invoices, checkout/change/cancel, downgrade selection status | Billing summary / sequence; Billing role sees counts without applicant/team content |
 | H14 `/settings`, `/verification` | Private legal/representative details, public contact, evidence/case status, closure | Clear Public vs Private labels; business badge scoped, unrelated to seeker credential verification |
 | H15 `/announcements`, `/:id/edit` | Draft/scheduled/live/expired notices, subject, short copy, canonical host/job CTA, preview and submit | List/editor / focused forms; manual moderation, no auto-post per job |
@@ -159,3 +159,12 @@ These are functional internal screens, not a consumer navigation extension. Desk
 ## 9. Inventory completion rule
 
 A design/build change names its screen IDs, actor, input, output, permission, state transitions, mobile/desktop treatment and acceptance evidence. Shared sheets are counted once even when entered from three discovery modes. Optional optimizer/templates/public professional directory/social groups cannot quietly become V1 implementation through an inventory entry. [Journeys](13-journeys-and-acceptance.md) tests cross-screen completeness; [roadmap](07-delivery-plan.md) maps the work to release gates.
+
+## 10. Dashboard notification screens (recommended D26)
+
+| ID / route | Content and actions | Responsive/permission acceptance |
+| --- | --- | --- |
+| S23 `/profile/notifications` | All/Unread, application/message/account/community notices, mark read/all, settings | List + detail/deep link on desktop; stacked rows/mobile; owner only, safe previews, source events unchanged |
+| H17 `/host/:orgId/notifications` | Recipient-scoped org notices; billing/verification/capacity/applicant events according to capability | Sidebar destination/More; no org-wide shared read flag or stale membership access; Billing never sees applicant detail |
+
+These additions make 80 screen groups; route groups are not independent top-level nav tabs. Interview scheduling screens remain conditional future D28, not designed/implemented by an Interviews filter.

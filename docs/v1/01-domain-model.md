@@ -41,7 +41,7 @@ erDiagram
 
 Public visibility requires lifecycle `published`, current time before expiry, clear moderation, active organization/account, published storefront and approved revision. Paused/closed/expired detail links show a tombstone with safe summary and active alternatives; no Apply. Restricted content exposes only a generic unavailable page. Suspensions cascade through visibility checks without deleting application records.
 
-Default subscription/Starter publication expires in 30 days; republishing requires explicit host review and revalidation, never silent renewal of stale vacancies. Editing content does not reset expiry or freshness. Renewing a reviewed listing can create a new publication cycle on the same ID. Retain immutable publication history; archived IDs cannot be recycled.
+Recommended listing freshness window is 30 days, separate from the monthly subscription/capacity term; republishing requires explicit host review and revalidation, never silent renewal of stale vacancies. Editing content does not reset expiry or freshness. Renewing a reviewed listing can create a new publication cycle on the same ID. Retain immutable publication history; archived IDs cannot be recycled.
 
 ## 3. Published listing revision — common fields
 
@@ -182,3 +182,11 @@ The normalized profile/import/availability/credential/affiliation entities and c
 | Remote coordinator | primary Remote, remote, US-only eligibility, rolling start, ongoing, monthly pay | Remote · United States eligible · Rolling/Ongoing; no arbitrary destination pin |
 
 None of these are seed listings or approved job terms. Every example must pass the same publication and moderation rules before it could become a real listing.
+
+## 11. Host-first map and dashboard read models (recommended D25/D26)
+
+`MapHostLocationProjection` is derived from currently eligible canonical listings grouped by `(organization_id, published public map_anchor/worksite identity)`, not a second job record. Include stable host-location key, current public host name/logo/slug/verification, approved anchor/precision, matching primary-category set, matching listing count and safe canonical IDs. Only groups with at least one matching live physical role get pins. Remote eligibility results remain separate. A host with several locations has several disclosed pins; do not collapse jobs in distant places to one headquarters. If old/new published worksite revisions disagree after a location edit, preserve their actual anchors as distinct provisional groups until jobs are reviewed/updated rather than silently moving terms.
+
+Counts explicitly distinguish matching jobs from host/locations. Category treatment derives only from matching primary categories: one category -> its symbol; multiple -> small category indicators, not a fifth mixed vertical or arbitrary primary host category. Secondary relevance stays labeled in detail. Current authoritative visibility filters before grouping/counting, so stale jobs cannot keep an otherwise empty host pin visible.
+
+Recommended private `SeekerDashboardPresentation` owns optional approved cover/avatar media references; neither is automatically public, a community avatar, or resume content. `Notification` stores recipient, event/type, safe title, authorized internal target, created/read timestamp and dedup event key; no complete resume/message/evidence payload. It is a private read model, not a new application status source. Interview/Not selected/Hired counts derive canonical application states under current actor permissions. Analytics entitlements gate aggregate reports, never privacy permissions or access to necessary application history.

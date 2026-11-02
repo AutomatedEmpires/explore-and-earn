@@ -28,3 +28,7 @@ Read [Product and scope](docs/v1/00-product-and-scope.md) first, then the domain
 ## Working agreement
 
 The active repository is `AutomatedEmpires/explore-and-earn`; `AutomatedEmpires/explore-earn` is the archived predecessor. Do not copy the archived application into this repository or change that repository as part of this work. Implement the scoped issues incrementally, keeping one listing model and one card system across all three discovery modes. Resolve the documented launch gates before accepting live users or payments. The linked GitHub issues are an implementation backlog; their creation does not mean features are implemented.
+
+## Current refinement
+
+V1.2 records the latest host-first Map preference, seeker/host dashboard brainstorm and monthly **Starter / Professional / Enterprise** naming. Host-logo pins favor public host pages with relevant jobs; final preview/collapse behavior remains open. Pricing recommends concurrent active listings and only Boosted job / Announcement initially; allowances/prices, invitation credits and analytics split remain open. See [discovery](docs/v1/02-discovery-and-cards.md), [dashboards](docs/v1/03-profiles-and-host-workspace.md), [commercial model](docs/v1/06-pricing-and-entitlements.md) and D25–D28 in [decisions](docs/v1/08-sources-and-decisions.md).

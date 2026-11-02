@@ -76,7 +76,7 @@ An internal application requires selected clean resume version, verified email, 
 
 ## 4. Profile hub and seeker pages
 
-Profile hub: profile/resume readiness, Saved, Skipped, Applications, Messages, Resume studio, Edit profile, Privacy/settings, Community and workspace switch. Saved lists have remove/apply links and closed-listing labels. Skipped lists allow restore-to-discovery or save. Applied listings remain in application history even if saved state changes.
+Profile hub: optional cover and headshot/avatar, profile/resume readiness, availability, Saved, Skipped, Applications with interview/not-selected/hired filters, Messages, Notifications, Resume studio, Edit profile, Privacy/settings, Community and workspace switch. These dashboard presentation/grouping choices are recommended D26, not additional pinned tabs. Saved lists have remove/apply links and closed-listing labels. Skipped lists allow restore-to-discovery or save. Applied listings remain in application history even if saved state changes.
 
 Applications list distinguishes internal status from external activity. Internal detail shows submitted snapshot, status history, conversation and withdraw. External activity is “Opened employer application site” with timestamp; a seeker may add private “Applied externally” or outcome notes, labeled self-reported. Never make a host-visible internal application from external activity. Messages list groups internal applications and unread counts, with clear organization/job context.
 
@@ -102,3 +102,26 @@ Listing wizard sections: Basics/category -> Worksite/remote eligibility -> Timin
 Applicant pipeline uses explicit transitions in [workflows](04-workflows-and-api.md). Internal notes belong to the hiring team and must be visually separated from applicant messages. Bulk actions show selection count, action confirmation and per-application failures; no bulk rejection by fit score. Permission changes immediately remove access even if a browser tab remains open.
 
 Multiple memberships require an organization switcher displaying the active organization on every private page. URLs/request scope include organization ID, and server derives authorization from membership. Never reuse an applicant cache across organizations. Host mobile navigation is Overview / Listings / Applicants / More; it does not replace seeker's pinned navigation globally. Switching back restores the previous seeker tab.
+
+## 6. Focused seeker and host dashboards (latest brainstorm D26)
+
+Keep the dashboards useful without turning every status into another main navigation item. The user's section ideas are exploratory; recommend the following grouping:
+
+| Seeker Profile dashboard | Host workspace |
+| --- | --- |
+| Identity header: optional cover, headshot/avatar, name, location and Edit profile | Overview: organization identity, live/available listing capacity, applicants needing attention, unread messages |
+| Resume + availability: Build/Edit, Import, preview/export, earliest-start summary | Public profile: Edit/Preview cover/logo/About/team/locations/photos/weather; distinct from private dashboard |
+| My applications: All applied, In progress, Interviews, Offers, Hired, Not selected, Withdrawn | Applicants: all received, Reviewing, Shortlisted, Interviews, Offered, Hired, Not selected; listing filter |
+| Saved and Skipped: independent discovery decisions | Listings: Create/manage drafts/live/paused/closed; clear plan capacity and optional future capacity purchase |
+| Messages and Notifications: separate private inbox views | Messages/Notifications; Billing for authorized owner/billing; Team by permission |
+| Community, Privacy/Settings, account controls and workspace switch | Analytics by listing/tier, Settings and optional Campaigns under More/secondary navigation |
+
+“Applied” means internal submissions, with external activity separated; it is not a new state. Interview/Not selected/Hired are filtered views of the same application records, not duplicated lists. Use user-facing **Not selected** for internal `rejected`; keep audit/API state stable. A skipped job is not a rejection, closed job is not a rejection, and silence is not a rejection. Recommend keeping Shortlisted within pipeline filters rather than adding another main dashboard shortcut. Whether applicant-facing copy names Shortlisted or uses a broader In progress label remains Open D26; no concealment/privacy guarantee is implied by a dashboard label. Before choosing concealment, define one audience-specific status projection shared by API, history, counts and notifications. Hired/offered are host-reported outcomes; they never fabricate applicant acceptance.
+
+Interviews in V1 mean pipeline state, context/notes and related application messages. A scheduler with date/time/timezone, reminders, reschedule/cancel and calendar integrations is a separate open expansion (D28), not implied by an Interviews shortcut. Offer/Interview badges derive current status and authorized events, not email parsing. Recommend small Next steps panel for resume/import review, availability confirmation and new messages; avoid a public employability score or unrelated widgets.
+
+Cover/headshot/avatar are optional private dashboard presentation. Preview explicitly if a professional photo is selected into a resume/application; no auto-public profile, no automatic community-avatar sync. Cover images are not sent to hosts by default. All uploads use owner-purpose/scan controls; a face image is not identity verification.
+
+Recommend `/profile/notifications` and `/host/:orgId/notifications`, with All/Unread and application/messages/account/community/billing categories appropriate to actor. Mark read individually/all, dedup by event, and navigate only to an authorized target. Do not put full private message/resume/evidence content in previews, emails or logs. Notification delivery/read state cannot advance an application. Billing notices follow billing permissions; staff removal revokes org notifications immediately. Essential account/security/transactional notices stay available independent of optional marketing preferences.
+
+Basic per-listing counts and hiring records should remain available to every subscribing host; recommend richer comparisons/trends/exports only where built and entitled. Exact tier split is D27. Never gate security/reporting, interview-state access or necessary old application history behind an analytics upgrade. Multi-location navigation, metrics windows and attribution labels must stay explicit.
