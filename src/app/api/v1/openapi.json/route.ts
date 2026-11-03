@@ -5,6 +5,9 @@
 // documented route is missing from this list. Keep it sorted.
 import '@/app/api/v1/health/route';
 import '@/app/api/v1/me/stream/route';
+import '@/app/api/v1/media/[id]/url/route';
+import '@/app/api/v1/media/uploads/[id]/complete/route';
+import '@/app/api/v1/media/uploads/route';
 import '@/app/api/v1/notifications/read/route';
 import '@/app/api/v1/notifications/route';
 import '@/app/api/v1/onboarding/route';
