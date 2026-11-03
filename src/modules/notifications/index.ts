@@ -2,7 +2,8 @@
 import type { HandlerMap } from '@/modules/jobs';
 import { FLUSH_TOPIC, flushBatches } from './batches';
 import { sendEmailJob } from './email/send';
-import { EMAIL_TOPIC } from './notify';
+import { EMAIL_TOPIC, PUSH_TOPIC } from './notify';
+import { sendPushJob } from './push';
 
 export {
   EMAIL_TOPIC,
@@ -55,11 +56,26 @@ export {
   verifyUnsubscribeToken,
 } from './email/unsubscribe';
 
+export {
+  isAllowedPushEndpoint,
+  pushSubscriptionSchema,
+  removeSubscription,
+  sendPushJob,
+  upsertSubscription,
+  vapidPublicKey,
+  type PushMessage,
+  type PushResult,
+  type PushSubscriptionInput,
+} from './push';
+
 export const jobHandlers: HandlerMap = {
   [EMAIL_TOPIC]: async (payload, { db }) => {
     await sendEmailJob(db, payload);
   },
   [FLUSH_TOPIC]: async (_payload, { db, now }) => {
     await flushBatches(db, now);
+  },
+  [PUSH_TOPIC]: async (payload, { db, now }) => {
+    await sendPushJob(db, payload, { now });
   },
 };
