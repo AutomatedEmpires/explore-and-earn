@@ -46,7 +46,8 @@ tests/e2e/               Playwright
 | Convention | Rule |
 |---|---|
 | Database | Supabase Postgres with PostGIS. Every app table lives in the `app` schema, which Supabase's auto-generated API doesn't expose. RLS is enabled on every table with no policies, so access is denied by default. Clients never query the database directly; everything goes through the server. |
-| Access | Drizzle ORM over `postgres.js`, using Supabase's transaction-mode pooler. Migrations are generated with drizzle-kit and checked into git. Schema changes go through migrations only. |
+| Access | Drizzle ORM over `postgres.js`, using Supabase's transaction-mode pooler. Drizzle provides the table types and queries. **Migrations are hand-written SQL files** in `drizzle/`, named `NNNN_<module>.sql`. Each workstream has its own number range, so parallel branches never conflict over drizzle-kit's journal file. A small migrator applies them in order and records each one in `app.schema_migrations`. Schema changes go through migrations only. |
+| Local database | There's no Docker on the dev machine, so `pnpm db:local` runs PGlite with PostGIS behind a Postgres wire server (`@electric-sql/pglite-socket`). Local development and end-to-end tests run against it until the Supabase `ee-dev` project exists. File storage likewise has a `local` adapter (files on disk) for development, and production refuses to start with it. |
 | IDs | UUIDv7, generated in the app |
 | Time | `timestamptz` in UTC. Calendar dates such as job dates use `date`. |
 | Money | Integer cents plus a `currency` field (always `USD` at launch) |
