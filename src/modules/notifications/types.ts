@@ -16,6 +16,19 @@ export const CATEGORIES = [
 ] as const;
 export type Category = (typeof CATEGORIES)[number];
 
+/** How each category is named to users (settings, unsubscribe pages). */
+export const CATEGORY_LABELS: Record<Category, string> = {
+  messages: 'Messages',
+  applications: 'Applications',
+  jobs: 'Job alerts',
+  alerts: 'Alerts',
+  community: 'Community',
+  account: 'Account',
+  security: 'Security',
+  billing: 'Billing',
+  operator: 'Operator console',
+};
+
 export const CHANNELS = ['email', 'push'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
