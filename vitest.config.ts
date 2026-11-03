@@ -1,5 +1,18 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { parseEnv } from 'node:util';
 import { defineConfig } from 'vitest/config';
+
+// Tests get the dev defaults from .env.local.example for any key the shell has not set,
+// so `getEnv()` works everywhere and CI can still override (for example DATABASE_URL).
+function exampleEnv(): Record<string, string> {
+  const parsed = parseEnv(readFileSync(path.resolve(import.meta.dirname, '.env.local.example'), 'utf8'));
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    if (value && process.env[key] === undefined) env[key] = value;
+  }
+  return env;
+}
 
 // Two projects:
 // - unit: everything that runs locally on PGlite and stubs (`pnpm test`).
@@ -12,6 +25,7 @@ export default defineConfig({
     },
   },
   test: {
+    env: exampleEnv(),
     setupFiles: ['./tests/setup.ts'],
     projects: [
       {
