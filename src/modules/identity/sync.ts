@@ -7,11 +7,15 @@
 //   own events fill in later (never a second row);
 // - rows remember the Clerk `updated_at` they were written from, and older snapshots are skipped;
 // - deletions are kept (deleted_at), so a reordered create or update can't bring a row back.
+// An event that can never apply (bad_request) is recorded as rejected and alerted on, not
+// retried: Clerk redelivers every non-2xx response for days, and it would fail the same way.
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { type Db, type DbOrTx, withTx } from '@/lib/db';
-import { badRequest } from '@/lib/errors';
+import { AppError, badRequest, isAppError } from '@/lib/errors';
 import { newId } from '@/lib/ids';
+import { logger } from '@/lib/logger';
+import { record } from '@/modules/audit';
 import {
   applyClerkMembership,
   applyClerkOrganization,
@@ -240,19 +244,71 @@ async function apply(db: DbOrTx, type: string, data: unknown): Promise<void> {
   }
 }
 
+export type ClerkEventResult = 'applied' | 'duplicate' | 'rejected';
+
+const MAX_REASON_LENGTH = 500;
+
+/** A permanent failure: the payload itself is invalid or unsupported, so a retry fails too. */
+function isPermanent(err: unknown): err is AppError {
+  return isAppError(err) && err.code === 'bad_request';
+}
+
 /**
- * Applies one Clerk webhook event exactly once. Returns 'duplicate' for an event ID already
- * applied. Throws (and records nothing) if the event can't be applied, so Clerk retries it.
+ * Applies one Clerk webhook event exactly once and returns:
+ * - 'applied': the effects and the app.webhook_events row are committed together;
+ * - 'duplicate': the event ID was already recorded (applied or rejected);
+ * - 'rejected': the event can never apply (a bad_request: its payload fails validation or names
+ *   an organization role we don't map). Its partial effects are rolled back, it is recorded as
+ *   rejected with the reason and audited, and an error is logged for an operator.
+ * Anything else throws with nothing recorded, so Clerk retries the delivery.
  */
-export async function handleClerkEvent(db: Db, evt: ClerkEvent): Promise<'applied' | 'duplicate'> {
-  return withTx(db, async (tx) => {
+export async function handleClerkEvent(
+  db: Db,
+  evt: ClerkEvent,
+  opts: { requestId?: string } = {},
+): Promise<ClerkEventResult> {
+  type Outcome = { result: 'applied' | 'duplicate' } | { result: 'rejected'; error: AppError };
+
+  const outcome = await withTx(db, async (tx): Promise<Outcome> => {
     const [fresh] = await tx
       .insert(webhookEvents)
-      .values({ id: evt.id, source: 'clerk' })
+      .values({ id: evt.id, source: 'clerk', eventType: evt.type })
       .onConflictDoNothing({ target: webhookEvents.id })
       .returning({ id: webhookEvents.id });
-    if (!fresh) return 'duplicate';
-    await apply(tx, evt.type, evt.data);
-    return 'applied';
+    if (!fresh) return { result: 'duplicate' };
+
+    try {
+      // A savepoint, so a rejected event's partial writes roll back but its record stays.
+      await tx.transaction((sp) => apply(sp, evt.type, evt.data));
+      return { result: 'applied' };
+    } catch (err) {
+      if (!isPermanent(err)) throw err;
+      const reason = err.message.slice(0, MAX_REASON_LENGTH);
+      await tx
+        .update(webhookEvents)
+        .set({ status: 'rejected', reason })
+        .where(eq(webhookEvents.id, evt.id));
+      await record(tx, {
+        actorType: 'system',
+        actorId: null,
+        action: 'identity.clerk_webhook_rejected',
+        subjectType: 'clerk_event',
+        subjectId: evt.id,
+        data: { type: evt.type, reason },
+        requestId: opts.requestId,
+      });
+      return { result: 'rejected', error: err };
+    }
   });
+
+  if (outcome.result === 'rejected') {
+    logger.error('clerk webhook: event can never apply; recorded as rejected', {
+      requestId: opts.requestId,
+      eventId: evt.id,
+      type: evt.type,
+      reason: outcome.error.message,
+      details: outcome.error.details,
+    });
+  }
+  return outcome.result;
 }

@@ -80,6 +80,10 @@ export async function setAccountType(
  * Runs onboarding for POST /api/v1/onboarding and returns where to send the user.
  * A host also creates their first organization. If that failed after the account type was
  * saved, calling this again finishes it; once the host has an organization it throws conflict.
+ *
+ * Creating the organization holds a lock on the user's row from the membership check until the
+ * organization is recorded, Clerk call included. So a form submitted twice at once creates one
+ * organization: the second request waits for the first, then finds its membership.
  */
 export async function completeOnboarding(
   db: Db,
@@ -100,10 +104,14 @@ export async function completeOnboarding(
 
   if (user.accountType === null) {
     await setAccountType(db, clerk, userId, { accountType: 'host' });
-  } else if (user.accountType !== 'host' || (await findHostMembership(db, userId, null))) {
+  } else if (user.accountType !== 'host') {
     throw conflict('Account type is already set');
   }
 
-  await createOrganization(db, clerk, { ownerUserId: userId, name: input.organizationName });
+  await withTx(db, async (tx) => {
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for('update');
+    if (await findHostMembership(tx, userId, null)) throw conflict('Account type is already set');
+    await createOrganization(tx, clerk, { ownerUserId: userId, name: input.organizationName });
+  });
   return { redirectTo: '/host' };
 }

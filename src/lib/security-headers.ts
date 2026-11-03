@@ -2,8 +2,9 @@
 // hardening headers. The proxy builds them per request with a fresh nonce; Next.js reads the
 // nonce back out of the request's CSP header and puts it on its own scripts.
 //
-// Pages must render at request time for the nonce to reach them. The root layout should pass
-// `dynamic` to <ClerkProvider>, which then reads the nonce from the `x-nonce` request header.
+// Pages must render at request time for the nonce to reach them, so the root layout awaits
+// `connection()` (pinned by src/app/layout.test.tsx). When <ClerkProvider> is added, pass it
+// `dynamic` too, so it reads the nonce from the `x-nonce` request header for Clerk's scripts.
 
 type AppEnv = 'dev' | 'preview' | 'prod';
 

@@ -1,6 +1,7 @@
-import { sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { queryRows, type Db } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { outbox } from './schema';
 
 /** Handles one outbox event. Throwing schedules a retry. */
 export type Handler = (payload: unknown, ctx: { db: Db; now: Date }) => Promise<void>;
@@ -26,7 +27,10 @@ const BASE_DELAY_MS = 30_000;
 const MAX_DELAY_MS = 6 * 60 * 60 * 1000;
 const JITTER = 0.2;
 const DEFAULT_BATCH_SIZE = 20;
-/** Stop claiming new batches after this long, well inside a serverless function's limit. */
+/**
+ * Start no new event after this long. The jobs route allows 60 s (maxDuration), so the last
+ * event started has 35 s to finish before the platform stops the function.
+ */
 const TIME_BUDGET_MS = 25_000;
 const MAX_ERROR_LENGTH = 2_000;
 
@@ -146,6 +150,28 @@ async function markFailed(
   return 'retried';
 }
 
+/**
+ * Hands back events this run claimed but never started (the time budget ran out): pending
+ * again, unlocked, and with the claim's attempt returned, so being late in a batch never
+ * uses up an event's attempts.
+ */
+async function releaseUnstarted(db: Db, rows: ClaimedRow[], now: Date): Promise<void> {
+  if (rows.length === 0) return;
+  await db
+    .update(outbox)
+    .set({ status: 'pending', lockedAt: null, attempts: sql`${outbox.attempts} - 1` })
+    .where(
+      and(
+        inArray(
+          outbox.id,
+          rows.map((r) => r.id),
+        ),
+        eq(outbox.status, 'processing'),
+        eq(outbox.lockedAt, now),
+      ),
+    );
+}
+
 async function defaultHandlers(): Promise<HandlerMap> {
   // Loaded lazily: the registry imports every module, including this one.
   const registry = await import('@/server/job-handlers');
@@ -154,24 +180,29 @@ async function defaultHandlers(): Promise<HandlerMap> {
 
 /**
  * Drains the outbox: claims batches and sends each event to its topic's handler until nothing
- * is available or the time budget is spent. Safe to run concurrently (the scheduler tick and a
- * post-commit kick): each claimed event is handled by exactly one worker. A failure is retried
- * with backoff (`nextDelayMs`) and after `MAX_ATTEMPTS` the event is `dead`.
+ * is available or the time budget is spent. The budget is checked before every event; claimed
+ * events left over when it runs out are handed back untouched. Safe to run concurrently (the
+ * scheduler tick and a post-commit kick): each claimed event is handled by exactly one worker.
+ * A failure is retried with backoff (`nextDelayMs`) and after `MAX_ATTEMPTS` the event is `dead`.
  */
 export async function runWorker(db: Db, opts: WorkerOptions = {}): Promise<WorkerResult> {
   const batchSize = Math.max(1, Math.floor(opts.batchSize ?? DEFAULT_BATCH_SIZE));
   const handlers = opts.handlers ?? (await defaultHandlers());
-  const started = Date.now();
+  const deadline = Date.now() + TIME_BUDGET_MS;
   const result: WorkerResult = { processed: 0, retried: 0, dead: 0 };
 
   result.dead += await buryExhausted(db, opts.now ?? new Date());
 
-  while (Date.now() - started < TIME_BUDGET_MS) {
+  while (Date.now() < deadline) {
     const now = opts.now ?? new Date();
     const batch = await claimBatch(db, now, batchSize);
     if (batch.length === 0) break;
 
-    for (const row of batch) {
+    for (const [index, row] of batch.entries()) {
+      if (Date.now() >= deadline) {
+        await releaseUnstarted(db, batch.slice(index), now);
+        return result;
+      }
       const handler = Object.hasOwn(handlers, row.topic) ? handlers[row.topic] : undefined;
       let ok = false;
       let failure: unknown;

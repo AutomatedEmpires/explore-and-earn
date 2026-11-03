@@ -49,6 +49,7 @@ export {
   mapClerkRole,
   syncClerkUser,
   type ClerkEvent,
+  type ClerkEventResult,
 } from './sync';
 
 export type { AccountType, OperatorRole } from './schema';

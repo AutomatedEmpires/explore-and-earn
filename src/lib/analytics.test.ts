@@ -1,8 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetAnalyticsForTests, scrubProps, track } from './analytics';
+import { initAnalytics } from './analytics-client';
+import { scrubClientProps } from './analytics-scrub';
 import { resetEnvCache } from './env';
 
 const sent = vi.hoisted(() => ({ events: [] as unknown[], options: [] as unknown[] }));
+
+const browser = vi.hoisted(() => ({
+  init: vi.fn<(key: string, config: Record<string, unknown>) => void>(),
+}));
+
+vi.mock('posthog-js', () => ({
+  default: {
+    __loaded: false,
+    init: browser.init,
+    capture: vi.fn(),
+  },
+}));
 
 vi.mock('posthog-node', () => ({
   PostHog: class {
@@ -28,6 +42,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   resetEnvCache();
   resetAnalyticsForTests();
 });
@@ -78,6 +93,76 @@ describe('scrubProps', () => {
       filters: { category: 'farm' },
       items: [{ id: 1 }],
       count: 3,
+    });
+  });
+});
+
+// An operator invitation lands on /sign-up?__clerk_ticket=<invitation ticket>; tokens in a URL
+// must never reach PostHog.
+const TICKET_URL = 'https://app.example.test/sign-up?__clerk_ticket=abc&__clerk_status=sign_up';
+
+describe('scrubClientProps', () => {
+  it('drops the query string and fragment from every URL PostHog records', () => {
+    expect(
+      scrubClientProps({
+        $current_url: TICKET_URL,
+        $referrer: 'https://accounts.example.test/verify?token=t0k#step-2',
+        $session_entry_url: `${TICKET_URL}#top`,
+        $set_once: {
+          $initial_current_url: TICKET_URL,
+          $initial_referrer: '$direct',
+        },
+        $pathname: '/sign-up',
+        $host: 'app.example.test',
+        listingId: '1',
+      }),
+    ).toEqual({
+      $current_url: 'https://app.example.test/sign-up',
+      $referrer: 'https://accounts.example.test/verify',
+      $session_entry_url: 'https://app.example.test/sign-up',
+      $set_once: {
+        $initial_current_url: 'https://app.example.test/sign-up',
+        $initial_referrer: '$direct',
+      },
+      $pathname: '/sign-up',
+      $host: 'app.example.test',
+      listingId: '1',
+    });
+  });
+
+  it('still drops personal-data keys that are not PostHog properties', () => {
+    expect(scrubClientProps({ $os: 'Mac OS X', email: 'a@b', listingId: '1' })).toEqual({
+      $os: 'Mac OS X',
+      listingId: '1',
+    });
+  });
+});
+
+describe('initAnalytics', () => {
+  it('masks URL tokens at the source and strips URLs again before sending', () => {
+    vi.stubGlobal('window', {});
+    browser.init.mockClear();
+
+    initAnalytics();
+
+    expect(browser.init).toHaveBeenCalledTimes(1);
+    const config = browser.init.mock.calls[0]?.[1] ?? {};
+    // Masking covers what before_send never sees, such as the /flags request's person properties.
+    expect(config).toMatchObject({
+      mask_personal_data_properties: true,
+      disable_capture_url_hashes: true,
+    });
+    expect(config.custom_personal_data_properties).toEqual(
+      expect.arrayContaining(['__clerk_ticket', '__clerk_status', 'token', 'redirect_url']),
+    );
+
+    const beforeSend = config.before_send as (e: { properties: Record<string, unknown> }) => {
+      properties: Record<string, unknown>;
+    };
+    const event = beforeSend({ properties: { $current_url: TICKET_URL, $pathname: '/sign-up' } });
+    expect(event.properties).toEqual({
+      $current_url: 'https://app.example.test/sign-up',
+      $pathname: '/sign-up',
     });
   });
 });

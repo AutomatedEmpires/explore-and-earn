@@ -10,6 +10,8 @@ const output = z.object({ redirectTo: z.enum(['/', '/host']) });
 export const POST = apiRoute({
   auth: 'user',
   input: onboardingRequestSchema,
+  // Sign-up is a sensitive endpoint (spec section 4), and each call writes to Clerk.
+  rateLimit: { key: (ctx) => `onboarding:${ctx.user?.id}`, limit: 5, windowSec: 3600 },
   openapi: {
     method: 'POST',
     path: '/api/v1/onboarding',

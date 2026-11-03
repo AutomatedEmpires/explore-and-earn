@@ -268,6 +268,40 @@ describe('runWorker', () => {
     );
   });
 
+  it('hands back claimed events it has no time left to start, without using an attempt', async () => {
+    // A fake wall clock for the time budget: the first handler takes 30 s, past the 25 s budget.
+    let clock = Date.parse('2026-01-01T10:00:00Z');
+    vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    const order: number[] = [];
+    const handlers: HandlerMap = {
+      slow: async (p) => {
+        order.push(p as number);
+        clock += 30_000;
+      },
+    };
+    for (const n of [1, 2, 3]) {
+      await enqueue(t.db, { topic: 'slow', payload: n, availableAt: at(T0, n - 10) });
+    }
+
+    const result = await runWorker(t.db, { now: T0, handlers });
+
+    expect(result).toEqual({ processed: 1, retried: 0, dead: 0 });
+    expect(order).toEqual([1]);
+    const after = await rows('slow');
+    expect(after.map((r) => [r.payload, r.status, r.attempts, r.lockedAt])).toEqual([
+      [1, 'done', 1, null],
+      [2, 'pending', 0, null],
+      [3, 'pending', 0, null],
+    ]);
+
+    // The next run starts with them, each on its first attempt.
+    clock += 60_000;
+    const next = await runWorker(t.db, { now: at(T0, 1000), handlers });
+    expect(next.processed).toBeGreaterThanOrEqual(1);
+    expect(order[1]).toBe(2);
+    expect((await rows('slow')).find((r) => r.payload === 2)?.attempts).toBe(1);
+  });
+
   it('processes events a handler enqueues during the same run when no clock is fixed', async () => {
     const done: string[] = [];
     const handlers: HandlerMap = {

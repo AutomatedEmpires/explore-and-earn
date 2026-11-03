@@ -19,6 +19,12 @@ vi.mock('@/lib/db', async (importOriginal) => {
   };
 });
 
+const sentry = vi.hoisted(() => ({ captureMessage: vi.fn() }));
+vi.mock('@sentry/nextjs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sentry/nextjs')>()),
+  captureMessage: sentry.captureMessage,
+}));
+
 const SECRET = `whsec_${randomBytes(24).toString('base64')}`;
 const previousSecret = process.env.CLERK_WEBHOOK_SECRET;
 let t: TestDb;
@@ -38,6 +44,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  sentry.captureMessage.mockClear();
   await t.db.execute(
     sql`truncate app.org_memberships, app.organizations, app.operators, app.users, app.webhook_events cascade`,
   );
@@ -149,15 +156,42 @@ describe('POST /api/webhooks/clerk', () => {
     expect(((await res.json()) as Envelope).error.code).toBe('bad_request');
   });
 
-  it('passes an AppError from the handler through (so Clerk retries) and records nothing', async () => {
+  it('answers 200 for an event that can never apply, so Clerk stops retrying, and alerts', async () => {
     const { POST } = await import('./route');
-    const res = await POST(
-      delivery('msg_route_3', { type: 'user.created', object: 'event', data: { id: 42 } }),
-    );
-    expect(res.status).toBe(400);
-    expect(((await res.json()) as Envelope).error.code).toBe('bad_request');
+    const { logger } = await import('@/lib/logger');
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    const invalid = { type: 'user.created', object: 'event', data: { id: 42 } };
 
-    const seen = await queryRows(t.db, sql`select id from app.webhook_events`);
-    expect(seen).toEqual([]);
+    const res = await POST(delivery('msg_route_3', invalid));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, result: 'rejected' });
+    const requestId = res.headers.get('x-request-id');
+
+    const seen = await queryRows<{ id: string; status: string }>(
+      t.db,
+      sql`select id, status from app.webhook_events`,
+    );
+    expect(seen).toEqual([{ id: 'msg_route_3', status: 'rejected' }]);
+    expect((await auditRows()).filter((r) => r.subject_id === 'msg_route_3')).toEqual([
+      {
+        action: 'identity.clerk_webhook_rejected',
+        subject_id: 'msg_route_3',
+        request_id: requestId,
+      },
+    ]);
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
+    expect(sentry.captureMessage).toHaveBeenCalledWith(
+      expect.stringContaining('rejected'),
+      expect.objectContaining({
+        level: 'error',
+        tags: expect.objectContaining({ eventId: 'msg_route_3', type: 'user.created' }),
+      }),
+    );
+
+    // Clerk's redelivery of the same message is a no-op and raises no second alert.
+    const again = await POST(delivery('msg_route_3', invalid));
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual({ ok: true, result: 'duplicate' });
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
   });
 });

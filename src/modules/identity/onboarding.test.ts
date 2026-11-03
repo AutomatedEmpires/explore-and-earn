@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { queryRows } from '@/lib/db';
+import { queryRows, type Db } from '@/lib/db';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { makeFakeClerkAdmin } from './clerk-admin';
 import { completeOnboarding, onboardingRequestSchema, setAccountType } from './onboarding';
@@ -11,6 +11,19 @@ vi.mock('@/modules/audit', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/modules/audit')>()),
   record: audit.record,
 }));
+
+// The route reads the database through getDb(); point it at this file's PGlite.
+const dbHolder = vi.hoisted(() => ({ current: undefined as Db | undefined }));
+vi.mock('@/lib/db', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/db')>();
+  return {
+    ...actual,
+    getDb: () => {
+      if (!dbHolder.current) throw new Error('test db not ready');
+      return dbHolder.current;
+    },
+  };
+});
 
 // The route is exercised with the guard mocked, so no Clerk session is needed.
 vi.mock('@/server/guards', () => ({
@@ -26,9 +39,11 @@ let t: TestDb;
 
 beforeAll(async () => {
   t = await createTestDb();
+  dbHolder.current = t.db;
 });
 
 afterAll(async () => {
+  dbHolder.current = undefined;
   await t.close();
 });
 
@@ -37,6 +52,7 @@ beforeEach(async () => {
   await t.db.execute(
     sql`truncate app.org_memberships, app.organizations, app.operators, app.users, app.webhook_events cascade`,
   );
+  await t.db.execute(sql`delete from app.rate_limits`);
 });
 
 async function newUser(clerkUserId = 'user_1'): Promise<string> {
@@ -226,6 +242,31 @@ describe('completeOnboarding', () => {
     expect(await completeOnboarding(t.db, clerk, host, input)).toEqual({ redirectTo: '/host' });
   });
 
+  it('creates one organization when the host form is submitted twice at once', async () => {
+    const host = await newUser();
+    await setAccountType(t.db, makeFakeClerkAdmin(), host, { accountType: 'host' });
+    const input = { accountType: 'host', organizationName: 'Kettle Ridge Lodge' } as const;
+
+    // The second submit arrives while the first is still waiting on Clerk for the organization.
+    let second: Promise<unknown> | undefined;
+    const clerk = makeFakeClerkAdmin({
+      onCreateOrganization: async () => {
+        if (second) return;
+        second = completeOnboarding(t.db, clerk, host, input).catch((err: unknown) => err);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      },
+    });
+
+    expect(await completeOnboarding(t.db, clerk, host, input)).toEqual({ redirectTo: '/host' });
+    expect(await second).toMatchObject({ code: 'conflict' });
+    expect(clerk.organizations).toHaveLength(1);
+    const orgs = await queryRows<{ slug: string; owner_user_id: string }>(
+      t.db,
+      sql`select slug, owner_user_id from app.organizations`,
+    );
+    expect(orgs).toEqual([{ slug: 'kettle-ridge-lodge', owner_user_id: host }]);
+  });
+
   it('throws conflict when a seeker tries to become a host', async () => {
     const userId = await newUser();
     const clerk = makeFakeClerkAdmin();
@@ -271,6 +312,17 @@ describe('POST /api/v1/onboarding', () => {
       }),
     );
     expect(res.status).toBe(400);
+  });
+
+  it('allows 5 onboarding attempts per user an hour, then returns 429', async () => {
+    const body = { accountType: 'seeker', adultAttested: true };
+    // The guard's user is not in the database, so each allowed attempt ends in 404.
+    for (let n = 0; n < 5; n++) expect((await post(body)).status).toBe(404);
+
+    const res = await post(body);
+    expect(res.status).toBe(429);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('rate_limited');
+    expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
   });
 
   it('returns 403 for a cross-site request', async () => {

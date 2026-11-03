@@ -1,7 +1,8 @@
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryRows } from '@/lib/db';
 import { AppError } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { handleClerkEvent, mapClerkRole } from './sync';
 
@@ -94,6 +95,10 @@ describe('handleClerkEvent', () => {
 
   afterAll(async () => {
     await t.close();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   beforeEach(async () => {
@@ -463,29 +468,102 @@ describe('handleClerkEvent', () => {
     expect(slugs).toEqual(['kettle-ridge-lodge', 'kettle-ridge-lodge-2']);
   });
 
-  it('rolls back a failing event so a redelivery can apply it later', async () => {
+  const webhookRows = () =>
+    queryRows<{ id: string; status: string; event_type: string | null; reason: string | null }>(
+      t.db,
+      sql`select id, status, event_type, reason from app.webhook_events order by id`,
+    );
+
+  it('records an event that can never apply as rejected, once, keeping none of its effects', async () => {
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
     const evt = {
       id: 'msg_bad',
       type: 'organizationMembership.created',
       data: membershipJson({
+        // Clerk's default member role, which we don't map.
         role: 'org:member',
         organization: { object: 'organization', id: 'org_1' },
         userId: 'user_1',
         updatedAt: '2026-11-01T00:00:00Z',
       }),
     };
-    await expect(handleClerkEvent(t.db, evt)).rejects.toMatchObject({ code: 'bad_request' });
 
+    expect(await handleClerkEvent(t.db, evt, { requestId: 'req_bad' })).toBe('rejected');
+
+    // The placeholders the event started to write are rolled back.
     expect(await users()).toHaveLength(0);
     expect(await orgs()).toHaveLength(0);
-    const seen = await queryRows(t.db, sql`select id from app.webhook_events`);
-    expect(seen).toHaveLength(0);
+    expect(await memberships()).toHaveLength(0);
+    expect(await webhookRows()).toEqual([
+      {
+        id: 'msg_bad',
+        status: 'rejected',
+        event_type: 'organizationMembership.created',
+        reason: 'Unknown Clerk organization role: org:member',
+      },
+    ]);
+    const audited = await queryRows<{ action: string; request_id: string | null; data: unknown }>(
+      t.db,
+      sql`select action, request_id, data from app.audit_events where subject_id = 'msg_bad'`,
+    );
+    expect(audited).toEqual([
+      {
+        action: 'identity.clerk_webhook_rejected',
+        request_id: 'req_bad',
+        data: {
+          type: 'organizationMembership.created',
+          reason: 'Unknown Clerk organization role: org:member',
+        },
+      },
+    ]);
+    // Logged as an error, so it alerts instead of being retried quietly for days.
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('rejected'),
+      expect.objectContaining({ eventId: 'msg_bad', type: 'organizationMembership.created' }),
+    );
+
+    // A redelivery is not tried again.
+    expect(await handleClerkEvent(t.db, evt)).toBe('duplicate');
+    expect(await webhookRows()).toHaveLength(1);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a payload that does not match the event type', async () => {
-    await expect(
-      handleClerkEvent(t.db, { id: 'msg_x', type: 'user.created', data: { id: 42 } }),
-    ).rejects.toMatchObject({ code: 'bad_request' });
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    expect(
+      await handleClerkEvent(t.db, { id: 'msg_x', type: 'user.created', data: { id: 42 } }),
+    ).toBe('rejected');
+    expect(await webhookRows()).toEqual([
+      {
+        id: 'msg_x',
+        status: 'rejected',
+        event_type: 'user.created',
+        reason: 'Invalid user payload',
+      },
+    ]);
+  });
+
+  it('throws on an unexpected failure and records nothing, so Clerk retries the delivery', async () => {
+    const evt = {
+      id: 'msg_retry',
+      type: 'user.created',
+      data: userJson({ id: 'user_r', email: 'r@example.test', updatedAt: '2026-11-01T00:00:00Z' }),
+    };
+    // Every insert into app.users fails, as during a database outage.
+    await t.db.execute(
+      sql`alter table app.users add constraint users_outage check (false) not valid`,
+    );
+    try {
+      await expect(handleClerkEvent(t.db, evt)).rejects.toThrow();
+    } finally {
+      await t.db.execute(sql`alter table app.users drop constraint users_outage`);
+    }
+    expect(await webhookRows()).toEqual([]);
+
+    expect(await handleClerkEvent(t.db, evt)).toBe('applied');
+    expect(await webhookRows()).toEqual([
+      { id: 'msg_retry', status: 'applied', event_type: 'user.created', reason: null },
+    ]);
   });
 
   it('records and skips event types it does not handle', async () => {

@@ -1,4 +1,4 @@
-// Drizzle tables for the identity module (drizzle/0100_identity.sql). Only this module
+// Drizzle tables for the identity module (drizzle/0100_identity.sql and 0101). Only this module
 // reads or writes them; other code goes through `@/modules/identity`.
 import { sql } from 'drizzle-orm';
 import { pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
@@ -42,9 +42,15 @@ export const operators = app.table('operators', {
   updatedAt: ts('updated_at').notNull().defaultNow(),
 });
 
+export const WEBHOOK_EVENT_STATUSES = ['applied', 'rejected'] as const;
+
 export const webhookEvents = app.table('webhook_events', {
   id: text('id').primaryKey(),
   source: text('source').notNull(),
+  /** 'rejected': the event can never apply (drizzle/0101_identity_webhook_status.sql). */
+  status: text('status', { enum: WEBHOOK_EVENT_STATUSES }).notNull().default('applied'),
+  eventType: text('event_type'),
+  reason: text('reason'),
   receivedAt: ts('received_at').notNull().defaultNow(),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
