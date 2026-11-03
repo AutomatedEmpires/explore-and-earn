@@ -70,6 +70,7 @@ describe('GET /api/v1/openapi.json', () => {
     expect(res.status).toBe(200);
     const doc = (await res.json()) as { paths: Record<string, unknown> };
     expect(doc.paths['/api/v1/health']).toBeDefined();
+    expect(doc.paths['/api/v1/onboarding']).toBeDefined();
   });
 
   it('imports every route file that documents itself, so none is missing from the document', () => {

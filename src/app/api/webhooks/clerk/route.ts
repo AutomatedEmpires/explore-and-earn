@@ -1,51 +1,55 @@
 // POST /api/webhooks/clerk: Clerk user, organization and membership events, delivered by Svix.
 // Verifies the signature, applies the event once (keyed by the svix-id header, which stays the
 // same across retries) and audits it. Any non-2xx response makes Clerk retry later.
+//
+// apiRoute supplies the request id, the error envelope and Sentry reporting. The route declares
+// no `input`, so apiRoute leaves the raw body unread for the signature check.
 import { verifyWebhook } from '@clerk/nextjs/webhooks';
 import type { NextRequest } from 'next/server';
-import { getDb } from '@/lib/db';
 import { getEnv } from '@/lib/env';
-import { type ErrorCode, isAppError } from '@/lib/errors';
-import { newId } from '@/lib/ids';
+import { badRequest, isAppError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { record } from '@/modules/audit';
 import { handleClerkEvent } from '@/modules/identity';
+import { apiRoute } from '@/server/api';
 
-function errorResponse(
-  status: number,
-  code: ErrorCode,
-  message: string,
-  requestId: string,
-  details?: unknown,
-): Response {
-  return Response.json(
-    { error: { code, message, ...(details === undefined ? {} : { details }), requestId } },
-    { status, headers: { 'x-request-id': requestId } },
-  );
-}
+export const POST = apiRoute({
+  auth: 'none',
+  handler: async ({ req, db, requestId }) => {
+    const eventId = req.headers.get('svix-id') ?? req.headers.get('webhook-id');
 
-export async function POST(req: NextRequest): Promise<Response> {
-  const requestId = newId();
-  const eventId = req.headers.get('svix-id') ?? req.headers.get('webhook-id');
+    let evt: Awaited<ReturnType<typeof verifyWebhook>>;
+    try {
+      const signingSecret = getEnv().CLERK_WEBHOOK_SECRET;
+      // Next passes a NextRequest; verifyWebhook also accepts any Web Request at runtime, but
+      // its declared parameter type only lists the Next request shapes.
+      evt = await verifyWebhook(req as NextRequest, signingSecret ? { signingSecret } : undefined);
+    } catch (err) {
+      logger.warn('clerk webhook: verification failed', {
+        requestId,
+        reason: err instanceof Error ? err.message : String(err),
+      });
+      throw badRequest('Invalid webhook signature');
+    }
+    if (!eventId) throw badRequest('Missing webhook id header');
 
-  let evt: Awaited<ReturnType<typeof verifyWebhook>>;
-  try {
-    const signingSecret = getEnv().CLERK_WEBHOOK_SECRET;
-    evt = await verifyWebhook(req, signingSecret ? { signingSecret } : undefined);
-  } catch (err) {
-    logger.warn('clerk webhook: verification failed', {
-      requestId,
-      reason: err instanceof Error ? err.message : String(err),
-    });
-    return errorResponse(400, 'bad_request', 'Invalid webhook signature', requestId);
-  }
-  if (!eventId) {
-    return errorResponse(400, 'bad_request', 'Missing webhook id header', requestId);
-  }
+    let result: Awaited<ReturnType<typeof handleClerkEvent>>;
+    try {
+      result = await handleClerkEvent(db, { id: eventId, type: evt.type, data: evt.data });
+    } catch (err) {
+      if (isAppError(err)) {
+        logger.warn('clerk webhook: event rejected', {
+          requestId,
+          eventId,
+          type: evt.type,
+          code: err.code,
+          message: err.message,
+        });
+      }
+      // apiRoute returns the envelope; anything that is not an AppError is logged as a 500.
+      throw err;
+    }
 
-  try {
-    const db = getDb();
-    const result = await handleClerkEvent(db, { id: eventId, type: evt.type, data: evt.data });
     if (result === 'applied') {
       const clerkId =
         typeof evt.data === 'object' && evt.data !== null && 'id' in evt.data
@@ -62,19 +66,6 @@ export async function POST(req: NextRequest): Promise<Response> {
       });
     }
     logger.info('clerk webhook', { requestId, eventId, type: evt.type, result });
-    return Response.json({ ok: true, result }, { headers: { 'x-request-id': requestId } });
-  } catch (err) {
-    if (isAppError(err)) {
-      logger.warn('clerk webhook: event rejected', {
-        requestId,
-        eventId,
-        type: evt.type,
-        code: err.code,
-        message: err.message,
-      });
-      return errorResponse(err.status, err.code, err.message, requestId, err.details);
-    }
-    logger.error('clerk webhook: failed', { requestId, eventId, type: evt.type, err });
-    return errorResponse(500, 'internal', 'Internal error', requestId);
-  }
-}
+    return { ok: true as const, result };
+  },
+});
