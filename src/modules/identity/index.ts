@@ -12,4 +12,12 @@ export type CurrentUser = {
   email: string | null;
 };
 
+export {
+  applyClerkUser,
+  handleClerkEvent,
+  mapClerkRole,
+  syncClerkUser,
+  type ClerkEvent,
+} from './sync';
+
 export const jobHandlers: HandlerMap = {};
