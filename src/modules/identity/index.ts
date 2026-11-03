@@ -12,4 +12,45 @@ export type CurrentUser = {
   email: string | null;
 };
 
+export {
+  bootstrapOwnerInvite,
+  countOperators,
+  evaluateHostAccess,
+  evaluateOperatorAccess,
+  findUserByClerkId,
+  getOperator,
+  type HostAccess,
+  type OperatorAccess,
+  type OperatorRecord,
+  type UserRecord,
+} from './access';
+
+export {
+  clerkAdmin,
+  makeFakeClerkAdmin,
+  userHasPasskey,
+  userHasStrongAuth,
+  type ClerkAdmin,
+  type FakeClerkAdmin,
+  type OperatorInviteRole,
+} from './clerk-admin';
+
+export {
+  completeOnboarding,
+  onboardingRequestSchema,
+  setAccountType,
+  type AccountTypeInput,
+  type OnboardingRequest,
+} from './onboarding';
+
+export {
+  applyClerkUser,
+  handleClerkEvent,
+  mapClerkRole,
+  syncClerkUser,
+  type ClerkEvent,
+} from './sync';
+
+export type { AccountType, OperatorRole } from './schema';
+
 export const jobHandlers: HandlerMap = {};
