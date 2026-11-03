@@ -1,0 +1,287 @@
+import { sql } from 'drizzle-orm';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { queryRows } from '@/lib/db';
+import { createTestDb, type TestDb } from '../../../tests/helpers/db';
+import { makeFakeClerkAdmin } from './clerk-admin';
+import { completeOnboarding, onboardingRequestSchema, setAccountType } from './onboarding';
+import { syncClerkUser } from './sync';
+
+const audit = vi.hoisted(() => ({ record: vi.fn(async () => {}) }));
+vi.mock('@/modules/audit', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/modules/audit')>()),
+  record: audit.record,
+}));
+
+// The route is exercised with the guard mocked, so no Clerk session is needed.
+vi.mock('@/server/guards', () => ({
+  requireUser: vi.fn(async () => ({
+    id: '00000000-0000-7000-8000-000000000001',
+    clerkUserId: 'user_route',
+    accountType: null,
+    email: null,
+  })),
+}));
+
+let t: TestDb;
+
+beforeAll(async () => {
+  t = await createTestDb();
+});
+
+afterAll(async () => {
+  await t.close();
+});
+
+beforeEach(async () => {
+  audit.record.mockClear();
+  await t.db.execute(
+    sql`truncate app.org_memberships, app.organizations, app.operators, app.users, app.webhook_events cascade`,
+  );
+});
+
+async function newUser(clerkUserId = 'user_1'): Promise<string> {
+  return syncClerkUser(t.db, {
+    id: clerkUserId,
+    first_name: 'Maya',
+    last_name: 'Rodriguez',
+    primary_email_address_id: 'idn_1',
+    email_addresses: [{ id: 'idn_1', email_address: `${clerkUserId}@example.test` }],
+    public_metadata: {},
+    updated_at: Date.parse('2026-11-01T00:00:00Z'),
+  });
+}
+
+async function userRow(id: string) {
+  const [row] = await queryRows<{ account_type: string | null; adult_attested_at: string | null }>(
+    t.db,
+    sql`select account_type, adult_attested_at::text from app.users where id = ${id}`,
+  );
+  return row;
+}
+
+describe('setAccountType', () => {
+  it('sets seeker with the 18+ attestation and mirrors it to Clerk', async () => {
+    const userId = await newUser();
+    const clerk = makeFakeClerkAdmin();
+
+    await setAccountType(t.db, clerk, userId, { accountType: 'seeker', adultAttested: true });
+
+    const row = await userRow(userId);
+    expect(row?.account_type).toBe('seeker');
+    expect(row?.adult_attested_at).not.toBeNull();
+    expect(clerk.calls).toEqual([
+      { method: 'setPublicMetadata', args: ['user_1', { account_type: 'seeker' }] },
+    ]);
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        actorType: 'user',
+        actorId: userId,
+        action: 'identity.account_type_set',
+        subjectType: 'user',
+        subjectId: userId,
+        data: { accountType: 'seeker' },
+      }),
+    );
+  });
+
+  it('sets host without an attestation', async () => {
+    const userId = await newUser();
+    const clerk = makeFakeClerkAdmin();
+    await setAccountType(t.db, clerk, userId, { accountType: 'host' });
+    expect(await userRow(userId)).toEqual({ account_type: 'host', adult_attested_at: null });
+    expect(clerk.metadata.get('user_1')).toEqual({ account_type: 'host' });
+  });
+
+  it('rejects a seeker without the 18+ attestation', async () => {
+    const userId = await newUser();
+    const input = { accountType: 'seeker', adultAttested: false } as const;
+    await expect(
+      // @ts-expect-error adultAttested must be the literal true
+      setAccountType(t.db, makeFakeClerkAdmin(), userId, input),
+    ).rejects.toMatchObject({ code: 'bad_request' });
+    expect((await userRow(userId))?.account_type).toBeNull();
+  });
+
+  it('never sets operator', async () => {
+    const userId = await newUser();
+    const input = { accountType: 'operator' } as const;
+    await expect(
+      // @ts-expect-error operator accounts exist only by invitation
+      setAccountType(t.db, makeFakeClerkAdmin(), userId, input),
+    ).rejects.toMatchObject({ code: 'bad_request' });
+    expect((await userRow(userId))?.account_type).toBeNull();
+  });
+
+  it.each([
+    [{ accountType: 'seeker', adultAttested: true } as const],
+    [{ accountType: 'host' } as const],
+  ])('throws conflict on a second call (%o)', async (second) => {
+    const userId = await newUser();
+    const clerk = makeFakeClerkAdmin();
+    await setAccountType(t.db, clerk, userId, { accountType: 'seeker', adultAttested: true });
+    await expect(setAccountType(t.db, clerk, userId, second)).rejects.toMatchObject({
+      code: 'conflict',
+    });
+    expect((await userRow(userId))?.account_type).toBe('seeker');
+  });
+
+  it('leaves the account type unset if Clerk fails, so the user can retry', async () => {
+    const userId = await newUser();
+    const clerk = makeFakeClerkAdmin();
+    clerk.failNext('setPublicMetadata');
+    await expect(setAccountType(t.db, clerk, userId, { accountType: 'host' })).rejects.toThrow();
+    expect((await userRow(userId))?.account_type).toBeNull();
+
+    await setAccountType(t.db, clerk, userId, { accountType: 'host' });
+    expect((await userRow(userId))?.account_type).toBe('host');
+  });
+
+  it('refuses an operator invitee, whose type is already set', async () => {
+    const userId = await syncClerkUser(t.db, {
+      id: 'user_op',
+      public_metadata: { account_type: 'operator' },
+      updated_at: Date.parse('2026-11-01T00:00:00Z'),
+    });
+    await expect(
+      setAccountType(t.db, makeFakeClerkAdmin(), userId, { accountType: 'host' }),
+    ).rejects.toMatchObject({ code: 'conflict' });
+  });
+
+  it('throws not_found for an unknown user', async () => {
+    await expect(
+      setAccountType(t.db, makeFakeClerkAdmin(), '00000000-0000-7000-8000-00000000abcd', {
+        accountType: 'host',
+      }),
+    ).rejects.toMatchObject({ code: 'not_found' });
+  });
+});
+
+describe('onboardingRequestSchema', () => {
+  it('accepts the two onboarding shapes', () => {
+    expect(
+      onboardingRequestSchema.safeParse({ accountType: 'seeker', adultAttested: true }).success,
+    ).toBe(true);
+    expect(
+      onboardingRequestSchema.safeParse({
+        accountType: 'host',
+        organizationName: 'Kettle Ridge Lodge',
+      }).success,
+    ).toBe(true);
+  });
+
+  it.each([
+    { accountType: 'operator' },
+    { accountType: 'seeker', adultAttested: false },
+    { accountType: 'seeker' },
+    { accountType: 'host' },
+    { accountType: 'host', organizationName: 'K' },
+    { accountType: 'host', organizationName: 'K'.repeat(81) },
+  ])('rejects %o', (body) => {
+    expect(onboardingRequestSchema.safeParse(body).success).toBe(false);
+  });
+});
+
+describe('completeOnboarding', () => {
+  it('sends a seeker to / and a host to /host with their new organization', async () => {
+    const seeker = await newUser('user_s');
+    const host = await newUser('user_h');
+    const clerk = makeFakeClerkAdmin();
+
+    expect(
+      await completeOnboarding(t.db, clerk, seeker, { accountType: 'seeker', adultAttested: true }),
+    ).toEqual({ redirectTo: '/' });
+    expect(
+      await completeOnboarding(t.db, clerk, host, {
+        accountType: 'host',
+        organizationName: 'Kettle Ridge Lodge',
+      }),
+    ).toEqual({ redirectTo: '/host' });
+
+    const orgs = await queryRows<{ name: string; owner_user_id: string }>(
+      t.db,
+      sql`select name, owner_user_id from app.organizations`,
+    );
+    expect(orgs).toEqual([{ name: 'Kettle Ridge Lodge', owner_user_id: host }]);
+  });
+
+  it('throws conflict when a host who already has an organization onboards again', async () => {
+    const host = await newUser();
+    const clerk = makeFakeClerkAdmin();
+    const input = { accountType: 'host', organizationName: 'Kettle Ridge Lodge' } as const;
+    await completeOnboarding(t.db, clerk, host, input);
+    await expect(completeOnboarding(t.db, clerk, host, input)).rejects.toMatchObject({
+      code: 'conflict',
+    });
+  });
+
+  it('lets a host whose organization creation failed finish onboarding', async () => {
+    const host = await newUser();
+    const clerk = makeFakeClerkAdmin();
+    clerk.failNext('createOrganization');
+    const input = { accountType: 'host', organizationName: 'Kettle Ridge Lodge' } as const;
+    await expect(completeOnboarding(t.db, clerk, host, input)).rejects.toThrow();
+    expect((await userRow(host))?.account_type).toBe('host');
+
+    expect(await completeOnboarding(t.db, clerk, host, input)).toEqual({ redirectTo: '/host' });
+  });
+
+  it('throws conflict when a seeker tries to become a host', async () => {
+    const userId = await newUser();
+    const clerk = makeFakeClerkAdmin();
+    await completeOnboarding(t.db, clerk, userId, { accountType: 'seeker', adultAttested: true });
+    await expect(
+      completeOnboarding(t.db, clerk, userId, { accountType: 'host', organizationName: 'Lodge' }),
+    ).rejects.toMatchObject({ code: 'conflict' });
+  });
+});
+
+describe('POST /api/v1/onboarding', () => {
+  const post = async (body: unknown) => {
+    const { POST } = await import('@/app/api/v1/onboarding/route');
+    return POST(
+      new Request('http://localhost:3000/api/v1/onboarding', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost:3000' },
+        body: JSON.stringify(body),
+      }),
+    );
+  };
+
+  it('returns 400 for an operator account type', async () => {
+    const res = await post({ accountType: 'operator' });
+    expect(res.status).toBe(400);
+    const json = (await res.json()) as { error: { code: string; requestId: string } };
+    expect(json.error.code).toBe('bad_request');
+    expect(json.error.requestId).toBe(res.headers.get('x-request-id'));
+  });
+
+  it('returns 400 for a seeker who has not attested to being 18 or older', async () => {
+    const res = await post({ accountType: 'seeker', adultAttested: false });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for a body that is not JSON', async () => {
+    const { POST } = await import('@/app/api/v1/onboarding/route');
+    const res = await POST(
+      new Request('http://localhost:3000/api/v1/onboarding', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{',
+      }),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 403 for a cross-site request', async () => {
+    const { POST } = await import('@/app/api/v1/onboarding/route');
+    const res = await POST(
+      new Request('http://localhost:3000/api/v1/onboarding', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'https://evil.test' },
+        body: JSON.stringify({ accountType: 'host', organizationName: 'Kettle Ridge Lodge' }),
+      }),
+    );
+    expect(res.status).toBe(403);
+  });
+});

@@ -13,6 +13,24 @@ export type CurrentUser = {
 };
 
 export {
+  clerkAdmin,
+  makeFakeClerkAdmin,
+  userHasPasskey,
+  userHasStrongAuth,
+  type ClerkAdmin,
+  type FakeClerkAdmin,
+  type OperatorInviteRole,
+} from './clerk-admin';
+
+export {
+  completeOnboarding,
+  onboardingRequestSchema,
+  setAccountType,
+  type AccountTypeInput,
+  type OnboardingRequest,
+} from './onboarding';
+
+export {
   applyClerkUser,
   handleClerkEvent,
   mapClerkRole,

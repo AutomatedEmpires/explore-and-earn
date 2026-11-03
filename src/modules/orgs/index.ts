@@ -2,6 +2,8 @@
 // Depends on identity for types only; identity's Clerk sync calls into this module.
 import type { HandlerMap } from '@/modules/jobs';
 
+export { createOrganization, organizationNameSchema } from './create';
+
 export {
   applyClerkMembership,
   applyClerkOrganization,
