@@ -1,0 +1,306 @@
+/*
+ * Explore&Earn design tokens (spec section 10). Imported once, from src/app/globals.css.
+ *
+ * The raw values live in --ee-* custom properties so the theme can switch at runtime:
+ *   - light by default, dark when the device prefers it;
+ *   - data-theme="light" or data-theme="dark" on <html> overrides the device setting;
+ *   - data-theme on any element themes just that subtree (the design-system gallery uses this).
+ * Tailwind utilities (bg-surface, text-ink, ...) read them through `@theme inline`.
+ *
+ * Keep every hex value identical to src/ui/tokens.ts; src/ui/tokens.test.ts enforces it and
+ * checks the contrast of every text and background pair.
+ */
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --ee-bg: #fbfaf7;
+  --ee-surface: #ffffff;
+  --ee-surface-2: #f3f0ea;
+  --ee-ink: #1c1b19;
+  --ee-ink-2: #4a4740;
+  --ee-muted: #6b675f;
+  --ee-line: #e6e1d8;
+  --ee-line-strong: #8c877d;
+  --ee-primary: #1c1b19;
+  --ee-on-primary: #ffffff;
+  --ee-success: #1f6b43;
+  --ee-success-bg: #e3f1e8;
+  --ee-warning: #8a5300;
+  --ee-warning-bg: #fbefd9;
+  --ee-danger: #b42318;
+  --ee-danger-bg: #fce9e7;
+  --ee-focus: #2457c5;
+  --ee-maritime-fg: #1a4f9c;
+  --ee-maritime-bg: #e6eefa;
+  --ee-maritime-solid: #1d5fbf;
+  --ee-seasonal-fg: #8f4e06;
+  --ee-seasonal-bg: #fbeedd;
+  --ee-seasonal-solid: #b45f06;
+  --ee-farm-fg: #24622e;
+  --ee-farm-bg: #e5f2e6;
+  --ee-farm-solid: #2f7d3b;
+  --ee-remote-fg: #a12c23;
+  --ee-remote-bg: #fbe7e5;
+  --ee-remote-solid: #c8382e;
+  --ee-scrim: rgb(20 19 17 / 0.48);
+  --ee-shadow-card: 0 1px 2px rgb(28 27 25 / 0.06), 0 8px 24px rgb(28 27 25 / 0.07);
+  --ee-shadow-raised: 0 2px 6px rgb(28 27 25 / 0.15);
+  --ee-shadow-overlay: 0 2px 8px rgb(28 27 25 / 0.08), 0 12px 40px rgb(28 27 25 / 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --ee-bg: #141311;
+    --ee-surface: #1d1b18;
+    --ee-surface-2: #282622;
+    --ee-ink: #f4f1ea;
+    --ee-ink-2: #d2cdc3;
+    --ee-muted: #a9a397;
+    --ee-line: #36332e;
+    --ee-line-strong: #7d776c;
+    --ee-primary: #f4f1ea;
+    --ee-on-primary: #1c1b19;
+    --ee-success: #7fd3a0;
+    --ee-success-bg: #163524;
+    --ee-warning: #f2b860;
+    --ee-warning-bg: #3a2a10;
+    --ee-danger: #f59990;
+    --ee-danger-bg: #45201c;
+    --ee-focus: #8ab4f8;
+    --ee-maritime-fg: #a9c8f5;
+    --ee-maritime-bg: #16294a;
+    --ee-maritime-solid: #5b95e8;
+    --ee-seasonal-fg: #f5bf7e;
+    --ee-seasonal-bg: #3a2710;
+    --ee-seasonal-solid: #e08a2e;
+    --ee-farm-fg: #9ad6a4;
+    --ee-farm-bg: #183520;
+    --ee-farm-solid: #55ac62;
+    --ee-remote-fg: #f6a8a1;
+    --ee-remote-bg: #451b17;
+    --ee-remote-solid: #e5604f;
+    --ee-scrim: rgb(0 0 0 / 0.6);
+    --ee-shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.3);
+    --ee-shadow-raised: 0 2px 6px rgb(0 0 0 / 0.5);
+    --ee-shadow-overlay: 0 2px 8px rgb(0 0 0 / 0.4), 0 12px 40px rgb(0 0 0 / 0.6);
+  }
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --ee-bg: #141311;
+  --ee-surface: #1d1b18;
+  --ee-surface-2: #282622;
+  --ee-ink: #f4f1ea;
+  --ee-ink-2: #d2cdc3;
+  --ee-muted: #a9a397;
+  --ee-line: #36332e;
+  --ee-line-strong: #7d776c;
+  --ee-primary: #f4f1ea;
+  --ee-on-primary: #1c1b19;
+  --ee-success: #7fd3a0;
+  --ee-success-bg: #163524;
+  --ee-warning: #f2b860;
+  --ee-warning-bg: #3a2a10;
+  --ee-danger: #f59990;
+  --ee-danger-bg: #45201c;
+  --ee-focus: #8ab4f8;
+  --ee-maritime-fg: #a9c8f5;
+  --ee-maritime-bg: #16294a;
+  --ee-maritime-solid: #5b95e8;
+  --ee-seasonal-fg: #f5bf7e;
+  --ee-seasonal-bg: #3a2710;
+  --ee-seasonal-solid: #e08a2e;
+  --ee-farm-fg: #9ad6a4;
+  --ee-farm-bg: #183520;
+  --ee-farm-solid: #55ac62;
+  --ee-remote-fg: #f6a8a1;
+  --ee-remote-bg: #451b17;
+  --ee-remote-solid: #e5604f;
+  --ee-scrim: rgb(0 0 0 / 0.6);
+  --ee-shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.3);
+  --ee-shadow-raised: 0 2px 6px rgb(0 0 0 / 0.5);
+  --ee-shadow-overlay: 0 2px 8px rgb(0 0 0 / 0.4), 0 12px 40px rgb(0 0 0 / 0.6);
+}
+
+/* `dark:` follows the same rules as the tokens: the device setting unless data-theme overrides. */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme='light']), :root:not([data-theme='light']) *) {
+      @slot;
+    }
+  }
+  &:where([data-theme='dark'], [data-theme='dark'] *) {
+    @slot;
+  }
+}
+
+@theme {
+  /* Figtree is loaded by next/font in src/app/layout.tsx, which sets --font-sans on <html>. */
+  --font-sans: Figtree, ui-sans-serif, system-ui, sans-serif;
+
+  /* Type scale: text-12 ... text-32. */
+  --text-*: initial;
+  --text-12: 0.75rem;
+  --text-12--line-height: 1rem;
+  --text-13: 0.8125rem;
+  --text-13--line-height: 1.125rem;
+  --text-14: 0.875rem;
+  --text-14--line-height: 1.25rem;
+  --text-15: 0.9375rem;
+  --text-15--line-height: 1.375rem;
+  --text-16: 1rem;
+  --text-16--line-height: 1.5rem;
+  --text-17: 1.0625rem;
+  --text-17--line-height: 1.5rem;
+  --text-19: 1.1875rem;
+  --text-19--line-height: 1.625rem;
+  --text-19--letter-spacing: -0.01em;
+  --text-21: 1.3125rem;
+  --text-21--line-height: 1.625rem;
+  --text-21--letter-spacing: -0.01em;
+  --text-24: 1.5rem;
+  --text-24--line-height: 1.875rem;
+  --text-24--letter-spacing: -0.01em;
+  --text-28: 1.75rem;
+  --text-28--line-height: 2.125rem;
+  --text-28--letter-spacing: -0.02em;
+  --text-32: 2rem;
+  --text-32--line-height: 2.375rem;
+  --text-32--letter-spacing: -0.02em;
+
+  /* Radius: sm 8, md 12, lg 14, xl 20, 2xl 24; rounded-full for pills and avatars. */
+  --radius-*: initial;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
+
+  /* Motion. Every transition and animation is used behind motion-safe:. */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 1, 1);
+  --animate-fade-in: ee-fade-in 160ms var(--ease-standard);
+  --animate-fade-out: ee-fade-out 120ms var(--ease-exit);
+  --animate-sheet-up: ee-sheet-up 240ms var(--ease-standard);
+  --animate-sheet-down: ee-sheet-down 180ms var(--ease-exit);
+  --animate-panel-in: ee-panel-in 240ms var(--ease-standard);
+  --animate-panel-out: ee-panel-out 180ms var(--ease-exit);
+  --animate-pop-in: ee-pop-in 160ms var(--ease-standard);
+  --animate-pop-out: ee-pop-out 120ms var(--ease-exit);
+
+  @keyframes ee-fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes ee-fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes ee-sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes ee-sheet-down {
+    to {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes ee-panel-in {
+    from {
+      transform: translateX(100%);
+    }
+  }
+  @keyframes ee-panel-out {
+    to {
+      transform: translateX(100%);
+    }
+  }
+  @keyframes ee-pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
+  @keyframes ee-pop-out {
+    to {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
+}
+
+/* Values that switch with the theme must be inlined, or subtrees would inherit the root's. */
+@theme inline {
+  --color-*: initial;
+  --color-bg: var(--ee-bg);
+  --color-surface: var(--ee-surface);
+  --color-surface-2: var(--ee-surface-2);
+  --color-ink: var(--ee-ink);
+  --color-ink-2: var(--ee-ink-2);
+  --color-muted: var(--ee-muted);
+  --color-line: var(--ee-line);
+  --color-line-strong: var(--ee-line-strong);
+  --color-primary: var(--ee-primary);
+  --color-on-primary: var(--ee-on-primary);
+  --color-success: var(--ee-success);
+  --color-success-bg: var(--ee-success-bg);
+  --color-warning: var(--ee-warning);
+  --color-warning-bg: var(--ee-warning-bg);
+  --color-danger: var(--ee-danger);
+  --color-danger-bg: var(--ee-danger-bg);
+  --color-focus: var(--ee-focus);
+  --color-maritime-fg: var(--ee-maritime-fg);
+  --color-maritime-bg: var(--ee-maritime-bg);
+  --color-maritime-solid: var(--ee-maritime-solid);
+  --color-seasonal-fg: var(--ee-seasonal-fg);
+  --color-seasonal-bg: var(--ee-seasonal-bg);
+  --color-seasonal-solid: var(--ee-seasonal-solid);
+  --color-farm-fg: var(--ee-farm-fg);
+  --color-farm-bg: var(--ee-farm-bg);
+  --color-farm-solid: var(--ee-farm-solid);
+  --color-remote-fg: var(--ee-remote-fg);
+  --color-remote-bg: var(--ee-remote-bg);
+  --color-remote-solid: var(--ee-remote-solid);
+  --color-scrim: var(--ee-scrim);
+
+  --shadow-*: initial;
+  --shadow-card: var(--ee-shadow-card);
+  --shadow-raised: var(--ee-shadow-raised);
+  --shadow-overlay: var(--ee-shadow-overlay);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body,
+  [data-theme] {
+    background-color: var(--ee-bg);
+    color: var(--ee-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ee-focus);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
