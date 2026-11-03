@@ -1,0 +1,39 @@
+# dependencies
+node_modules/
+/.pnp
+.pnp.*
+
+# next.js
+.next/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# env files (.env.local.example stays committed)
+.env
+.env*.local
+
+# local data
+.pglite/
+.data/
+.clerk/
+
+# testing
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+coverage/
+
+# design review scratch files
+artifacts/design-review/*.tmp
+
+# misc
+.DS_Store
+*.pem
+.vercel
+
+# debug
+npm-debug.log*
+.pnpm-debug.log*
