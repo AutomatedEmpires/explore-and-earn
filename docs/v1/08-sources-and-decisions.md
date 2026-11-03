@@ -2,6 +2,10 @@
 
 Version 1.2 · 2026-11-02. Living register for product/design/engineering/operations. This is vision and proposed contracts, not implemented features, vendor approval or market validation.
 
+> **Superseded in part (2026-11-03).** Where this register conflicts with [the product design spec](../superpowers/specs/2026-11-03-explore-earn-product-design.md), the spec wins. Its section 27 lists every decision it replaces.
+>
+> **Repository names corrected:** `explore-earn` is this repository's old name, which GitHub redirects here. It is not an archived predecessor. The predecessor app is `AutomatedEmpires/exploreearn`.
+
 ## 1. Current repository and sources
 
 Current user explicitly identifies **new active `explore-and-earn`; old archived `explore-earn`**. Local inspection confirmed `C:\Users\Cole0\AutomatedEmpires\Projects\explore-and-earn`, origin fetch/push `https://github.com/AutomatedEmpires/explore-and-earn.git`, branch `main`, starting commit `a5b407b` (`docs: define implementation-ready Explore&Earn V1 architecture and phased backlog`). Working tree/index were clean; no repository/checked-ancestor AGENTS.md was found. Archived repository was not opened or modified. “Archived” is the user's description; its remote archive flag was not independently queried.

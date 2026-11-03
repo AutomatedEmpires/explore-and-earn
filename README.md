@@ -27,7 +27,9 @@ Read [Product and scope](docs/v1/00-product-and-scope.md) first, then the domain
 
 ## Working agreement
 
-The active repository is `AutomatedEmpires/explore-and-earn`; `AutomatedEmpires/explore-earn` is the archived predecessor. Do not copy the archived application into this repository or change that repository as part of this work. Implement the scoped issues incrementally, keeping one listing model and one card system across all three discovery modes. Resolve the documented launch gates before accepting live users or payments. The linked GitHub issues are an implementation backlog; their creation does not mean features are implemented.
+**Source of truth:** [the product design spec](docs/superpowers/specs/2026-11-03-explore-earn-product-design.md), approved 2026-11-03. It replaces `docs/v1` wherever the two conflict.
+
+The active repository is `AutomatedEmpires/explore-and-earn`. `AutomatedEmpires/explore-earn` is not a separate repository; it is this repository's old name, and GitHub redirects it here. The predecessor app is `AutomatedEmpires/exploreearn`. Use it as a reference only: don't copy it wholesale and don't change it. Implement the scoped issues incrementally, keeping one listing model and one card system across all three discovery modes. Resolve the documented launch gates before accepting live users or payments. The linked GitHub issues are an implementation backlog; their creation does not mean features are implemented.
 
 ## Current refinement
 
