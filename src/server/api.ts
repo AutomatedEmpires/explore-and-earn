@@ -25,6 +25,7 @@ import {
   type HostContext,
   type OperatorContext,
 } from './guards';
+import { registerRoute } from './openapi';
 import { REQUEST_ID_HEADER, requestIdFrom, runWithRequestContext } from './request-context';
 
 export type AuthMode = 'none' | 'user' | 'seeker' | 'host' | 'operator';
@@ -253,6 +254,10 @@ function finish(result: unknown, requestId: string): Response {
 /** Wraps a route handler with the API conventions. See the example at the top of this file. */
 export function apiRoute<I = undefined, O = unknown>(opts: ApiRouteOptions<I, O>): RouteHandler {
   const auth = opts.auth ?? 'none';
+  if (opts.openapi) {
+    const { method, path, summary, output } = opts.openapi;
+    registerRoute({ method, path, summary, auth, input: opts.input, output });
+  }
 
   return async (req, route) => {
     const requestId = requestIdFrom(req);
