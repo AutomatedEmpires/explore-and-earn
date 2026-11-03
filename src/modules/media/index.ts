@@ -1,5 +1,8 @@
 // Public API of the media module: uploads, scanning and media URLs. Owned by W7 (Tasks 20-21).
 import type { HandlerMap } from '@/modules/jobs';
+import { registerSubjectHandlers } from '@/modules/trust';
+import { createMediaSubjectHandlers, mediaJobHandlers } from './scan';
+import { getStorage } from './storage';
 
 export {
   ALT_TEXT_KINDS,
@@ -41,10 +44,44 @@ export {
 
 export {
   completeUpload,
+  isUuid,
   requestUpload,
+  SCAN_TOPIC,
   uploadRequestSchema,
   type UploadActor,
   type UploadRequest,
 } from './uploads';
 
-export const jobHandlers: HandlerMap = {};
+export {
+  approveHeldMedia,
+  CLEANUP_TOPIC,
+  createMediaSubjectHandlers,
+  defaultScanDeps,
+  destinationBucket,
+  removeMedia,
+  scanMedia,
+  variantPaths,
+  type ScanDeps,
+} from './scan';
+
+export {
+  cloudmersiveScanner,
+  getChildSafetyScanner,
+  getMalwareScanner,
+  photoDnaScanner,
+  stubChildSafetyScanner,
+  stubMalwareScanner,
+  type ChildSafetyScanner,
+  type CloudmersiveOptions,
+  type MalwareScanner,
+  type PhotoDnaOptions,
+} from './scanners';
+
+export { getMediaUrl, SIGNED_URL_TTL_SEC, type MediaViewer } from './urls';
+
+/** `media.scan` (queued by completeUpload) and `media.cleanup` (deletes superseded copies). */
+export const jobHandlers: HandlerMap = mediaJobHandlers;
+
+// Operator decisions on a review item whose subject is `media` (a file held for review):
+// approve publishes it, remove rejects it and deletes its copies.
+registerSubjectHandlers('media', createMediaSubjectHandlers(getStorage));

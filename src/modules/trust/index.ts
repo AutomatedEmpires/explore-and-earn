@@ -56,4 +56,17 @@ export async function runCheck(_db: DbOrTx, _i: RunCheckInput): Promise<CheckRes
   return { checkId: newId(), decision: 'approved', score: 0, labels: [], reason: 'stub' };
 }
 
+export type ReviewAction = 'approve' | 'remove' | 'ask_info' | 'suspend' | 'ban' | 'refund';
+
+/**
+ * Registers what an applied decision does to one subject type. Stub (no-op), added by W7 so
+ * media can register its subject before Task 16 lands; Task 16 replaces it.
+ */
+export function registerSubjectHandlers(
+  _subjectType: string,
+  _h: Partial<
+    Record<ReviewAction, (db: DbOrTx, subjectId: string, data?: unknown) => Promise<void>>
+  >,
+): void {}
+
 export const jobHandlers: HandlerMap = {};

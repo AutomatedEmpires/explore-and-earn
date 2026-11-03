@@ -37,6 +37,7 @@ export type RejectionReason =
   | 'too_large'
   | 'missing_file'
   | 'invalid_image'
+  | 'unsupported_format'
   | 'invalid_pdf'
   | 'malware'
   | 'unsafe_content'
