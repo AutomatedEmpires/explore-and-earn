@@ -1,14 +1,35 @@
 // Public API of the notifications module (in-app, email, push). Owned by W6 (Tasks 17-19).
-import type { DbOrTx } from '@/lib/db';
 import type { HandlerMap } from '@/modules/jobs';
 
-/** Notifies a user on every channel the type and their preferences allow.
- * Stub (no-op): Task 17 replaces it. */
-export async function notify(
-  _db: DbOrTx,
-  _userId: string,
-  _type: string,
-  _data: Record<string, unknown>,
-): Promise<void> {}
+export {
+  EMAIL_TOPIC,
+  PUSH_TOPIC,
+  getPreferences,
+  isEmailSuppressed,
+  listNotifications,
+  markRead,
+  notify,
+  setPreference,
+  suppressEmail,
+  unreadCount,
+  type NotificationItem,
+  type Preferences,
+  type SuppressionReason,
+} from './notify';
+
+export {
+  CATEGORIES,
+  CHANNELS,
+  EMAIL_TEMPLATE_NAMES,
+  MANDATORY_CATEGORIES,
+  defineType,
+  getType,
+  isMandatory,
+  type Category,
+  type Channel,
+  type EmailTemplateName,
+  type NotificationData,
+  type NotificationTypeDef,
+} from './types';
 
 export const jobHandlers: HandlerMap = {};
