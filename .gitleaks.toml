@@ -1,0 +1,17 @@
+title = "Explore&Earn gitleaks config"
+
+# Start from gitleaks' built-in rules.
+[extend]
+useDefault = true
+
+# Known non-secrets: the dev-only defaults in .env.local.example, the local PGlite URL and
+# obviously fake values in tests. Allowlisted by whole value, not by file, so a real secret
+# pasted into any of these files is still caught.
+[allowlist]
+description = "Dev placeholders and test values"
+regexes = [
+  '''^dev-only-[a-z-]+-0+$''',
+  '''^dev-placeholder-[a-z-]+$''',
+  '''postgres://postgres:postgres@localhost:\d+/postgres''',
+  '''^test-[a-z-]+$''',
+]

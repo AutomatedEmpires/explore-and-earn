@@ -40,10 +40,9 @@ const prod = {
   RESEND_API_KEY: 'test-resend',
 } satisfies Record<string, string>;
 
-function without<T extends Record<string, string>>(source: T, ...keys: (keyof T)[]) {
-  const copy: Record<string, string | undefined> = { ...source };
-  for (const key of keys) delete copy[key as string];
-  return copy;
+function without<T extends Record<string, string>>(source: T, ...keys: (keyof T & string)[]) {
+  const drop = new Set<string>(keys);
+  return Object.fromEntries(Object.entries(source).filter(([key]) => !drop.has(key)));
 }
 
 describe('parseEnv', () => {
