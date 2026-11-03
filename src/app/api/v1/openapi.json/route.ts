@@ -5,7 +5,10 @@
 // documented route is missing from this list. Keep it sorted.
 import '@/app/api/v1/health/route';
 import '@/app/api/v1/me/stream/route';
+import '@/app/api/v1/notifications/read/route';
+import '@/app/api/v1/notifications/route';
 import '@/app/api/v1/onboarding/route';
+import '@/app/api/v1/push/subscriptions/route';
 
 import { apiRoute } from '@/server/api';
 import { buildOpenApi } from '@/server/openapi';

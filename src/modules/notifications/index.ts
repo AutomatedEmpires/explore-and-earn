@@ -1,14 +1,81 @@
 // Public API of the notifications module (in-app, email, push). Owned by W6 (Tasks 17-19).
-import type { DbOrTx } from '@/lib/db';
 import type { HandlerMap } from '@/modules/jobs';
+import { FLUSH_TOPIC, flushBatches } from './batches';
+import { sendEmailJob } from './email/send';
+import { EMAIL_TOPIC, PUSH_TOPIC } from './notify';
+import { sendPushJob } from './push';
 
-/** Notifies a user on every channel the type and their preferences allow.
- * Stub (no-op): Task 17 replaces it. */
-export async function notify(
-  _db: DbOrTx,
-  _userId: string,
-  _type: string,
-  _data: Record<string, unknown>,
-): Promise<void> {}
+export {
+  EMAIL_TOPIC,
+  PUSH_TOPIC,
+  getPreferences,
+  isEmailSuppressed,
+  listNotifications,
+  markRead,
+  notify,
+  setPreference,
+  suppressEmail,
+  unreadCount,
+  type NotificationItem,
+  type Preferences,
+  type SuppressionReason,
+} from './notify';
 
-export const jobHandlers: HandlerMap = {};
+export {
+  CATEGORIES,
+  CATEGORY_LABELS,
+  CHANNELS,
+  EMAIL_TEMPLATE_NAMES,
+  MANDATORY_CATEGORIES,
+  defineType,
+  getType,
+  isMandatory,
+  type Category,
+  type Channel,
+  type EmailTemplateName,
+  type NotificationData,
+  type NotificationTypeDef,
+} from './types';
+
+export { FLUSH_TOPIC, flushBatches } from './batches';
+
+export {
+  getEmailProvider,
+  resendEmailProvider,
+  sendEmailJob,
+  stubEmailProvider,
+  stubOutbox,
+  type EmailProvider,
+  type Message,
+} from './email/send';
+
+export {
+  buildUnsubscribeToken,
+  unsubscribe,
+  unsubscribeUrl,
+  verifyUnsubscribeToken,
+} from './email/unsubscribe';
+
+export {
+  isAllowedPushEndpoint,
+  pushSubscriptionSchema,
+  removeSubscription,
+  sendPushJob,
+  upsertSubscription,
+  vapidPublicKey,
+  type PushMessage,
+  type PushResult,
+  type PushSubscriptionInput,
+} from './push';
+
+export const jobHandlers: HandlerMap = {
+  [EMAIL_TOPIC]: async (payload, { db }) => {
+    await sendEmailJob(db, payload);
+  },
+  [FLUSH_TOPIC]: async (_payload, { db, now }) => {
+    await flushBatches(db, now);
+  },
+  [PUSH_TOPIC]: async (payload, { db, now }) => {
+    await sendPushJob(db, payload, { now });
+  },
+};

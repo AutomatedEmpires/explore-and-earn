@@ -5,4 +5,6 @@ export const schedules: { topic: string; cron: string }[] = [
   { topic: 'review.sla_sweep', cron: '*/5 * * * *' },
   // W5 trust: copy a random share of last week's automatic decisions into audit_sample.
   { topic: 'trust.audit_sample', cron: '0 9 * * 1' },
+  // W6 notifications: close due batches and queue one digest per batch.
+  { topic: 'notifications.flush_batches', cron: '* * * * *' },
 ];
