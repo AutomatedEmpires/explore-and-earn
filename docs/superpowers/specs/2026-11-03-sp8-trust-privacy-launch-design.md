@@ -438,7 +438,7 @@ Workflow evidence is read from the GitHub Actions API (`GITHUB_STATUS_TOKEN`), a
 | T−30 d | export the full zone to `docs/runbooks/evidence/zone-<date>.txt` | never change any record not in this table (MX, mailbox SPF and DKIM stay untouched) |
 | T−30 d | `app`, `admin.app`, `staging`, `admin.staging` CNAME | `cname.vercel-dns.com` |
 | T−30 d | `clerk.app`, `accounts.app`, `clkmail.app`, `clk._domainkey.app`, `clk2._domainkey.app` CNAME | values from the new Clerk instance |
-| T−30 d | Resend `mail` domain: `resend._domainkey.mail` TXT, `send.mail` MX and TXT; `_dmarc.mail` TXT `v=DMARC1; p=none` (raised to `p=quarantine` 30 days after launch) | values from Resend |
+| T−30 d | Resend: reuse `send.exploreandearn.com`, which already carries Resend's records (MX to amazonses and SPF TXT, checked 2026-11-03); no new `mail` domain. Add only records Resend still shows as missing, and a DMARC TXT `v=DMARC1; p=none` (raised to `p=quarantine` 30 days after launch) | values from Resend |
 | T−30 d | `reply` MX | Resend inbound value |
 | T−30 d | `_vercel` TXT, Google Search Console TXT | values Vercel and Google show |
 | T−7 d | apex A, `www` CNAME and the old five Clerk records | TTL lowered to 600 s |
@@ -543,7 +543,7 @@ Migration ranges inside 7000–7999: W1 7000–7099, W4 7100–7199, W5 7200–7
 | Item | Owner | Decide before |
 |---|---|---|
 | Where DNS is managed (product section 26): keep the zone at GoDaddy for V1, which drops the Cloudflare CSAM serving check, or move it to Cloudflare as product section 24 recommends | Founder | W6 starts the runbook (T−30 d) |
-| Confirm `app.`, `admin.app.`, `staging.`, `reply.` and `mail.` are unused in the GoDaddy zone | Founder | W6 creates the Clerk production instance |
+| **Resolved 2026-11-03.** `app.`, `admin.app.`, `admin.`, `staging.`, `next.`, `reply.` and `mail.` were checked in the GoDaddy zone and are unused. `send.exploreandearn.com` already carries Resend's records (MX to amazonses and SPF), so that domain is reused in Resend (8.12) | Founder | Done |
 | The About page story (product section 21) | Founder | `/about` goes live (it 404s until saved) |
 | Manual screen-reader pass by the founder, or an external auditor | Founder | the `a11y.audit` gate run |
 | Billing retention of 7 years; redaction of shared applications on deletion; fit score in access responses | Counsel | `legal.privacy` gate |
@@ -552,4 +552,4 @@ Migration ranges inside 7000–7999: W1 7000–7099, W4 7100–7199, W5 7200–7
 | Clerk Pro plan approval (MFA, passkeys, impersonation) | Founder | W3 view-as and W6 |
 | Supabase projects `ee-perf` and `ee-backup` approved on the Pro organization | Founder | W2 and W7 |
 | Resend inbound enabled on the account for `reply.exploreandearn.com` | Engineering | W4 |
-| Seekers 18+ confirmation (product section 26) | Founder | `legal.terms` gate |
+| **Resolved 2026-11-03.** Seekers must be 18 or older (product section 26): confirmed by the founder | Founder | Done |
