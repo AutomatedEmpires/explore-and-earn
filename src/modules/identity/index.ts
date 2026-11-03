@@ -13,6 +13,19 @@ export type CurrentUser = {
 };
 
 export {
+  bootstrapOwnerInvite,
+  countOperators,
+  evaluateHostAccess,
+  evaluateOperatorAccess,
+  findUserByClerkId,
+  getOperator,
+  type HostAccess,
+  type OperatorAccess,
+  type OperatorRecord,
+  type UserRecord,
+} from './access';
+
+export {
   clerkAdmin,
   makeFakeClerkAdmin,
   userHasPasskey,
@@ -37,5 +50,7 @@ export {
   syncClerkUser,
   type ClerkEvent,
 } from './sync';
+
+export type { AccountType, OperatorRole } from './schema';
 
 export const jobHandlers: HandlerMap = {};
