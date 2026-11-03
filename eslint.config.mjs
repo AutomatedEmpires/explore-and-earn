@@ -61,6 +61,8 @@ export default defineConfig([
       'src/modules/**',
       'src/lib/db.ts',
       'src/lib/migrate.ts',
+      // The rate limiter's upsert is raw SQL over app.rate_limits (W4, Task 11).
+      'src/lib/rate-limit.ts',
       'tests/**',
       '**/*.test.ts',
       '**/*.test.tsx',
