@@ -1,59 +1,50 @@
 // Public API of the trust module (AI checks, review queues). Owned by W5 (Tasks 14-16).
-import type { DbOrTx } from '@/lib/db';
-import { newId } from '@/lib/ids';
 import type { HandlerMap } from '@/modules/jobs';
+import { auditSample } from './sampling';
+import { slaSweep } from './sla';
 
-export type Queue =
-  | 'moderation'
-  | 'fraud'
-  | 'reports'
-  | 'support'
-  | 'child_safety'
-  | 'billing'
-  | 'appeals'
-  | 'audit_sample';
+export {
+  addNote,
+  approveSecond,
+  claim,
+  decide,
+  escalate,
+  handOff,
+  openAppeal,
+  parseMentions,
+  rejectSecond,
+  type DecisionData,
+} from './actions';
+export { raiseAlert, type Alert } from './alerts';
+export { CLASSIFIER_ERROR, runCheck } from './checks';
+export { SLA_HOURS, openReviewItem, pickAssignee } from './routing';
+export { auditSample } from './sampling';
+export { slaSweep } from './sla';
+export {
+  TEST_ITEM_SUBJECT,
+  registerSubjectHandlers,
+  type SubjectHandler,
+  type SubjectHandlers,
+} from './subjects';
+export {
+  QUEUES,
+  REVIEW_ACTIONS,
+  type ActionStatus,
+  type CheckDecision,
+  type CheckKind,
+  type CheckResult,
+  type OpenReviewItemInput,
+  type Queue,
+  type ReviewAction,
+  type ReviewStatus,
+  type RunCheckInput,
+} from './types';
 
-export type OpenReviewItemInput = {
-  queue: Queue;
-  subjectType: string;
-  subjectId: string;
-  reason: string;
-  checkId?: string;
-  aiConfidence?: number;
-  priority?: number;
-  excludeOperatorIds?: string[];
-  originalItemId?: string;
+export const jobHandlers: HandlerMap = {
+  'review.sla_sweep': async (_payload, { db, now }) => {
+    await slaSweep(db, now);
+  },
+  'trust.audit_sample': async (_payload, { db, now }) => {
+    await auditSample(db, now);
+  },
 };
-
-export type RunCheckInput = {
-  kind: 'image_safety' | 'text_safety';
-  subjectType: string;
-  subjectId: string;
-  text?: string;
-  image?: { mime: string; bytes: Uint8Array };
-  wantAltText?: boolean;
-};
-
-export type CheckResult = {
-  checkId: string;
-  decision: 'approved' | 'rejected' | 'needs_review';
-  score: number;
-  labels: string[];
-  reason: string;
-  altText?: string;
-};
-
-/** Opens a review item and routes it to an operator. Stub: Task 15 replaces it. */
-export async function openReviewItem(
-  _db: DbOrTx,
-  _i: OpenReviewItemInput,
-): Promise<{ id: string }> {
-  throw new Error('not implemented');
-}
-
-/** Classifies content and applies the thresholds. Stub (always approves): Task 14 replaces it. */
-export async function runCheck(_db: DbOrTx, _i: RunCheckInput): Promise<CheckResult> {
-  return { checkId: newId(), decision: 'approved', score: 0, labels: [], reason: 'stub' };
-}
-
-export const jobHandlers: HandlerMap = {};
