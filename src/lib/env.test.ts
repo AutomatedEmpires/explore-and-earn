@@ -76,14 +76,17 @@ describe('parseEnv', () => {
     );
   });
 
-  it.each(['AI_PROVIDER', 'CHILD_SAFETY_PROVIDER', 'MALWARE_PROVIDER', 'EMAIL_PROVIDER', 'STORAGE_PROVIDER'])(
-    'refuses %s=stub in prod',
-    (name) => {
-      expect(() => parseEnv({ ...prod, [name]: 'stub' })).toThrow(
-        `Stub provider not allowed in prod: ${name}`,
-      );
-    },
-  );
+  it.each([
+    'AI_PROVIDER',
+    'CHILD_SAFETY_PROVIDER',
+    'MALWARE_PROVIDER',
+    'EMAIL_PROVIDER',
+    'STORAGE_PROVIDER',
+  ])('refuses %s=stub in prod', (name) => {
+    expect(() => parseEnv({ ...prod, [name]: 'stub' })).toThrow(
+      `Stub provider not allowed in prod: ${name}`,
+    );
+  });
 
   it('refuses local storage in prod', () => {
     expect(() => parseEnv({ ...prod, STORAGE_PROVIDER: 'local' })).toThrow(/STORAGE_PROVIDER/);

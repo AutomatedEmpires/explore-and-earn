@@ -6,7 +6,9 @@ import { defineConfig } from 'vitest/config';
 // Tests get the dev defaults from .env.local.example for any key the shell has not set,
 // so `getEnv()` works everywhere and CI can still override (for example DATABASE_URL).
 function exampleEnv(): Record<string, string> {
-  const parsed = parseEnv(readFileSync(path.resolve(import.meta.dirname, '.env.local.example'), 'utf8'));
+  const parsed = parseEnv(
+    readFileSync(path.resolve(import.meta.dirname, '.env.local.example'), 'utf8'),
+  );
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(parsed)) {
     if (value && process.env[key] === undefined) env[key] = value;
@@ -32,8 +34,14 @@ export default defineConfig({
         test: {
           name: 'unit',
           environment: 'node',
+          globalSetup: ['./tests/global-setup.ts'],
           include: ['tests/**/*.test.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
-          exclude: ['**/*.int.test.{ts,tsx}', 'tests/lint/fixtures/**', 'tests/e2e/**', 'node_modules/**'],
+          exclude: [
+            '**/*.int.test.{ts,tsx}',
+            'tests/lint/fixtures/**',
+            'tests/e2e/**',
+            'node_modules/**',
+          ],
           testTimeout: 30_000,
           hookTimeout: 60_000,
         },
