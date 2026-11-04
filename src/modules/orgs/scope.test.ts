@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
-import { seedHostOrg, seedMember } from '../../../tests/helpers/sp2';
+import { seedHostOrg, seedListingRow, seedLocation, seedMember } from '../../../tests/helpers/sp2';
 import { assignListing, canAccessListing, getListingAccess, getMember, listMembers } from './index';
 
 let t: TestDb;
@@ -35,8 +35,8 @@ describe('getListingAccess and canAccessListing', () => {
   it('limits an assigned Recruiter to their location', async () => {
     const org = await seedHostOrg(t.db);
     const recruiter = await seedMember(t.db, org.orgId, 'recruiter', { scope: 'assigned' });
-    const l1 = newId();
-    const l2 = newId();
+    const l1 = await seedLocation(t.db, { orgId: org.orgId });
+    const l2 = await seedLocation(t.db, { orgId: org.orgId, name: 'Other site' });
     await assignLocation(recruiter.membershipId, l1);
 
     expect(await getListingAccess(t.db, recruiter.ctx)).toEqual({
@@ -56,7 +56,7 @@ describe('getListingAccess and canAccessListing', () => {
   it('lets an assigned Recruiter reach a listing assigned to them by id', async () => {
     const org = await seedHostOrg(t.db);
     const recruiter = await seedMember(t.db, org.orgId, 'recruiter', { scope: 'assigned' });
-    const listingId = newId();
+    const listingId = await seedListingRow(t.db, { orgId: org.orgId });
     await assignListing(t.db, org.orgId, recruiter.userId, listingId);
 
     expect(await getListingAccess(t.db, recruiter.ctx)).toEqual({
@@ -141,7 +141,7 @@ describe('listMembers and getMember', () => {
       scope: 'assigned',
     });
     const billing = await seedMember(t.db, org.orgId, 'billing');
-    const l1 = newId();
+    const l1 = await seedLocation(t.db, { orgId: org.orgId });
     await assignLocation(recruiter.membershipId, l1);
     await t.db.execute(
       sql`update app.org_memberships set deleted_at = now() where id = ${billing.membershipId}`,

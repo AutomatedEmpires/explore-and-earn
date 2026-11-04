@@ -10,6 +10,7 @@ import { orgsFake } from '../../../tests/fakes/sp2/orgs';
 import {
   buildListingContent,
   seedHostOrg,
+  seedLocation,
   seedMember,
   type SeededOrg,
 } from '../../../tests/helpers/sp2';
@@ -176,8 +177,8 @@ describe('patchDraft', () => {
 describe('recruiter scopes', () => {
   it("assigns an assigned Recruiter's new listing and keeps them to their locations", async () => {
     const recruiter = await seedMember(db, org.orgId, 'recruiter', { scope: 'assigned' });
-    const l1 = newId();
-    const l2 = newId();
+    const l1 = await seedLocation(db, { orgId: org.orgId });
+    const l2 = await seedLocation(db, { orgId: org.orgId, name: 'Other site' });
     await db.execute(sql`
       insert into app.member_assignments (id, membership_id, location_id)
       values (${newId()}, ${recruiter.membershipId}, ${l1})

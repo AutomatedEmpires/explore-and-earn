@@ -101,6 +101,36 @@ export async function seedHostOrg(
   };
 }
 
+/**
+ * A location row. `member_assignments.location_id` and `organizations.primary_location_id`
+ * reference this table, so a test that names a location has to insert one.
+ */
+export async function seedLocation(
+  db: DbOrTx,
+  o: { orgId: string; id?: string; name?: string; city?: string; state?: string },
+): Promise<string> {
+  const id = o.id ?? newId();
+  await db.execute(sql`
+    insert into app.locations (id, org_id, name, kind, city, state, point, public_point, timezone)
+    values (${id}, ${o.orgId}, ${o.name ?? 'Site'}, 'business_site', ${o.city ?? 'Wenatchee'},
+      ${o.state ?? 'WA'}, 'SRID=4326;POINT(-120.66 47.42)', 'SRID=4326;POINT(-120.66 47.42)',
+      'America/Los_Angeles')
+  `);
+  return id;
+}
+
+/** A draft listing row. `member_assignments.listing_id` references this table. */
+export async function seedListingRow(
+  db: DbOrTx,
+  o: { orgId: string; id?: string },
+): Promise<string> {
+  const id = o.id ?? newId();
+  await db.execute(sql`
+    insert into app.listings (id, org_id) values (${id}, ${o.orgId})
+  `);
+  return id;
+}
+
 /** Another member of `orgId`. `scope` matters for Recruiters (default `all`). */
 export async function seedMember(
   db: DbOrTx,

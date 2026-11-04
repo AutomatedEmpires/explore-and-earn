@@ -4,7 +4,8 @@
 // fewest items in hand (assigned or escalated), ties to whoever was assigned longest ago, never
 // first. When nobody can take it, the item still opens, unassigned (`open`): the SLA sweep
 // alerts the Owner once it is overdue, so nothing is lost (Review Focus 4).
-import type { DbOrTx } from '@/lib/db';
+import { sql } from 'drizzle-orm';
+import { queryRows, type DbOrTx } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { record } from '@/modules/audit';
 import { raiseAlert } from './alerts';

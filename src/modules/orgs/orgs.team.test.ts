@@ -11,7 +11,14 @@ import { runWorker } from '@/modules/jobs';
 import { getEmailProvider, stubOutbox, type Message } from '@/modules/notifications';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { entitlementsFake } from '../../../tests/fakes/sp2/entitlements';
-import { seedHostOrg, seedMember, seedSeeker, type SeededOrg } from '../../../tests/helpers/sp2';
+import {
+  seedHostOrg,
+  seedListingRow,
+  seedLocation,
+  seedMember,
+  seedSeeker,
+  type SeededOrg,
+} from '../../../tests/helpers/sp2';
 import {
   acceptInvitation,
   createInvitation,
@@ -354,7 +361,7 @@ describe('previewInvitation', () => {
 describe('acceptInvitation', () => {
   it('(row 9) scopes a Recruiter invited to one location to that location', async () => {
     const org = await seedHostOrg(t.db);
-    const l1 = newId();
+    const l1 = await seedLocation(t.db, { orgId: org.orgId });
     const { token } = await invite(org, 'maya@kettle.com', 'recruiter', {
       kind: 'assigned',
       listingIds: [],
@@ -504,9 +511,10 @@ describe('acceptInvitation', () => {
 
   it('undoes the membership when Clerk fails', async () => {
     const org = await seedHostOrg(t.db);
+    const listingId = await seedListingRow(t.db, { orgId: org.orgId });
     const { id, token } = await invite(org, 'maya@kettle.com', 'recruiter', {
       kind: 'assigned',
-      listingIds: [newId()],
+      listingIds: [listingId],
       locationIds: [],
     });
     const user = await newUser('maya@kettle.com');

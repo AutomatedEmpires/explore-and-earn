@@ -6,7 +6,7 @@
 // (paste is limited to 20 an hour per org) -> { id, openSection }.
 import { z } from 'zod';
 import { rateLimited, unauthorized } from '@/lib/errors';
-import { consume } from '@/lib/rate-limit';
+import { consume } from '@/modules/ratelimit';
 import { createListing, createListingSchema, listOrgListings } from '@/modules/listings';
 import { requireCapability } from '@/modules/orgs';
 import { apiRoute } from '@/server/api';

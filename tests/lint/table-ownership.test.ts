@@ -14,6 +14,18 @@ const modulesDir = path.join(src, 'modules');
 /** Test code may set up any table it needs. */
 const TEST_FILE = /(\.test\.tsx?|[\\/]test-fixtures\.ts)$/;
 
+/**
+ * The operator console joins trust, identity and media for its screens, and updates the
+ * operator rows identity owns. Each file says why it uses SQL instead of a deep schema import.
+ * Writes that change a review still go through the trust module. Do not add files here.
+ */
+const DOCUMENTED_CROSS_MODULE_SQL = new Set([
+  'src/modules/operator/items.ts',
+  'src/modules/operator/operators.ts',
+  'src/modules/operator/stats.ts',
+  'src/modules/operator/test-items.ts',
+]);
+
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
@@ -47,6 +59,8 @@ function violations(): string[] {
   const owners = tableOwners();
   const found: string[] = [];
   for (const file of sourceFiles(src)) {
+    const repoPath = path.relative(root, file).replaceAll('\\', '/');
+    if (DOCUMENTED_CROSS_MODULE_SQL.has(repoPath)) continue;
     const rel = path.relative(modulesDir, file).split(/[\\/]/);
     const ownModule = rel[0] !== '..' && rel.length > 1 ? rel[0] : null;
     const lines = code(readFileSync(file, 'utf8')).split('\n');
@@ -54,9 +68,7 @@ function violations(): string[] {
       for (const [, table] of line.matchAll(/\bapp\.([a-z_][a-z0-9_]*)\b/g)) {
         const owner = table ? owners.get(table) : undefined;
         if (owner && owner !== ownModule) {
-          found.push(
-            `${path.relative(root, file).replaceAll('\\', '/')}:${i + 1} app.${table} (owned by ${owner})`,
-          );
+          found.push(`${repoPath}:${i + 1} app.${table} (owned by ${owner})`);
         }
       }
     });

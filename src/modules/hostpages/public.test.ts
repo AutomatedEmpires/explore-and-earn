@@ -16,6 +16,7 @@ import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import {
   buildListingContent,
   seedHostOrg,
+  seedLocation,
   seedMedia,
   seedSeeker,
   type SeededOrg,
@@ -439,8 +440,14 @@ describe('getHostIdentities', () => {
     });
     const b = await publicOrg({ name: 'Beta Boats' });
     const hidden = await seedHostOrg(t.db, { name: 'Not Public' });
+    const homeId = await seedLocation(t.db, {
+      orgId: a.orgId,
+      city: 'Wenatchee',
+      state: 'WA',
+      name: 'Home',
+    });
     const home = locationsFake.setLocation({
-      id: newId(),
+      id: homeId,
       orgId: a.orgId,
       city: 'Wenatchee',
       state: 'WA',

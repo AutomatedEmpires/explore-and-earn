@@ -5,7 +5,7 @@ import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { makeFakeClerkAdmin } from '@/modules/identity';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
-import { seedHostOrg, seedMember } from '../../../tests/helpers/sp2';
+import { seedHostOrg, seedListingRow, seedLocation, seedMember } from '../../../tests/helpers/sp2';
 import {
   changeMember,
   getListingAccess,
@@ -109,7 +109,7 @@ describe('changeMember', () => {
     const org = await seedHostOrg(t.db);
     const recruiter = await seedMember(t.db, org.orgId, 'recruiter');
     const clerk = makeFakeClerkAdmin();
-    const l1 = newId();
+    const l1 = await seedLocation(t.db, { orgId: org.orgId });
 
     const member = await changeMember(t.db, clerk, org.owner.ctx, recruiter.membershipId, {
       scope: { kind: 'assigned', listingIds: [], locationIds: [l1] },
@@ -175,9 +175,10 @@ describe('removeMember', () => {
     const org = await seedHostOrg(t.db);
     const admin = await seedMember(t.db, org.orgId, 'admin');
     const recruiter = await seedMember(t.db, org.orgId, 'recruiter', { scope: 'assigned' });
+    const locationId = await seedLocation(t.db, { orgId: org.orgId });
     await t.db.execute(sql`
       insert into app.member_assignments (id, membership_id, location_id)
-      values (${newId()}, ${recruiter.membershipId}, ${newId()})
+      values (${newId()}, ${recruiter.membershipId}, ${locationId})
     `);
     const clerk = makeFakeClerkAdmin();
 
@@ -286,9 +287,10 @@ describe('privacyHandlers', () => {
     await t.db.execute(sql`
       update app.org_memberships set invited_by = ${admin.userId} where id = ${recruiter.membershipId}
     `);
+    const listingId = await seedListingRow(t.db, { orgId: org.orgId });
     await t.db.execute(sql`
       insert into app.member_assignments (id, membership_id, listing_id)
-      values (${newId()}, ${recruiter.membershipId}, ${newId()})
+      values (${newId()}, ${recruiter.membershipId}, ${listingId})
     `);
     await t.db.execute(sql`
       insert into app.org_invitations (id, org_id, email, role, expires_at, invited_by)

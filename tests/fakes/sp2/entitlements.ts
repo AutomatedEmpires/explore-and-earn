@@ -8,8 +8,10 @@
 //
 // Capacity: `limit` is the setLimit value when set, else the sum of valid grants of that kind
 // once the org has ever been granted that kind (ended grants count as granted), else the
-// default (listing_slot 10, seat 5). `used` comes from the registered counter when there is
-// one, else from setUsed (default 0).
+// default (listing_slot 10, seat 5). `used` is the setUsed value when the test has set one.
+// Otherwise it comes from the registered counter, else 0. setUsed wins because listings and
+// orgs register real counters when their modules load, and a billing test states usage
+// without inserting those rows.
 import { badRequest, conflict, notFound } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import type {
@@ -96,10 +98,10 @@ async function getCapacity(
         ? ever.filter((g) => isValid(g, now)).reduce((sum, g) => sum + g.quantity, 0)
         : DEFAULT_LIMIT[kind];
   }
+  const explicit = state.used.get(key(orgId, kind));
   const counter = state.counters.get(kind);
-  const used = counter
-    ? await counter(db as never, orgId)
-    : (state.used.get(key(orgId, kind)) ?? 0);
+  const used =
+    explicit !== undefined ? explicit : counter ? await counter(db as never, orgId) : 0;
   return { limit, used };
 }
 
@@ -282,7 +284,7 @@ export const entitlementsFake = Object.assign(fns as Fns, {
     if (n === null) state.limits.delete(key(orgId, kind));
     else state.limits.set(key(orgId, kind), n);
   },
-  /** Usage when no counter is registered for the kind. */
+  /** Stated usage. Wins over a counter registered by module load. */
   setUsed(orgId: string, kind: CapacityKind, n: number) {
     state.used.set(key(orgId, kind), n);
   },
