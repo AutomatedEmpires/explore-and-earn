@@ -35,6 +35,7 @@ export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { ErrorState, type ErrorStateProps } from './ErrorState';
 export { Field, type FieldProps } from './Field';
 export { IconButton, type IconButtonProps } from './IconButton';
+export { IconLink, type IconLinkProps } from './IconLink';
 export { Img, type ImgProps } from './Img';
 export { Input, type InputProps } from './Input';
 export {
