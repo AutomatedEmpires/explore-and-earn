@@ -49,6 +49,14 @@ export {
   type PortalConfigurationInput,
 } from './catalog';
 export {
+  computeFoundingTrialEnd,
+  createCheckout,
+  isReturningFounder,
+  type CheckoutInput,
+} from './checkout';
+/** SP6 one-time purchases. */
+export { ensureStripeCustomer } from './customers';
+export {
   createFoundingCodes,
   generateFoundingCode,
   getFoundingCount,
@@ -95,11 +103,6 @@ export async function getSubscriberBadges(
   _orgIds: string[],
 ): Promise<Map<string, { hostSince: Date }>> {
   return notImplemented('getSubscriberBadges');
-}
-
-/** SP6 one-time purchases. */
-export async function ensureStripeCustomer(_db: Db, _orgId: string): Promise<string> {
-  return notImplemented('ensureStripeCustomer');
 }
 
 export async function syncSubscription(_db: Db, _stripeSubscriptionId: string): Promise<void> {

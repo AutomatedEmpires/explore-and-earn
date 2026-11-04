@@ -2,7 +2,7 @@
 // With `autoComplete`, Checkout creates the subscription at once and returns the success URL,
 // so stub-billing hosts become entitled without Stripe. Test controls: completeCheckout,
 // setSubscription, setCardChecks, declineNextUpdate, failNext, hooks and the `calls` log.
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import {
   BillingCardError,
   type BillingGateway,
@@ -74,8 +74,10 @@ export function makeFakeBillingGateway(
   o: { autoComplete?: boolean; now?: () => Date } = {},
 ): FakeBillingGateway {
   const now = o.now ?? (() => new Date());
+  // Unique across instances (like Stripe ids), so tests sharing a database never collide.
+  const tag = randomBytes(4).toString('hex');
   let n = 0;
-  const nextId = (prefix: string) => `${prefix}_fake_${++n}`;
+  const nextId = (prefix: string) => `${prefix}_fake${tag}_${++n}`;
 
   const replays = new Map<string, unknown>();
   const customers = new Map<string, { orgId: string; name: string; email: string | null }>();
