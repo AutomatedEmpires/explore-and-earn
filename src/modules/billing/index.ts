@@ -4,49 +4,50 @@
 import type { Db, DbOrTx } from '@/lib/db';
 import type { Actor } from '@/modules/entitlements';
 import type { HandlerMap } from '@/modules/jobs';
+import type { BillingGateway } from './gateway';
+import type { BillingInterval, PlanCode } from './plans';
 
 export type { Actor } from '@/modules/entitlements';
 
-export type PlanCode = 'starter' | 'professional' | 'enterprise';
-export type BillingInterval = 'month' | 'year';
-
-/** Section 8.1 values. Stripe prices are authoritative for charging. */
-export const PLANS: Record<
-  PlanCode,
-  {
-    monthlyCents: number;
-    annualCents: number;
-    slots: number;
-    seats: number;
-    inviteCredits: number;
-    extraSlotMonthlyCents: number;
-  }
-> = {
-  starter: {
-    monthlyCents: 9900,
-    annualCents: 99000,
-    slots: 2,
-    seats: 1,
-    inviteCredits: 10,
-    extraSlotMonthlyCents: 3900,
-  },
-  professional: {
-    monthlyCents: 29900,
-    annualCents: 299000,
-    slots: 10,
-    seats: 5,
-    inviteCredits: 50,
-    extraSlotMonthlyCents: 2900,
-  },
-  enterprise: {
-    monthlyCents: 59900,
-    annualCents: 599000,
-    slots: 30,
-    seats: 15,
-    inviteCredits: 150,
-    extraSlotMonthlyCents: 1900,
-  },
-};
+export {
+  BILLING_INTERVALS,
+  EXTRA_SLOT_ANNUAL_MULTIPLIER,
+  FOUNDING_COUPON_ID,
+  PLANS,
+  PLAN_CODES,
+  lookupKey,
+  monthlyEquivalentCents,
+  parseLookupKey,
+  planItems,
+  planLimits,
+  type BillingInterval,
+  type LookupKind,
+  type Plan,
+  type PlanCode,
+} from './plans';
+export {
+  BillingCardError,
+  billingGateway,
+  isBillingCardError,
+  stripeGateway,
+  type BillingGateway,
+  type CardChecks,
+  type CheckoutParams,
+  type GatewayItem,
+  type ProrationBehavior,
+  type SubSnapshot,
+  type SubscriptionStatus,
+  type SubscriptionUpdate,
+  type WebhookEvent,
+} from './gateway';
+export { makeFakeBillingGateway, type FakeBillingGateway } from './gateway-fake';
+export {
+  seedStripeCatalog,
+  stripeCatalogApi,
+  type CatalogApi,
+  type CatalogPrice,
+  type PortalConfigurationInput,
+} from './catalog';
 
 export type SubscriptionState = {
   status:
@@ -70,15 +71,6 @@ export type SubscriptionState = {
   hostSince: Date | null;
   founding: 'none' | 'active' | 'lapsed' | 'forfeited';
 };
-
-/**
- * The Stripe calls billing makes. W0 declares only what `cancelSubscriptionNow` needs; W2's
- * gateway (Task 11) defines the full interface.
- */
-export interface BillingGateway {
-  /** Cancels immediately, without proration. */
-  cancelSubscription(id: string, idempotencyKey: string): Promise<void>;
-}
 
 function notImplemented(name: string): never {
   throw new Error(`not implemented: ${name} (W2)`);
