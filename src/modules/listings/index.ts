@@ -65,8 +65,27 @@ export {
 } from './publish';
 export { listingTeamUserIds } from './team';
 export { LISTING_NOTIFICATION_TYPES } from './notifications';
-// Module-load registrations: the listing_slot usage counter.
+export {
+  domainStatus,
+  getLinkSafety,
+  stubLinkSafety,
+  webRisk,
+  type DomainStatus,
+  type LinkSafety,
+  type LinkVerdict,
+} from './link-safety';
+export {
+  MEDIA_MAX_ATTEMPTS,
+  listingCheckText,
+  photoSlotCheck,
+  resumeScreening,
+  screenRevision,
+} from './screening';
+export { REVIEW_NOTE_MAX, requestReview } from './review-request';
+// Module-load registrations: the listing_slot usage counter and the trust subject handlers.
 import './slots';
+import './subjects';
+import { photoSlotCheck, resumeScreening, screenRevision } from './screening';
 export { CATEGORIES, GENRES, PERKS, type Category } from '@/lib/taxonomy';
 
 export type ListingState = 'draft' | 'in_review' | 'active' | 'closed' | 'removed';
@@ -247,9 +266,15 @@ const noop = async () => {};
 
 /** W5 replaces each no-op (spec section 6). */
 export const jobHandlers: HandlerMap = {
-  'listings.screen': noop,
-  'listings.photo_slot_check': noop,
-  'listings.resume_screening': noop,
+  'listings.screen': async (payload, { db, now }) => {
+    await screenRevision(db, payload, now);
+  },
+  'listings.photo_slot_check': async (payload, { db, now }) => {
+    await photoSlotCheck(db, payload, now);
+  },
+  'listings.resume_screening': async (payload, { db, now }) => {
+    await resumeScreening(db, payload, now);
+  },
   'listings.enforce_slot_limit': noop,
   'listings.close_for_org': noop,
   'listings.still_hiring_sweep': noop,

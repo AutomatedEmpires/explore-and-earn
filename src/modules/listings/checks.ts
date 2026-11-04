@@ -62,7 +62,7 @@ const MESSAGES = {
   genre_invalid: 'Choose a genre for this category.',
 } as const;
 
-const SLOT_LABELS: Record<string, string> = {
+export const SLOT_LABELS: Record<string, string> = {
   bedroom: 'Bedroom',
   bathroom: 'Bathroom',
   kitchen: 'Kitchen',

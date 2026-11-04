@@ -64,6 +64,20 @@ export async function seedDraftListing(
   return id;
 }
 
+/** An Owner operator on shift (covers every queue); returns its user id. */
+export async function addOperator(db: DbOrTx): Promise<string> {
+  const id = newId();
+  await db.execute(sql`
+    insert into app.users (id, clerk_user_id, email, display_name, account_type)
+    values (${id}, ${`user_${id}`}, ${`${id}@ops.test`}, 'Operator', 'operator')
+  `);
+  await db.execute(sql`
+    insert into app.operators (user_id, role, queues, shift_status)
+    values (${id}, 'owner', '{}'::text[], 'on_shift')
+  `);
+  return id;
+}
+
 /** The outbox rows of a topic, oldest first. */
 export async function outboxRows(
   db: DbOrTx,
