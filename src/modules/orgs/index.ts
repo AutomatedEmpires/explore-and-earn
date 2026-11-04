@@ -1,14 +1,12 @@
 // Public API of the orgs module: host organizations and memberships. Owned by W2 (Tasks 6-7).
-// Depends on identity for types only; identity's Clerk sync calls into this module.
+// Identity's Clerk sync calls into this module, so orgs imports identity for types, and loads
+// it at runtime only when first needed (accepting an invitation sets the account type).
 //
-// SP2 adds the team, invitations, recruiter scopes, org status and settings, slugs and the
-// activity log, and imports entitlements. The SP2 functions below are W0 typed stubs that W3
-// (Tasks 17-19) replaces; the role matrix (./roles) is real.
-import type { DbOrTx } from '@/lib/db';
-import type { Actor } from '@/modules/entitlements';
+// SP2 (W3, Tasks 17-19) adds the team, invitations, recruiter scopes, org status and settings,
+// slugs and the activity log, and imports entitlements. Reverse flows to other SP2 modules go
+// through domain events (org.status_changed, org.member_removed, hostpage.updated).
 import type { HandlerMap } from '@/modules/jobs';
-import type { HostContext } from '@/server/guards';
-import type { Member } from './roles';
+import { SEND_INVITATION_TOPIC, sendInvitationJob } from './invitations';
 
 export { createOrganization, organizationNameSchema } from './create';
 
@@ -35,123 +33,81 @@ export {
 
 export type { Actor } from '@/modules/entitlements';
 
-export type OrgStatus = 'active' | 'suspended' | 'banned';
+export { getMember, listMembers } from './members';
 
-/** The same values as verification's VerificationStatus (orgs can't import verification). */
-export type OrgVerificationStatus =
-  'unverified' | 'running' | 'verified' | 'needs_review' | 'needs_info' | 'failed';
+export { assignListing, canAccessListing, getListingAccess, type ListingAccess } from './scope';
 
-export type OrgSummary = {
-  id: string;
-  clerkOrgId: string;
-  name: string;
-  slug: string;
-  status: OrgStatus;
-  deleted: boolean;
-  websiteUrl: string | null;
-  requireRecruiterApproval: boolean;
-  primaryLocationId: string | null;
-  verificationStatus: OrgVerificationStatus;
-  ownerUserId: string | null;
-  createdAt: Date;
-};
+export {
+  getOrgStatus,
+  setOrgStatus,
+  setVerificationStatus,
+  type OrgStatus,
+  type OrgVerificationStatus,
+} from './status';
 
-export type ListingAccess =
-  { all: true } | { all: false; listingIds: string[]; locationIds: string[] };
+export {
+  getOrgSummaries,
+  updateOrg,
+  updateOrgSchema,
+  websiteUrlSchema,
+  type OrgSummary,
+  type UpdateOrgInput,
+} from './org-settings';
 
-function notImplemented(name: string): never {
-  throw new Error(`not implemented: ${name} (W3)`);
-}
+export {
+  invitationJson,
+  invitationJsonSchema,
+  memberJson,
+  memberJsonSchema,
+  orgJson,
+  orgJsonSchema,
+  recruiterScopeSchema,
+  type InvitationJson,
+  type MemberJson,
+  type OrgJson,
+} from './json';
 
-export async function listMembers(_db: DbOrTx, _orgId: string): Promise<Member[]> {
-  return notImplemented('listMembers');
-}
+// Loading ./invitations registers the `seat` usage counter and (through ./notifications) the
+// team notification types.
+export {
+  acceptInvitation,
+  countSeats,
+  createInvitation,
+  createInvitationSchema,
+  listInvitations,
+  maskEmail,
+  previewInvitation,
+  revokeInvitation,
+  sendInvitationJob,
+  toClerkRole,
+  type CreateInvitationInput,
+  type Invitation,
+  type InvitationRole,
+} from './invitations';
 
-/** Owner, Admin and Recruiters with scope `all` see everything; Billing sees no listings. */
-export async function getListingAccess(_db: DbOrTx, _ctx: HostContext): Promise<ListingAccess> {
-  return notImplemented('getListingAccess');
-}
+export { ROLE_LABELS, ROLE_PHRASES } from './notifications';
 
-/** SP5. */
-export async function canAccessListing(
-  _db: DbOrTx,
-  _ctx: HostContext,
-  _l: { id: string; locationId: string | null },
-): Promise<boolean> {
-  return notImplemented('canAccessListing');
-}
+export { INVITATION_ROLES, ORG_ROLES } from './schema';
 
-export async function getOrgStatus(_db: DbOrTx, _orgId: string): Promise<OrgStatus> {
-  return notImplemented('getOrgStatus');
-}
+export { changeMember, changeMemberSchema, removeMember, transferOwnership } from './member-admin';
 
-export async function getMember(
-  _db: DbOrTx,
-  _orgId: string,
-  _userId: string,
-): Promise<Member | null> {
-  return notImplemented('getMember');
-}
+export { RESERVED_SLUGS, changeSlug, resolveSlug } from './slugs';
 
-export async function getOrgSummaries(
-  _db: DbOrTx,
-  _ids: string[],
-): Promise<Map<string, OrgSummary>> {
-  return notImplemented('getOrgSummaries');
-}
+export {
+  ACTIVITY_ACTION_PREFIXES,
+  ACTIVITY_PAGE_SIZE,
+  listActivity,
+  type ActivityItem,
+} from './activity';
 
-/** Sets the status, records `orgs.status_changed` and emits `org.status_changed`. */
-export async function setOrgStatus(
-  _db: DbOrTx,
-  _orgId: string,
-  _status: OrgStatus,
-  _actor: Actor,
-  _reason?: string,
-): Promise<void> {
-  return notImplemented('setOrgStatus');
-}
-
-export async function setVerificationStatus(
-  _db: DbOrTx,
-  _orgId: string,
-  _status: OrgVerificationStatus,
-  _at?: Date,
-): Promise<void> {
-  return notImplemented('setVerificationStatus');
-}
-
-/** Assigns a listing to an `assigned` Recruiter (listings they create are auto-assigned). */
-export async function assignListing(
-  _db: DbOrTx,
-  _orgId: string,
-  _userId: string,
-  _listingId: string,
-): Promise<void> {
-  return notImplemented('assignListing');
-}
-
-/** The org a slug belongs to; `retired` when it is no longer the org's current slug. */
-export async function resolveSlug(
-  _db: DbOrTx,
-  _slug: string,
-): Promise<{ orgId: string; currentSlug: string; retired: boolean } | null> {
-  return notImplemented('resolveSlug');
-}
+export { deleteOrganization } from './deletion';
 
 /** SP8 registers these with its privacy exporter and eraser. */
-export const privacyHandlers: {
-  export(db: DbOrTx, userId: string): Promise<Record<string, unknown>>;
-  erase(db: DbOrTx, userId: string): Promise<void>;
-} = {
-  async export() {
-    return notImplemented('privacyHandlers.export');
-  },
-  async erase() {
-    return notImplemented('privacyHandlers.erase');
-  },
-};
+export { privacyHandlers } from './privacy';
 
-/** W3 replaces the no-op: it creates the invitation token and sends it (Plan decision 9). */
 export const jobHandlers: HandlerMap = {
-  'orgs.send_invitation': async () => {},
+  // Creates the invitation token and emails it in one step (SP2 plan decision 9).
+  [SEND_INVITATION_TOPIC]: async (payload, { db, now }) => {
+    await sendInvitationJob(db, payload, now);
+  },
 };
