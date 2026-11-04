@@ -73,6 +73,28 @@ describe('JobCard', () => {
     expect(screen.getByText('$18.50–22/hr')).toBeInTheDocument();
   });
 
+  it('shows preformatted pay and start labels as given', () => {
+    render(<JobCard {...base} pay={{ label: '$52k/yr' }} starts={{ label: 'Summer 2027' }} />);
+    expect(within(chip(/^Pay/)).getByText('$52k/yr')).toBeInTheDocument();
+    expect(screen.getByText('Summer 2027')).toBeInTheDocument();
+  });
+
+  it('shows the end label in place of "Ends ..."', () => {
+    render(<JobCard {...base} endLabel="Ongoing" />);
+    expect(screen.getByText('· Ongoing')).toBeInTheDocument();
+    expect(screen.queryByText(/Ends/)).toBeNull();
+  });
+
+  it('shows a disabled "Applied" button once the seeker has applied', () => {
+    const onApply = vi.fn();
+    render(<JobCard {...base} applied onApply={onApply} />);
+    const applied = screen.getByRole('button', { name: 'Applied' });
+    expect(applied).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
+    fireEvent.click(applied);
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
   it('opens chips and runs the Skip, Apply and Save actions', () => {
     const onOpenChip = vi.fn();
     const onSkip = vi.fn();
