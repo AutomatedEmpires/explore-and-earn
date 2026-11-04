@@ -18,12 +18,13 @@ export function leafPaths(value: unknown, prefix = ''): string[] {
   );
 }
 
-/** The value at `path`, or undefined. */
+/** The value at `path` (a numeric segment indexes a list), or undefined. */
 export function getPath(value: unknown, path: string): unknown {
   let at: unknown = value;
   for (const key of path.split('.')) {
-    if (!isObject(at)) return undefined;
-    at = at[key];
+    if (Array.isArray(at) && /^\d+$/.test(key)) at = at[Number(key)];
+    else if (isObject(at)) at = at[key];
+    else return undefined;
   }
   return at;
 }

@@ -43,6 +43,19 @@ export {
 } from './drafts';
 export { DESCRIPTION_MAX_CHARS, MAX_BULLETS, generateDescription } from './describe';
 export { AI_UNAVAILABLE_MESSAGE, PASTE_MAX_CHARS, PASTE_MIN_CHARS } from './import';
+export {
+  BLOCKING_CODES,
+  WARNING_CODES,
+  ackKey,
+  checkListing,
+  normalizeForPhraseMatch,
+  runListingChecks,
+  type Issue,
+  type IssueCode,
+  type ListingChecksResult,
+} from './checks';
+export { checkLinkSyntax, type LinkLists } from './links';
+export { hourlyPayCents } from './min-wage';
 export { CATEGORIES, GENRES, PERKS, type Category } from '@/lib/taxonomy';
 
 export type ListingState = 'draft' | 'in_review' | 'active' | 'closed' | 'removed';
