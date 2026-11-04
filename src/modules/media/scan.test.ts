@@ -20,6 +20,7 @@ import {
   photoDnaScanner,
   stubChildSafetyScanner,
   stubMalwareScanner,
+  UndecodableImageError,
   UnscannableImageError,
 } from './scanners';
 import { getStorage, type MemoryStorage } from './storage';
@@ -107,6 +108,13 @@ const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest(
 /** A JPEG header (the type check passes) with no decodable image behind it. */
 const corruptJpeg = () =>
   new Uint8Array([...fixture('gps.jpg').subarray(0, 20), ...new Uint8Array(200).fill(7)]);
+
+/** A WebP whose header reads (sharp knows its format and size) but whose pixels don't decode. */
+async function undecodableWebp(): Promise<Uint8Array> {
+  const webp = new Uint8Array(await sharp(fixture('gps.jpg')).webp().toBuffer());
+  webp.fill(0x55, 40);
+  return webp;
+}
 
 let t: TestDb;
 let storage: MemoryStorage;
@@ -343,6 +351,37 @@ describe('scanMedia: images', () => {
     expect(hashCheck).toHaveBeenCalledWith(original);
     expect(await row(mediaId)).toMatchObject({ rejection_reason: 'invalid_image' });
     expect(objectsOf('quarantine', mediaId)).toEqual([]);
+  });
+
+  it('rejects an image nothing can decode as invalid_image with PhotoDNA too', async () => {
+    const original = corruptJpeg();
+    const { mediaId } = await uploaded('community_photo', 'image/jpeg', original);
+    const fetchSpy = vi.fn(async () => Response.json({}));
+    const photoDna = photoDnaScanner({ key: 'pdna', fetch: fetchSpy });
+
+    expect(await scanMedia(t.db, { ...deps(), childSafety: photoDna }, mediaId)).toBe('rejected');
+
+    expect(await row(mediaId)).toMatchObject({
+      status: 'rejected',
+      rejection_reason: 'invalid_image',
+    });
+    expect(objectsOf('quarantine', mediaId)).toEqual([]);
+    expect(trust.items.filter((i) => i.subjectId === mediaId)).toEqual([]);
+    expect(trust.checks).toEqual([]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('holds an image PhotoDNA recognises but cannot convert, keeping the original', async () => {
+    const { mediaId } = await uploaded('community_photo', 'image/webp', await undecodableWebp());
+    const photoDna = photoDnaScanner({ key: 'pdna', fetch: vi.fn(async () => Response.json({})) });
+
+    expect(await scanMedia(t.db, { ...deps(), childSafety: photoDna }, mediaId)).toBe(
+      'in_review',
+    );
+    expect(await row(mediaId)).toMatchObject({ status: 'in_review', bucket: 'quarantine' });
+    expect(trust.items.filter((i) => i.subjectId === mediaId)).toEqual([
+      expect.objectContaining({ queue: 'moderation', reason: 'child_safety_unscannable' }),
+    ]);
   });
 
   it('holds an image the child-safety scanner cannot read, keeping the original', async () => {
@@ -744,10 +783,19 @@ describe('scanners', () => {
     await expect(failing.scanImage(jpg)).rejects.not.toBeInstanceOf(UnscannableImageError);
   });
 
-  it('PhotoDNA: an image it can neither read nor convert is unscannable; nothing is sent', async () => {
+  it('PhotoDNA: an image it recognises but cannot convert is unscannable; nothing is sent', async () => {
     const fetchSpy = vi.fn(async () => Response.json({}));
     const scanner = photoDnaScanner({ key: 'pdna', fetch: fetchSpy });
-    await expect(scanner.scanImage(corruptJpeg())).rejects.toBeInstanceOf(UnscannableImageError);
+    await expect(scanner.scanImage(await undecodableWebp())).rejects.toBeInstanceOf(
+      UnscannableImageError,
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('PhotoDNA: bytes nothing can read are undecodable, not unscannable; nothing is sent', async () => {
+    const fetchSpy = vi.fn(async () => Response.json({}));
+    const scanner = photoDnaScanner({ key: 'pdna', fetch: fetchSpy });
+    await expect(scanner.scanImage(corruptJpeg())).rejects.toBeInstanceOf(UndecodableImageError);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

@@ -72,6 +72,7 @@ export {
   photoDnaScanner,
   stubChildSafetyScanner,
   stubMalwareScanner,
+  UndecodableImageError,
   UnscannableImageError,
   type ChildSafetyScanner,
   type CloudmersiveOptions,

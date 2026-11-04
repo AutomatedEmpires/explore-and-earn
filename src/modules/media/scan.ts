@@ -4,8 +4,9 @@
 //      allowed for the kind, else `type_mismatch` (an SVG is never an image here);
 //   3. images: run the child-safety hash check on the original bytes before anything can
 //      reject them (a match is `blocked`, preserved as evidence and sent to the child_safety
-//      queue, and nothing else happens; an image the scanner cannot read is held for review,
-//      never deleted unchecked), then re-encode (auto-rotated, no metadata) into WebP
+//      queue, and nothing else happens; a recognised image the scanner cannot read is held for
+//      review, never deleted unchecked; bytes nothing can decode are rejected `invalid_image`,
+//      as the re-encode would), then re-encode (auto-rotated, no metadata) into WebP
 //      variants, then the AI safety check;
 //   4. PDFs: structure and malware checks;
 //   5. the file lands in its final bucket and the quarantine copy is deleted (unless blocked
@@ -49,6 +50,7 @@ import {
 import {
   getChildSafetyScanner,
   getMalwareScanner,
+  UndecodableImageError,
   UnscannableImageError,
   type ChildSafetyScanner,
   type MalwareScanner,
@@ -292,13 +294,20 @@ async function scanImage(
   original: Uint8Array,
   facts: Facts,
 ): Promise<MediaStatus> {
+  // The bundled libvips cannot decode HEVC, so most HEIC photos that fail to decode are that.
+  const undecodable = facts.detectedMime === 'image/heic' ? 'unsupported_format' : 'invalid_image';
+
   // The hash check comes first, on the original bytes, so a file that fails to decode below
-  // has still been checked before its original is deleted.
+  // has still been checked before its original is deleted. A scanner that cannot even read
+  // the header (no image at all) rejects it the same way the re-encode would.
   let match: Awaited<ReturnType<ChildSafetyScanner['scanImage']>>;
   try {
     match = await deps.childSafety.scanImage(original);
   } catch (err) {
     if (err instanceof UnscannableImageError) return holdUnscannable(db, row, facts, err);
+    if (err instanceof UndecodableImageError) {
+      return reject(db, deps, row, undecodable, facts, { error: err });
+    }
     throw err;
   }
   if (match.match) return block(db, deps, row, original, facts, match);
@@ -307,9 +316,7 @@ async function scanImage(
   try {
     processed = await processImage(original);
   } catch (err) {
-    // The bundled libvips cannot decode HEVC, so most HEIC photos end here.
-    const reason = facts.detectedMime === 'image/heic' ? 'unsupported_format' : 'invalid_image';
-    return reject(db, deps, row, reason, facts, { error: err });
+    return reject(db, deps, row, undecodable, facts, { error: err });
   }
 
   // The classifier sees the largest re-encoded variant: no metadata, a format and size the

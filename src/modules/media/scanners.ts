@@ -9,8 +9,9 @@ import { getEnv } from '@/lib/env';
 
 export interface ChildSafetyScanner {
   /**
-   * Throws UnscannableImageError when it cannot read this image at all (a format it does not
-   * take that cannot be converted); any other error means "try again later".
+   * Throws UndecodableImageError when the bytes are not an image anything here can read, and
+   * UnscannableImageError when they are a recognised image it cannot read (a format it does
+   * not take that cannot be converted); any other error means "try again later".
    */
   scanImage(bytes: Uint8Array): Promise<{ match: boolean; provider: string; reference?: string }>;
 }
@@ -23,6 +24,18 @@ export class UnscannableImageError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = 'UnscannableImageError';
+  }
+}
+
+/**
+ * The bytes are not an image that anything here can decode (sharp cannot even read the
+ * header). The scan rejects the file as it would when re-encoding it (`invalid_image`): it
+ * could never be served or published, and it never left quarantine.
+ */
+export class UndecodableImageError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'UndecodableImageError';
   }
 }
 
@@ -95,6 +108,8 @@ const photoDnaResponse = z.object({
 });
 const PHOTODNA_OK = 3000;
 const PHOTODNA_FORMATS = new Set(['jpeg', 'png', 'gif', 'tiff']);
+/** As strict as the scan's re-encode, so only bytes it would reject count as undecodable. */
+const DECODE_OPTIONS = { failOn: 'error' } as const;
 
 export type PhotoDnaOptions = { key?: string; endpoint?: string; fetch?: FetchLike };
 
@@ -107,22 +122,25 @@ export function photoDnaScanner(opts: PhotoDnaOptions = {}): ChildSafetyScanner 
 
       // PhotoDNA hashes are robust to re-encoding; send formats it reads as they are, and
       // convert the others (WebP, decodable HEIF) to PNG. HEVC-coded HEIC cannot be decoded
-      // here, so it cannot be converted, and PhotoDNA cannot read it.
-      const format = await sharp(bytes)
-        .metadata()
-        .then(
-          (m) => m.format,
-          () => undefined,
-        );
+      // here, so it cannot be converted, and PhotoDNA cannot read it. Bytes whose header sharp
+      // cannot read are no image at all: nothing here could decode, serve or check them.
+      let format: string;
+      try {
+        format = (await sharp(bytes, DECODE_OPTIONS).metadata()).format;
+      } catch (err) {
+        throw new UndecodableImageError('This file is not an image that can be read', {
+          cause: err,
+        });
+      }
       let body: Uint8Array;
-      if (format && PHOTODNA_FORMATS.has(format)) {
+      if (PHOTODNA_FORMATS.has(format)) {
         body = bytes;
       } else {
         try {
-          body = new Uint8Array(await sharp(bytes).png().toBuffer());
+          body = new Uint8Array(await sharp(bytes, DECODE_OPTIONS).png().toBuffer());
         } catch (err) {
           throw new UnscannableImageError(
-            `PhotoDNA cannot read this image (${format ?? 'unreadable'}) and it could not be converted`,
+            `PhotoDNA cannot read this image (${format}) and it could not be converted`,
             { cause: err },
           );
         }

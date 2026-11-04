@@ -5,7 +5,8 @@
 // with requireOperator. An operator may act on an item in a queue they cover (Owners cover
 // every queue) that is unassigned or theirs; an Owner may act on any item. Two exceptions:
 // - an item's excluded operators (an appeal's original decider and signer) may not claim,
-//   decide, sign off or be handed it while anyone else could (spec section 8);
+//   decide or be handed it while another operator covering its queue is on shift, nor sign
+//   off a decision on it while any other operator exists (spec section 8);
 // - a second sign-off may come from any other operator, whatever queues they cover, so a
 //   decision held for one never waits on nobody.
 import { and, eq, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
@@ -67,22 +68,25 @@ function assertMayAct(item: ItemRecord, op: ActiveOperator): void {
 
 /**
  * Whether `userId` is kept off this item: they are in its exclusions (for an appeal, whoever
- * made or signed off the original decision) and someone else could do the job. That is an
- * operator outside the exclusions (and outside `besides`) covering the item's queue, or with
- * `anyQueue`, any such operator. When nobody else could, an excluded operator may act, so the
- * item never waits on nobody.
+ * made or signed off the original decision) and someone else is available to do the job. That
+ * is an on-shift operator outside the exclusions covering the item's queue: the spec routes an
+ * appeal to another operator "when one is available", as routing and the SLA sweep count
+ * availability. When nobody else is, an excluded operator may act, so the item never waits on
+ * nobody. With `signOff`, any operator outside the exclusions and `besides`, on shift or not,
+ * whatever queues they cover: a second sign-off waits for one by rule (needsSecondSignOff
+ * counts operators that exist).
  */
 async function keptOff(
   db: DbOrTx,
   item: ItemRecord,
   userId: string,
-  o: { anyQueue?: boolean; besides?: string[] } = {},
+  o: { signOff?: boolean; besides?: string[] } = {},
 ): Promise<boolean> {
   if (!item.excludeOperatorIds.includes(userId)) return false;
   return anyOperatorBesides(
     db,
     [...item.excludeOperatorIds, ...(o.besides ?? [])],
-    o.anyQueue ? undefined : item.queue,
+    o.signOff ? {} : { queue: item.queue, onShift: true },
   );
 }
 
@@ -549,7 +553,7 @@ async function signingOperator(
 ): Promise<ActiveOperator> {
   const op = await findOperator(tx, operatorId);
   if (!op) throw forbidden('Only operators can do this');
-  if (await keptOff(tx, item, op.userId, { anyQueue: true, besides: [authorId] })) {
+  if (await keptOff(tx, item, op.userId, { signOff: true, besides: [authorId] })) {
     throw forbidden(KEPT_OFF);
   }
   return op;
@@ -628,7 +632,7 @@ export async function rejectSecond(
  * Opens an appeal of a decided item in the `appeals` queue, about the same subject. The
  * operators who made the original decision (or signed it off) are its exclusions: routing never
  * gives it to them while anyone else is on shift, and they may not claim, decide, sign off or be
- * handed it while anyone else could (keptOff). One open appeal per decision.
+ * handed it while someone else is available (keptOff). One open appeal per decision.
  */
 export async function openAppeal(
   db: DbOrTx,

@@ -425,7 +425,37 @@ describe('appeals', () => {
     });
   });
 
-  it('keeps the original decider off the appeal while another operator could take it', async () => {
+  it('lets the original decider take the appeal while nobody else is on shift', async () => {
+    const owner = await addOperator(t.db, { role: 'owner' });
+    await addOperator(t.db, { queues: ['appeals'], shift: 'away' });
+    const { id } = await open();
+    await decide(t.db, id, owner, 'remove');
+
+    // Opened while B is away: it waits, unassigned, and nobody else is available to take it.
+    const appeal = await openAppeal(t.db, { originalItemId: id, reason: 'Please look again' });
+    expect(await getItem(t.db, appeal.id)).toMatchObject({
+      status: 'open',
+      assignee_operator_id: null,
+    });
+    await claim(t.db, appeal.id, owner);
+    expect(await decide(t.db, appeal.id, owner, 'approve')).toEqual({ status: 'applied' });
+  });
+
+  it('escalates an appeal to the original decider once its holder goes off shift', async () => {
+    const owner = await addOperator(t.db, { role: 'owner' });
+    const b = await addOperator(t.db, { queues: ['appeals'] });
+    const { id } = await open();
+    await decide(t.db, id, owner, 'remove');
+    const appeal = await openAppeal(t.db, { originalItemId: id, reason: 'x' });
+    expect((await getItem(t.db, appeal.id)).assignee_operator_id).toBe(b);
+
+    await setShift(t.db, b, 'away');
+    await escalate(t.db, appeal.id, b, { reason: 'Leaving for the day' });
+    expect((await getItem(t.db, appeal.id)).assignee_operator_id).toBe(owner);
+    expect(await decide(t.db, appeal.id, owner, 'approve')).toEqual({ status: 'applied' });
+  });
+
+  it('keeps the original decider off the appeal while another operator is on shift', async () => {
     const owner = await addOperator(t.db, { role: 'owner' });
     const b = await addOperator(t.db, { queues: ['appeals'], shift: 'away' });
     const { id } = await open();
@@ -437,12 +467,11 @@ describe('appeals', () => {
       status: 'open',
       assignee_operator_id: null,
     });
-    expect(await codeOf(claim(t.db, appeal.id, owner))).toBe('forbidden');
-    expect(await codeOf(decide(t.db, appeal.id, owner, 'approve'))).toBe('forbidden');
 
-    // Still not once B is on shift; B takes it.
+    // Once B is on shift, the decider is refused; B takes it.
     await setShift(t.db, b, 'on_shift');
     expect(await codeOf(claim(t.db, appeal.id, owner))).toBe('forbidden');
+    expect(await codeOf(decide(t.db, appeal.id, owner, 'approve'))).toBe('forbidden');
     await claim(t.db, appeal.id, b);
 
     // An Owner may act on any item, but not on the appeal of their own decision.
