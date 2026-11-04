@@ -145,8 +145,11 @@ export function JobCard({
       }
       identity={
         host.href ? (
-          <a href={host.href} aria-label={`${host.name} host page`} className="flex rounded-lg">
+          // Named by its text, not an aria-label: the logo's initials would be visible text
+          // missing from the name (WCAG 2.5.3, label in name).
+          <a href={host.href} className="flex rounded-lg">
             {logo}
+            <span className="sr-only">{host.name} host page</span>
           </a>
         ) : (
           logo

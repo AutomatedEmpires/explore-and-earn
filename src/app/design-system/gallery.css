@@ -1,0 +1,18 @@
+/*
+ * Gallery only. A state specimen wrapped in data-force-state="focus" shows its keyboard focus
+ * ring without being focused, so the focus state can sit beside the others. The rule is the
+ * same as :focus-visible in src/ui/tokens.css.
+ *   focus          every focusable control inside the wrapper (wrap one control)
+ *   focus-current  only the current, active or checked item of a composite
+ *                  (a tab list, a navigation bar, a segmented control)
+ */
+[data-force-state='focus'] :is(a[href], button, textarea, [role='slider'], input:not(.sr-only)),
+[data-force-state='focus-current']
+  :is(
+    [role='tab'][data-state='active'],
+    [aria-current='page'],
+    label:has(> input.sr-only:checked)
+  ) {
+  outline: 2px solid var(--ee-focus);
+  outline-offset: 2px;
+}
