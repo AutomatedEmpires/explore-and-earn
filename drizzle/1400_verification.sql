@@ -15,7 +15,8 @@ create table app.business_verifications (
   check_id uuid references app.trust_checks (id),
   -- The review item that holds the run, or the one an operator decided it with.
   review_item_id uuid references app.review_items (id),
-  info_request text check (char_length(info_request) between 1 and 2000),
+  -- The operator's ask_info note (trust allows notes up to 5,000 characters).
+  info_request text check (char_length(info_request) between 1 and 5000),
   info_response text check (char_length(info_response) between 1 and 2000),
   info_website_url text check (info_website_url ~ '^https://'),
   decided_by text check (decided_by in ('auto', 'operator')),
