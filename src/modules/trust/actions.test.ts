@@ -279,7 +279,7 @@ describe('decide and the second sign-off', () => {
 
     expect(await codeOf(decide(t.db, id, a, 'approve'))).toBe('bad_request');
     await decide(t.db, id, a, 'remove', { note: 'Spam' });
-    expect(seen).toEqual([{ subjectId, data: { note: 'Spam' } }]);
+    expect(seen).toEqual([{ subjectId, data: { note: 'Spam', reviewItemId: id } }]);
 
     const unknown = await openReviewItem(t.db, {
       queue: 'moderation',

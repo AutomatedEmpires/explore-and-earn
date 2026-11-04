@@ -12,9 +12,13 @@ import { getEnv } from '@/lib/env';
 import { badRequest } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
-import { getSetting, type Thresholds } from '@/modules/settings';
+import { SETTING_DEFAULTS, getSetting, type Thresholds } from '@/modules/settings';
 import { transact } from './internal';
+import * as businessVerificationPrompt from './prompts/business_verification';
 import * as imageSafetyPrompt from './prompts/image_safety';
+import * as listingFraudPrompt from './prompts/listing_fraud';
+import * as listingModerationPrompt from './prompts/listing_moderation';
+import * as photoSlotPrompt from './prompts/photo_slot';
 import * as textSafetyPrompt from './prompts/text_safety';
 import { openReviewItem } from './routing';
 import { trustChecks } from './schema';
@@ -52,7 +56,8 @@ export function registerCheckKind(def: CheckKindDef): void {
     throw new Error(`registerCheckKind: "${def.kind}" is not a lowercase kind name`);
   }
   const t = def.defaultThresholds;
-  if (!(t.approveBelow >= 0 && t.approveBelow <= t.rejectAtOrAbove && t.rejectAtOrAbove <= 1)) {
+  // rejectAtOrAbove may be 1.01, above any score, so a kind is never auto-rejected.
+  if (!(t.approveBelow >= 0 && t.approveBelow <= t.rejectAtOrAbove && t.rejectAtOrAbove <= 1.01)) {
     throw new Error(`registerCheckKind: ${def.kind} has invalid default thresholds`);
   }
   if (!def.prompt.version || !def.prompt.system) {
@@ -82,6 +87,48 @@ registerCheckKind({
   prompt: imageSafetyPrompt,
   schema: safety.extend({ altText: z.string() }),
   defaultThresholds: FOUNDATION_THRESHOLDS,
+});
+
+// SP2's kinds. Their default thresholds are the trust.thresholds defaults, so the operator
+// console shows them; text kinds classify `text`, image kinds classify `image` with `text` as
+// its caption or label.
+const SP2_THRESHOLDS = SETTING_DEFAULTS['trust.thresholds'];
+
+function sp2Thresholds(kind: string): Thresholds {
+  const t = SP2_THRESHOLDS[kind];
+  if (!t) throw new Error(`trust.thresholds has no default for ${kind}`);
+  return t;
+}
+
+registerCheckKind({
+  kind: 'listing_moderation',
+  input: 'text',
+  prompt: listingModerationPrompt,
+  schema: safety,
+  defaultThresholds: sp2Thresholds('listing_moderation'),
+});
+registerCheckKind({
+  kind: 'listing_fraud',
+  input: 'text',
+  prompt: listingFraudPrompt,
+  schema: safety,
+  defaultThresholds: sp2Thresholds('listing_fraud'),
+});
+registerCheckKind({
+  kind: 'business_verification',
+  input: 'text',
+  prompt: businessVerificationPrompt,
+  schema: safety,
+  // Never auto-rejected: rejectAtOrAbove is 1.01 (SP2 spec section 8.4).
+  defaultThresholds: sp2Thresholds('business_verification'),
+});
+registerCheckKind({
+  kind: 'photo_slot',
+  input: 'image',
+  // The 640 px photo and its slot label; the score is the probability of a mismatch.
+  prompt: photoSlotPrompt,
+  schema: safety,
+  defaultThresholds: sp2Thresholds('photo_slot'),
 });
 
 /**
@@ -152,11 +199,12 @@ function describeError(err: unknown): string {
 
 /**
  * Classifies a subject and decides it: `score < approveBelow` is approved, `score >=
- * rejectAtOrAbove` is rejected, anything else is needs_review and opens a `moderation` review
- * item (thresholds from the `trust.thresholds` setting, or the kind's registered default when
- * that has no entry for it). Any classifier failure is needs_review with reason
- * 'classifier_error'; its returned `score` is 1 so no caller can read it as safe (the stored
- * score is null). Every call stores one `app.trust_checks` row.
+ * rejectAtOrAbove` is rejected, anything else is needs_review and opens a review item in
+ * `reviewQueue` (default `moderation`; `null` opens none). Thresholds come from the
+ * `trust.thresholds` setting, or the kind's registered default when that has no entry for it.
+ * Any classifier failure is needs_review with reason 'classifier_error'; its returned `score` is
+ * 1 so no caller can read it as safe (the stored score is null). Every call stores one
+ * `app.trust_checks` row.
  *
  * Throws `bad_request` for an unregistered kind or when the input its kind needs is missing.
  * The classifier call runs before any write, so pass a Db rather than an open transaction when
@@ -166,6 +214,7 @@ export async function runCheck(db: DbOrTx, i: RunCheckInput): Promise<CheckResul
   const kind = findKind(i.kind);
   if (!kind) throw badRequest(`Unknown check kind: ${String(i.kind)}`);
   const content = buildContent(kind, i);
+  const reviewQueue = i.reviewQueue === undefined ? 'moderation' : i.reviewQueue;
   const tuned = await getSetting(db, 'trust.thresholds');
   const thresholds = Object.hasOwn(tuned, i.kind)
     ? (tuned[i.kind] ?? kind.defaultThresholds)
@@ -226,9 +275,9 @@ export async function runCheck(db: DbOrTx, i: RunCheckInput): Promise<CheckResul
       error,
       altText: altText ?? null,
     });
-    if (decision === 'needs_review') {
+    if (decision === 'needs_review' && reviewQueue !== null) {
       await openReviewItem(tx, {
-        queue: 'moderation',
+        queue: reviewQueue,
         subjectType: i.subjectType,
         subjectId: i.subjectId,
         reason,

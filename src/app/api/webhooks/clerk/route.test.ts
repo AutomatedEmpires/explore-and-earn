@@ -1,11 +1,17 @@
 // POST /api/webhooks/clerk end to end on PGlite: a real Svix (Standard Webhooks) signature, the
 // apiRoute envelope, idempotent redelivery and the audit row.
+//
+// The route is imported statically: apiRoute loads every SP2 module (src/server/sp2-wiring.ts),
+// and importing that graph inside a test counted against the test timeout and timed out under a
+// loaded full run. The mocks below are hoisted above this import, and the route reads the env
+// and the database only per request.
 import { createHmac, randomBytes } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryRows, type Db } from '@/lib/db';
 import { resetEnvCache } from '@/lib/env';
 import { createTestDb, type TestDb } from '../../../../../tests/helpers/db';
+import { POST } from './route';
 
 const dbHolder = vi.hoisted(() => ({ current: undefined as Db | undefined }));
 vi.mock('@/lib/db', async (importOriginal) => {
@@ -109,7 +115,6 @@ describe('POST /api/webhooks/clerk', () => {
   });
 
   it('applies a signed event once, audits it, and treats a redelivery as a duplicate', async () => {
-    const { POST } = await import('./route');
     const before = (await auditRows()).length;
 
     const first = await POST(delivery('msg_route_1', userCreated));
@@ -135,7 +140,6 @@ describe('POST /api/webhooks/clerk', () => {
   });
 
   it('returns 400 in the error envelope for a bad signature and applies nothing', async () => {
-    const { POST } = await import('./route');
     const wrongSecret = `whsec_${randomBytes(24).toString('base64')}`;
     const res = await POST(delivery('msg_route_2', userCreated, { secret: wrongSecret }));
 
@@ -150,7 +154,6 @@ describe('POST /api/webhooks/clerk', () => {
   });
 
   it('returns 400 for missing Svix headers', async () => {
-    const { POST } = await import('./route');
     const res = await POST(
       new Request('http://localhost:3000/api/webhooks/clerk', {
         method: 'POST',
@@ -163,7 +166,6 @@ describe('POST /api/webhooks/clerk', () => {
   });
 
   it('answers 200 for an event that can never apply, so Clerk stops retrying, and alerts', async () => {
-    const { POST } = await import('./route');
     const { logger } = await import('@/lib/logger');
     vi.spyOn(logger, 'error').mockImplementation(() => {});
     const invalid = { type: 'user.created', object: 'event', data: { id: 42 } };

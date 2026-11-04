@@ -32,11 +32,21 @@ export type ActionStatus = (typeof ACTION_STATUSES)[number];
 export const CHECK_DECISIONS = ['approved', 'rejected', 'needs_review'] as const;
 export type CheckDecision = (typeof CHECK_DECISIONS)[number];
 
+/** The check kinds trust registers itself: Foundation's two and SP2's four. */
+export const CHECK_KINDS = [
+  'image_safety',
+  'text_safety',
+  'listing_moderation',
+  'listing_fraud',
+  'business_verification',
+  'photo_slot',
+] as const;
+
 /**
- * A check kind: Foundation's two, or one a later sub-project registers with registerCheckKind
- * (listing, message scam, business verification, ...).
+ * A check kind: one of CHECK_KINDS, or one a later sub-project registers with registerCheckKind
+ * (message scam, ...).
  */
-export type CheckKind = 'image_safety' | 'text_safety' | (string & {});
+export type CheckKind = (typeof CHECK_KINDS)[number] | (string & {});
 
 export type OpenReviewItemInput = {
   queue: Queue;
@@ -57,6 +67,8 @@ export type RunCheckInput = {
   text?: string;
   image?: { mime: string; bytes: Uint8Array };
   wantAltText?: boolean;
+  /** Where a needs_review decision opens its item. Default 'moderation'; null opens none. */
+  reviewQueue?: Queue | null;
 };
 
 export type CheckResult = {
