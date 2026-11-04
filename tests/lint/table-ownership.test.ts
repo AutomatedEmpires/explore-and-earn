@@ -24,6 +24,14 @@ const DOCUMENTED_CROSS_MODULE_SQL = new Set([
   'src/modules/operator/operators.ts',
   'src/modules/operator/stats.ts',
   'src/modules/operator/test-items.ts',
+  // SP2 reads another module's table where importing that module would cycle or the public
+  // API does not carry the joined columns. Each file says why.
+  'src/modules/billing/webhook.ts',
+  'src/modules/hostpages/public.ts',
+  'src/modules/hostpages/subjects.ts',
+  'src/modules/locations/jobs.ts',
+  'src/modules/locations/service.ts',
+  'src/modules/orgs/people.ts',
 ]);
 
 function sourceFiles(dir: string): string[] {

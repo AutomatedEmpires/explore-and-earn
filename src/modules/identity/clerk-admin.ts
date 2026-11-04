@@ -1,8 +1,17 @@
 // The Clerk Backend API calls our domain code makes, behind an interface so tests use a fake.
+// These two constants live here, not in the orgs barrel: orgs loads notifications, and
+// notifications loads identity. Importing orgs from this file made that a cycle and left
+// defineType uninitialized.
 import type { UserJSON } from '@clerk/nextjs/server';
-import { CREATED_VIA_APP, CREATED_VIA_KEY } from '@/modules/orgs';
+
+/** Clerk public-metadata mark on every organization this server creates. */
+export const CREATED_VIA_KEY = 'created_via';
+export const CREATED_VIA_APP = 'app';
 
 export type OperatorInviteRole = 'owner' | 'operator';
+
+/** Clerk organization roles for host members (the Owner is Clerk's `org:admin` too). */
+export type ClerkOrgRole = 'org:admin' | 'org:recruiter' | 'org:billing';
 
 export interface ClerkAdmin {
   /** Deep-merges `md` into the user's public metadata. */
@@ -17,6 +26,17 @@ export interface ClerkAdmin {
   hasStrongAuth(clerkUserId: string): Promise<boolean>;
   /** Emails a sign-up invitation that makes the new user an operator with `role`. */
   inviteOperator(email: string, role: OperatorInviteRole): Promise<void>;
+  /** Adds a user to an organization with `clerkRole` (SP2 team invitations). */
+  addMembership(clerkOrgId: string, clerkUserId: string, clerkRole: ClerkOrgRole): Promise<void>;
+  removeMembership(clerkOrgId: string, clerkUserId: string): Promise<void>;
+  updateMembershipRole(
+    clerkOrgId: string,
+    clerkUserId: string,
+    clerkRole: ClerkOrgRole,
+  ): Promise<void>;
+  deleteOrganization(clerkOrgId: string): Promise<void>;
+  /** Renames the organization in Clerk, so Clerk's next snapshot doesn't undo a rename here. */
+  updateOrganization(clerkOrgId: string, patch: { name: string }): Promise<void>;
 }
 
 /**
@@ -59,7 +79,9 @@ export function clerkAdmin(): ClerkAdmin {
       await (await client()).users.updateUserMetadata(clerkUserId, { publicMetadata: md });
     },
     async createOrganization({ name, createdBy }) {
-      const org = await (await client()).organizations.createOrganization({
+      const org = await (
+        await client()
+      ).organizations.createOrganization({
         name,
         createdBy,
         // Marks it as ours: the webhook only adopts the creator of such an organization as its
@@ -85,10 +107,43 @@ export function clerkAdmin(): ClerkAdmin {
         ...(appUrl ? { redirectUrl: new URL('/sign-up', appUrl).toString() } : {}),
       });
     },
+    async addMembership(clerkOrgId, clerkUserId, clerkRole) {
+      await (
+        await client()
+      ).organizations.createOrganizationMembership({
+        organizationId: clerkOrgId,
+        userId: clerkUserId,
+        role: clerkRole,
+      });
+    },
+    async removeMembership(clerkOrgId, clerkUserId) {
+      await (
+        await client()
+      ).organizations.deleteOrganizationMembership({
+        organizationId: clerkOrgId,
+        userId: clerkUserId,
+      });
+    },
+    async updateMembershipRole(clerkOrgId, clerkUserId, clerkRole) {
+      await (
+        await client()
+      ).organizations.updateOrganizationMembership({
+        organizationId: clerkOrgId,
+        userId: clerkUserId,
+        role: clerkRole,
+      });
+    },
+    async deleteOrganization(clerkOrgId) {
+      await (await client()).organizations.deleteOrganization(clerkOrgId);
+    },
+    async updateOrganization(clerkOrgId, patch) {
+      await (await client()).organizations.updateOrganization(clerkOrgId, { name: patch.name });
+    },
   };
 }
 
 type FakeOrg = { clerkOrgId: string; name: string; createdBy: string };
+type FakeMembership = { clerkOrgId: string; clerkUserId: string; role: ClerkOrgRole };
 
 export type FakeClerkAdmin = ClerkAdmin & {
   /** Every call, in order. */
@@ -96,6 +151,8 @@ export type FakeClerkAdmin = ClerkAdmin & {
   /** Public metadata per Clerk user ID, merged as Clerk merges it. */
   metadata: Map<string, Record<string, unknown>>;
   organizations: FakeOrg[];
+  /** Memberships added through addMembership (not the creator's own). */
+  memberships: FakeMembership[];
   invitations: { email: string; role: OperatorInviteRole }[];
   /** Clerk user IDs that have a passkey. */
   passkeys: Set<string>;
@@ -121,6 +178,7 @@ export function makeFakeClerkAdmin(
     calls: [],
     metadata: new Map(),
     organizations: [],
+    memberships: [],
     invitations: [],
     passkeys: new Set(opts.passkeys),
     twoStep: new Set(opts.twoStep),
@@ -151,6 +209,34 @@ export function makeFakeClerkAdmin(
     async inviteOperator(email, role) {
       call('inviteOperator', [email, role]);
       fake.invitations.push({ email, role });
+    },
+    async addMembership(clerkOrgId, clerkUserId, clerkRole) {
+      call('addMembership', [clerkOrgId, clerkUserId, clerkRole]);
+      fake.memberships = fake.memberships.filter(
+        (m) => !(m.clerkOrgId === clerkOrgId && m.clerkUserId === clerkUserId),
+      );
+      fake.memberships.push({ clerkOrgId, clerkUserId, role: clerkRole });
+    },
+    async removeMembership(clerkOrgId, clerkUserId) {
+      call('removeMembership', [clerkOrgId, clerkUserId]);
+      fake.memberships = fake.memberships.filter(
+        (m) => !(m.clerkOrgId === clerkOrgId && m.clerkUserId === clerkUserId),
+      );
+    },
+    async updateMembershipRole(clerkOrgId, clerkUserId, clerkRole) {
+      call('updateMembershipRole', [clerkOrgId, clerkUserId, clerkRole]);
+      for (const m of fake.memberships) {
+        if (m.clerkOrgId === clerkOrgId && m.clerkUserId === clerkUserId) m.role = clerkRole;
+      }
+    },
+    async deleteOrganization(clerkOrgId) {
+      call('deleteOrganization', [clerkOrgId]);
+      fake.organizations = fake.organizations.filter((o) => o.clerkOrgId !== clerkOrgId);
+      fake.memberships = fake.memberships.filter((m) => m.clerkOrgId !== clerkOrgId);
+    },
+    async updateOrganization(clerkOrgId, patch) {
+      call('updateOrganization', [clerkOrgId, patch]);
+      for (const o of fake.organizations) if (o.clerkOrgId === clerkOrgId) o.name = patch.name;
     },
   };
 

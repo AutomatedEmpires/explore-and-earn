@@ -26,6 +26,17 @@ const prodEnv = {
   JOBS_SECRET: 'j'.repeat(32),
   UNSUBSCRIBE_SECRET: 'u'.repeat(32),
   SENTRY_DSN: '',
+  BILLING_PROVIDER: 'stripe',
+  STRIPE_SECRET_KEY: 'sk_live_test_secret',
+  STRIPE_WEBHOOK_SECRET: 'whsec_test',
+  STRIPE_PORTAL_CONFIG_FULL: 'bpc_full',
+  STRIPE_PORTAL_CONFIG_BILLING: 'bpc_billing',
+  GEOCODER_PROVIDER: 'census',
+  WEATHER_PROVIDER: 'nws',
+  NWS_USER_AGENT: 'Explore&Earn (test@exploreandearn.test)',
+  LINK_SAFETY_PROVIDER: 'webrisk',
+  WEB_RISK_API_KEY: 'test-webrisk',
+  NEXT_PUBLIC_MAPBOX_TOKEN: 'pk.test_mapbox',
 };
 
 function stubAll(env: Record<string, string>) {
