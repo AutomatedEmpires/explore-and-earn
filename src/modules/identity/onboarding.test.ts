@@ -1,5 +1,8 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+// Imported statically: apiRoute loads every SP2 module (src/server/sp2-wiring.ts), and importing
+// that graph inside a test counted against the test timeout. The mocks below are hoisted above it.
+import { POST } from '@/app/api/v1/onboarding/route';
 import { queryRows, type Db } from '@/lib/db';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { makeFakeClerkAdmin } from './clerk-admin';
@@ -279,7 +282,6 @@ describe('completeOnboarding', () => {
 
 describe('POST /api/v1/onboarding', () => {
   const post = async (body: unknown) => {
-    const { POST } = await import('@/app/api/v1/onboarding/route');
     return POST(
       new Request('http://localhost:3000/api/v1/onboarding', {
         method: 'POST',
@@ -303,7 +305,6 @@ describe('POST /api/v1/onboarding', () => {
   });
 
   it('returns 400 for a body that is not JSON', async () => {
-    const { POST } = await import('@/app/api/v1/onboarding/route');
     const res = await POST(
       new Request('http://localhost:3000/api/v1/onboarding', {
         method: 'POST',
@@ -326,7 +327,6 @@ describe('POST /api/v1/onboarding', () => {
   });
 
   it('returns 403 for a cross-site request', async () => {
-    const { POST } = await import('@/app/api/v1/onboarding/route');
     const res = await POST(
       new Request('http://localhost:3000/api/v1/onboarding', {
         method: 'POST',
