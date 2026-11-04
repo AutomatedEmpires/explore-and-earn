@@ -82,9 +82,27 @@ export {
   screenRevision,
 } from './screening';
 export { REVIEW_NOTE_MAX, requestReview } from './review-request';
+export {
+  autoClose,
+  canAcceptApplications,
+  closeListing,
+  confirmActive,
+  repostReminders,
+  stillHiringSweep,
+  type CloseReason,
+} from './lifecycle';
+export { repostListing } from './repost';
+export {
+  computeApplicationsCloseAt,
+  computeAutoCloseAt,
+  nextReminderAt,
+  shiftListingDates,
+  zonedMidnightAfter,
+} from './time';
 // Module-load registrations: the listing_slot usage counter and the trust subject handlers.
 import './slots';
 import './subjects';
+import { autoClose, repostReminders, stillHiringSweep } from './lifecycle';
 import { photoSlotCheck, resumeScreening, screenRevision } from './screening';
 export { CATEGORIES, GENRES, PERKS, type Category } from '@/lib/taxonomy';
 
@@ -179,18 +197,6 @@ export async function getListingSummaries(
   return notImplemented('getListingSummaries');
 }
 
-/** SP4 apply. */
-export async function canAcceptApplications(
-  _db: DbOrTx,
-  _listingId: string,
-  _now?: Date,
-): Promise<
-  | { ok: true; revisionId: string }
-  | { ok: false; reason: 'not_active' | 'org_inactive' | 'deadline_passed' }
-> {
-  return notImplemented('canAcceptApplications');
-}
-
 const statsProviders = new Map<string, ListingStatsProvider>();
 
 /** SP3, SP4 and SP5 fill the Library stats. */
@@ -277,7 +283,13 @@ export const jobHandlers: HandlerMap = {
   },
   'listings.enforce_slot_limit': noop,
   'listings.close_for_org': noop,
-  'listings.still_hiring_sweep': noop,
-  'listings.auto_close': noop,
-  'listings.repost_reminders': noop,
+  'listings.still_hiring_sweep': async (_payload, { db, now }) => {
+    await stillHiringSweep(db, now);
+  },
+  'listings.auto_close': async (_payload, { db, now }) => {
+    await autoClose(db, now);
+  },
+  'listings.repost_reminders': async (_payload, { db, now }) => {
+    await repostReminders(db, now);
+  },
 };

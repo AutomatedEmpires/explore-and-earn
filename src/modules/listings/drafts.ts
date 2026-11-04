@@ -167,7 +167,14 @@ export async function insertDraftListing(
       subjectType: 'listing',
       subjectId: id,
       data: {
-        start: i.provenance === 'imported' ? 'paste' : i.copiedFromId ? 'copy' : 'blank',
+        start:
+          i.provenance === 'imported'
+            ? 'paste'
+            : i.copiedFromId
+              ? 'copy'
+              : i.repostedFromId
+                ? 'repost'
+                : 'blank',
         ...(i.copiedFromId ? { copiedFromId: i.copiedFromId } : {}),
         ...(i.repostedFromId ? { repostedFromId: i.repostedFromId } : {}),
       },
