@@ -48,6 +48,12 @@ export {
   type CatalogPrice,
   type PortalConfigurationInput,
 } from './catalog';
+export {
+  createFoundingCodes,
+  generateFoundingCode,
+  getFoundingCount,
+  normalizeFoundingCode,
+} from './founding';
 
 export type SubscriptionState = {
   status:
@@ -102,19 +108,6 @@ export async function syncSubscription(_db: Db, _stripeSubscriptionId: string): 
 
 export async function getPendingKeepList(_db: DbOrTx, _orgId: string): Promise<string[] | null> {
   return notImplemented('getPendingKeepList');
-}
-
-export async function createFoundingCodes(
-  _db: Db,
-  _i: { count: number; note: string; operatorId: string | null },
-): Promise<string[]> {
-  return notImplemented('createFoundingCodes');
-}
-
-export async function getFoundingCount(
-  _db: DbOrTx,
-): Promise<{ redeemed: number; held: number; max: number }> {
-  return notImplemented('getFoundingCount');
 }
 
 /** Marks the org's pending plan change applied once listings has enforced its keep list. */
