@@ -32,6 +32,9 @@ const POSTHOG = {
   assets: ['https://us-assets.i.posthog.com', 'https://eu-assets.i.posthog.com'],
 };
 
+/** Mapbox GL (LocationPicker): styles, tiles and telemetry. Its workers run from blob: URLs. */
+const MAPBOX = ['https://api.mapbox.com', 'https://events.mapbox.com'];
+
 /** Public images served from Supabase Storage (media-public). */
 const SUPABASE_STORAGE = 'https://*.supabase.co';
 
@@ -109,6 +112,7 @@ export function buildSecurityHeaders(i: {
         ...SENTRY_INGEST,
         ...POSTHOG.api,
         ...POSTHOG.assets,
+        ...MAPBOX,
       ],
     ],
     ['worker-src', ["'self'", 'blob:']],

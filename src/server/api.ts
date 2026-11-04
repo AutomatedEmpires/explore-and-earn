@@ -29,7 +29,7 @@ import { registerRoute } from './openapi';
 import { REQUEST_ID_HEADER, requestIdFrom, runWithRequestContext } from './request-context';
 
 export type AuthMode = 'none' | 'user' | 'seeker' | 'host' | 'operator';
-export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export type ApiContext<I> = {
   input: I;
