@@ -7,6 +7,7 @@ cron, Clerk, Vercel and GitHub. The design is in
 - **Who runs it:** the founder, or an engineer with access to each dashboard.
 - **When:** once per environment. Re-run a section when you rotate a secret or rebuild a project.
 - **Never commit a value** from this runbook. Secrets go in Vercel and GitHub environment secrets only.
+- **Where the account tokens live:** Doppler project `exploreandearn`, config `prd` only (there are no `dev` or `stg` configs). It holds the provider tokens (Supabase, Vercel, Clerk, Stripe, Resend, PostHog, Sentry, Anthropic, GoDaddy). Run scripts with `doppler run --project exploreandearn --config prd -- <command>`. Secrets the setup generated (database passwords, `JOBS_SECRET`, `UNSUBSCRIBE_SECRET`, VAPID keys) are in the Vercel env. Rotate everything at launch.
 
 ## Environments
 
