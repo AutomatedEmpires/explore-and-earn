@@ -2,13 +2,18 @@
 //   1. read the upload from quarantine;
 //   2. trust the bytes, not the name: the detected type must equal the declared one and be
 //      allowed for the kind, else `type_mismatch` (an SVG is never an image here);
-//   3. images: re-encode (auto-rotated, no metadata) into WebP variants, run the child-safety
-//      hash check (a match is `blocked`, preserved as evidence and sent to the child_safety
-//      queue, and nothing else happens), then the AI safety check;
+//   3. images: run the child-safety hash check on the original bytes before anything can
+//      reject them (a match is `blocked`, preserved as evidence and sent to the child_safety
+//      queue, and nothing else happens; an image the scanner cannot read is held for review,
+//      never deleted unchecked), then re-encode (auto-rotated, no metadata) into WebP
+//      variants, then the AI safety check;
 //   4. PDFs: structure and malware checks;
-//   5. the file lands in its final bucket and the quarantine copy is deleted (unless blocked).
-// Each run is idempotent: only a row still `scanning` is processed and settled, and every
-// storage write goes to a fixed path, so a retried job converges on the same result.
+//   5. the file lands in its final bucket and the quarantine copy is deleted (unless blocked
+//      or unreadable by the scanner). An image the classifier rejects is kept in
+//      media-private, never served to its owner, so an operator can still overturn it.
+// Each run is idempotent: only a row still `scanning` is processed and settled, every storage
+// write goes to a fixed path, and the AI check is reused once stored, so a retried job
+// converges on the same result with one check and one review item.
 import { createHash } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { fileTypeFromBuffer } from 'file-type';
@@ -19,7 +24,13 @@ import { conflict, isAppError, notFound } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { record } from '@/modules/audit';
 import { enqueue, type HandlerMap } from '@/modules/jobs';
-import { openReviewItem, runCheck, type ReviewAction } from '@/modules/trust';
+import {
+  findLatestCheck,
+  openReviewItem,
+  runCheck,
+  type CheckResult,
+  type ReviewAction,
+} from '@/modules/trust';
 import {
   allowsMime,
   ALT_TEXT_KINDS,
@@ -38,6 +49,7 @@ import {
 import {
   getChildSafetyScanner,
   getMalwareScanner,
+  UnscannableImageError,
   type ChildSafetyScanner,
   type MalwareScanner,
 } from './scanners';
@@ -52,6 +64,12 @@ export type ScanDeps = {
 };
 
 export const CLEANUP_TOPIC = 'media.cleanup';
+
+/** The review reason for an image the child-safety scanner cannot read. */
+export const UNSCANNABLE_REASON = 'child_safety_unscannable';
+
+/** Rejections whose file is kept (in media-private), so an operator can still publish it. */
+const RESTORABLE: readonly RejectionReason[] = ['unsafe_content', 'removed_by_operator'];
 
 /** Larger inputs are decompression bombs, not photos (about 100 megapixels). */
 const MAX_INPUT_PIXELS = 100_000_000;
@@ -204,6 +222,69 @@ async function block(
   return 'blocked';
 }
 
+/**
+ * Fails closed when the child-safety scanner cannot read the image: the file is never deleted
+ * (or published) unchecked. The original stays in quarantine, where nothing serves it, the
+ * file is held `in_review`, and a moderation item asks an operator to decide. It can only be
+ * removed: approveHeldMedia refuses a file still in quarantine.
+ */
+async function holdUnscannable(
+  db: DbOrTx,
+  row: MediaRow,
+  facts: Facts,
+  err: UnscannableImageError,
+): Promise<MediaStatus> {
+  let settled = false;
+  await db.transaction(async (tx) => {
+    settled = await settle(tx, row.id, { status: 'in_review', ...factColumns(facts) });
+    if (!settled) return;
+    await openReviewItem(tx, {
+      queue: 'moderation',
+      subjectType: 'media',
+      subjectId: row.id,
+      reason: UNSCANNABLE_REASON,
+    });
+    await record(tx, {
+      actorType: 'system',
+      actorId: null,
+      orgId: row.ownerOrgId,
+      action: 'media.held_unscannable',
+      subjectType: 'media',
+      subjectId: row.id,
+      data: {
+        sha256: facts.sha256,
+        detectedMime: facts.detectedMime ?? null,
+        ownerUserId: row.ownerUserId,
+      },
+    });
+  });
+  if (!settled) return statusOf(db, row.id);
+  logger.warn('media held: the child-safety scanner cannot read it', {
+    mediaId: row.id,
+    mime: facts.detectedMime,
+    error: err,
+  });
+  return 'in_review';
+}
+
+/**
+ * The image's AI safety check, once per scan. A scan is retried when a later step fails (a
+ * storage write, the settle) after the check was stored; the retry reuses that check, with
+ * the review item it opened and its alt text, rather than store a second check and open a
+ * second item. A file is `scanning` only once, so any image check of it is this scan's.
+ */
+async function imageCheck(
+  db: DbOrTx,
+  mediaId: string,
+  image: Uint8Array,
+  wantAltText: boolean,
+): Promise<CheckResult> {
+  const subject = { kind: 'image_safety', subjectType: 'media', subjectId: mediaId } as const;
+  const earlier = await findLatestCheck(db, subject);
+  if (earlier) return earlier;
+  return runCheck(db, { ...subject, image: { mime: 'image/webp', bytes: image }, wantAltText });
+}
+
 async function scanImage(
   db: DbOrTx,
   deps: ScanDeps,
@@ -211,6 +292,17 @@ async function scanImage(
   original: Uint8Array,
   facts: Facts,
 ): Promise<MediaStatus> {
+  // The hash check comes first, on the original bytes, so a file that fails to decode below
+  // has still been checked before its original is deleted.
+  let match: Awaited<ReturnType<ChildSafetyScanner['scanImage']>>;
+  try {
+    match = await deps.childSafety.scanImage(original);
+  } catch (err) {
+    if (err instanceof UnscannableImageError) return holdUnscannable(db, row, facts, err);
+    throw err;
+  }
+  if (match.match) return block(db, deps, row, original, facts, match);
+
   let processed: Processed;
   try {
     processed = await processImage(original);
@@ -220,37 +312,32 @@ async function scanImage(
     return reject(db, deps, row, reason, facts, { error: err });
   }
 
-  const match = await deps.childSafety.scanImage(original);
-  if (match.match) return block(db, deps, row, original, facts, match);
-
   // The classifier sees the largest re-encoded variant: no metadata, a format and size the
   // model accepts, and the same pixels the public will see.
   const largest = processed.variants[processed.variants.length - 1];
   if (!largest) throw new Error('No image variants were produced');
   const wantAltText = ALT_TEXT_KINDS.includes(row.kind);
-  const check = await runCheck(db, {
-    kind: 'image_safety',
-    subjectType: 'media',
-    subjectId: row.id,
-    image: { mime: 'image/webp', bytes: largest.bytes },
-    wantAltText,
-  });
-  if (check.decision === 'rejected') {
-    return reject(db, deps, row, 'unsafe_content', facts, { checkId: check.checkId });
-  }
+  const check = await imageCheck(db, row.id, largest.bytes, wantAltText);
 
-  // Held for review in the private bucket, where only the owner and operators can see it.
-  const approved = check.decision === 'approved';
-  const bucket = approved ? destinationBucket(row.kind) : 'media-private';
+  // Approved: the final bucket. Held for review: media-private, for the owner and operators.
+  // Rejected: media-private too, for operators only, so an accuracy sample or an appeal can
+  // still publish it.
+  const status: MediaStatus =
+    check.decision === 'approved'
+      ? 'approved'
+      : check.decision === 'rejected'
+        ? 'rejected'
+        : 'in_review';
+  const bucket = status === 'approved' ? destinationBucket(row.kind) : 'media-private';
   const variants = variantPaths(row.id);
   for (const v of processed.variants) {
     const objectPath = variants[String(v.width)];
     if (objectPath) await deps.storage.write(bucket, objectPath, v.bytes, 'image/webp');
   }
 
-  const status = approved ? 'approved' : 'in_review';
   const settled = await settle(db, row.id, {
     status,
+    ...(status === 'rejected' ? { rejectionReason: 'unsafe_content' satisfies RejectionReason } : {}),
     bucket,
     path: row.id,
     variants,
@@ -260,6 +347,14 @@ async function scanImage(
     ...factColumns(facts),
   });
   if (!settled) return statusOf(db, row.id);
+  if (status === 'rejected') {
+    logger.info('media rejected', {
+      mediaId: row.id,
+      kind: row.kind,
+      reason: 'unsafe_content',
+      checkId: check.checkId,
+    });
+  }
   await removeQuietly(deps.storage, 'quarantine', row.path);
   return status;
 }
@@ -353,12 +448,72 @@ async function lockRow(db: DbOrTx, mediaId: string): Promise<MediaRow> {
   return row;
 }
 
-/** Deletes objects once the caller's transaction commits (they may still be needed if not). */
-async function enqueueCleanup(db: DbOrTx, objects: ObjectRef[]): Promise<void> {
-  if (objects.length > 0) await enqueue(db, { topic: CLEANUP_TOPIC, payload: { objects } });
+/**
+ * Deletes a file's superseded copies once the caller's transaction commits (they may still be
+ * needed if not). The job keeps any copy the file uses again by the time it runs (see
+ * cleanupMedia).
+ */
+async function enqueueCleanup(db: DbOrTx, mediaId: string, objects: ObjectRef[]): Promise<void> {
+  if (objects.length > 0) {
+    await enqueue(db, { topic: CLEANUP_TOPIC, payload: { mediaId, objects } });
+  }
 }
 
-/** `approve` on a held file: it is published to its final bucket. */
+/** The objects a file still uses: its copies in its bucket, unless it can never be used. */
+function liveObjects(row: MediaRow | undefined): Set<string> {
+  // A rejected file still in quarantine was never scanned, so it can never be published.
+  if (!row || (row.status === 'rejected' && row.bucket === 'quarantine')) return new Set();
+  return new Set(objectPathsOf(row).map((p) => `${row.bucket}/${p}`));
+}
+
+/**
+ * The `media.cleanup` job. Paths are fixed per file, so a copy queued for deletion can be in use
+ * again when the job runs: removed (public copies queued), then restored by an appeal to the
+ * same paths before the job ran. The row stays locked while the job deletes, so no decision
+ * moves the file in between, and every copy the file uses now is kept.
+ */
+async function cleanupMedia(
+  db: DbOrTx,
+  storage: Storage,
+  mediaId: string | undefined,
+  objects: ObjectRef[],
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    let live = new Set<string>();
+    if (mediaId !== undefined && isUuid(mediaId)) {
+      const [row] = await tx.select().from(media).where(eq(media.id, mediaId)).for('update');
+      live = liveObjects(row);
+    }
+    for (const o of objects) {
+      if (!live.has(`${o.bucket}/${o.path}`)) await storage.remove(o.bucket, o.path);
+    }
+  });
+}
+
+/** Why an operator cannot publish this file, or null when they can. */
+function whyNotPublishable(row: MediaRow): string | null {
+  switch (row.status) {
+    case 'in_review':
+      return row.bucket === 'quarantine'
+        ? 'This file could not be checked for child safety, so it can never be published'
+        : null;
+    case 'rejected':
+      return row.bucket === 'media-private' &&
+        (RESTORABLE as readonly (string | null)[]).includes(row.rejectionReason)
+        ? null
+        : `This file was rejected (${row.rejectionReason ?? 'unknown'}) and not kept; ask for a new upload`;
+    case 'blocked':
+      return 'A child-safety match is preserved as evidence and is never published';
+    default:
+      return `Media ${row.id} is still ${row.status}`;
+  }
+}
+
+/**
+ * `approve`: a held file is published to its final bucket. So is a rejected one that was kept
+ * (rejected by the classifier, or removed by an operator), when an accuracy sample or an
+ * appeal overturns that. Throws `conflict` for anything else, a blocked file above all.
+ */
 export async function approveHeldMedia(
   db: DbOrTx,
   storage: Storage,
@@ -366,55 +521,78 @@ export async function approveHeldMedia(
 ): Promise<void> {
   const row = await lockRow(db, mediaId);
   if (row.status === 'approved') return;
-  if (row.status !== 'in_review') {
-    throw conflict(`Media ${mediaId} is ${row.status}, not in review`);
-  }
+  const refusal = whyNotPublishable(row);
+  if (refusal) throw conflict(refusal);
 
   const from = row.bucket;
   const to = destinationBucket(row.kind);
   const paths = objectPathsOf(row);
+  const approved = { status: 'approved', rejectionReason: null } as const;
   if (to === from) {
-    await db.update(media).set({ status: 'approved' }).where(eq(media.id, mediaId));
+    await db.update(media).set(approved).where(eq(media.id, mediaId));
     return;
   }
   for (const p of paths) await storage.copy({ bucket: from, path: p }, { bucket: to, path: p });
-  await db.update(media).set({ status: 'approved', bucket: to }).where(eq(media.id, mediaId));
+  await db
+    .update(media)
+    .set({ ...approved, bucket: to })
+    .where(eq(media.id, mediaId));
   await enqueueCleanup(
     db,
+    mediaId,
     paths.map((p) => ({ bucket: from, path: p })),
   );
 }
 
-/** `remove` on a held or published file: it is rejected and its copies deleted. */
-export async function removeMedia(db: DbOrTx, mediaId: string): Promise<void> {
+/**
+ * `remove`: a held or published file is rejected (`removed_by_operator`) and taken down. Its
+ * copies are kept in media-private, never served to its owner, so an appeal can publish it
+ * again; a held file the scanner could not read is deleted instead. On a blocked file (a
+ * child-safety match) it confirms the block: nothing changes, and the evidence stays.
+ */
+export async function removeMedia(db: DbOrTx, storage: Storage, mediaId: string): Promise<void> {
   const row = await lockRow(db, mediaId);
-  if (row.status === 'rejected') return;
-  if (row.status === 'blocked') {
-    throw conflict('Blocked media is preserved as evidence and cannot be removed here');
-  }
+  if (row.status === 'rejected' || row.status === 'blocked') return;
   if (row.status !== 'in_review' && row.status !== 'approved') {
     throw conflict(`Media ${mediaId} is still ${row.status}`);
   }
 
+  const paths = objectPathsOf(row);
+  let bucket = row.bucket;
+  if (row.bucket === 'media-public') {
+    for (const p of paths) {
+      await storage.copy({ bucket: 'media-public', path: p }, { bucket: 'media-private', path: p });
+    }
+    bucket = 'media-private';
+  }
   await db
     .update(media)
-    .set({ status: 'rejected', rejectionReason: 'removed_by_operator' })
+    .set({ status: 'rejected', rejectionReason: 'removed_by_operator', bucket })
     .where(eq(media.id, mediaId));
-  await enqueueCleanup(
-    db,
-    objectPathsOf(row).map((p) => ({ bucket: row.bucket, path: p })),
-  );
+  // The public copies are superseded by the private ones; an unscanned original is not kept.
+  if (bucket !== row.bucket || row.bucket === 'quarantine') {
+    await enqueueCleanup(
+      db,
+      mediaId,
+      paths.map((p) => ({ bucket: row.bucket, path: p })),
+    );
+  }
 }
 
 type SubjectHandlers = Partial<
   Record<ReviewAction, (db: DbOrTx, subjectId: string, data?: unknown) => Promise<void>>
 >;
 
-/** What trust's decisions do to a `media` subject. `storage` is read when a decision runs. */
+/**
+ * What trust's decisions do to a `media` subject, in every state an item can find it: a held
+ * file (moderation), a published one (reports), a blocked one (child_safety: `remove` confirms
+ * the block), a removed or rejected one (appeals, audit_sample: `approve` publishes it, `remove`
+ * upholds it). `storage` is read when a decision runs.
+ */
 export function createMediaSubjectHandlers(storage: () => Storage): SubjectHandlers {
   return {
     approve: (db, subjectId) => approveHeldMedia(db, storage(), subjectId),
-    remove: (db, subjectId) => removeMedia(db, subjectId),
+    remove: (db, subjectId) => removeMedia(db, storage(), subjectId),
   };
 }
 
@@ -422,6 +600,8 @@ export function createMediaSubjectHandlers(storage: () => Storage): SubjectHandl
 
 const scanPayload = z.object({ mediaId: z.string() });
 const cleanupPayload = z.object({
+  /** Absent in jobs queued before the copies were checked against the file. */
+  mediaId: z.string().optional(),
   objects: z.array(z.object({ bucket: z.enum(BUCKETS), path: z.string().min(1) })),
 });
 
@@ -438,9 +618,8 @@ export const mediaJobHandlers: HandlerMap = {
       throw err;
     }
   },
-  [CLEANUP_TOPIC]: async (payload) => {
-    const { objects } = cleanupPayload.parse(payload);
-    const storage = getStorage();
-    for (const o of objects) await storage.remove(o.bucket, o.path);
+  [CLEANUP_TOPIC]: async (payload, { db }) => {
+    const { mediaId, objects } = cleanupPayload.parse(payload);
+    await cleanupMedia(db, getStorage(), mediaId, objects);
   },
 };

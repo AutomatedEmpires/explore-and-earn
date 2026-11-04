@@ -20,22 +20,27 @@ import {
   photoDnaScanner,
   stubChildSafetyScanner,
   stubMalwareScanner,
+  UnscannableImageError,
 } from './scanners';
 import { getStorage, type MemoryStorage } from './storage';
 import { completeUpload, requestUpload } from './uploads';
 
 // The trust module (W5) is replaced by a fake that keeps the documented contract:
 // runCheck returns the verdict set for the subject (default approved) and, like the real one,
-// opens a moderation item on needs_review; openReviewItem records the item; decide() runs the
-// subject handler registered for the item's subject type, the way trust.decide applies it.
+// opens a moderation item on needs_review and stores the result, which findLatestCheck
+// returns; openReviewItem records the item; decide() runs the subject handler registered for
+// the item's subject type, the way trust.decide applies it.
 type SubjectHandler = (db: DbOrTx, subjectId: string, data?: unknown) => Promise<void>;
 type FakeItem = OpenReviewItemInput & { id: string; resolution?: string };
+type CheckKey = Pick<RunCheckInput, 'kind' | 'subjectType' | 'subjectId'>;
 
 const trust = vi.hoisted(() => {
   const subjects = new Map<string, Partial<Record<string, SubjectHandler>>>();
   const items: FakeItem[] = [];
   const checks: RunCheckInput[] = [];
+  const results = new Map<string, CheckResult>();
   const verdicts = new Map<string, CheckResult['decision']>();
+  const keyOf = (k: CheckKey) => `${k.kind}:${k.subjectType}:${k.subjectId}`;
 
   const openReviewItem = async (_db: DbOrTx, i: OpenReviewItemInput) => {
     const id = globalThis.crypto.randomUUID();
@@ -47,8 +52,12 @@ const trust = vi.hoisted(() => {
     subjects,
     items,
     checks,
+    results,
     verdicts,
     openReviewItem,
+    async findLatestCheck(_db: DbOrTx, k: CheckKey): Promise<CheckResult | null> {
+      return results.get(keyOf(k)) ?? null;
+    },
     registerSubjectHandlers(subjectType: string, h: Partial<Record<string, SubjectHandler>>) {
       subjects.set(subjectType, h);
     },
@@ -69,6 +78,7 @@ const trust = vi.hoisted(() => {
       }
       const result: CheckResult = { checkId, decision, score, labels: [], reason: 'fake' };
       if (i.wantAltText) result.altText = 'Test image';
+      results.set(keyOf(i), result);
       return result;
     },
     async decide(db: DbOrTx, itemId: string, action: 'approve' | 'remove') {
@@ -84,6 +94,7 @@ const trust = vi.hoisted(() => {
 
 vi.mock('@/modules/trust', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/modules/trust')>()),
+  findLatestCheck: trust.findLatestCheck,
   openReviewItem: trust.openReviewItem,
   registerSubjectHandlers: trust.registerSubjectHandlers,
   runCheck: trust.runCheck,
@@ -92,6 +103,10 @@ vi.mock('@/modules/trust', async (importOriginal) => ({
 const FIXTURES = path.resolve('tests/fixtures/media');
 const fixture = (name: string) => new Uint8Array(readFileSync(path.join(FIXTURES, name)));
 const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+
+/** A JPEG header (the type check passes) with no decodable image behind it. */
+const corruptJpeg = () =>
+  new Uint8Array([...fixture('gps.jpg').subarray(0, 20), ...new Uint8Array(200).fill(7)]);
 
 let t: TestDb;
 let storage: MemoryStorage;
@@ -114,6 +129,7 @@ afterAll(async () => {
 beforeEach(async () => {
   trust.items.length = 0;
   trust.checks.length = 0;
+  trust.results.clear();
   trust.verdicts.clear();
   await t.db.execute(sql`delete from app.outbox`);
 });
@@ -302,6 +318,105 @@ describe('scanMedia: images', () => {
     expect(audit).toEqual([{ action: 'media.blocked' }]);
   });
 
+  it('checks an image it cannot decode for child safety first, and blocks a match', async () => {
+    const original = corruptJpeg();
+    const { mediaId } = await uploaded('community_photo', 'image/jpeg', original);
+
+    expect(await scanMedia(t.db, deps([sha256(original)]), mediaId)).toBe('blocked');
+
+    expect(await row(mediaId)).toMatchObject({ status: 'blocked', bucket: 'evidence' });
+    expect([...(await storage.read('evidence', mediaId))]).toEqual([...original]);
+    expect(objectsOf('quarantine', mediaId)).toEqual([mediaId]);
+    expect(trust.items).toEqual([
+      expect.objectContaining({ queue: 'child_safety', subjectType: 'media', subjectId: mediaId }),
+    ]);
+  });
+
+  it('rejects an image it cannot decode only once the child-safety check has cleared it', async () => {
+    const original = corruptJpeg();
+    const { mediaId } = await uploaded('listing_photo', 'image/jpeg', original);
+    const d = deps();
+    const hashCheck = vi.spyOn(d.childSafety, 'scanImage');
+
+    expect(await scanMedia(t.db, d, mediaId)).toBe('rejected');
+
+    expect(hashCheck).toHaveBeenCalledWith(original);
+    expect(await row(mediaId)).toMatchObject({ rejection_reason: 'invalid_image' });
+    expect(objectsOf('quarantine', mediaId)).toEqual([]);
+  });
+
+  it('holds an image the child-safety scanner cannot read, keeping the original', async () => {
+    const original = corruptJpeg();
+    const { mediaId } = await uploaded('community_photo', 'image/jpeg', original);
+    const unreadable = {
+      async scanImage(): Promise<never> {
+        throw new UnscannableImageError('cannot read this image');
+      },
+    };
+
+    expect(await scanMedia(t.db, { ...deps(), childSafety: unreadable }, mediaId)).toBe(
+      'in_review',
+    );
+
+    expect(await row(mediaId)).toMatchObject({
+      status: 'in_review',
+      bucket: 'quarantine',
+      sha256: sha256(original),
+    });
+    expect(objectsOf('quarantine', mediaId)).toEqual([mediaId]);
+    expect(trust.checks).toEqual([]);
+    const item = trust.items.find((i) => i.subjectId === mediaId);
+    expect(item).toMatchObject({
+      queue: 'moderation',
+      subjectType: 'media',
+      reason: 'child_safety_unscannable',
+    });
+
+    // It is never published unchecked; removing it deletes the original.
+    await expect(trust.decide(t.db, item?.id ?? '', 'approve')).rejects.toMatchObject({
+      code: 'conflict',
+    });
+    await trust.decide(t.db, item?.id ?? '', 'remove');
+    expect(await row(mediaId)).toMatchObject({
+      status: 'rejected',
+      rejection_reason: 'removed_by_operator',
+    });
+    await runWorker(t.db, { handlers: jobHandlers });
+    expect(objectsOf('quarantine', mediaId)).toEqual([]);
+  });
+
+  it('retries the scan when the child-safety scanner fails for another reason', async () => {
+    const { mediaId } = await uploaded('community_photo', 'image/jpeg', fixture('gps.jpg'));
+    const down = {
+      async scanImage(): Promise<never> {
+        throw new Error('PhotoDNA responded 503');
+      },
+    };
+    await expect(scanMedia(t.db, { ...deps(), childSafety: down }, mediaId)).rejects.toThrow(
+      '503',
+    );
+    expect(await row(mediaId)).toMatchObject({ status: 'scanning', bucket: 'quarantine' });
+    expect(objectsOf('quarantine', mediaId)).toEqual([mediaId]);
+  });
+
+  it('opens one review item when a scan is retried after its check ran', async () => {
+    const { mediaId } = await uploaded('housing_photo', 'image/jpeg', fixture('gps.jpg'));
+    trust.verdicts.set(mediaId, 'needs_review');
+    const write = vi.spyOn(storage, 'write').mockRejectedValueOnce(new Error('storage is down'));
+
+    try {
+      await expect(scanMedia(t.db, deps(), mediaId)).rejects.toThrow('storage is down');
+      expect((await row(mediaId)).status).toBe('scanning');
+      expect(await scanMedia(t.db, deps(), mediaId)).toBe('in_review');
+    } finally {
+      write.mockRestore();
+    }
+
+    expect(trust.checks).toHaveLength(1);
+    expect(trust.items.filter((i) => i.subjectId === mediaId)).toHaveLength(1);
+    expect(await row(mediaId)).toMatchObject({ status: 'in_review', alt_text: 'Test image' });
+  });
+
   it('holds a flagged image in review; approving it through decide publishes it', async () => {
     const { mediaId } = await uploaded('housing_photo', 'image/jpeg', fixture('gps.jpg'));
     trust.verdicts.set(mediaId, 'needs_review');
@@ -326,7 +441,7 @@ describe('scanMedia: images', () => {
     expect(objectsOf('media-private', mediaId)).toEqual([]);
   });
 
-  it('removing a flagged image rejects it and deletes the held copies', async () => {
+  it('removing a flagged image rejects it and keeps the held copies private', async () => {
     const { mediaId } = await uploaded('meal_photo', 'image/png', fixture('gps.png'));
     trust.verdicts.set(mediaId, 'needs_review');
     await scanMedia(t.db, deps(), mediaId);
@@ -337,10 +452,86 @@ describe('scanMedia: images', () => {
     expect(await row(mediaId)).toMatchObject({
       status: 'rejected',
       rejection_reason: 'removed_by_operator',
+      bucket: 'media-private',
     });
     await runWorker(t.db, { handlers: jobHandlers });
-    expect(objectsOf('media-private', mediaId)).toEqual([]);
+    expect(objectsOf('media-private', mediaId)).toHaveLength(3);
     expect(objectsOf('media-public', mediaId)).toEqual([]);
+  });
+
+  it('an appeal granted on a removed image publishes it again', async () => {
+    const { mediaId } = await uploaded('listing_photo', 'image/jpeg', fixture('gps.jpg'));
+    expect(await scanMedia(t.db, deps(), mediaId)).toBe('approved');
+    const report = await trust.openReviewItem(t.db, {
+      queue: 'reports',
+      subjectType: 'media',
+      subjectId: mediaId,
+      reason: 'reported',
+    });
+
+    // Removing a published image takes it down; a private copy is kept for an appeal.
+    await trust.decide(t.db, report.id, 'remove');
+    expect(await row(mediaId)).toMatchObject({ status: 'rejected', bucket: 'media-private' });
+    await runWorker(t.db, { handlers: jobHandlers });
+    expect(objectsOf('media-public', mediaId)).toEqual([]);
+    expect(objectsOf('media-private', mediaId)).toHaveLength(3);
+
+    const appeal = await trust.openReviewItem(t.db, {
+      queue: 'appeals',
+      subjectType: 'media',
+      subjectId: mediaId,
+      reason: 'It is my own photo',
+      originalItemId: report.id,
+    });
+    await trust.decide(t.db, appeal.id, 'approve');
+
+    expect(await row(mediaId)).toMatchObject({
+      status: 'approved',
+      bucket: 'media-public',
+      rejection_reason: null,
+      alt_text: 'Test image',
+    });
+    await runWorker(t.db, { handlers: jobHandlers });
+    expect(objectsOf('media-public', mediaId)).toHaveLength(3);
+    expect(objectsOf('media-private', mediaId)).toEqual([]);
+  });
+
+  it('an operator can overturn the classifier rejecting an image (accuracy sample)', async () => {
+    const { mediaId } = await uploaded('community_photo', 'image/jpeg', fixture('gps.jpg'));
+    trust.verdicts.set(mediaId, 'rejected');
+    expect(await scanMedia(t.db, deps(), mediaId)).toBe('rejected');
+    const sample = await trust.openReviewItem(t.db, {
+      queue: 'audit_sample',
+      subjectType: 'media',
+      subjectId: mediaId,
+      reason: 'Accuracy sample',
+    });
+
+    await trust.decide(t.db, sample.id, 'approve');
+
+    expect(await row(mediaId)).toMatchObject({
+      status: 'approved',
+      bucket: 'media-public',
+      rejection_reason: null,
+    });
+    expect(objectsOf('media-public', mediaId)).toHaveLength(3);
+  });
+
+  it('removing a blocked file confirms the block and keeps the evidence', async () => {
+    const original = fixture('gps.jpg');
+    const { mediaId } = await uploaded('community_photo', 'image/jpeg', original);
+    await scanMedia(t.db, deps([sha256(original)]), mediaId);
+    const item = trust.items.find((i) => i.queue === 'child_safety');
+
+    await expect(trust.decide(t.db, item?.id ?? '', 'approve')).rejects.toMatchObject({
+      code: 'conflict',
+    });
+    await trust.decide(t.db, item?.id ?? '', 'remove');
+    await runWorker(t.db, { handlers: jobHandlers });
+
+    expect(await row(mediaId)).toMatchObject({ status: 'blocked', bucket: 'evidence' });
+    expect([...(await storage.read('evidence', mediaId))]).toEqual([...original]);
+    expect(objectsOf('quarantine', mediaId)).toEqual([mediaId]);
   });
 
   it('refuses to approve while the scan has not finished', async () => {
@@ -349,14 +540,17 @@ describe('scanMedia: images', () => {
     await expect(approve?.(t.db, mediaId)).rejects.toMatchObject({ code: 'conflict' });
   });
 
-  it('rejects an image the classifier rejects, keeping no copy', async () => {
+  it('rejects an image the classifier rejects, keeping only a private copy', async () => {
     const { mediaId } = await uploaded('community_photo', 'image/jpeg', fixture('gps.jpg'));
     trust.verdicts.set(mediaId, 'rejected');
     expect(await scanMedia(t.db, deps(), mediaId)).toBe('rejected');
-    expect(await row(mediaId)).toMatchObject({ rejection_reason: 'unsafe_content' });
-    for (const bucket of ['quarantine', 'media-public', 'media-private'] as const) {
-      expect(objectsOf(bucket, mediaId)).toEqual([]);
-    }
+    expect(await row(mediaId)).toMatchObject({
+      rejection_reason: 'unsafe_content',
+      bucket: 'media-private',
+    });
+    expect(objectsOf('media-private', mediaId)).toHaveLength(3);
+    expect(objectsOf('media-public', mediaId)).toEqual([]);
+    expect(objectsOf('quarantine', mediaId)).toEqual([]);
   });
 });
 
@@ -546,5 +740,14 @@ describe('scanners', () => {
       fetch: reply({ Status: { Code: 3208, Description: 'Bad image' }, IsMatch: false }),
     });
     await expect(failing.scanImage(jpg)).rejects.toThrow(/3208/);
+    // A provider error is retried, not treated as an unreadable image.
+    await expect(failing.scanImage(jpg)).rejects.not.toBeInstanceOf(UnscannableImageError);
+  });
+
+  it('PhotoDNA: an image it can neither read nor convert is unscannable; nothing is sent', async () => {
+    const fetchSpy = vi.fn(async () => Response.json({}));
+    const scanner = photoDnaScanner({ key: 'pdna', fetch: fetchSpy });
+    await expect(scanner.scanImage(corruptJpeg())).rejects.toBeInstanceOf(UnscannableImageError);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

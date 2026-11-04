@@ -5,6 +5,7 @@ import { newId } from '@/lib/ids';
 import { notify } from '@/modules/notifications';
 import { schedules } from '@/server/schedules';
 import { jobHandlers, openReviewItem, slaSweep } from './index';
+import { SWEEP_LIMIT } from './sla';
 import { addOperator, auditActions, getItem, resetTrustTables, setShift } from './test-fixtures';
 
 vi.mock('@/modules/notifications', () => ({
@@ -129,6 +130,31 @@ describe('slaSweep', () => {
     expect((await slaSweep(t.db, hoursFromNow(0.5))).breached).toBe(0);
     expect((await slaSweep(t.db, hoursFromNow(1.5))).breached).toBe(1);
     expect((await getItem(t.db, id)).sla_breached_at).not.toBeNull();
+  });
+
+  it('reaches a newly overdue item behind a backlog of breached ones', async () => {
+    const owner = await addOperator(t.db, { role: 'owner', shift: 'away' });
+    // More breached items than one sweep handles, all older and as urgent as the new one.
+    const past = hoursFromNow(-48);
+    await t.db.execute(sql`
+      insert into app.review_items
+        (id, queue, status, subject_type, subject_id, reason, sla_due_at, sla_breached_at)
+      select gen_random_uuid(), 'moderation', 'open', 'test_item', gen_random_uuid()::text,
+        'backlog', ${past}::timestamptz, ${past}::timestamptz
+      from generate_series(1, ${SWEEP_LIMIT + 1})
+    `);
+    const { id } = await openModeration();
+
+    expect(await slaSweep(t.db, hoursFromNow(25))).toEqual({ reassigned: 0, breached: 1 });
+
+    expect((await getItem(t.db, id)).sla_breached_at).not.toBeNull();
+    expect(vi.mocked(notify)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(notify)).toHaveBeenCalledWith(
+      expect.anything(),
+      owner,
+      'operator.alert',
+      expect.objectContaining({ kind: 'sla_breach', itemId: id }),
+    );
   });
 
   it('ignores resolved items', async () => {

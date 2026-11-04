@@ -4,6 +4,7 @@
 // Fail closed (Review Focus 5): if the classifier errors, times out, or answers in the wrong
 // shape, the decision is needs_review with reason 'classifier_error'. Nothing is ever approved
 // without a valid classifier answer.
+import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { CLASSIFIER_MODEL, ClassifierError, classify, type ClassifyContent } from '@/lib/ai';
 import type { DbOrTx } from '@/lib/db';
@@ -148,7 +149,8 @@ export async function runCheck(db: DbOrTx, i: RunCheckInput): Promise<CheckResul
   const reason = output
     ? output.reason.trim().slice(0, MAX_REASON_LENGTH) || 'No reason given'
     : CLASSIFIER_ERROR;
-  const altText = output?.altText?.trim().slice(0, MAX_ALT_TEXT_LENGTH);
+  const wrote = output?.altText?.trim().slice(0, MAX_ALT_TEXT_LENGTH);
+  const altText = i.kind === 'image_safety' && i.wantAltText && wrote ? wrote : undefined;
 
   await transact(db, async (tx) => {
     await tx.insert(trustChecks).values({
@@ -165,6 +167,7 @@ export async function runCheck(db: DbOrTx, i: RunCheckInput): Promise<CheckResul
       decision,
       latencyMs,
       error,
+      altText: altText ?? null,
     });
     if (decision === 'needs_review') {
       await openReviewItem(tx, {
@@ -184,6 +187,39 @@ export async function runCheck(db: DbOrTx, i: RunCheckInput): Promise<CheckResul
     score: output ? output.score : 1,
     labels,
     reason,
-    ...(i.kind === 'image_safety' && i.wantAltText && altText ? { altText } : {}),
+    ...(altText ? { altText } : {}),
+  };
+}
+
+/**
+ * The newest stored check of `kind` for a subject, as runCheck returned it (a failed one has
+ * score 1), or null. A caller that must classify a subject once (a retried media scan) reads
+ * this first, so a retry reuses the earlier result and the review item it opened instead of
+ * storing a second check and opening a second item.
+ */
+export async function findLatestCheck(
+  db: DbOrTx,
+  i: { kind: CheckKind; subjectType: string; subjectId: string },
+): Promise<CheckResult | null> {
+  const [row] = await db
+    .select()
+    .from(trustChecks)
+    .where(
+      and(
+        eq(trustChecks.kind, i.kind),
+        eq(trustChecks.subjectType, i.subjectType),
+        eq(trustChecks.subjectId, i.subjectId),
+      ),
+    )
+    .orderBy(desc(trustChecks.createdAt), desc(trustChecks.id))
+    .limit(1);
+  if (!row) return null;
+  return {
+    checkId: row.id,
+    decision: row.decision,
+    score: row.score ?? 1,
+    labels: row.labels,
+    reason: row.reason,
+    ...(row.altText ? { altText: row.altText } : {}),
   };
 }

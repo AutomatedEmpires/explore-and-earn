@@ -8,7 +8,22 @@ import { z } from 'zod';
 import { getEnv } from '@/lib/env';
 
 export interface ChildSafetyScanner {
+  /**
+   * Throws UnscannableImageError when it cannot read this image at all (a format it does not
+   * take that cannot be converted); any other error means "try again later".
+   */
   scanImage(bytes: Uint8Array): Promise<{ match: boolean; provider: string; reference?: string }>;
+}
+
+/**
+ * The child-safety scanner cannot read this image, so it can never be checked. The scan holds
+ * the file for review and keeps the original rather than retry, or delete it unchecked.
+ */
+export class UnscannableImageError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'UnscannableImageError';
+  }
 }
 
 export interface MalwareScanner {
@@ -90,10 +105,28 @@ export function photoDnaScanner(opts: PhotoDnaOptions = {}): ChildSafetyScanner 
       const key = opts.key ?? getEnv().PHOTODNA_KEY;
       if (!key) throw new Error('PHOTODNA_KEY is not set');
 
-      // PhotoDNA hashes are robust to re-encoding; send formats it reads as they are.
-      const format = (await sharp(bytes).metadata()).format;
-      const body =
-        format && PHOTODNA_FORMATS.has(format) ? bytes : await sharp(bytes).png().toBuffer();
+      // PhotoDNA hashes are robust to re-encoding; send formats it reads as they are, and
+      // convert the others (WebP, decodable HEIF) to PNG. HEVC-coded HEIC cannot be decoded
+      // here, so it cannot be converted, and PhotoDNA cannot read it.
+      const format = await sharp(bytes)
+        .metadata()
+        .then(
+          (m) => m.format,
+          () => undefined,
+        );
+      let body: Uint8Array;
+      if (format && PHOTODNA_FORMATS.has(format)) {
+        body = bytes;
+      } else {
+        try {
+          body = new Uint8Array(await sharp(bytes).png().toBuffer());
+        } catch (err) {
+          throw new UnscannableImageError(
+            `PhotoDNA cannot read this image (${format ?? 'unreadable'}) and it could not be converted`,
+            { cause: err },
+          );
+        }
+      }
 
       const res = await (opts.fetch ?? fetch)(`${endpoint}/photodna/v1.0/Match?enhance=false`, {
         method: 'POST',

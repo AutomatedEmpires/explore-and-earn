@@ -1,6 +1,7 @@
 // Media URLs. Approved public files have permanent public URLs. Everything else is private:
 // a 300-second signed URL, only for the owner, a member of the owning organization or an
-// operator. A blocked file (child-safety match) is never served to anyone.
+// operator. A rejected file that was kept (for an appeal or an accuracy sample) is shown to
+// operators only. A blocked file (child-safety match) is never served to anyone.
 import { eq } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
 import { forbidden, notFound } from '@/lib/errors';
@@ -19,7 +20,8 @@ const LARGEST: VariantWidth = VARIANT_WIDTHS[VARIANT_WIDTHS.length - 1] ?? 1280;
 /**
  * The URL of a media file, for images at one variant width (default the largest).
  * Throws `not_found` for an unknown id or a file not available (still scanning, or
- * rejected), and `forbidden` when the viewer may not read it.
+ * rejected, except to an operator when it was kept), and `forbidden` when the viewer may not
+ * read it.
  */
 export async function getMediaUrl(
   db: DbOrTx,
@@ -45,7 +47,11 @@ export async function getMediaUrl(
     (row.ownerOrgId !== null && viewer.orgIds.includes(row.ownerOrgId));
   if (!mayRead || row.status === 'blocked') throw forbidden('You cannot view this file');
 
-  if ((row.status === 'approved' || row.status === 'in_review') && row.bucket === 'media-private') {
+  const available =
+    row.status === 'approved' ||
+    row.status === 'in_review' ||
+    (row.status === 'rejected' && viewer.isOperator);
+  if (available && row.bucket === 'media-private') {
     return storage.signedUrl('media-private', objectPath, SIGNED_URL_TTL_SEC);
   }
   throw notFound('This file is not available');

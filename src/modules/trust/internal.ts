@@ -106,6 +106,30 @@ export async function activeOwners(db: DbOrTx): Promise<ActiveOperator[]> {
   return rows.map(toOperator);
 }
 
+/**
+ * Whether any operator (account not deleted) outside `exclude` exists, on shift or not;
+ * with `queue`, only operators covering it count.
+ */
+export async function anyOperatorBesides(
+  db: DbOrTx,
+  exclude: readonly (string | null | undefined)[],
+  queue?: string,
+): Promise<boolean> {
+  const rows = await queryRows<{ one: number }>(
+    db,
+    sql`
+      select 1 as one
+      from app.operators o
+      join app.users u on u.id = o.user_id and u.deleted_at is null
+      where true
+        ${queue === undefined ? sql`` : sql`and (o.role = 'owner' or ${queue}::text = any (o.queues))`}
+        ${excludeOperators(exclude)}
+      limit 1
+    `,
+  );
+  return rows.length > 0;
+}
+
 /** Owners match every queue; other operators only the queues they are assigned. */
 export function coversQueue(op: Pick<ActiveOperator, 'role' | 'queues'>, queue: string): boolean {
   return op.role === 'owner' || op.queues.includes(queue);

@@ -197,6 +197,38 @@ describe('decide and the second sign-off', () => {
     expect(await codeOf(decide(t.db, id, a, 'delete_everything'))).toBe('bad_request');
   });
 
+  it('takes the second sign-off from any other operator, even one outside the queue', async () => {
+    const owner = await addOperator(t.db, { role: 'owner' });
+    const support = await addOperator(t.db, { queues: ['support'], shift: 'away' });
+    const first = await open();
+    const second = await open();
+    expect((await getItem(t.db, first.id)).assignee_operator_id).toBe(owner);
+
+    // Two operators exist, so the Owner's ban waits; the only other one covers support alone.
+    expect(await decide(t.db, first.id, owner, 'ban')).toEqual({ status: 'pending_second' });
+    const [pending] = await actions(first.id);
+    await approveSecond(t.db, pending?.id ?? '', support);
+
+    expect(await getItem(t.db, first.id)).toMatchObject({
+      status: 'resolved',
+      resolution: 'ban',
+      decided_by: owner,
+    });
+    expect((await actions(first.id))[0]).toMatchObject({
+      status: 'applied',
+      second_operator_id: support,
+    });
+
+    // They may turn one down as well.
+    await decide(t.db, second.id, owner, 'ban');
+    const [another] = await actions(second.id);
+    await rejectSecond(t.db, another?.id ?? '', support);
+    expect((await actions(second.id))[0]).toMatchObject({
+      status: 'rejected',
+      second_operator_id: support,
+    });
+  });
+
   it('allows one pending decision per item, and a withdrawn one frees it', async () => {
     const a = await addOperator(t.db, { queues: ['moderation'] });
     const b = await addOperator(t.db, { queues: ['moderation'], shift: 'away' });
@@ -391,6 +423,71 @@ describe('appeals', () => {
       status: 'open',
       assignee_operator_id: null,
     });
+  });
+
+  it('keeps the original decider off the appeal while another operator could take it', async () => {
+    const owner = await addOperator(t.db, { role: 'owner' });
+    const b = await addOperator(t.db, { queues: ['appeals'], shift: 'away' });
+    const { id } = await open();
+    await decide(t.db, id, owner, 'remove');
+
+    // Opened while B is away: it waits, unassigned.
+    const appeal = await openAppeal(t.db, { originalItemId: id, reason: 'Please look again' });
+    expect(await getItem(t.db, appeal.id)).toMatchObject({
+      status: 'open',
+      assignee_operator_id: null,
+    });
+    expect(await codeOf(claim(t.db, appeal.id, owner))).toBe('forbidden');
+    expect(await codeOf(decide(t.db, appeal.id, owner, 'approve'))).toBe('forbidden');
+
+    // Still not once B is on shift; B takes it.
+    await setShift(t.db, b, 'on_shift');
+    expect(await codeOf(claim(t.db, appeal.id, owner))).toBe('forbidden');
+    await claim(t.db, appeal.id, b);
+
+    // An Owner may act on any item, but not on the appeal of their own decision.
+    expect(await codeOf(decide(t.db, appeal.id, owner, 'approve'))).toBe('forbidden');
+    expect(await codeOf(handOff(t.db, appeal.id, b, owner))).toBe('bad_request');
+    expect(
+      await codeOf(escalate(t.db, appeal.id, b, { toOperatorId: owner, reason: 'Your call' })),
+    ).toBe('bad_request');
+    expect(await codeOf(escalate(t.db, appeal.id, b, { reason: 'Owner, please' }))).toBe(
+      'conflict',
+    );
+    expect((await getItem(t.db, appeal.id)).assignee_operator_id).toBe(b);
+
+    expect(await decide(t.db, appeal.id, b, 'approve')).toEqual({ status: 'applied' });
+  });
+
+  it('lets the original decider handle the appeal when nobody else could', async () => {
+    const owner = await addOperator(t.db, { role: 'owner' });
+    await addOperator(t.db, { queues: ['support'] });
+    const { id } = await open('support');
+    await decide(t.db, id, owner, 'remove');
+
+    // Nobody else covers appeals.
+    const appeal = await openAppeal(t.db, { originalItemId: id, reason: 'x' });
+    await claim(t.db, appeal.id, owner);
+    expect(await decide(t.db, appeal.id, owner, 'approve')).toEqual({ status: 'applied' });
+  });
+
+  it('keeps the original decider from signing off a decision on the appeal', async () => {
+    const owner = await addOperator(t.db, { role: 'owner' });
+    const b = await addOperator(t.db, { queues: ['appeals'], shift: 'away' });
+    const c = await addOperator(t.db, { queues: ['support'], shift: 'away' });
+    const { id } = await open();
+    await decide(t.db, id, owner, 'remove');
+    await setShift(t.db, b, 'on_shift');
+    const appeal = await openAppeal(t.db, { originalItemId: id, reason: 'x' });
+    expect((await getItem(t.db, appeal.id)).assignee_operator_id).toBe(b);
+
+    expect(await decide(t.db, appeal.id, b, 'ban')).toEqual({ status: 'pending_second' });
+    const [pending] = await actions(appeal.id);
+    expect(await codeOf(approveSecond(t.db, pending?.id ?? '', owner))).toBe('forbidden');
+    expect(await codeOf(rejectSecond(t.db, pending?.id ?? '', owner))).toBe('forbidden');
+
+    await approveSecond(t.db, pending?.id ?? '', c);
+    expect(await getItem(t.db, appeal.id)).toMatchObject({ status: 'resolved', decided_by: b });
   });
 
   it('only appeals a decided item, once at a time', async () => {

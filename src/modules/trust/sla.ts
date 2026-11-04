@@ -1,6 +1,6 @@
 // The SLA sweep (`review.sla_sweep`, every 5 minutes): moves overdue items to someone else, and
 // alerts the Owners when nobody else can take one.
-import { and, asc, desc, eq, lte, ne } from 'drizzle-orm';
+import { and, asc, desc, eq, lte, ne, sql } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
 import { record } from '@/modules/audit';
 import { raiseAlert } from './alerts';
@@ -9,13 +9,18 @@ import { pickAssignee, slaDueAt } from './routing';
 import { reviewItems } from './schema';
 
 /** Items handled per sweep; the rest wait for the next run five minutes later. */
-const SWEEP_LIMIT = 500;
+export const SWEEP_LIMIT = 500;
 
 /**
  * For each unresolved item past `sla_due_at`: assigns it to another operator (never the
  * current assignee, nor an excluded one) and restarts its clock with the queue's time limit.
  * When nobody else is available it sets `sla_breached_at`, once, and raises a critical alert;
  * the item keeps its assignee and is retried on the next sweep.
+ *
+ * Items not yet breached come first: a breached item keeps its old due time, so a backlog of
+ * them (nobody on shift for a while) would otherwise fill every batch and newly overdue items
+ * would never be reassigned or alerted. Each sweep moves the unbreached ones out of that group
+ * (reassigned with a new due time, or breached), so the breached ones still get their turn.
  */
 export async function slaSweep(
   db: DbOrTx,
@@ -34,7 +39,12 @@ export async function slaSweep(
       })
       .from(reviewItems)
       .where(and(ne(reviewItems.status, 'resolved'), lte(reviewItems.slaDueAt, now)))
-      .orderBy(desc(reviewItems.priority), asc(reviewItems.slaDueAt), asc(reviewItems.id))
+      .orderBy(
+        sql`${reviewItems.slaBreachedAt} is not null`,
+        desc(reviewItems.priority),
+        asc(reviewItems.slaDueAt),
+        asc(reviewItems.id),
+      )
       .limit(SWEEP_LIMIT)
       // A concurrent sweep (or an operator's claim) skips the rows this one is handling.
       .for('update', { skipLocked: true });

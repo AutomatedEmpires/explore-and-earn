@@ -3,7 +3,11 @@
 //
 // Permissions here are the domain rules; the console's server actions also check the session
 // with requireOperator. An operator may act on an item in a queue they cover (Owners cover
-// every queue) that is unassigned or theirs; an Owner may act on any item.
+// every queue) that is unassigned or theirs; an Owner may act on any item. Two exceptions:
+// - an item's excluded operators (an appeal's original decider and signer) may not claim,
+//   decide, sign off or be handed it while anyone else could (spec section 8);
+// - a second sign-off may come from any other operator, whatever queues they cover, so a
+//   decision held for one never waits on nobody.
 import { and, eq, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { queryRows, type DbOrTx, type Tx } from '@/lib/db';
@@ -14,6 +18,7 @@ import { countOperators } from '@/modules/identity';
 import { notify } from '@/modules/notifications';
 import { getSetting } from '@/modules/settings';
 import {
+  anyOperatorBesides,
   coversQueue,
   excludeOperators,
   findOperator,
@@ -59,6 +64,29 @@ function assertMayAct(item: ItemRecord, op: ActiveOperator): void {
     throw forbidden('Another operator holds this item');
   }
 }
+
+/**
+ * Whether `userId` is kept off this item: they are in its exclusions (for an appeal, whoever
+ * made or signed off the original decision) and someone else could do the job. That is an
+ * operator outside the exclusions (and outside `besides`) covering the item's queue, or with
+ * `anyQueue`, any such operator. When nobody else could, an excluded operator may act, so the
+ * item never waits on nobody.
+ */
+async function keptOff(
+  db: DbOrTx,
+  item: ItemRecord,
+  userId: string,
+  o: { anyQueue?: boolean; besides?: string[] } = {},
+): Promise<boolean> {
+  if (!item.excludeOperatorIds.includes(userId)) return false;
+  return anyOperatorBesides(
+    db,
+    [...item.excludeOperatorIds, ...(o.besides ?? [])],
+    o.anyQueue ? undefined : item.queue,
+  );
+}
+
+const KEPT_OFF = 'You made or signed off the decision under appeal; another operator reviews it';
 
 function assertOpen(item: ItemRecord): void {
   if (item.status === 'resolved') throw conflict('This item is already resolved');
@@ -151,13 +179,15 @@ export async function addNote(
 
 /**
  * Takes an unassigned item (or confirms one already held). Atomic: when two operators claim at
- * once exactly one wins, and the other gets `conflict`.
+ * once exactly one wins, and the other gets `conflict`. An excluded operator (see keptOff)
+ * gets `forbidden`.
  */
 export async function claim(db: DbOrTx, itemId: string, operatorId: string): Promise<void> {
   await transact(db, async (tx) => {
     const item = await loadItem(tx, itemId, false);
     assertOpen(item);
     const op = await actingOperator(tx, operatorId, item.queue);
+    if (await keptOff(tx, item, op.userId)) throw forbidden(KEPT_OFF);
     if (item.assigneeOperatorId === op.userId) return;
 
     const now = new Date();
@@ -210,6 +240,9 @@ export async function handOff(
     if (!to) throw badRequest('Hand off to an operator');
     if (!coversQueue(to, item.queue)) {
       throw badRequest(`That operator is not assigned to the ${item.queue} queue`);
+    }
+    if (await keptOff(tx, item, to.userId)) {
+      throw badRequest('That operator made or signed off the decision under appeal');
     }
 
     const now = new Date();
@@ -284,12 +317,17 @@ export async function escalate(
       if (!coversQueue(named, item.queue)) {
         throw badRequest(`That operator is not assigned to the ${item.queue} queue`);
       }
+      if (await keptOff(tx, item, named.userId)) {
+        throw badRequest('That operator made or signed off the decision under appeal');
+      }
       targetId = named.userId;
     } else {
-      // Respect the item's exclusions (an appeal's original decider) when another Owner exists.
-      targetId =
-        (await leastLoadedOwner(tx, [from.userId, ...item.excludeOperatorIds])) ??
-        (await leastLoadedOwner(tx, [from.userId]));
+      // An excluded Owner (an appeal's original decider) only when they could act on it.
+      targetId = await leastLoadedOwner(tx, [from.userId, ...item.excludeOperatorIds]);
+      if (!targetId) {
+        const fallback = await leastLoadedOwner(tx, [from.userId]);
+        if (fallback && !(await keptOff(tx, item, fallback))) targetId = fallback;
+      }
       if (!targetId) throw conflict('No other Owner is available to escalate to');
     }
     const target = await findOperator(tx, targetId);
@@ -423,6 +461,7 @@ export async function decide(
     assertOpen(item);
     const op = await actingOperator(tx, operatorId, item.queue);
     assertMayAct(item, op);
+    if (await keptOff(tx, item, op.userId)) throw forbidden(KEPT_OFF);
     const handler = await requireHandler(item.subjectType, action);
 
     const [pending] = await tx
@@ -497,8 +536,28 @@ async function loadPendingAction(tx: Tx, actionId: string) {
 }
 
 /**
- * The second sign-off: a different operator covering the queue approves a pending decision,
- * which is then applied. Throws `forbidden` when `operatorId` made the decision.
+ * The operator signing off (or turning down) someone else's pending decision. Any operator
+ * qualifies, whatever queues they cover: a second sign-off is required as soon as two
+ * operators exist (needsSecondSignOff), so it must never depend on who covers which queue.
+ * An excluded operator (see keptOff) qualifies only when nobody else does.
+ */
+async function signingOperator(
+  tx: Tx,
+  item: ItemRecord,
+  authorId: string,
+  operatorId: string,
+): Promise<ActiveOperator> {
+  const op = await findOperator(tx, operatorId);
+  if (!op) throw forbidden('Only operators can do this');
+  if (await keptOff(tx, item, op.userId, { anyQueue: true, besides: [authorId] })) {
+    throw forbidden(KEPT_OFF);
+  }
+  return op;
+}
+
+/**
+ * The second sign-off: any operator other than its author approves a pending decision, which
+ * is then applied. Throws `forbidden` when `operatorId` made the decision.
  */
 export async function approveSecond(
   db: DbOrTx,
@@ -511,7 +570,7 @@ export async function approveSecond(
       throw forbidden('A second, different operator must approve this decision');
     }
     assertOpen(item);
-    const op = await actingOperator(tx, operatorId, item.queue);
+    const op = await signingOperator(tx, item, action.actorOperatorId, operatorId);
     const handler = await requireHandler(item.subjectType, action.action);
 
     await tx
@@ -531,8 +590,8 @@ export async function approveSecond(
 }
 
 /**
- * Turns down (or, by its author, withdraws) a decision waiting for a second sign-off. The item
- * stays open for another decision.
+ * Turns down (any operator who could sign it off) or, by its author, withdraws a decision
+ * waiting for a second sign-off. The item stays open for another decision.
  */
 export async function rejectSecond(
   db: DbOrTx,
@@ -541,7 +600,10 @@ export async function rejectSecond(
 ): Promise<void> {
   await transact(db, async (tx) => {
     const { item, action } = await loadPendingAction(tx, actionId);
-    const op = await actingOperator(tx, operatorId, item.queue);
+    const op =
+      operatorId === action.actorOperatorId
+        ? await actingOperator(tx, operatorId, item.queue)
+        : await signingOperator(tx, item, action.actorOperatorId, operatorId);
     await tx
       .update(reviewActions)
       .set({
@@ -563,9 +625,10 @@ export async function rejectSecond(
 // --- Appeals ----------------------------------------------------------------------------------
 
 /**
- * Opens an appeal of a decided item in the `appeals` queue, about the same subject. Routing
- * never gives it to an operator who made the original decision (or signed it off) while anyone
- * else can take it. One open appeal per decision.
+ * Opens an appeal of a decided item in the `appeals` queue, about the same subject. The
+ * operators who made the original decision (or signed it off) are its exclusions: routing never
+ * gives it to them while anyone else is on shift, and they may not claim, decide, sign off or be
+ * handed it while anyone else could (keptOff). One open appeal per decision.
  */
 export async function openAppeal(
   db: DbOrTx,

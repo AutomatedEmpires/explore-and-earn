@@ -5,7 +5,7 @@ import type { ClassifyOptions } from '@/lib/ai';
 import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { setSetting } from '@/modules/settings';
-import { runCheck } from './index';
+import { findLatestCheck, runCheck } from './index';
 
 // classify() runs the real stub provider (AI_PROVIDER=stub in tests) unless a test overrides it.
 const ai = vi.hoisted(() => ({
@@ -169,6 +169,38 @@ describe('runCheck when the classifier fails (fail closed)', () => {
   });
 });
 
+describe('findLatestCheck', () => {
+  const flagged = {
+    mime: 'image/jpeg',
+    bytes: new Uint8Array([0xff, 0xd8, 0xff, ...new TextEncoder().encode('__flag__')]),
+  };
+
+  it('returns the newest check of a kind for a subject, as runCheck returned it', async () => {
+    const subjectId = newId();
+    const subject = { kind: 'image_safety' as const, subjectType: 'media', subjectId };
+    expect(await findLatestCheck(t.db, subject)).toBeNull();
+
+    await runCheck(t.db, { ...subject, image: flagged, wantAltText: true });
+    const newest = await runCheck(t.db, { ...subject, image: flagged, wantAltText: true });
+    // Neither another kind for the subject nor the same kind for another subject counts.
+    await runCheck(t.db, { kind: 'text_safety', subjectType: 'media', subjectId, text: 'hi' });
+    await runCheck(t.db, { ...subject, subjectId: newId(), image: flagged });
+
+    expect(newest).toMatchObject({ decision: 'needs_review', score: 0.5, altText: 'Test image' });
+    expect(await findLatestCheck(t.db, subject)).toEqual(newest);
+  });
+
+  it('reads a failed check as needs_review with score 1, like runCheck', async () => {
+    ai.override = async () => {
+      throw new Error('timeout');
+    };
+    const subject = { kind: 'text_safety' as const, subjectType: 'test_item', subjectId: newId() };
+    const result = await runCheck(t.db, { ...subject, text: 'hello' });
+    expect(await findLatestCheck(t.db, subject)).toEqual(result);
+    expect(result).toMatchObject({ decision: 'needs_review', score: 1, reason: 'classifier_error' });
+  });
+});
+
 describe('runCheck thresholds', () => {
   it('reads them from trust.thresholds', async () => {
     await setSetting(
@@ -217,6 +249,18 @@ describe('runCheck records', () => {
       });
       expect(row.latency_ms).toBeGreaterThanOrEqual(0);
     }
+  });
+
+  it('keeps the alt text it returned, and only that', async () => {
+    const image = { mime: 'image/jpeg', bytes: new Uint8Array([0xff, 0xd8, 0xff, 1]) };
+    const base = { kind: 'image_safety' as const, subjectType: 'media', image };
+    await runCheck(t.db, { ...base, subjectId: newId(), wantAltText: true });
+    await runCheck(t.db, { ...base, subjectId: newId() });
+    const rows = await queryRows<{ alt_text: string | null }>(
+      t.db,
+      sql`select alt_text from app.trust_checks order by created_at, id`,
+    );
+    expect(rows.map((r) => r.alt_text)).toEqual(['Test image', null]);
   });
 
   it('refuses a check without the input its kind needs', async () => {

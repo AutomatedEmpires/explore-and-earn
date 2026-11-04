@@ -60,6 +60,7 @@ export {
   destinationBucket,
   removeMedia,
   scanMedia,
+  UNSCANNABLE_REASON,
   variantPaths,
   type ScanDeps,
 } from './scan';
@@ -71,6 +72,7 @@ export {
   photoDnaScanner,
   stubChildSafetyScanner,
   stubMalwareScanner,
+  UnscannableImageError,
   type ChildSafetyScanner,
   type CloudmersiveOptions,
   type MalwareScanner,
@@ -82,6 +84,7 @@ export { getMediaUrl, SIGNED_URL_TTL_SEC, type MediaViewer } from './urls';
 /** `media.scan` (queued by completeUpload) and `media.cleanup` (deletes superseded copies). */
 export const jobHandlers: HandlerMap = mediaJobHandlers;
 
-// Operator decisions on a review item whose subject is `media` (a file held for review):
-// approve publishes it, remove rejects it and deletes its copies.
+// Operator decisions on a review item whose subject is `media`: approve publishes a held file
+// (or a kept rejected one, when an appeal or an accuracy sample overturns the rejection);
+// remove takes a file down and keeps a private copy, or on a blocked file confirms the block.
 registerSubjectHandlers('media', createMediaSubjectHandlers(getStorage));

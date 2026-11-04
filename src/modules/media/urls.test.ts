@@ -147,6 +147,23 @@ describe('getMediaUrl', () => {
     );
   });
 
+  it('shows a rejected file kept for review only to operators', async () => {
+    const owner = await newUser();
+    const id = await seed({
+      kind: 'listing_photo',
+      status: 'rejected',
+      bucket: 'media-private',
+      ownerUserId: owner,
+    });
+    await expect(
+      getMediaUrl(t.db, storage, { userId: owner, orgIds: [], isOperator: false }, id),
+    ).rejects.toMatchObject({ code: 'not_found' });
+    const operator: MediaViewer = { userId: newId(), orgIds: [], isOperator: true };
+    expect(await getMediaUrl(t.db, storage, operator, id)).toBe(
+      `memory://media-private/${id}/1280.webp?expiresIn=300`,
+    );
+  });
+
   it('never serves a blocked file, not even to an operator', async () => {
     const owner = await newUser();
     const id = await seed({

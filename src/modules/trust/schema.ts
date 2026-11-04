@@ -1,4 +1,5 @@
-// Drizzle tables for the trust module. The DDL lives in drizzle/0400_trust.sql.
+// Drizzle tables for the trust module. The DDL lives in drizzle/0400_trust.sql and
+// drizzle/0401_trust_check_alt_text.sql.
 // Only tables are exported here: src/db/schema.ts re-exports every module's schema file.
 import { sql } from 'drizzle-orm';
 import { integer, jsonb, pgSchema, real, text, timestamp, uuid } from 'drizzle-orm/pg-core';
@@ -25,6 +26,8 @@ export const trustChecks = app.table('trust_checks', {
   decision: text('decision', { enum: CHECK_DECISIONS }).notNull(),
   latencyMs: integer('latency_ms').notNull(),
   error: text('error'),
+  /** Image checks asked for alt text (wantAltText) only. */
+  altText: text('alt_text'),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 });
