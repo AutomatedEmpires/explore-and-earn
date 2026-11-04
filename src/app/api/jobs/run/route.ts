@@ -5,7 +5,7 @@ import { getEnv } from '@/lib/env';
 import { unauthorized } from '@/lib/errors';
 import { enqueueDueSchedules, runWorker } from '@/modules/jobs';
 import { apiRoute } from '@/server/api';
-import { handlers } from '@/server/job-handlers';
+import { handlers, onDeadEvent } from '@/server/job-handlers';
 
 export const maxDuration = 60;
 
@@ -24,7 +24,7 @@ export const POST = apiRoute({
       throw unauthorized('Invalid jobs secret');
     }
     const scheduled = await enqueueDueSchedules(db, new Date());
-    const counts = await runWorker(db, { handlers });
+    const counts = await runWorker(db, { handlers, onDead: onDeadEvent });
     return { scheduled, ...counts };
   },
 });

@@ -1,7 +1,8 @@
 // File storage behind one interface (spec section 7). Three implementations:
 // - supabaseStorage(): Supabase Storage with the service-role key (preview and prod);
 // - localStorage(dir): files on disk, served by /api/v1/media/local/[...path] (dev only);
-// - memoryStorage(): in-process, for tests (STORAGE_PROVIDER=stub).
+// - memoryStorage(): in-process, for unit tests (STORAGE_PROVIDER=stub, which the environment
+//   check accepts only under a test runner: no browser can upload to it).
 // The environment check refuses `local` and `stub` when APP_ENV=prod.
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';

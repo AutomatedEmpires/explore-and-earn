@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildSecurityHeaders, frontendApiFromPublishableKey, newNonce } from './security-headers';
+import {
+  buildSecurityHeaders,
+  frontendApiFromPublishableKey,
+  newNonce,
+  storageOrigin,
+} from './security-headers';
 
 function directives(csp: string): Map<string, string[]> {
   const map = new Map<string, string[]>();
@@ -93,6 +98,43 @@ describe('buildSecurityHeaders', () => {
         appEnv: 'prod',
         clerkFrontendApi: 'x.test; script-src *',
       }),
+    ).toThrow();
+  });
+});
+
+describe('Supabase Storage in the CSP', () => {
+  const project = 'https://abcdefghijklmnop.supabase.co';
+
+  it('lets the browser PUT uploads to, and load images from, our project only', () => {
+    const origin = storageOrigin({ STORAGE_PROVIDER: 'supabase', SUPABASE_URL: `${project}/` });
+    expect(origin).toBe(project);
+    const csp = directives(
+      buildSecurityHeaders({ nonce: 'abc', appEnv: 'prod', storageOrigin: origin })[
+        'Content-Security-Policy'
+      ] ?? '',
+    );
+    expect(csp.get('connect-src')).toContain(project);
+    expect(csp.get('img-src')).toContain(project);
+    for (const name of ['connect-src', 'img-src']) {
+      expect((csp.get(name) ?? []).join(' ')).not.toContain('*.supabase.co');
+    }
+  });
+
+  it('allows no Supabase host at all with local or stub storage', () => {
+    expect(storageOrigin({ STORAGE_PROVIDER: 'local', SUPABASE_URL: project })).toBeNull();
+    const csp =
+      buildSecurityHeaders({ nonce: 'abc', appEnv: 'dev', storageOrigin: null })[
+        'Content-Security-Policy'
+      ] ?? '';
+    expect(csp).not.toContain('supabase');
+  });
+
+  it('rejects a storage origin that is not a bare https origin', () => {
+    expect(() =>
+      buildSecurityHeaders({ nonce: 'abc', appEnv: 'prod', storageOrigin: `${project}; x *` }),
+    ).toThrow();
+    expect(() =>
+      buildSecurityHeaders({ nonce: 'abc', appEnv: 'prod', storageOrigin: 'http://x.test' }),
     ).toThrow();
   });
 });

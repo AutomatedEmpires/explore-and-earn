@@ -13,8 +13,9 @@ import { z } from 'zod';
 import { queryRows, type DbOrTx } from '@/lib/db';
 import { getEnv } from '@/lib/env';
 import { logger } from '@/lib/logger';
+import { getUserContact } from '@/modules/identity';
 import { getSetting } from '@/modules/settings';
-import { jobKey } from '../notify';
+import { isEmailSuppressed, jobKey } from '../notify';
 import {
   getType,
   isMandatory,
@@ -170,13 +171,18 @@ function canEmail(r: Recipient): r is Recipient & { email: string } {
   return r.email !== null && r.email.trim() !== '' && !r.deleted && !r.suppressed;
 }
 
-const RECIPIENT_COLUMNS = sql`
-  u.email,
-  u.deleted_at is not null as deleted,
-  exists (select 1 from app.email_suppressions s where s.email = lower(u.email)) as suppressed
-`;
+/** The user's address (from identity, which owns app.users) and whether it may be emailed. */
+async function recipientOf(db: DbOrTx, userId: string): Promise<Recipient> {
+  const user = await getUserContact(db, userId);
+  const email = user?.email ?? null;
+  return {
+    email,
+    deleted: !user || user.deleted,
+    suppressed: email ? await isEmailSuppressed(db, email) : false,
+  };
+}
 
-type NotificationRow = Recipient & {
+type NotificationRow = {
   id: string;
   user_id: string;
   type: string;
@@ -196,13 +202,11 @@ async function sendOne(
     db,
     sql`
       select n.id, n.user_id, n.type, n.category, n.title, n.body, n.data::text as data,
-        ${RECIPIENT_COLUMNS},
         coalesce((
           select enabled from app.notification_preferences p
           where p.user_id = n.user_id and p.category = n.category and p.channel = 'email'
         ), true) as email_enabled
       from app.notifications n
-      join app.users u on u.id = n.user_id
       where n.id = ${notificationId}
     `,
   );
@@ -215,7 +219,9 @@ async function sendOne(
     logger.warn('notifications.email: type has no email', { notificationId, type: n.type });
     return 'skipped';
   }
-  if (!canEmail(n) || !(isMandatory(def) || n.email_enabled)) return 'skipped';
+  if (!(isMandatory(def) || n.email_enabled)) return 'skipped';
+  const to = await recipientOf(db, n.user_id);
+  if (!canEmail(to)) return 'skipped';
 
   const data = JSON.parse(n.data) as NotificationData;
   const footer = await footerFor(db, n.user_id, n.category);
@@ -226,7 +232,7 @@ async function sendOne(
   );
   const { html, text } = await renderEmail(el);
   await provider.send({
-    to: n.email,
+    to: to.email,
     subject: n.title,
     html,
     text,
@@ -241,23 +247,19 @@ async function sendDigest(
   batchId: string,
   provider: EmailProvider,
 ): Promise<'sent' | 'skipped'> {
-  const [b] = await queryRows<Recipient & { id: string; user_id: string }>(
+  const [b] = await queryRows<{ id: string; user_id: string }>(
     db,
-    sql`
-      select b.id, b.user_id, ${RECIPIENT_COLUMNS}
-      from app.notification_batches b
-      join app.users u on u.id = b.user_id
-      where b.id = ${batchId}
-    `,
+    sql`select b.id, b.user_id from app.notification_batches b where b.id = ${batchId}`,
   );
   if (!b) {
     logger.warn('notifications.email: batch not found', { batchId });
     return 'skipped';
   }
-  if (!canEmail(b)) return 'skipped';
+  const to = await recipientOf(db, b.user_id);
+  if (!canEmail(to)) return 'skipped';
 
   // Only what is still unread, and only categories whose email is still on.
-  const rows = await queryRows<Omit<NotificationRow, keyof Recipient | 'user_id'>>(
+  const rows = await queryRows<Omit<NotificationRow, 'user_id'>>(
     db,
     sql`
       select n.id, n.type, n.category, n.title, n.body, n.data::text as data,
@@ -291,7 +293,7 @@ async function sendDigest(
     createElement(Digest, { items, url: manageNotificationsUrl(), footer }),
   );
   await provider.send({
-    to: b.email,
+    to: to.email,
     subject: digestSubject(items),
     html,
     text,

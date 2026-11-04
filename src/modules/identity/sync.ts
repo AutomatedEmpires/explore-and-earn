@@ -19,6 +19,8 @@ import { record } from '@/modules/audit';
 import {
   applyClerkMembership,
   applyClerkOrganization,
+  CREATED_VIA_APP,
+  CREATED_VIA_KEY,
   deleteClerkOrganization,
   type OrgSnapshot,
 } from '@/modules/orgs';
@@ -49,10 +51,13 @@ const userSchema = z.object({
 
 const deletedSchema = z.object({ id: z.string().min(1) });
 
+const orgMetadata = z.record(z.string(), z.unknown()).nullish();
+
 const orgSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
   created_by: z.string().nullish(),
+  public_metadata: orgMetadata,
   updated_at: clerkTime,
 });
 
@@ -61,8 +66,17 @@ const embeddedOrgSchema = z.object({
   id: z.string().min(1),
   name: z.string().nullish(),
   created_by: z.string().nullish(),
+  public_metadata: orgMetadata,
   updated_at: clerkTime.nullish(),
 });
+
+/**
+ * Whether our server created the organization (createOrganization marks it in Clerk's public
+ * metadata), or null when the payload doesn't say (no metadata at all).
+ */
+function createdViaApp(md: Record<string, unknown> | null | undefined): boolean | null {
+  return md ? md[CREATED_VIA_KEY] === CREATED_VIA_APP : null;
+}
 
 const membershipSchema = z.object({
   role: z.string().min(1),
@@ -187,6 +201,7 @@ async function embeddedOrg(
     clerkOrgId: o.id,
     name: o.name ?? null,
     createdByUserId: o.created_by ? await ensureUser(db, o.created_by) : null,
+    createdViaApp: createdViaApp(o.public_metadata),
     // A partial organization (no name) only seeds a placeholder.
     clerkUpdatedAt: o.name ? (o.updated_at ?? null) : null,
   };
@@ -210,6 +225,7 @@ async function apply(db: DbOrTx, type: string, data: unknown): Promise<void> {
         clerkOrgId: o.id,
         name: o.name,
         createdByUserId: o.created_by ? await ensureUser(db, o.created_by) : null,
+        createdViaApp: createdViaApp(o.public_metadata),
         clerkUpdatedAt: o.updated_at,
       });
       return;

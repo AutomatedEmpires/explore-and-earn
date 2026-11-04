@@ -18,6 +18,7 @@ import {
   buildSecurityHeaders,
   frontendApiFromPublishableKey,
   newNonce,
+  storageOrigin,
 } from '@/lib/security-headers';
 import {
   isAdminHost,
@@ -40,6 +41,7 @@ async function handle(req: NextRequest, auth: ClerkMiddlewareAuth | null): Promi
     nonce,
     appEnv: env.APP_ENV,
     clerkFrontendApi: frontendApiFromPublishableKey(env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY),
+    storageOrigin: storageOrigin(env),
   });
 
   const decorate = (res: NextResponse): NextResponse => {

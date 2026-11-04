@@ -1,12 +1,16 @@
 // The Clerk Backend API calls our domain code makes, behind an interface so tests use a fake.
 import type { UserJSON } from '@clerk/nextjs/server';
+import { CREATED_VIA_APP, CREATED_VIA_KEY } from '@/modules/orgs';
 
 export type OperatorInviteRole = 'owner' | 'operator';
 
 export interface ClerkAdmin {
   /** Deep-merges `md` into the user's public metadata. */
   setPublicMetadata(clerkUserId: string, md: Record<string, unknown>): Promise<void>;
-  /** Creates an organization in Clerk; `createdBy` (a Clerk user ID) becomes its first admin. */
+  /**
+   * Creates an organization in Clerk, marked as created by the app in its public metadata;
+   * `createdBy` (a Clerk user ID) becomes its first admin.
+   */
   createOrganization(input: { name: string; createdBy: string }): Promise<{ clerkOrgId: string }>;
   hasPasskey(clerkUserId: string): Promise<boolean>;
   /** A passkey or two-step sign-in. */
@@ -55,7 +59,13 @@ export function clerkAdmin(): ClerkAdmin {
       await (await client()).users.updateUserMetadata(clerkUserId, { publicMetadata: md });
     },
     async createOrganization({ name, createdBy }) {
-      const org = await (await client()).organizations.createOrganization({ name, createdBy });
+      const org = await (await client()).organizations.createOrganization({
+        name,
+        createdBy,
+        // Marks it as ours: the webhook only adopts the creator of such an organization as its
+        // Owner (orgs.applyClerkOrganization).
+        publicMetadata: { [CREATED_VIA_KEY]: CREATED_VIA_APP },
+      });
       return { clerkOrgId: org.id };
     },
     async hasPasskey(clerkUserId) {

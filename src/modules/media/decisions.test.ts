@@ -12,6 +12,7 @@ import { resetEnvCache } from '@/lib/env';
 import { AppError } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import { runWorker } from '@/modules/jobs';
+import { notify } from '@/modules/notifications';
 import { auditSample, decide, openAppeal, openReviewItem } from '@/modules/trust';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 // The module index registers the `media` trust subject.
@@ -164,6 +165,31 @@ describe('deciding media review items', () => {
     });
     expect(await mediaRow(mediaId)).toMatchObject({ status: 'blocked', bucket: 'evidence' });
     expect([...(await storage.read('evidence', mediaId))]).toEqual([...original]);
+  });
+
+  it('tells the owner, once, when an operator removes a held image', async () => {
+    const owner = await addOwner();
+    ai.override = async () => ({ score: 0.5, labels: ['unclear'], reason: 'Hard to tell' });
+    const mediaId = await uploaded('housing_photo', 'image/jpeg', fixture('gps.jpg'));
+    expect(await scanMedia(t.db, deps(), mediaId)).toBe('in_review');
+    const item = await itemFor('moderation', mediaId);
+    vi.mocked(notify).mockClear();
+
+    expect(await decide(t.db, item.id, owner, 'remove')).toEqual({ status: 'applied' });
+
+    const [uploader] = await queryRows<{ owner_user_id: string }>(
+      t.db,
+      sql`select owner_user_id from app.media where id = ${mediaId}`,
+    );
+    const rejections = vi.mocked(notify).mock.calls.filter((c) => c[2] === 'media.rejected');
+    expect(rejections).toEqual([
+      [
+        expect.anything(),
+        uploader?.owner_user_id,
+        'media.rejected',
+        { mediaId, kind: 'housing_photo', reason: 'removed_by_operator' },
+      ],
+    ]);
   });
 
   it('grants an appeal of a removed image by publishing it again', async () => {

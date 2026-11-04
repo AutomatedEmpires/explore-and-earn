@@ -1,13 +1,18 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import type { SettingKey, SettingValues } from '@/modules/settings';
+import type { SettingKey, SettingValues, Thresholds } from '@/modules/settings';
 import { Button, Input, Textarea } from '@/ui/components';
 import { updateSetting } from '../actions';
 import { ActionMessage } from './ActionMessage';
 import { useConsoleAction } from './use-console-action';
 
-type Thresholds = SettingValues['trust.thresholds'];
+const FALLBACK_THRESHOLD: Thresholds = { approveBelow: 0.2, rejectAtOrAbove: 0.9 };
+
+/** A stored kind, else the Foundation default. This file is a client component, so it cannot import the settings module's values. */
+function threshold(values: SettingValues, kind: string): Thresholds {
+  return values['trust.thresholds'][kind] ?? FALLBACK_THRESHOLD;
+}
 
 /** One setting's form: its fields, a Save button and the result. */
 function SettingForm({
@@ -107,11 +112,13 @@ function ThresholdFields({
 /** A typed form per setting (settings registry). Saving needs a recent sign-in confirmation. */
 export function SettingsForms({ values, canEdit }: { values: SettingValues; canEdit: boolean }) {
   const [invites, setInvites] = useState(String(values['limits.invites_per_seeker_per_week']));
+  const image = threshold(values, 'image_safety');
+  const text = threshold(values, 'text_safety');
   const [t, setT] = useState({
-    imageApprove: toPercent(values['trust.thresholds'].image_safety.approveBelow),
-    imageReject: toPercent(values['trust.thresholds'].image_safety.rejectAtOrAbove),
-    textApprove: toPercent(values['trust.thresholds'].text_safety.approveBelow),
-    textReject: toPercent(values['trust.thresholds'].text_safety.rejectAtOrAbove),
+    imageApprove: toPercent(image.approveBelow),
+    imageReject: toPercent(image.rejectAtOrAbove),
+    textApprove: toPercent(text.approveBelow),
+    textReject: toPercent(text.rejectAtOrAbove),
   });
   const [sampleRate, setSampleRate] = useState(toPercent(values['trust.audit_sample_rate']));
   const [address, setAddress] = useState(values['business.mailing_address']);
@@ -155,7 +162,7 @@ export function SettingsForms({ values, canEdit }: { values: SettingValues; canE
           if ((ia ?? 0) > (ir ?? 0) || (ta ?? 0) > (tr ?? 0)) {
             return { error: 'The approve number must not be above the reject number' };
           }
-          const value: Thresholds = {
+          const value: SettingValues['trust.thresholds'] = {
             image_safety: { approveBelow: ia ?? 0, rejectAtOrAbove: ir ?? 0 },
             text_safety: { approveBelow: ta ?? 0, rejectAtOrAbove: tr ?? 0 },
           };

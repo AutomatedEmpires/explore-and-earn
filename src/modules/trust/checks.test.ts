@@ -4,8 +4,9 @@ import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import type { ClassifyOptions } from '@/lib/ai';
 import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
+import { z } from 'zod';
 import { setSetting } from '@/modules/settings';
-import { findLatestCheck, runCheck } from './index';
+import { findLatestCheck, registerCheckKind, runCheck } from './index';
 
 // classify() runs the real stub provider (AI_PROVIDER=stub in tests) unless a test overrides it.
 const ai = vi.hoisted(() => ({
@@ -215,6 +216,57 @@ describe('runCheck thresholds', () => {
 
     expect((await textCheck('__flag__')).decision).toBe('approved');
     expect(await items()).toHaveLength(0);
+  });
+
+  it('keeps tuned kinds when a later sub-project registers a new kind', async () => {
+    // Tuned by an operator before `listing` existed.
+    await setSetting(
+      t.db,
+      'trust.thresholds',
+      {
+        image_safety: { approveBelow: 0.2, rejectAtOrAbove: 0.9 },
+        text_safety: { approveBelow: 0.6, rejectAtOrAbove: 0.9 },
+      },
+      { operatorId: newId() },
+    );
+    registerCheckKind({
+      kind: 'listing_test',
+      input: 'text',
+      prompt: { version: 'listing_test@1', system: 'Classify the listing.' },
+      schema: z.object({ score: z.number(), labels: z.array(z.string()), reason: z.string() }),
+      // Stricter than Foundation's kinds: the stub's 0.5 for __flag__ is rejected outright.
+      defaultThresholds: { approveBelow: 0.01, rejectAtOrAbove: 0.5 },
+    });
+
+    // text_safety still uses the operator's 0.6: the stub's 0.5 is approved.
+    expect((await textCheck('__flag__')).decision).toBe('approved');
+    // The new kind, missing from the stored value, uses its own default.
+    const listing = await runCheck(t.db, {
+      kind: 'listing_test',
+      subjectType: 'test_item',
+      subjectId: newId(),
+      text: '__flag__',
+    });
+    expect(listing.decision).toBe('rejected');
+    expect((await checks()).map((c) => [c.kind, c.prompt_version])).toEqual([
+      ['text_safety', 'text_safety@1'],
+      ['listing_test', 'listing_test@1'],
+    ]);
+  });
+
+  it('refuses an unknown kind, and a kind registered without the input it needs', async () => {
+    await expect(
+      runCheck(t.db, { kind: 'nope', subjectType: 'test_item', subjectId: newId(), text: 'x' }),
+    ).rejects.toMatchObject({ code: 'bad_request' });
+    expect(() =>
+      registerCheckKind({
+        kind: '',
+        input: 'text',
+        prompt: { version: 'x@1', system: 'x' },
+        schema: z.object({ score: z.number(), labels: z.array(z.string()), reason: z.string() }),
+        defaultThresholds: { approveBelow: 0.2, rejectAtOrAbove: 0.9 },
+      }),
+    ).toThrow();
   });
 
   it('treats a score equal to rejectAtOrAbove as rejected', async () => {

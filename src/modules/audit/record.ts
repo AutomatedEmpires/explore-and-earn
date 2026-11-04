@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
 import { newId } from '@/lib/ids';
+import { getRequestContext } from '@/server/request-context';
 import { auditEvents } from './schema';
 
 export type AuditEventInput = {
@@ -54,8 +55,13 @@ export function redact(data: Record<string, unknown>): Record<string, unknown> {
 /**
  * Appends an audit event. Pass the domain transaction so the event commits (or rolls back)
  * with the change it describes. Rows can never be changed or deleted afterwards.
+ *
+ * Inside a request (apiRoute), `requestId` defaults to the request's id and, for a user's or
+ * an operator's action, `ipHash` to their hashed IP, so callers never have to thread them.
  */
 export async function record(db: DbOrTx, e: AuditEventInput): Promise<void> {
+  const request = getRequestContext();
+  const ipHash = e.ipHash ?? (e.actorType === 'system' ? null : request?.ipHash);
   await db.insert(auditEvents).values({
     id: newId(),
     actorType: e.actorType,
@@ -65,7 +71,7 @@ export async function record(db: DbOrTx, e: AuditEventInput): Promise<void> {
     subjectType: e.subjectType,
     subjectId: e.subjectId,
     data: e.data === undefined ? null : sql`${JSON.stringify(redact(e.data))}::jsonb`,
-    requestId: e.requestId ?? null,
-    ipHash: e.ipHash ?? null,
+    requestId: e.requestId ?? request?.requestId ?? null,
+    ipHash: ipHash ?? null,
   });
 }

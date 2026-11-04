@@ -1,6 +1,8 @@
 # Explore&Earn V1 — product and scope
 
-Specification version: **1.2 · 2026-11-02**. Status: living V1 vision; confirmed scope plus recommended/inherited contracts and explicitly open decisions. No application is implemented. Audience: product, design, engineering, QA and marketplace operations.
+Specification version: **1.2 · 2026-11-02**. Status: historical V1 vision as of that date. Confirmed scope plus recommended/inherited contracts and explicitly open decisions. Audience: product, design, engineering, QA and marketplace operations.
+
+> **Not the current authority.** On 4 November 2026 the founder approved a decision record that overrides this document where they disagree, including rule 4 below (one account may no longer be both seeker and host). Read [the decisions](../decisions/2026-11-04-founder-decisions.md) first. This file is kept so the earlier choice stays visible.
 
 ## 1. Product promise and non-negotiable rules
 

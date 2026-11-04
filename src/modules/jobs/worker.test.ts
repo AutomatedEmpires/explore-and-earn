@@ -24,6 +24,19 @@ vi.mock('@/lib/db', async (importOriginal) => {
   };
 });
 
+const sentry = vi.hoisted(() => ({ captureMessage: vi.fn() }));
+vi.mock('@sentry/nextjs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sentry/nextjs')>()),
+  captureMessage: sentry.captureMessage,
+}));
+
+// Next's after() needs a request scope; tests decide what it does.
+const nextServer = vi.hoisted(() => ({ after: vi.fn() }));
+vi.mock('next/server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/server')>()),
+  after: (task: () => Promise<void>) => nextServer.after(task),
+}));
+
 const T0 = new Date('2026-01-01T10:00:00.000Z');
 const minutes = (n: number) => n * 60_000;
 const at = (base: Date, ms: number) => new Date(base.getTime() + ms);
@@ -48,6 +61,8 @@ beforeEach(async () => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  nextServer.after.mockReset();
+  sentry.captureMessage.mockClear();
 });
 
 function rows(topic?: string) {
@@ -160,6 +175,7 @@ describe('runWorker', () => {
 
   it('retries a failing handler with backoff, then marks it dead after the 8th failure', async () => {
     const errorSpy = quiet();
+    const onDead = vi.fn(async () => {});
     const handlers: HandlerMap = {
       flaky: async () => {
         throw new Error('provider down');
@@ -167,7 +183,7 @@ describe('runWorker', () => {
     };
     await enqueue(t.db, { topic: 'flaky', payload: {}, availableAt: T0 });
 
-    const first = await runWorker(t.db, { now: T0, handlers });
+    const first = await runWorker(t.db, { now: T0, handlers, onDead });
     expect(first).toEqual({ processed: 0, retried: 1, dead: 0 });
     let [row] = await rows('flaky');
     expect(row?.attempts).toBe(1);
@@ -182,7 +198,7 @@ describe('runWorker', () => {
     // Failures 2..7 stay pending; each run happens after the event is available again.
     for (let attempt = 2; attempt < MAX_ATTEMPTS; attempt++) {
       const now = at(row?.availableAt ?? T0, 1);
-      expect(await runWorker(t.db, { now, handlers })).toEqual({
+      expect(await runWorker(t.db, { now, handlers, onDead })).toEqual({
         processed: 0,
         retried: 1,
         dead: 0,
@@ -192,8 +208,10 @@ describe('runWorker', () => {
       expect(row?.status).toBe('pending');
     }
     expect(errorSpy).not.toHaveBeenCalled();
+    expect(onDead).not.toHaveBeenCalled();
+    expect(sentry.captureMessage).not.toHaveBeenCalled();
 
-    const last = await runWorker(t.db, { now: at(row?.availableAt ?? T0, 1), handlers });
+    const last = await runWorker(t.db, { now: at(row?.availableAt ?? T0, 1), handlers, onDead });
     expect(last).toEqual({ processed: 0, retried: 0, dead: 1 });
     [row] = await rows('flaky');
     expect(row?.attempts).toBe(MAX_ATTEMPTS);
@@ -204,9 +222,27 @@ describe('runWorker', () => {
       expect.objectContaining({ topic: 'flaky', attempts: MAX_ATTEMPTS }),
     );
 
+    // Going dead raises the alert: Sentry, and the operator alert hook (in its own transaction).
+    expect(onDead).toHaveBeenCalledTimes(1);
+    expect(onDead).toHaveBeenCalledWith(t.db, {
+      eventId: row?.id,
+      topic: 'flaky',
+      attempts: MAX_ATTEMPTS,
+      error: 'provider down',
+    });
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
+    expect(sentry.captureMessage).toHaveBeenCalledWith(
+      expect.stringContaining('dead'),
+      expect.objectContaining({
+        level: 'error',
+        tags: expect.objectContaining({ topic: 'flaky', eventId: row?.id }),
+      }),
+    );
+
     // A dead event is never picked up again.
-    const after = await runWorker(t.db, { now: at(T0, minutes(60 * 24 * 30)), handlers });
+    const after = await runWorker(t.db, { now: at(T0, minutes(60 * 24 * 30)), handlers, onDead });
     expect(after).toEqual({ processed: 0, retried: 0, dead: 0 });
+    expect(onDead).toHaveBeenCalledTimes(1);
   });
 
   it('retries an event whose topic has no handler', async () => {
@@ -257,15 +293,72 @@ describe('runWorker', () => {
         locked_at = ${at(T0, -minutes(11))}::timestamptz
       where topic = 'crashy'`);
 
-    const result = await runWorker(t.db, { now: T0, handlers: { crashy: handler } });
+    const onDead = vi.fn(async () => {});
+    const result = await runWorker(t.db, { now: T0, handlers: { crashy: handler }, onDead });
 
     expect(result).toEqual({ processed: 0, retried: 0, dead: 1 });
     expect(handler).not.toHaveBeenCalled();
-    expect((await rows('crashy'))[0]?.status).toBe('dead');
+    const [row] = await rows('crashy');
+    expect(row?.status).toBe('dead');
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining('dead'),
       expect.objectContaining({ topic: 'crashy' }),
     );
+    expect(onDead).toHaveBeenCalledWith(t.db, {
+      eventId: row?.id,
+      topic: 'crashy',
+      attempts: MAX_ATTEMPTS,
+      error: 'lock expired on the final attempt',
+    });
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('still marks an event dead when its alert cannot be raised', async () => {
+    const errorSpy = quiet();
+    await enqueue(t.db, { topic: 'doomed', payload: {}, availableAt: T0 });
+    await t.db.execute(sql`update app.outbox set attempts = ${MAX_ATTEMPTS - 1} where topic = 'doomed'`);
+    const onDead = vi.fn(async () => {
+      throw new Error('alerting is down too');
+    });
+
+    const result = await runWorker(t.db, {
+      now: T0,
+      handlers: { doomed: async () => Promise.reject(new Error('nope')) },
+      onDead,
+    });
+
+    expect(result).toEqual({ processed: 0, retried: 0, dead: 1 });
+    expect((await rows('doomed'))[0]?.status).toBe('dead');
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('alert'),
+      expect.objectContaining({ topic: 'doomed' }),
+    );
+  });
+
+  it("never stores or logs a failed query's parameters", async () => {
+    quiet();
+    const logged = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const email = 'maya.private@example.test';
+    const handlers: HandlerMap = {
+      insert: async (_p, { db }) => {
+        // Drizzle's error message lists the values: the email among them.
+        await db.insert(outbox).values({
+          id: 'not-a-uuid',
+          topic: email,
+          payload: {},
+        });
+      },
+    };
+    await enqueue(t.db, { topic: 'insert', payload: {}, availableAt: T0 });
+    vi.mocked(logger.warn).mockRestore();
+
+    await runWorker(t.db, { now: T0, handlers });
+
+    const [row] = await rows('insert');
+    expect(row?.status).toBe('pending');
+    expect(row?.lastError).toContain('Failed query: insert into "app"."outbox"');
+    expect(row?.lastError).not.toContain(email);
+    expect(logged.mock.calls.map((c) => String(c[0])).join('\n')).not.toContain(email);
   });
 
   it('hands back claimed events it has no time left to start, without using an attempt', async () => {
@@ -394,18 +487,50 @@ describe('lastDueAt', () => {
 });
 
 describe('kickWorker', () => {
-  it('posts to the jobs route with the secret without waiting', async () => {
-    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
-    vi.stubGlobal('fetch', fetchMock);
-    expect(kickWorker()).toBeUndefined();
+  const expectKick = (fetchMock: ReturnType<typeof vi.fn>) =>
     expect(fetchMock).toHaveBeenCalledWith('http://localhost:3000/api/jobs/run', {
       method: 'POST',
       headers: { 'x-jobs-secret': process.env.JOBS_SECRET },
     });
+
+  it("hands the request to Next's after(), so a serverless function lives until it is sent", async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const tasks: (() => Promise<void>)[] = [];
+    nextServer.after.mockImplementation((task: () => Promise<void>) => void tasks.push(task));
+
+    expect(kickWorker()).toBeUndefined();
+    expect(nextServer.after).toHaveBeenCalledTimes(1);
+    // Nothing is sent while the response is still being written...
+    expect(fetchMock).not.toHaveBeenCalled();
+    // ...and the platform runs the task (awaiting it) once it is.
+    await tasks[0]?.();
+    expectKick(fetchMock);
+  });
+
+  it('accepts another scheduler, such as a waitUntil', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const pending: Promise<void>[] = [];
+    kickWorker((task) => void pending.push(task()));
+    await Promise.all(pending);
+    expectKick(fetchMock);
+    expect(nextServer.after).not.toHaveBeenCalled();
+  });
+
+  it('sends at once outside a request scope (scripts, tests)', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    nextServer.after.mockImplementation(() => {
+      throw new Error('`after` was called outside a request scope.');
+    });
+    expect(kickWorker()).toBeUndefined();
+    expectKick(fetchMock);
   });
 
   it('logs a failed request instead of throwing', async () => {
     const errorSpy = quiet();
+    nextServer.after.mockImplementation((task: () => Promise<void>) => void task());
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {

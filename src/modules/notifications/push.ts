@@ -11,6 +11,7 @@ import { queryRows, type DbOrTx } from '@/lib/db';
 import { getEnv } from '@/lib/env';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
+import { getUserContact } from '@/modules/identity';
 import { pushSubscriptions } from './schema';
 import { getType, isMandatory, notificationUrl, type NotificationData } from './types';
 
@@ -148,19 +149,16 @@ export async function sendPushJob(
     title: string;
     body: string;
     data: string;
-    deleted: boolean;
     push_enabled: boolean;
   }>(
     db,
     sql`
       select n.user_id, n.type, n.title, n.body, n.data::text as data,
-        u.deleted_at is not null as deleted,
         coalesce((
           select enabled from app.notification_preferences p
           where p.user_id = n.user_id and p.category = n.category and p.channel = 'push'
         ), true) as push_enabled
       from app.notifications n
-      join app.users u on u.id = n.user_id
       where n.id = ${notificationId}
     `,
   );
@@ -169,7 +167,10 @@ export async function sendPushJob(
     return result;
   }
   const def = getType(n.type);
-  if (!def?.push || n.deleted || !(isMandatory(def) || n.push_enabled)) return result;
+  if (!def?.push || !(isMandatory(def) || n.push_enabled)) return result;
+  // identity owns app.users; a deleted (or unknown) user gets no push.
+  const user = await getUserContact(db, n.user_id);
+  if (!user || user.deleted) return result;
 
   const subs = await db
     .select({
