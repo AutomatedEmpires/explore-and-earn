@@ -2,7 +2,53 @@
 
 Explore&Earn connects seekers with **Maritime, Seasonal, Farm, and Remote** work through three equal discovery modes: **Seek, Swipe, and Map**. Mobile seekers have pinned bottom navigation in this order: **Seek / Swipe / Map / Profile**.
 
-This fresh repository currently contains the V1 product architecture and implementation plan only. It does not contain an application, migrations, deployed services, or production configuration.
+This repository holds the product specifications and the Explore&Earn web app, a single Next.js app built one sub-project at a time, starting with [Foundation](docs/superpowers/specs/2026-11-03-foundation-design.md). Setting up the cloud environments is covered in the [Foundation setup runbook](docs/runbooks/foundation-setup.md).
+
+## Develop locally
+
+You need Node.js 22.12 or newer and pnpm (`npm i -g pnpm`). Docker isn't needed: the local database is PGlite with PostGIS, served over the Postgres wire protocol.
+
+1. **Install:** `pnpm install`
+2. **Configure:** `cp .env.local.example .env.local`. The defaults use local file storage and stub providers. Production refuses to start with either.
+3. **Start the database** in its own shell: `pnpm db:local`. It listens on `localhost:5433` and keeps its data in `.pglite/`.
+4. **Apply the migrations:** `pnpm db:migrate`
+5. **Run the app:** `pnpm dev`
+   - The app is at <http://localhost:3000>.
+   - The operator console is at <http://admin.localhost:3000>.
+
+**Sign-in** needs the keys of a Clerk development instance, never a production one. Put `CLERK_SECRET_KEY` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` in `.env.local`.
+
+- Without keys, the app runs signed out and the proxy logs a warning.
+- Clerk's keyless mode works too: copy the keys it saves in `.clerk/.tmp/keyless.json` (gitignored) into `.env.local`.
+- Clerk webhooks can't reach your machine. A new user's row is created from Clerk's API on their first request instead.
+- To make yourself the first operator Owner, run `pnpm ops:bootstrap-owner you@example.com` and accept the invitation email.
+
+**Background jobs.** Locally, nothing calls the worker on a schedule. The app runs it after uploads, but scheduled topics (the SLA sweep, digests) only run when you call the worker yourself:
+
+```sh
+curl -X POST -H "x-jobs-secret: <JOBS_SECRET from .env.local>" http://localhost:3000/api/jobs/run
+```
+
+**Stub providers** are deterministic, so you can trigger each outcome on purpose:
+
+| Provider | What it does |
+|---|---|
+| AI (`AI_PROVIDER=stub`) | Text or image bytes containing `__flag__` go to review in the moderation queue. `__block__` is rejected. Anything else is approved. |
+| Malware (`MALWARE_PROVIDER=stub`) | A file containing the EICAR test string is rejected. |
+| Child safety (`CHILD_SAFETY_PROVIDER=stub`) | An image whose SHA-256 is listed in `CHILD_SAFETY_STUB_HASHES` is blocked. |
+| Email (`EMAIL_PROVIDER=stub`) | Messages are kept in memory and nothing is sent. |
+| Storage (`STORAGE_PROVIDER=local`) | Files are written under `.data/storage` and served by `/api/v1/media/local/...`, in development only. |
+
+**Checks.** Run these before you commit:
+
+```sh
+pnpm lint && pnpm check:tokens && pnpm typecheck && pnpm test
+```
+
+- **Unit and domain tests** run on in-memory PGlite.
+- **Integration tests** (`*.int.test.ts`) need a real Postgres with PostGIS. CI runs them with `pnpm test:integration`.
+- **End-to-end tests:** `pnpm e2e`. Start `pnpm db:local` first; Playwright starts `pnpm dev` itself.
+  - The Foundation exit criteria also need Clerk keys: `pnpm e2e tests/e2e/exit-criteria.spec.ts --project chromium`.
 
 ## V1 specification
 

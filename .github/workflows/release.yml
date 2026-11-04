@@ -1,0 +1,69 @@
+# The production release (foundation spec section 13). Started by hand from the Actions tab on
+# main. The job runs in the protected `production` environment, so it waits for the founder's
+# approval before it can read the production secrets. Then it:
+#   1. applies drizzle/*.sql to ee-prod (PROD_DATABASE_URL), and only if that succeeds
+#   2. calls the Vercel production deploy hook (VERCEL_DEPLOY_HOOK_PROD).
+#
+# A deploy hook builds the newest commit on its branch, so the job first checks that main has
+# not moved since the release started; otherwise the deploy could carry migrations this run
+# never applied. Setup: docs/runbooks/foundation-setup.md.
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-production
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  release:
+    name: migrate ee-prod and deploy production
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check this commit is still the head of main
+        run: |
+          head="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [ "$head" != "$GITHUB_SHA" ]; then
+            echo "::error::main moved to $head after this release started ($GITHUB_SHA). Start a new release."
+            exit 1
+          fi
+
+      - name: Migrate ee-prod
+        run: pnpm db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+
+      - name: Check main again before deploying
+        run: |
+          head="$(git ls-remote origin refs/heads/main | cut -f1)"
+          if [ "$head" != "$GITHUB_SHA" ]; then
+            echo "::error::main moved to $head while migrating. ee-prod has the migrations of $GITHUB_SHA; start a new release to deploy."
+            exit 1
+          fi
+
+      - name: Deploy production on Vercel
+        env:
+          DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_PROD }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "::error::VERCEL_DEPLOY_HOOK_PROD is not set in the production environment."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --request POST "$DEPLOY_HOOK"

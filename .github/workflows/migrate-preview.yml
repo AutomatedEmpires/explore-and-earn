@@ -1,0 +1,41 @@
+# Applies drizzle/*.sql to the ee-preview database whenever main moves (foundation spec
+# section 13: "Merging to main applies migrations to ee-preview").
+#
+# Needs the secret PREVIEW_DATABASE_URL: ee-preview's session pooler connection string
+# (port 5432 on the pooler host; GitHub runners have no IPv6 for the direct connection).
+# Keep it in the `preview` environment, limited to main. See docs/runbooks/foundation-setup.md.
+name: Migrate preview
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One migration run at a time, in push order; never cancel one halfway.
+concurrency:
+  group: migrate-preview
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  migrate:
+    name: migrate ee-preview
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: preview
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
