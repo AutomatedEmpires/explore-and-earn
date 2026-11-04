@@ -5,6 +5,7 @@
 // counter listings registers), so the API wrapper, the jobs route and every page that calls an
 // SP2 module import this file. No module imports it.
 import { registerOrgNotificationTypes } from '@/modules/orgs';
+import '@/modules/orgs';
 import '@/modules/entitlements';
 import '@/modules/billing';
 import '@/modules/locations';

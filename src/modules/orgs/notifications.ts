@@ -78,6 +78,10 @@ export function registerOrgNotificationTypes(): void {
   });
 }
 
+// After the current import cycle finishes, defineType exists. Tests and routes that notify
+// before sp2-wiring's explicit call still get the types.
+queueMicrotask(registerOrgNotificationTypes);
+
 /** Notifies every live Owner and Admin of the org, except `exceptUserId`. */
 export async function notifyOwnerAdmins(
   db: DbOrTx,
