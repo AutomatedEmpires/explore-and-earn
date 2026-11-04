@@ -17,6 +17,12 @@
 // .clerk/.tmp/keyless.json. The run creates three throwaway `+clerk_test` users in that instance
 // and deletes them, and the host's organization, when it ends. It never runs on a production key.
 //
+// The instance needs Organizations and passkeys turned on (docs/runbooks/foundation-setup.md,
+// section 4). A fresh keyless app has both off: the host step then fails with that reason, so
+// it runs last, after the steps that don't need them. With passkeys off, run the dev server
+// (and this test) with ALLOW_OPERATOR_WITHOUT_PASSKEY=true, and the operator skips its passkey;
+// the host Owner still needs one. Prod refuses that flag.
+//
 // On Windows, Defender can delete the EICAR file the local storage adapter writes to
 // .data/storage/quarantine before the scan reads it; exclude .data/storage or run on Linux.
 import { existsSync, readFileSync } from 'node:fs';
@@ -36,6 +42,8 @@ import { pdfWithEicar } from '../fixtures/media/eicar';
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 
 const KEYLESS_FILE = '.clerk/.tmp/keyless.json';
+/** Must match the dev server's setting (see the header). */
+const PASSKEY_OPTIONAL = process.env.ALLOW_OPERATOR_WITHOUT_PASSKEY === 'true';
 const CLERK_API = 'https://api.clerk.com/v1';
 const JPEG = new Uint8Array(readFileSync('tests/fixtures/media/gps.jpg'));
 const ORG_NAME = 'Kettle Ridge Lodge';
@@ -110,6 +118,22 @@ async function createClerkUser(email: string, publicMetadata: Record<string, unk
   return clerkUserSchema.parse(created).id;
 }
 
+const NEEDS_ORGANIZATIONS =
+  'The Clerk instance has Organizations turned off (a fresh keyless app does), so the host ' +
+  'cannot create their organization. Turn Organizations on (docs/runbooks/foundation-setup.md).';
+
+/** Whether the instance can hold organizations (a read; a host needs one to onboard). */
+async function organizationsEnabled(): Promise<boolean> {
+  if (!keys) throw new Error('Clerk is not set up');
+  const res = await fetch(`${CLERK_API}/organizations?limit=1`, {
+    headers: { authorization: `Bearer ${keys.secretKey}` },
+  });
+  if (res.ok) return true;
+  const text = await res.text();
+  if (text.includes('organization_not_enabled_in_instance')) return false;
+  throw new Error(`Clerk GET /organizations: ${res.status} ${text}`);
+}
+
 /** Adds a passkey to the signed-in user, made by Chromium's virtual authenticator. */
 async function addPasskey(page: Page): Promise<void> {
   const cdp = await page.context().newCDPSession(page);
@@ -125,10 +149,28 @@ async function addPasskey(page: Page): Promise<void> {
     },
   });
   await clerk.loaded({ page });
+  await page
+    .evaluate(async () => {
+      // Clerk refuses passkeys in automated browsers (navigator.webdriver); the authenticator
+      // here is Chromium's virtual one, so let Clerk use it.
+      Object.defineProperty(navigator, 'webdriver', { configurable: true, get: () => false });
+      const user = window.Clerk.user;
+      if (!user) throw new Error('Not signed in');
+      await user.createPasskey();
+    })
+    .catch((err: unknown) => {
+      throw new Error(
+        'Could not add a passkey. The Clerk instance needs passkeys turned on ' +
+          '(docs/runbooks/foundation-setup.md, section 4).',
+        { cause: err },
+      );
+    });
+}
+
+/** Fetches a fresh session token, so the proxy sees the account type onboarding just set. */
+async function refreshSession(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const user = window.Clerk.user;
-    if (!user) throw new Error('Not signed in');
-    await user.createPasskey();
+    await window.Clerk.session?.getToken({ skipCache: true });
   });
 }
 
@@ -171,12 +213,18 @@ async function newestTestItem(since: Date): Promise<ItemRow | null> {
   return row ?? null;
 }
 
-type Outcome = { status: string; resolution: string | null; decided_by: string | null };
+type Outcome = {
+  status: string;
+  resolution: string | null;
+  decided_by: string | null;
+  assignee_operator_id: string | null;
+};
 
 async function itemOutcome(id: string): Promise<Outcome | undefined> {
   const q = db();
   const [row] = await q<Outcome[]>`
-    select status, resolution, decided_by from app.review_items where id = ${id}`;
+    select status, resolution, decided_by, assignee_operator_id
+    from app.review_items where id = ${id}`;
   return row;
 }
 
@@ -249,7 +297,24 @@ async function signIn(
   const page = await context.newPage();
   await page.goto('/sign-in');
   await clerk.signIn({ page, emailAddress: email });
+  // Clerk refreshes the page once the session is set; let that finish first.
+  await page.waitForLoadState('networkidle');
   return { clerkUserId, email, context, page };
+}
+
+/**
+ * page.goto, retried when Clerk's post-sign-in refresh (or a handshake redirect) interrupts it
+ * with net::ERR_ABORTED.
+ */
+async function visit(page: Page, path: string) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await page.goto(path);
+    } catch (err) {
+      if (attempt >= 3 || !String(err).includes('ERR_ABORTED')) throw err;
+      await page.waitForLoadState('networkidle');
+    }
+  }
 }
 
 /** A link in one of the page's navigation landmarks (top bar, bottom tabs or sidebar). */
@@ -363,41 +428,11 @@ test.describe('Foundation exit criteria', () => {
     });
     expect(onboarded.status, JSON.stringify(onboarded.body)).toBe(200);
     expect(onboarded.body).toEqual({ redirectTo: '/' });
+    await refreshSession(seeker.page);
 
-    await seeker.page.goto('/');
+    await visit(seeker.page, '/');
     await expect(navLink(seeker.page, UI.seekerHome)).toHaveAttribute('aria-current', 'page');
     ids.seeker = await userIdFor(clerkUserId);
-  });
-
-  test('a host signs in, creates an organization and lands in the host workspace', async ({
-    browser,
-  }) => {
-    const clerkUserId = await createClerkUser(emailFor('host'));
-    clerkUserIds.push(clerkUserId);
-    const host = await signIn(browser, appURL, clerkUserId, emailFor('host'));
-    actors.set('host', host);
-    // An Owner needs a passkey or two-step sign-in before the workspace opens.
-    await addPasskey(host.page);
-
-    const onboarded = await browserFetch(host.page, '/api/v1/onboarding', {
-      method: 'POST',
-      json: { accountType: 'host', organizationName: ORG_NAME },
-    });
-    expect(onboarded.status, JSON.stringify(onboarded.body)).toBe(200);
-    expect(onboarded.body).toEqual({ redirectTo: '/host' });
-
-    await host.page.goto('/host');
-    await expect(host.page).toHaveURL(`${appURL}/host`);
-    await expect(navLink(host.page, UI.hostHome)).toBeVisible();
-
-    ids.host = await userIdFor(clerkUserId);
-    const q = db();
-    const [org] = await q<{ id: string; clerk_org_id: string }[]>`
-      select id, clerk_org_id from app.organizations
-      where owner_user_id = ${ids.host} order by created_at desc limit 1`;
-    expect(org, 'the host owns an organization').toBeDefined();
-    ids.org = org?.id;
-    hostClerkOrgId = org?.clerk_org_id ?? null;
   });
 
   test('an operator signs in on the admin host and lands in the operator console', async ({
@@ -411,10 +446,10 @@ test.describe('Foundation exit criteria', () => {
     clerkUserIds.push(clerkUserId);
     const operator = await signIn(browser, adminURL(), clerkUserId, emailFor('operator'));
     actors.set('operator', operator);
-    // The console needs a passkey.
-    await addPasskey(operator.page);
+    // The console needs a passkey (unless the dev server allows operators without one).
+    if (!PASSKEY_OPTIONAL) await addPasskey(operator.page);
 
-    await operator.page.goto('/');
+    await visit(operator.page, '/');
     await expect(operator.page).toHaveURL(`${adminURL()}/`);
     await expect(navLink(operator.page, UI.consoleQueues)).toBeVisible();
 
@@ -460,7 +495,7 @@ test.describe('Foundation exit criteria', () => {
     const { page } = actor('operator');
     const since = new Date();
 
-    await page.goto('/queues');
+    await visit(page, '/queues');
     await page.getByRole('button', { name: UI.createTestItem }).click();
 
     await expect.poll(() => newestTestItem(since), { timeout: 15_000 }).not.toBeNull();
@@ -470,16 +505,58 @@ test.describe('Foundation exit criteria', () => {
     const itemId = item?.id ?? '';
     ids.item = itemId;
 
-    await page.goto(`/queues/${itemId}`);
-    await page.getByRole('button', { name: UI.claim }).click();
+    await visit(page, `/queues/${itemId}`);
+    // Routing may already have given it to this operator (an Owner on shift); else claim it.
+    if ((await itemOutcome(itemId))?.assignee_operator_id !== ids.operator) {
+      await page.getByRole('button', { name: UI.claim }).click();
+      await expect
+        .poll(async () => (await itemOutcome(itemId))?.assignee_operator_id)
+        .toBe(ids.operator);
+    }
     await page.getByRole('textbox', { name: UI.note }).fill('Checked in the exit-criteria run.');
     await page.getByRole('button', { name: UI.addNote }).click();
-    await page.getByRole('button', { name: UI.approve }).click();
+    await expect.poll(() => noteCount(itemId)).toBe(1);
+    await page.getByRole('button', { name: UI.approve, exact: true }).click();
 
     await expect
       .poll(() => itemOutcome(itemId))
-      .toEqual({ status: 'resolved', resolution: 'approve', decided_by: ids.operator });
+      .toMatchObject({ status: 'resolved', resolution: 'approve', decided_by: ids.operator });
     expect(await noteCount(itemId)).toBe(1);
+  });
+
+  // Last of the shells, because it needs Organizations and passkeys on the Clerk instance (see
+  // the header): without them it fails with that reason, after the other criteria have run.
+  test('a host signs in, creates an organization and lands in the host workspace', async ({
+    browser,
+  }) => {
+    expect(await organizationsEnabled(), NEEDS_ORGANIZATIONS).toBe(true);
+    const clerkUserId = await createClerkUser(emailFor('host'));
+    clerkUserIds.push(clerkUserId);
+    const host = await signIn(browser, appURL, clerkUserId, emailFor('host'));
+    actors.set('host', host);
+    // An Owner needs a passkey or two-step sign-in before the workspace opens.
+    await addPasskey(host.page);
+
+    const onboarded = await browserFetch(host.page, '/api/v1/onboarding', {
+      method: 'POST',
+      json: { accountType: 'host', organizationName: ORG_NAME },
+    });
+    expect(onboarded.status, JSON.stringify(onboarded.body)).toBe(200);
+    expect(onboarded.body).toEqual({ redirectTo: '/host' });
+    await refreshSession(host.page);
+
+    await visit(host.page, '/host');
+    await expect(host.page).toHaveURL(`${appURL}/host`);
+    await expect(navLink(host.page, UI.hostHome)).toBeVisible();
+
+    ids.host = await userIdFor(clerkUserId);
+    const q = db();
+    const [org] = await q<{ id: string; clerk_org_id: string }[]>`
+      select id, clerk_org_id from app.organizations
+      where owner_user_id = ${ids.host} order by created_at desc limit 1`;
+    expect(org, 'the host owns an organization').toBeDefined();
+    ids.org = org?.id;
+    hostClerkOrgId = org?.clerk_org_id ?? null;
   });
 
   test('the audit log has account_type_set, orgs.created and trust.decided', async () => {
@@ -491,7 +568,7 @@ test.describe('Foundation exit criteria', () => {
 
     // And the console's audit viewer shows the decision.
     const { page } = actor('operator');
-    await page.goto('/audit');
-    await expect(page.getByText('trust.decided').first()).toBeVisible();
+    await visit(page, `/audit?action=trust.decided&subjectId=${ids.item ?? ''}`);
+    await expect(page.getByRole('cell', { name: 'trust.decided' })).toBeVisible();
   });
 });

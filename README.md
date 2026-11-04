@@ -49,6 +49,7 @@ pnpm lint && pnpm check:tokens && pnpm typecheck && pnpm test
 - **Integration tests** (`*.int.test.ts`) need a real Postgres with PostGIS. CI runs them with `pnpm test:integration`.
 - **End-to-end tests:** `pnpm e2e`. Start `pnpm db:local` first; Playwright starts `pnpm dev` itself.
   - The Foundation exit criteria also need Clerk keys: `pnpm e2e tests/e2e/exit-criteria.spec.ts --project chromium`.
+  - The host steps (in the exit criteria and `shells.spec.ts`) need Organizations and passkeys turned on in the Clerk development instance ([runbook](docs/runbooks/foundation-setup.md), section 4). A fresh keyless app has both off. With passkeys off, set `ALLOW_OPERATOR_WITHOUT_PASSKEY=true` for the operator steps; the host Owner still needs a passkey.
 
 ## V1 specification
 
