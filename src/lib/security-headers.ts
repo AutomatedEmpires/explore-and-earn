@@ -32,8 +32,8 @@ const POSTHOG = {
   assets: ['https://us-assets.i.posthog.com', 'https://eu-assets.i.posthog.com'],
 };
 
-/** Public images served from Supabase Storage (media-public). */
-const SUPABASE_STORAGE = 'https://*.supabase.co';
+/** An https origin and nothing else: scheme, host and an optional port. */
+const HTTPS_ORIGIN = /^https:\/\/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}(?::\d{1,5})?$/i;
 
 /** A fresh base64 nonce (128 random bits). */
 export function newNonce(): string {
@@ -59,6 +59,24 @@ export function frontendApiFromPublishableKey(key: string | undefined): string |
 }
 
 /**
+ * The origin of our Supabase project (from SUPABASE_URL) when files live in Supabase Storage, or
+ * null with local or stub storage. Browsers PUT uploads straight to its signed upload URLs and
+ * load public and signed images from it, so the CSP must allow exactly this origin.
+ */
+export function storageOrigin(env: {
+  STORAGE_PROVIDER: string;
+  SUPABASE_URL?: string | null;
+}): string | null {
+  if (env.STORAGE_PROVIDER !== 'supabase' || !env.SUPABASE_URL) return null;
+  try {
+    const origin = new URL(env.SUPABASE_URL).origin.toLowerCase();
+    return HTTPS_ORIGIN.test(origin) ? origin : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The security headers for one response. `clerkFrontendApi` is the production Clerk Frontend
  * API host (from `frontendApiFromPublishableKey`); development instances are allowed outside prod.
  */
@@ -66,11 +84,17 @@ export function buildSecurityHeaders(i: {
   nonce: string;
   appEnv: AppEnv;
   clerkFrontendApi?: string | null;
+  /** Our Supabase Storage origin (`storageOrigin(env)`), for uploads and images. */
+  storageOrigin?: string | null;
 }): Record<string, string> {
   if (!NONCE.test(i.nonce)) throw new Error('buildSecurityHeaders: the nonce must be base64');
   if (i.clerkFrontendApi && !HOSTNAME.test(i.clerkFrontendApi)) {
     throw new Error('buildSecurityHeaders: clerkFrontendApi must be a bare hostname');
   }
+  if (i.storageOrigin && !HTTPS_ORIGIN.test(i.storageOrigin)) {
+    throw new Error('buildSecurityHeaders: storageOrigin must be a bare https origin');
+  }
+  const storage = i.storageOrigin ? [i.storageOrigin] : [];
 
   const dev = i.appEnv === 'dev';
   const clerkApi = [
@@ -97,12 +121,14 @@ export function buildSecurityHeaders(i: {
     ],
     // Clerk styles its components with runtime CSS-in-JS.
     ['style-src', ["'self'", "'unsafe-inline'"]],
-    ['img-src', ["'self'", 'blob:', 'data:', CLERK.images, SUPABASE_STORAGE]],
+    ['img-src', ["'self'", 'blob:', 'data:', CLERK.images, ...storage]],
     ['font-src', ["'self'", 'data:']],
     [
       'connect-src',
       [
         "'self'",
+        // Uploads go from the browser straight to the signed upload URL.
+        ...storage,
         ...clerkApi,
         `${CLERK.protect}:*`,
         ...CLERK.telemetry,

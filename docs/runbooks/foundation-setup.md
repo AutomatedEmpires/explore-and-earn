@@ -134,6 +134,16 @@ Use the development instance for dev and preview, and the production instance fo
 each change in both instances.
 
 1. **Organizations:** turn on Organizations. The creator's role is `org:admin`.
+   - Turn **off** "Allow users to create organizations" (Organizations > Settings). Hosts create
+     their organization through onboarding, which validates the name, audits it and makes the
+     host its Owner; only our server creates organizations, through the Backend API, and marks
+     each one `{"created_via": "app"}` in its public metadata.
+   - If it is left on, a signed-in user can still create one from the browser, but the webhook
+     gives such an organization no Owner, so it grants nobody access, and logs a warning naming
+     this setting.
+   - An Owner's membership changes only through the app. A webhook that demotes or removes the
+     recorded Owner (an Admin doing it in Clerk's UI) is recorded as rejected and reported to
+     Sentry, and our database keeps the Owner.
 2. **Custom roles** (Organizations > Roles & Permissions):
    - `org:recruiter`, named Recruiter
    - `org:billing`, named Billing

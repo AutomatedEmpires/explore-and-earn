@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { queryRows } from '@/lib/db';
 import { AppError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
+import { findHostMembership } from '@/modules/orgs';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { handleClerkEvent, mapClerkRole } from './sync';
 
@@ -36,14 +37,23 @@ function userJson(o: {
   };
 }
 
-function orgJson(o: { id: string; name: string; createdBy?: string; updatedAt: string }) {
+/** The public metadata our server sets on every organization it creates in Clerk. */
+const APP_CREATED = { created_via: 'app' };
+
+function orgJson(o: {
+  id: string;
+  name: string;
+  createdBy?: string;
+  updatedAt: string;
+  publicMetadata?: Record<string, unknown>;
+}) {
   return {
     object: 'organization',
     id: o.id,
     name: o.name,
     slug: o.name.toLowerCase().replaceAll(' ', '-'),
     created_by: o.createdBy,
-    public_metadata: {},
+    public_metadata: o.publicMetadata ?? {},
     created_at: ms('2026-11-01T00:00:00Z'),
     updated_at: ms(o.updatedAt),
   };
@@ -322,7 +332,7 @@ describe('handleClerkEvent', () => {
     expect(rows[0]?.deleted_at).not.toBeNull();
   });
 
-  it("makes the organization's creator its owner whichever event arrives first", async () => {
+  it("makes the creator of an organization the app created its owner, whichever event arrives first", async () => {
     // The creator's membership (Clerk role org:admin) arrives before the organization.
     await handleClerkEvent(t.db, {
       id: 'msg_m',
@@ -344,6 +354,7 @@ describe('handleClerkEvent', () => {
         name: 'Kettle Ridge Lodge',
         createdBy: 'user_1',
         updatedAt: '2026-11-01T00:00:00Z',
+        publicMetadata: APP_CREATED,
       }),
     });
 
@@ -364,6 +375,7 @@ describe('handleClerkEvent', () => {
           name: 'Kettle Ridge Lodge',
           createdBy: 'user_1',
           updatedAt: '2026-11-01T00:00:00Z',
+          publicMetadata: APP_CREATED,
         }),
         userId: 'user_2',
         updatedAt: '2026-11-01T00:00:02Z',
@@ -371,6 +383,94 @@ describe('handleClerkEvent', () => {
     });
     const roles = (await memberships()).map((m) => m.role).sort();
     expect(roles).toEqual(['admin', 'owner']);
+  });
+
+  it('gives an organization created outside the app (Clerk Frontend API) no owner and no access', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    // A signed-in user called Clerk.createOrganization() from the browser.
+    const org = orgJson({
+      id: 'org_rogue',
+      name: 'Totally Real Lodge',
+      createdBy: 'user_rogue',
+      updatedAt: '2026-11-01T00:00:00Z',
+    });
+    await handleClerkEvent(t.db, { id: 'msg_ro', type: 'organization.created', data: org });
+    await handleClerkEvent(t.db, {
+      id: 'msg_rm',
+      type: 'organizationMembership.created',
+      data: membershipJson({
+        role: 'org:admin',
+        organization: org,
+        userId: 'user_rogue',
+        updatedAt: '2026-11-01T00:00:01Z',
+      }),
+    });
+
+    const [o] = await orgs();
+    expect(o?.owner_user_id).toBeNull();
+    const [u] = await users();
+    // The creator is recorded as an admin of an organization nobody owns, which grants nothing.
+    expect(await memberships()).toEqual([expect.objectContaining({ role: 'admin' })]);
+    expect(await findHostMembership(t.db, u?.id ?? '', null)).toBeNull();
+    expect(await findHostMembership(t.db, u?.id ?? '', 'org_rogue')).toBeNull();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('outside the app'),
+      expect.objectContaining({ clerkOrgId: 'org_rogue' }),
+    );
+  });
+
+  it('refuses to demote or remove the recorded Owner through Clerk, until the organization is deleted', async () => {
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    const org = orgJson({
+      id: 'org_1',
+      name: 'Kettle Ridge Lodge',
+      createdBy: 'user_1',
+      updatedAt: '2026-11-01T00:00:00Z',
+      publicMetadata: APP_CREATED,
+    });
+    await handleClerkEvent(t.db, { id: 'msg_o', type: 'organization.created', data: org });
+    const owner = (role: string, updatedAt: string) =>
+      membershipJson({ role, organization: org, userId: 'user_1', updatedAt });
+    await handleClerkEvent(t.db, {
+      id: 'msg_own',
+      type: 'organizationMembership.created',
+      data: owner('org:admin', '2026-11-01T00:00:01Z'),
+    });
+    expect(await memberships()).toEqual([expect.objectContaining({ role: 'owner' })]);
+
+    // Another admin demotes the Owner, then removes them, in Clerk's own UI.
+    expect(
+      await handleClerkEvent(t.db, {
+        id: 'msg_demote',
+        type: 'organizationMembership.updated',
+        data: owner('org:billing', '2026-11-01T00:00:02Z'),
+      }),
+    ).toBe('rejected');
+    expect(
+      await handleClerkEvent(t.db, {
+        id: 'msg_remove',
+        type: 'organizationMembership.deleted',
+        data: owner('org:admin', '2026-11-01T00:00:03Z'),
+      }),
+    ).toBe('rejected');
+    expect(await memberships()).toEqual([
+      expect.objectContaining({ role: 'owner', deleted_at: null }),
+    ]);
+
+    // Deleting the organization removes everyone, the Owner included.
+    await handleClerkEvent(t.db, {
+      id: 'msg_org_del',
+      type: 'organization.deleted',
+      data: { object: 'organization', id: 'org_1', deleted: true },
+    });
+    expect(
+      await handleClerkEvent(t.db, {
+        id: 'msg_remove_2',
+        type: 'organizationMembership.deleted',
+        data: owner('org:admin', '2026-11-01T00:00:04Z'),
+      }),
+    ).toBe('applied');
+    expect((await memberships())[0]?.deleted_at).not.toBeNull();
   });
 
   it('applies membership updates by version and keeps a removal when events are reordered', async () => {

@@ -31,6 +31,9 @@ let t: TestDb;
 
 beforeAll(async () => {
   t = await createTestDb();
+  // A decision on an unknown subject type imports every module (findSubjectHandler). Load
+  // them here, under the hook timeout, not cold inside one test's 30 s on a loaded machine.
+  await import('@/server/job-handlers');
 });
 
 afterAll(async () => {

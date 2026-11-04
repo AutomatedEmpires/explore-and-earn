@@ -40,6 +40,9 @@ let t: TestDb;
 beforeAll(async () => {
   t = await createTestDb();
   dbHolder.current = t.db;
+  // createOrganization loads identity's index on first use (orgs/create.ts); pay that here, not
+  // inside the first host test on a loaded machine.
+  await import('./index');
 });
 
 afterAll(async () => {
@@ -278,6 +281,11 @@ describe('completeOnboarding', () => {
 });
 
 describe('POST /api/v1/onboarding', () => {
+  // The route's first import loads Clerk and Sentry cold; pay that under the hook timeout.
+  beforeAll(async () => {
+    await import('@/app/api/v1/onboarding/route');
+  });
+
   const post = async (body: unknown) => {
     const { POST } = await import('@/app/api/v1/onboarding/route');
     return POST(

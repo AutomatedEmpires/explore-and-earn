@@ -7,5 +7,6 @@ export * from '../modules/media/schema';
 export * from '../modules/notifications/schema';
 export * from '../modules/operator/schema';
 export * from '../modules/orgs/schema';
+export * from '../modules/ratelimit/schema';
 export * from '../modules/settings/schema';
 export * from '../modules/trust/schema';

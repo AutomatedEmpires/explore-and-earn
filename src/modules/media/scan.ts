@@ -25,6 +25,7 @@ import { conflict, isAppError, notFound } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { record } from '@/modules/audit';
 import { enqueue, type HandlerMap } from '@/modules/jobs';
+import { notify } from '@/modules/notifications';
 import {
   findLatestCheck,
   openReviewItem,
@@ -132,6 +133,18 @@ async function removeQuietly(storage: Storage, bucket: Bucket, objectPath: strin
   }
 }
 
+/**
+ * Tells the uploader why their file was rejected (spec section 7, step 4), in the transaction
+ * that settles it, so they are told exactly once. Never used for a child-safety block.
+ */
+async function tellRejected(db: DbOrTx, row: MediaRow, reason: RejectionReason): Promise<void> {
+  await notify(db, row.ownerUserId, 'media.rejected', {
+    mediaId: row.id,
+    kind: row.kind,
+    reason,
+  });
+}
+
 async function reject(
   db: DbOrTx,
   deps: ScanDeps,
@@ -140,10 +153,14 @@ async function reject(
   facts: Partial<Facts>,
   log: Record<string, unknown> = {},
 ): Promise<MediaStatus> {
-  const settled = await settle(db, row.id, {
-    status: 'rejected',
-    rejectionReason: reason,
-    ...factColumns(facts),
+  const settled = await db.transaction(async (tx) => {
+    const done = await settle(tx, row.id, {
+      status: 'rejected',
+      rejectionReason: reason,
+      ...factColumns(facts),
+    });
+    if (done) await tellRejected(tx, row, reason);
+    return done;
   });
   if (!settled) return statusOf(db, row.id);
   logger.info('media rejected', { mediaId: row.id, kind: row.kind, reason, ...log });
@@ -342,16 +359,22 @@ async function scanImage(
     if (objectPath) await deps.storage.write(bucket, objectPath, v.bytes, 'image/webp');
   }
 
-  const settled = await settle(db, row.id, {
-    status,
-    ...(status === 'rejected' ? { rejectionReason: 'unsafe_content' satisfies RejectionReason } : {}),
-    bucket,
-    path: row.id,
-    variants,
-    width: processed.width,
-    height: processed.height,
-    altText: wantAltText ? (check.altText ?? null) : null,
-    ...factColumns(facts),
+  const settled = await db.transaction(async (tx) => {
+    const done = await settle(tx, row.id, {
+      status,
+      ...(status === 'rejected'
+        ? { rejectionReason: 'unsafe_content' satisfies RejectionReason }
+        : {}),
+      bucket,
+      path: row.id,
+      variants,
+      width: processed.width,
+      height: processed.height,
+      altText: wantAltText ? (check.altText ?? null) : null,
+      ...factColumns(facts),
+    });
+    if (done && status === 'rejected') await tellRejected(tx, row, 'unsafe_content');
+    return done;
   });
   if (!settled) return statusOf(db, row.id);
   if (status === 'rejected') {

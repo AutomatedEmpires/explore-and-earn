@@ -26,6 +26,15 @@ export {
 } from './access';
 
 export {
+  getUserContact,
+  listActiveOperators,
+  markOperatorAssigned,
+  type ActiveOperator,
+  type OperatorFilter,
+  type UserContact,
+} from './directory';
+
+export {
   clerkAdmin,
   makeFakeClerkAdmin,
   userHasPasskey,

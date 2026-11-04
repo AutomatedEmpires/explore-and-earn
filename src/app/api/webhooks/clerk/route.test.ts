@@ -102,6 +102,12 @@ const auditRows = () =>
 type Envelope = { error: { code: string; message: string; requestId: string } };
 
 describe('POST /api/webhooks/clerk', () => {
+  // The route's first import loads Clerk, Sentry and svix cold. Pay that here, under the hook
+  // timeout, not inside the first test's 30 s budget on a loaded machine.
+  beforeAll(async () => {
+    await import('./route');
+  });
+
   it('applies a signed event once, audits it, and treats a redelivery as a duplicate', async () => {
     const { POST } = await import('./route');
     const before = (await auditRows()).length;

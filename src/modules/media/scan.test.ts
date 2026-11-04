@@ -799,3 +799,55 @@ describe('scanners', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('scanMedia: the uploader is told why a file was rejected (spec section 7, step 4)', () => {
+  const told = (userId: string) =>
+    queryRows<{ type: string; title: string; body: string; data: Record<string, unknown> }>(
+      t.db,
+      sql`select type, title, body, data from app.notifications where user_id = ${userId}`,
+    );
+
+  it.each([
+    ['type_mismatch', 'listing_photo', 'image/jpeg', () => fixture('disguised.jpg')],
+    ['malware', 'resume', 'application/pdf', () => pdfWithEicar()],
+    ['invalid_image', 'avatar', 'image/jpeg', () => corruptJpeg()],
+  ] as const)('%s: a media.rejected notification with the reason', async (reason, kind, mime, bytes) => {
+    const { userId, mediaId } = await uploaded(kind, mime, bytes());
+    expect(await scanMedia(t.db, deps(), mediaId)).toBe('rejected');
+
+    const [note, ...more] = await told(userId);
+    expect(more).toEqual([]);
+    expect(note).toMatchObject({ type: 'media.rejected', data: { mediaId, kind, reason } });
+    expect(note?.body.length).toBeGreaterThan(10);
+    expect(note?.body).not.toContain(reason);
+  });
+
+  it('unsafe_content: when the classifier rejects an image', async () => {
+    const { userId, mediaId } = await uploaded('community_photo', 'image/jpeg', fixture('gps.jpg'));
+    trust.verdicts.set(mediaId, 'rejected');
+    expect(await scanMedia(t.db, deps(), mediaId)).toBe('rejected');
+    expect(await told(userId)).toEqual([
+      expect.objectContaining({
+        type: 'media.rejected',
+        data: { mediaId, kind: 'community_photo', reason: 'unsafe_content' },
+      }),
+    ]);
+  });
+
+  it('only once, however often the scan job runs', async () => {
+    const { userId, mediaId } = await uploaded('avatar', 'image/png', fixture('image.svg'));
+    await scanMedia(t.db, deps(), mediaId);
+    await scanMedia(t.db, deps(), mediaId);
+    expect(await told(userId)).toHaveLength(1);
+  });
+
+  it('never for an approved file, or a child-safety match (nothing tips the uploader off)', async () => {
+    const photo = fixture('gps.jpg');
+    const approved = await uploaded('avatar', 'image/jpeg', photo);
+    expect(await scanMedia(t.db, deps(), approved.mediaId)).toBe('approved');
+    const blocked = await uploaded('community_photo', 'image/jpeg', photo);
+    expect(await scanMedia(t.db, deps([sha256(photo)]), blocked.mediaId)).toBe('blocked');
+    expect(await told(approved.userId)).toEqual([]);
+    expect(await told(blocked.userId)).toEqual([]);
+  });
+});

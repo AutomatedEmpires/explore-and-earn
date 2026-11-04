@@ -4,6 +4,7 @@ import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { queryRows, withTx } from '@/lib/db';
 import { AppError } from '@/lib/errors';
 import { newId } from '@/lib/ids';
+import { runWithRequestContext } from '@/server/request-context';
 import { record, redact, searchAudit, type AuditEventInput } from './index';
 
 let t: TestDb;
@@ -45,6 +46,35 @@ function event(overrides: Partial<AuditEventInput> = {}): AuditEventInput {
 }
 
 describe('record', () => {
+  it("takes the request id (and a person's hashed IP) from the current request", async () => {
+    const actions = ['user', 'system', 'explicit'].map((n) => uniqueAction(`ctx.${n}`));
+    await runWithRequestContext({ requestId: 'req-from-context-1', ipHash: 'iphash-ctx' }, () =>
+      Promise.all([
+        record(t.db, event({ action: actions[0], actorType: 'user', actorId: newId() })),
+        // The system acts for nobody at that address, so its rows carry no IP hash.
+        record(t.db, event({ action: actions[1] })),
+        record(
+          t.db,
+          event({ action: actions[2], actorType: 'user', requestId: 'req-x', ipHash: 'ip-x' }),
+        ),
+      ]),
+    );
+    await record(t.db, event({ action: uniqueAction('ctx.outside') }));
+
+    const rows = await queryRows<{ action: string; request_id: string | null; ip_hash: string | null }>(
+      t.db,
+      sql`select action, request_id, ip_hash from app.audit_events where action like 'test.ctx.%'`,
+    );
+    const by = (a: string | undefined) => rows.find((r) => r.action === a);
+    expect(by(actions[0])).toMatchObject({ request_id: 'req-from-context-1', ip_hash: 'iphash-ctx' });
+    expect(by(actions[1])).toMatchObject({ request_id: 'req-from-context-1', ip_hash: null });
+    expect(by(actions[2])).toMatchObject({ request_id: 'req-x', ip_hash: 'ip-x' });
+    expect(rows.find((r) => r.action.startsWith('test.ctx.outside'))).toMatchObject({
+      request_id: null,
+      ip_hash: null,
+    });
+  });
+
   it('stores every field and redacts secrets in data', async () => {
     const action = uniqueAction('stored');
     const actorId = newId();

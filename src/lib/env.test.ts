@@ -1,5 +1,13 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { parseEnv as parseDotenv } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { getEnv, parseEnv } from './env';
+
+/** The public, committed defaults in .env.local.example. */
+const example = parseDotenv(
+  readFileSync(path.resolve(import.meta.dirname, '../../.env.local.example'), 'utf8'),
+);
 
 const dev = {
   APP_ENV: 'dev',
@@ -131,6 +139,47 @@ describe('parseEnv', () => {
   it('requires secrets of at least 32 characters', () => {
     expect(() => parseEnv({ ...dev, JOBS_SECRET: 'short' })).toThrow(/JOBS_SECRET/);
     expect(() => parseEnv({ ...dev, UNSUBSCRIBE_SECRET: 'short' })).toThrow(/UNSUBSCRIBE_SECRET/);
+  });
+});
+
+describe('the public placeholder secrets from .env.local.example', () => {
+  const placeholders = {
+    JOBS_SECRET: example.JOBS_SECRET ?? '',
+    UNSUBSCRIBE_SECRET: example.UNSUBSCRIBE_SECRET ?? '',
+    VAPID_PUBLIC_KEY: example.VAPID_PUBLIC_KEY ?? '',
+    VAPID_PRIVATE_KEY: example.VAPID_PRIVATE_KEY ?? '',
+  };
+
+  it('are what the example file ships', () => {
+    for (const value of Object.values(placeholders)) expect(value).toMatch(/^dev-/);
+  });
+
+  it('are accepted in dev', () => {
+    expect(() => parseEnv({ ...dev, ...placeholders })).not.toThrow();
+  });
+
+  it.each(['preview', 'prod'])('are each refused, by name, when APP_ENV=%s', (appEnv) => {
+    for (const [key, value] of Object.entries(placeholders)) {
+      expect(() => parseEnv({ ...prod, APP_ENV: appEnv, [key]: value })).toThrow(
+        new RegExp(`${key}: .*placeholder`),
+      );
+    }
+  });
+});
+
+describe('STORAGE_PROVIDER=stub (in-memory storage)', () => {
+  it('is refused for a running server: no browser can upload to it', () => {
+    expect(() => parseEnv({ ...dev, STORAGE_PROVIDER: 'stub' })).toThrow(/STORAGE_PROVIDER/);
+    expect(() =>
+      parseEnv({ ...prod, APP_ENV: 'preview', STORAGE_PROVIDER: 'stub' }),
+    ).toThrow(/STORAGE_PROVIDER/);
+  });
+
+  it('is allowed under a test runner', () => {
+    expect(parseEnv({ ...dev, STORAGE_PROVIDER: 'stub', VITEST: 'true' }).STORAGE_PROVIDER).toBe(
+      'stub',
+    );
+    expect(() => parseEnv({ ...dev, STORAGE_PROVIDER: 'stub', NODE_ENV: 'test' })).not.toThrow();
   });
 });
 

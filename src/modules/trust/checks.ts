@@ -12,7 +12,7 @@ import { getEnv } from '@/lib/env';
 import { badRequest } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
-import { getSetting } from '@/modules/settings';
+import { getSetting, type Thresholds } from '@/modules/settings';
 import { transact } from './internal';
 import * as imageSafetyPrompt from './prompts/image_safety';
 import * as textSafetyPrompt from './prompts/text_safety';
@@ -23,23 +23,75 @@ import type { CheckDecision, CheckKind, CheckResult, RunCheckInput } from './typ
 /** The reason stored (and returned) when the classifier gave no usable answer. */
 export const CLASSIFIER_ERROR = 'classifier_error';
 
+/** What every kind's classifier answers. An image kind may add alt text. */
+export type CheckOutput = { score: number; labels: string[]; reason: string; altText?: string };
+
+export type CheckKindDef = {
+  kind: string;
+  /** What the classifier reads: `text` (required), or an `image` (with optional text). */
+  input: 'text' | 'image';
+  /** Bump `version` whenever `system` changes: every stored check records it. */
+  prompt: { version: string; system: string };
+  /** The classifier's answer, validated before anything is decided. */
+  schema: z.ZodType<CheckOutput>;
+  /** Used until an operator tunes this kind in the `trust.thresholds` setting. */
+  defaultThresholds: Thresholds;
+};
+
+const KIND_NAME = /^[a-z][a-z0-9_]{0,63}$/;
+const kinds = new Map<string, CheckKindDef>();
+
+/**
+ * Registers (or replaces) a check kind, so later sub-projects add theirs (listing, message
+ * scam, business verification) without editing trust. An operator's thresholds for other kinds
+ * are untouched: `trust.thresholds` is keyed by kind, and a kind it has no entry for uses
+ * `defaultThresholds`.
+ */
+export function registerCheckKind(def: CheckKindDef): void {
+  if (!KIND_NAME.test(def.kind)) {
+    throw new Error(`registerCheckKind: "${def.kind}" is not a lowercase kind name`);
+  }
+  const t = def.defaultThresholds;
+  if (!(t.approveBelow >= 0 && t.approveBelow <= t.rejectAtOrAbove && t.rejectAtOrAbove <= 1)) {
+    throw new Error(`registerCheckKind: ${def.kind} has invalid default thresholds`);
+  }
+  if (!def.prompt.version || !def.prompt.system) {
+    throw new Error(`registerCheckKind: ${def.kind} needs a prompt version and system prompt`);
+  }
+  kinds.set(def.kind, def);
+}
+
 const safety = z.object({
   score: z.number().min(0).max(1),
   labels: z.array(z.string()),
   reason: z.string(),
 });
 
-const imageSafety = safety.extend({ altText: z.string() });
+const FOUNDATION_THRESHOLDS: Thresholds = { approveBelow: 0.2, rejectAtOrAbove: 0.9 };
 
-type SafetyOutput = z.infer<typeof safety> & { altText?: string };
+registerCheckKind({
+  kind: 'text_safety',
+  input: 'text',
+  prompt: textSafetyPrompt,
+  schema: safety,
+  defaultThresholds: FOUNDATION_THRESHOLDS,
+});
+registerCheckKind({
+  kind: 'image_safety',
+  input: 'image',
+  prompt: imageSafetyPrompt,
+  schema: safety.extend({ altText: z.string() }),
+  defaultThresholds: FOUNDATION_THRESHOLDS,
+});
 
-const KINDS: Record<
-  CheckKind,
-  { prompt: { version: string; system: string }; schema: z.ZodType<SafetyOutput> }
-> = {
-  text_safety: { prompt: textSafetyPrompt, schema: safety },
-  image_safety: { prompt: imageSafetyPrompt, schema: imageSafety },
-};
+/**
+ * The registered kind, or undefined. A module registers its kinds when its index is imported,
+ * and only that module runs checks of them (it supplies their input), so a kind is always
+ * registered by the time it is checked.
+ */
+function findKind(kind: string): CheckKindDef | undefined {
+  return kinds.get(kind);
+}
 
 const MAX_LABELS = 10;
 const MAX_LABEL_LENGTH = 40;
@@ -53,13 +105,13 @@ function wrapSubmittedText(text: string): string {
   return `<submitted_text>\n${safe}\n</submitted_text>`;
 }
 
-function buildContent(i: RunCheckInput): ClassifyContent[] {
+function buildContent(def: CheckKindDef, i: RunCheckInput): ClassifyContent[] {
   const text = i.text?.trim() ? i.text : undefined;
-  if (i.kind === 'text_safety') {
-    if (!text) throw badRequest('text_safety needs non-empty text');
+  if (def.input === 'text') {
+    if (!text) throw badRequest(`${def.kind} needs non-empty text`);
     return [{ type: 'text', text: wrapSubmittedText(text) }];
   }
-  if (!i.image || i.image.bytes.length === 0) throw badRequest('image_safety needs an image');
+  if (!i.image || i.image.bytes.length === 0) throw badRequest(`${def.kind} needs an image`);
   const instruction = text
     ? `Classify the image above. Text sent with it:\n${wrapSubmittedText(text)}`
     : 'Classify the image above.';
@@ -101,22 +153,27 @@ function describeError(err: unknown): string {
 /**
  * Classifies a subject and decides it: `score < approveBelow` is approved, `score >=
  * rejectAtOrAbove` is rejected, anything else is needs_review and opens a `moderation` review
- * item (thresholds from the `trust.thresholds` setting). Any classifier failure is needs_review
- * with reason 'classifier_error'; its returned `score` is 1 so no caller can read it as safe
- * (the stored score is null). Every call stores one `app.trust_checks` row.
+ * item (thresholds from the `trust.thresholds` setting, or the kind's registered default when
+ * that has no entry for it). Any classifier failure is needs_review with reason
+ * 'classifier_error'; its returned `score` is 1 so no caller can read it as safe (the stored
+ * score is null). Every call stores one `app.trust_checks` row.
  *
- * Throws `bad_request` when the input its kind needs is missing. The classifier call runs
- * before any write, so pass a Db rather than an open transaction when you can.
+ * Throws `bad_request` for an unregistered kind or when the input its kind needs is missing.
+ * The classifier call runs before any write, so pass a Db rather than an open transaction when
+ * you can.
  */
 export async function runCheck(db: DbOrTx, i: RunCheckInput): Promise<CheckResult> {
-  const kind = Object.hasOwn(KINDS, i.kind) ? KINDS[i.kind] : undefined;
+  const kind = findKind(i.kind);
   if (!kind) throw badRequest(`Unknown check kind: ${String(i.kind)}`);
-  const content = buildContent(i);
-  const thresholds = (await getSetting(db, 'trust.thresholds'))[i.kind];
+  const content = buildContent(kind, i);
+  const tuned = await getSetting(db, 'trust.thresholds');
+  const thresholds = Object.hasOwn(tuned, i.kind)
+    ? (tuned[i.kind] ?? kind.defaultThresholds)
+    : kind.defaultThresholds;
   const provider = getEnv().AI_PROVIDER;
 
   const started = performance.now();
-  let output: SafetyOutput | null = null;
+  let output: CheckOutput | null = null;
   let error: string | null = null;
   try {
     const answer: unknown = await classify({
@@ -150,7 +207,7 @@ export async function runCheck(db: DbOrTx, i: RunCheckInput): Promise<CheckResul
     ? output.reason.trim().slice(0, MAX_REASON_LENGTH) || 'No reason given'
     : CLASSIFIER_ERROR;
   const wrote = output?.altText?.trim().slice(0, MAX_ALT_TEXT_LENGTH);
-  const altText = i.kind === 'image_safety' && i.wantAltText && wrote ? wrote : undefined;
+  const altText = kind.input === 'image' && i.wantAltText && wrote ? wrote : undefined;
 
   await transact(db, async (tx) => {
     await tx.insert(trustChecks).values({

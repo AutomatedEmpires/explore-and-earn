@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import { after } from 'next/server';
 import type { DbOrTx } from '@/lib/db';
 import { getEnv } from '@/lib/env';
 import { newId } from '@/lib/ids';
@@ -36,12 +37,20 @@ export async function enqueue(db: DbOrTx, e: EnqueueInput): Promise<void> {
     .onConflictDoNothing({ target: outbox.dedupeKey });
 }
 
+/** Runs a task after the response is sent, keeping the function alive until it settles. */
+export type Scheduler = (task: () => Promise<void>) => void;
+
 /**
  * Asks the worker to run now instead of at the next scheduler tick. Fire and forget: it never
  * throws and never waits, and logs a failure. Call it only after the enqueuing transaction has
  * committed; the scheduler picks the event up within a minute either way.
+ *
+ * Call it inside a request (a route handler or server function): the request goes through
+ * `schedule`, by default Next's `after()`, because a serverless function may be frozen as soon
+ * as its response is sent, and a bare `fetch` would then often never leave. Outside a request
+ * scope (scripts, tests) `after()` throws, and the request is sent at once instead.
  */
-export function kickWorker(): void {
+export function kickWorker(schedule: Scheduler = after): void {
   let url: string;
   let secret: string;
   try {
@@ -53,12 +62,20 @@ export function kickWorker(): void {
     return;
   }
 
-  void fetch(url, { method: 'POST', headers: { 'x-jobs-secret': secret } })
-    .then(async (res) => {
+  const send = async (): Promise<void> => {
+    try {
+      const res = await fetch(url, { method: 'POST', headers: { 'x-jobs-secret': secret } });
       if (!res.ok) logger.warn('kickWorker: worker responded with an error', { status: res.status });
       await res.body?.cancel();
-    })
-    .catch((err: unknown) => {
+    } catch (err) {
       logger.error('kickWorker: request failed', { error: err });
-    });
+    }
+  };
+
+  try {
+    schedule(send);
+  } catch {
+    // No request scope to attach to: nothing will freeze this process mid-request.
+    void send();
+  }
 }

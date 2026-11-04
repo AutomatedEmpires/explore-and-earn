@@ -1,8 +1,8 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestDb, type TestDb } from '../../tests/helpers/db';
-import { queryRows } from './db';
-import { consume } from './rate-limit';
+import { createTestDb, type TestDb } from '../../../tests/helpers/db';
+import { queryRows } from '@/lib/db';
+import { consume } from './index';
 
 describe('consume (fixed-window rate limiter)', () => {
   let t: TestDb;
