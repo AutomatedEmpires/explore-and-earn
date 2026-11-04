@@ -7,3 +7,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Explore&Earn product authority
+
+Read [docs/decisions/2026-11-04-founder-decisions.md](docs/decisions/2026-11-04-founder-decisions.md) before `docs/v1` or the 3 November product design. Those decisions amend the product design. The product design otherwise replaces `docs/v1` where they conflict.
+
+Do not treat GitHub issues #1–#25 as a statement that no code exists. Application code is on integration branches, not on `main`. Do not merge pull requests #26 or #27, start SP3–SP8, or turn on live billing unless the founder says so. Do not show sample job counts as live listings.
