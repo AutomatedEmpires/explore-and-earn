@@ -35,6 +35,8 @@ export {
 } from './directory';
 
 export {
+  CREATED_VIA_APP,
+  CREATED_VIA_KEY,
   clerkAdmin,
   makeFakeClerkAdmin,
   userHasPasskey,

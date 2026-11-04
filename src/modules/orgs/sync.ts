@@ -15,12 +15,10 @@ import type { DbOrTx } from '@/lib/db';
 import { badRequest } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
-import type { OrgRole } from '@/modules/identity';
-import { organizations, orgMemberships, orgSlugs } from './schema';
+import { CREATED_VIA_APP, CREATED_VIA_KEY, type OrgRole } from '@/modules/identity';
 
-/** The Clerk public-metadata key and value our server sets on every organization it creates. */
-export const CREATED_VIA_KEY = 'created_via';
-export const CREATED_VIA_APP = 'app';
+export { CREATED_VIA_APP, CREATED_VIA_KEY };
+import { organizations, orgMemberships, orgSlugs } from './schema';
 
 const CLERK_ROLES: Record<string, OrgRole> = {
   'org:recruiter': 'recruiter',

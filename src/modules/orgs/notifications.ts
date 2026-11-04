@@ -1,5 +1,7 @@
-// The team's notification types (SP2 spec section 6) and who receives them. Registered when
-// the module loads (orgs/index.ts imports this file).
+// The team's notification types (SP2 spec section 6) and who receives them.
+// Registration is a function, not module scope: loading orgs pulls this file while the
+// notifications barrel is still starting (identity imports orgs), and defineType is not
+// ready until that barrel finishes.
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
 import type { OrgRole } from '@/modules/identity';
@@ -30,44 +32,51 @@ const rolePhrase = (value: unknown): string =>
     ? ROLE_PHRASES[value as OrgRole]
     : 'a team member';
 
-defineType({
-  type: 'orgs.member_joined',
-  category: 'account',
-  title: (d) => `${text(d.memberName, 'Someone')} joined your team`,
-  body: (d) => `They joined ${text(d.orgName, 'your organization')} as ${rolePhrase(d.role)}.`,
-  url: () => '/host/team',
-});
+let registered = false;
 
-defineType({
-  type: 'orgs.member_changed',
-  category: 'account',
-  title: (d) => `Your access at ${text(d.orgName, 'your team')} changed`,
-  body: (d) =>
-    d.roleChanged === true
-      ? `You're now ${rolePhrase(d.role)}. ${text(d.actorName, 'An Admin')} made the change.`
-      : `${text(d.actorName, 'An Admin')} changed which listings you work on.`,
-  url: () => '/host',
-  email: { template: 'HostNotice' },
-});
+/** Registers the team notification types. Safe to call more than once. */
+export function registerOrgNotificationTypes(): void {
+  if (registered) return;
+  registered = true;
+  defineType({
+    type: 'orgs.member_joined',
+    category: 'account',
+    title: (d) => `${text(d.memberName, 'Someone')} joined your team`,
+    body: (d) => `They joined ${text(d.orgName, 'your organization')} as ${rolePhrase(d.role)}.`,
+    url: () => '/host/team',
+  });
 
-defineType({
-  type: 'orgs.ownership_transferred',
-  category: 'security',
-  mandatory: true,
-  title: (d) => `${text(d.orgName, 'Your organization')} has a new Owner`,
-  body: (d) =>
-    d.you === 'new'
-      ? `You're now the Owner of ${text(d.orgName, 'your organization')}. ${text(
-          d.previousOwnerName,
-          'The previous Owner',
-        )} is an Admin now.`
-      : `${text(d.newOwnerName, 'An Admin')} is now the Owner of ${text(
-          d.orgName,
-          'your organization',
-        )}. You're an Admin now. If you didn't do this, contact support right away.`,
-  url: () => '/host/team',
-  email: { template: 'HostNotice' },
-});
+  defineType({
+    type: 'orgs.member_changed',
+    category: 'account',
+    title: (d) => `Your access at ${text(d.orgName, 'your team')} changed`,
+    body: (d) =>
+      d.roleChanged === true
+        ? `You're now ${rolePhrase(d.role)}. ${text(d.actorName, 'An Admin')} made the change.`
+        : `${text(d.actorName, 'An Admin')} changed which listings you work on.`,
+    url: () => '/host',
+    email: { template: 'HostNotice' },
+  });
+
+  defineType({
+    type: 'orgs.ownership_transferred',
+    category: 'security',
+    mandatory: true,
+    title: (d) => `${text(d.orgName, 'Your organization')} has a new Owner`,
+    body: (d) =>
+      d.you === 'new'
+        ? `You're now the Owner of ${text(d.orgName, 'your organization')}. ${text(
+            d.previousOwnerName,
+            'The previous Owner',
+          )} is an Admin now.`
+        : `${text(d.newOwnerName, 'An Admin')} is now the Owner of ${text(
+            d.orgName,
+            'your organization',
+          )}. You're an Admin now. If you didn't do this, contact support right away.`,
+    url: () => '/host/team',
+    email: { template: 'HostNotice' },
+  });
+}
 
 /** Notifies every live Owner and Admin of the org, except `exceptUserId`. */
 export async function notifyOwnerAdmins(
@@ -77,6 +86,7 @@ export async function notifyOwnerAdmins(
   data: NotificationData,
   opts: { exceptUserId?: string } = {},
 ): Promise<void> {
+  registerOrgNotificationTypes();
   const rows = await db
     .select({ userId: orgMemberships.userId })
     .from(orgMemberships)

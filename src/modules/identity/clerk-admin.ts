@@ -1,6 +1,12 @@
 // The Clerk Backend API calls our domain code makes, behind an interface so tests use a fake.
+// These two constants live here, not in the orgs barrel: orgs loads notifications, and
+// notifications loads identity. Importing orgs from this file made that a cycle and left
+// defineType uninitialized.
 import type { UserJSON } from '@clerk/nextjs/server';
-import { CREATED_VIA_APP, CREATED_VIA_KEY } from '@/modules/orgs';
+
+/** Clerk public-metadata mark on every organization this server creates. */
+export const CREATED_VIA_KEY = 'created_via';
+export const CREATED_VIA_APP = 'app';
 
 export type OperatorInviteRole = 'owner' | 'operator';
 
@@ -73,7 +79,9 @@ export function clerkAdmin(): ClerkAdmin {
       await (await client()).users.updateUserMetadata(clerkUserId, { publicMetadata: md });
     },
     async createOrganization({ name, createdBy }) {
-      const org = await (await client()).organizations.createOrganization({
+      const org = await (
+        await client()
+      ).organizations.createOrganization({
         name,
         createdBy,
         // Marks it as ours: the webhook only adopts the creator of such an organization as its

@@ -1,12 +1,14 @@
 // Public API of the orgs module: host organizations and memberships. Owned by W2 (Tasks 6-7).
-// Identity's Clerk sync calls into this module, so orgs imports identity for types, and loads
-// it at runtime only when first needed (accepting an invitation sets the account type).
+// Identity's Clerk sync calls into this module. The created-via constants live in identity so
+// clerk-admin does not import this barrel (that cycle left notification types uninitialized).
 //
 // SP2 (W3, Tasks 17-19) adds the team, invitations, recruiter scopes, org status and settings,
 // slugs and the activity log, and imports entitlements. Reverse flows to other SP2 modules go
 // through domain events (org.status_changed, org.member_removed, hostpage.updated).
 import type { HandlerMap } from '@/modules/jobs';
 import { SEND_INVITATION_TOPIC, sendInvitationJob } from './invitations';
+
+export { registerOrgNotificationTypes } from './notifications';
 
 export { createOrganization, organizationNameSchema } from './create';
 
