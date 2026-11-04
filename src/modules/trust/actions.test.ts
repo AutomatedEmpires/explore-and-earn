@@ -24,6 +24,8 @@ import type { Queue } from './types';
 
 vi.mock('@/modules/notifications', () => ({
   notify: vi.fn(async () => {}),
+  // SP2 modules define their notification types when they load (decide may load them all).
+  defineType: vi.fn(),
   jobHandlers: {},
 }));
 
