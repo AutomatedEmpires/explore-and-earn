@@ -29,7 +29,9 @@ describe('runMigrations', () => {
 
     const second = await runMigrations(t.db);
     expect(second).toEqual([]);
-  });
+    // Creating PostGIS inside 0000_init.sql takes most of this. On a loaded ARM machine it can
+    // pass 30s, which used to abort the run after only the first file had committed.
+  }, 90_000);
 
   it('enables PostGIS', async () => {
     const rows = await queryRows<{ v: string }>(t.db, sql`select postgis_version() as v`);
