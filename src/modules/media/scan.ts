@@ -577,8 +577,10 @@ export async function approveHeldMedia(
 /**
  * `remove`: a held or published file is rejected (`removed_by_operator`) and taken down. Its
  * copies are kept in media-private, never served to its owner, so an appeal can publish it
- * again; a held file the scanner could not read is deleted instead. On a blocked file (a
- * child-safety match) it confirms the block: nothing changes, and the evidence stays.
+ * again; a held file the scanner could not read is deleted instead. The owner is told, in the
+ * caller's transaction. On a blocked file (a child-safety match) it confirms the block: nothing
+ * changes, the evidence stays and nobody is told; nor is anyone told again when a removal is
+ * upheld.
  */
 export async function removeMedia(db: DbOrTx, storage: Storage, mediaId: string): Promise<void> {
   const row = await lockRow(db, mediaId);
@@ -599,6 +601,7 @@ export async function removeMedia(db: DbOrTx, storage: Storage, mediaId: string)
     .update(media)
     .set({ status: 'rejected', rejectionReason: 'removed_by_operator', bucket })
     .where(eq(media.id, mediaId));
+  await tellRejected(db, row, 'removed_by_operator');
   // The public copies are superseded by the private ones; an unscanned original is not kept.
   if (bucket !== row.bucket || row.bucket === 'quarantine') {
     await enqueueCleanup(

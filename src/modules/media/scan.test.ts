@@ -850,4 +850,55 @@ describe('scanMedia: the uploader is told why a file was rejected (spec section 
     expect(await told(approved.userId)).toEqual([]);
     expect(await told(blocked.userId)).toEqual([]);
   });
+
+  it('removed_by_operator: when an operator removes a held file, once', async () => {
+    const { userId, mediaId } = await uploaded('housing_photo', 'image/jpeg', fixture('gps.jpg'));
+    trust.verdicts.set(mediaId, 'needs_review');
+    expect(await scanMedia(t.db, deps(), mediaId)).toBe('in_review');
+    expect(await told(userId)).toEqual([]);
+    const item = trust.items.find((i) => i.subjectId === mediaId);
+
+    await trust.decide(t.db, item?.id ?? '', 'remove');
+    // Upholding the removal (an appeal turned down) tells them nothing new.
+    await trust.decide(t.db, item?.id ?? '', 'remove');
+
+    const [note, ...more] = await told(userId);
+    expect(more).toEqual([]);
+    expect(note).toMatchObject({
+      type: 'media.rejected',
+      data: { mediaId, kind: 'housing_photo', reason: 'removed_by_operator' },
+    });
+    expect(note?.body).toBe('It was removed after a review.');
+  });
+
+  it('removed_by_operator: when an operator takes down a published file', async () => {
+    const { userId, mediaId } = await uploaded('listing_photo', 'image/jpeg', fixture('gps.jpg'));
+    expect(await scanMedia(t.db, deps(), mediaId)).toBe('approved');
+    const report = await trust.openReviewItem(t.db, {
+      queue: 'reports',
+      subjectType: 'media',
+      subjectId: mediaId,
+      reason: 'reported',
+    });
+
+    await trust.decide(t.db, report.id, 'remove');
+
+    expect(await told(userId)).toEqual([
+      expect.objectContaining({
+        type: 'media.rejected',
+        data: { mediaId, kind: 'listing_photo', reason: 'removed_by_operator' },
+      }),
+    ]);
+  });
+
+  it('never when an operator confirms a child-safety block', async () => {
+    const original = fixture('gps.jpg');
+    const { userId, mediaId } = await uploaded('community_photo', 'image/jpeg', original);
+    expect(await scanMedia(t.db, deps([sha256(original)]), mediaId)).toBe('blocked');
+    const item = trust.items.find((i) => i.subjectId === mediaId && i.queue === 'child_safety');
+
+    await trust.decide(t.db, item?.id ?? '', 'remove');
+
+    expect(await told(userId)).toEqual([]);
+  });
 });
