@@ -75,8 +75,11 @@ describe('HostShell', () => {
 
   it('shows the organization switcher on the current organization', () => {
     render(<HostShell org={ORG}>page</HostShell>);
+    // Named by its text (WCAG 2.5.3), so the sidebar's also reads the role label after the name.
     expect(
-      screen.getAllByRole('button', { name: 'Switch organization, current: Kettle Ridge Lodge' }),
+      screen.getAllByRole('button', {
+        name: /^Switch organization, current:\s*Kettle Ridge Lodge/,
+      }),
     ).toHaveLength(2); // the sidebar's, and the phone top bar's logo
     expect(screen.getByText('Owner')).toBeInTheDocument();
   });

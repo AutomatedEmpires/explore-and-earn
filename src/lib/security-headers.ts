@@ -3,8 +3,8 @@
 // nonce back out of the request's CSP header and puts it on its own scripts.
 //
 // Pages must render at request time for the nonce to reach them, so the root layout awaits
-// `connection()` (pinned by src/app/layout.test.tsx). When <ClerkProvider> is added, pass it
-// `dynamic` too, so it reads the nonce from the `x-nonce` request header for Clerk's scripts.
+// `connection()` (pinned by src/app/layout.test.tsx). Its <ClerkProvider> is `dynamic` too, so
+// it reads the nonce from the `x-nonce` request header for Clerk's scripts.
 
 type AppEnv = 'dev' | 'preview' | 'prod';
 
