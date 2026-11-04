@@ -5,6 +5,7 @@ import { defineType, notify, type NotificationData } from '@/modules/notificatio
 import { listMembers } from '@/modules/orgs';
 
 export const CONTENT_HELD = 'hostpages.content_held';
+export const NEW_JOB = 'hosts.new_job';
 
 const text = (value: unknown): string | null =>
   typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
@@ -34,6 +35,23 @@ defineType({
   },
   url: () => '/host/host-page',
   email: { template: 'HostNotice' },
+});
+
+// Followers hear about a host's new job; emails wait an hour in a `host_follow` digest, so a
+// host posting several jobs at once sends one email.
+defineType({
+  type: NEW_JOB,
+  category: 'jobs',
+  title: (d) => `${text(d.orgName) ?? 'A host you follow'} posted a new job`,
+  body: (d) => {
+    const title = text(d.listingTitle);
+    return title
+      ? `${sentence(title)} Take a look while it's open.`
+      : "Take a look while it's open.";
+  },
+  url: (d) => text(d.href),
+  email: { template: 'HostNotice', batch: { key: 'host_follow', delayMinutes: 60 } },
+  push: true,
 });
 
 /** Notifies the org's Owner and every Admin. */
