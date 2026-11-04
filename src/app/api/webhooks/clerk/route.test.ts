@@ -104,9 +104,9 @@ type Envelope = { error: { code: string; message: string; requestId: string } };
 describe('POST /api/webhooks/clerk', () => {
   let POST: (typeof import('./route'))['POST'];
 
-  // Loading the route compiles its whole module graph; under the full suite's parallel load
-  // that can outlast a test's 30 s, so it happens here, within the 60 s hook timeout (after
-  // the file's beforeAll has set the webhook secret).
+  // Loading the route compiles its whole module graph, including SP2 wiring. Under the full
+  // suite's parallel load that can outlast a test's 30 s, so it happens here, within the hook
+  // timeout (after the file's beforeAll has set the webhook secret).
   beforeAll(async () => {
     ({ POST } = await import('./route'));
   });

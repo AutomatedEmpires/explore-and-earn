@@ -14,7 +14,11 @@ import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
 import { getSetting, type Thresholds } from '@/modules/settings';
 import { transact } from './internal';
+import * as businessVerificationPrompt from './prompts/business_verification';
 import * as imageSafetyPrompt from './prompts/image_safety';
+import * as listingFraudPrompt from './prompts/listing_fraud';
+import * as listingModerationPrompt from './prompts/listing_moderation';
+import * as photoSlotPrompt from './prompts/photo_slot';
 import * as textSafetyPrompt from './prompts/text_safety';
 import { openReviewItem } from './routing';
 import { trustChecks } from './schema';
@@ -52,7 +56,7 @@ export function registerCheckKind(def: CheckKindDef): void {
     throw new Error(`registerCheckKind: "${def.kind}" is not a lowercase kind name`);
   }
   const t = def.defaultThresholds;
-  if (!(t.approveBelow >= 0 && t.approveBelow <= t.rejectAtOrAbove && t.rejectAtOrAbove <= 1)) {
+  if (!(t.approveBelow >= 0 && t.approveBelow <= t.rejectAtOrAbove && t.rejectAtOrAbove <= 1.01)) {
     throw new Error(`registerCheckKind: ${def.kind} has invalid default thresholds`);
   }
   if (!def.prompt.version || !def.prompt.system) {
@@ -82,6 +86,37 @@ registerCheckKind({
   prompt: imageSafetyPrompt,
   schema: safety.extend({ altText: z.string() }),
   defaultThresholds: FOUNDATION_THRESHOLDS,
+});
+
+registerCheckKind({
+  kind: 'listing_moderation',
+  input: 'text',
+  prompt: listingModerationPrompt,
+  schema: safety,
+  defaultThresholds: { approveBelow: 0.2, rejectAtOrAbove: 0.9 },
+});
+registerCheckKind({
+  kind: 'listing_fraud',
+  input: 'text',
+  prompt: listingFraudPrompt,
+  schema: safety,
+  defaultThresholds: { approveBelow: 0.2, rejectAtOrAbove: 0.95 },
+});
+// Never auto-rejected: no classifier score reaches 1.01 (SP2 spec section 8.4).
+registerCheckKind({
+  kind: 'business_verification',
+  input: 'text',
+  prompt: businessVerificationPrompt,
+  schema: safety,
+  defaultThresholds: { approveBelow: 0.3, rejectAtOrAbove: 1.01 },
+});
+// The 640 px photo and its slot label; the score is the probability of a mismatch.
+registerCheckKind({
+  kind: 'photo_slot',
+  input: 'image',
+  prompt: photoSlotPrompt,
+  schema: safety,
+  defaultThresholds: { approveBelow: 0.5, rejectAtOrAbove: 0.5 },
 });
 
 /**
@@ -152,11 +187,12 @@ function describeError(err: unknown): string {
 
 /**
  * Classifies a subject and decides it: `score < approveBelow` is approved, `score >=
- * rejectAtOrAbove` is rejected, anything else is needs_review and opens a `moderation` review
- * item (thresholds from the `trust.thresholds` setting, or the kind's registered default when
- * that has no entry for it). Any classifier failure is needs_review with reason
- * 'classifier_error'; its returned `score` is 1 so no caller can read it as safe (the stored
- * score is null). Every call stores one `app.trust_checks` row.
+ * rejectAtOrAbove` is rejected, anything else is needs_review and opens a review item in
+ * `reviewQueue` (default `moderation`; `null` opens none). Thresholds come from the
+ * `trust.thresholds` setting, or the kind's registered default when that has no entry for it.
+ * Any classifier failure is needs_review with reason 'classifier_error'; its returned `score`
+ * is 1 so no caller can read it as safe (the stored score is null). Every call stores one
+ * `app.trust_checks` row.
  *
  * Throws `bad_request` for an unregistered kind or when the input its kind needs is missing.
  * The classifier call runs before any write, so pass a Db rather than an open transaction when
@@ -166,6 +202,7 @@ export async function runCheck(db: DbOrTx, i: RunCheckInput): Promise<CheckResul
   const kind = findKind(i.kind);
   if (!kind) throw badRequest(`Unknown check kind: ${String(i.kind)}`);
   const content = buildContent(kind, i);
+  const reviewQueue = i.reviewQueue === undefined ? 'moderation' : i.reviewQueue;
   const tuned = await getSetting(db, 'trust.thresholds');
   const thresholds = Object.hasOwn(tuned, i.kind)
     ? (tuned[i.kind] ?? kind.defaultThresholds)
@@ -226,9 +263,9 @@ export async function runCheck(db: DbOrTx, i: RunCheckInput): Promise<CheckResul
       error,
       altText: altText ?? null,
     });
-    if (decision === 'needs_review') {
+    if (decision === 'needs_review' && reviewQueue !== null) {
       await openReviewItem(tx, {
-        queue: 'moderation',
+        queue: reviewQueue,
         subjectType: i.subjectType,
         subjectId: i.subjectId,
         reason,

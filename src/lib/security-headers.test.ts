@@ -71,6 +71,15 @@ describe('buildSecurityHeaders', () => {
     expect(csp.get('worker-src')).toEqual(["'self'", 'blob:']);
   });
 
+  it('allows Mapbox GL (tiles, telemetry and its blob workers)', () => {
+    const csp = directives(
+      buildSecurityHeaders({ nonce: 'abc', appEnv: 'prod' })['Content-Security-Policy'] ?? '',
+    );
+    expect(csp.get('connect-src')).toContain('https://api.mapbox.com');
+    expect(csp.get('connect-src')).toContain('https://events.mapbox.com');
+    expect(csp.get('worker-src')).toContain('blob:');
+  });
+
   it("allows Clerk's development hosts outside prod", () => {
     const dev = directives(
       buildSecurityHeaders({ nonce: 'abc', appEnv: 'dev' })['Content-Security-Policy'] ?? '',

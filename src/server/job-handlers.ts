@@ -4,8 +4,13 @@
 import type { Db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { jobHandlers as audit } from '@/modules/audit';
+import { jobHandlers as billing } from '@/modules/billing';
+import { jobHandlers as entitlements } from '@/modules/entitlements';
+import { jobHandlers as hostpages } from '@/modules/hostpages';
 import { jobHandlers as identity } from '@/modules/identity';
 import { jobHandlers as jobs, type DeadEvent, type HandlerMap } from '@/modules/jobs';
+import { jobHandlers as listings } from '@/modules/listings';
+import { jobHandlers as locations } from '@/modules/locations';
 import { jobHandlers as media } from '@/modules/media';
 import {
   EMAIL_TOPIC,
@@ -17,6 +22,7 @@ import { jobHandlers as orgs } from '@/modules/orgs';
 import { jobHandlers as ratelimit } from '@/modules/ratelimit';
 import { jobHandlers as settings } from '@/modules/settings';
 import { raiseAlert, jobHandlers as trust } from '@/modules/trust';
+import { jobHandlers as verification } from '@/modules/verification';
 
 function merge(maps: Record<string, HandlerMap>): HandlerMap {
   const out: HandlerMap = {};
@@ -44,6 +50,13 @@ export const handlers: HandlerMap = merge({
   ratelimit,
   settings,
   trust,
+  // SP2
+  billing,
+  entitlements,
+  hostpages,
+  listings,
+  locations,
+  verification,
 });
 
 /**

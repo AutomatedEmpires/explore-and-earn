@@ -29,6 +29,11 @@ export type FooterProps = {
   unsubscribeUrl: string;
 };
 
+/** A direct email's footer: sent to an address, not a user, so there is nothing to manage. */
+export type DirectFooterProps = { mailingAddress: string };
+
+export type AnyFooterProps = FooterProps | DirectFooterProps;
+
 export const styles = {
   heading: {
     color: c.ink,
@@ -120,7 +125,7 @@ export function Layout({
   children,
 }: {
   preview: string;
-  footer: FooterProps;
+  footer: AnyFooterProps;
   children: ReactNode;
 }) {
   return (
@@ -133,14 +138,22 @@ export function Layout({
           {children}
           <Hr style={{ borderColor: c.line, margin: '32px 0 16px' }} />
           <Text style={footer}>
-            {'Work worth going somewhere for. '}
-            <Link href={f.manageUrl} style={{ color: c.muted, textDecoration: 'underline' }}>
-              Manage notifications
-            </Link>
-            {' · '}
-            <Link href={f.unsubscribeUrl} style={{ color: c.muted, textDecoration: 'underline' }}>
-              Unsubscribe
-            </Link>
+            {'Work worth going somewhere for.'}
+            {'unsubscribeUrl' in f ? (
+              <>
+                {' '}
+                <Link href={f.manageUrl} style={{ color: c.muted, textDecoration: 'underline' }}>
+                  Manage notifications
+                </Link>
+                {' · '}
+                <Link
+                  href={f.unsubscribeUrl}
+                  style={{ color: c.muted, textDecoration: 'underline' }}
+                >
+                  Unsubscribe
+                </Link>
+              </>
+            ) : null}
           </Text>
           {f.mailingAddress ? <Text style={footer}>{f.mailingAddress}</Text> : null}
         </Container>

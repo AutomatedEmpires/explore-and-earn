@@ -35,6 +35,9 @@ const POSTHOG = {
 /** An https origin and nothing else: scheme, host and an optional port. */
 const HTTPS_ORIGIN = /^https:\/\/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}(?::\d{1,5})?$/i;
 
+/** Mapbox GL (LocationPicker): styles, tiles and telemetry. Its workers run from blob: URLs. */
+const MAPBOX = ['https://api.mapbox.com', 'https://events.mapbox.com'];
+
 /** A fresh base64 nonce (128 random bits). */
 export function newNonce(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -135,6 +138,7 @@ export function buildSecurityHeaders(i: {
         ...SENTRY_INGEST,
         ...POSTHOG.api,
         ...POSTHOG.assets,
+        ...MAPBOX,
       ],
     ],
     ['worker-src', ["'self'", 'blob:']],

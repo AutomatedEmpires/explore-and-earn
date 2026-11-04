@@ -73,6 +73,29 @@ const schema = z
       .enum(['true', 'false'])
       .default('false')
       .transform((v) => v === 'true'),
+
+    // Billing (SP2)
+    BILLING_PROVIDER: z.enum(['stripe', 'stub']),
+    STRIPE_SECRET_KEY: z
+      .string()
+      .regex(/^sk_(test|live)_/, 'must start with sk_test_ or sk_live_')
+      .optional(),
+    STRIPE_WEBHOOK_SECRET: z
+      .string()
+      .regex(/^whsec_/, 'must start with whsec_')
+      .optional(),
+    STRIPE_PORTAL_CONFIG_FULL: z.string().regex(/^bpc_/, 'must start with bpc_').optional(),
+    STRIPE_PORTAL_CONFIG_BILLING: z.string().regex(/^bpc_/, 'must start with bpc_').optional(),
+
+    // Geocoding, weather and link safety (SP2)
+    GEOCODER_PROVIDER: z.enum(['census', 'stub']),
+    WEATHER_PROVIDER: z.enum(['nws', 'stub']),
+    NWS_USER_AGENT: optional,
+    LINK_SAFETY_PROVIDER: z.enum(['webrisk', 'stub']),
+    WEB_RISK_API_KEY: optional,
+
+    // Maps (SP2). A public token; required outside dev.
+    NEXT_PUBLIC_MAPBOX_TOKEN: z.string().regex(/^pk\./, 'must start with pk.').optional(),
   })
   .superRefine((env, ctx) => {
     const need = (key: keyof typeof env, because: string) => {
@@ -93,11 +116,29 @@ const schema = z
       need('CLOUDMERSIVE_API_KEY', 'when MALWARE_PROVIDER=cloudmersive');
     }
     if (env.EMAIL_PROVIDER === 'resend') need('RESEND_API_KEY', 'when EMAIL_PROVIDER=resend');
+    if (env.BILLING_PROVIDER === 'stripe') {
+      need('STRIPE_SECRET_KEY', 'when BILLING_PROVIDER=stripe');
+      need('STRIPE_WEBHOOK_SECRET', 'when BILLING_PROVIDER=stripe');
+      need('STRIPE_PORTAL_CONFIG_FULL', 'when BILLING_PROVIDER=stripe');
+      need('STRIPE_PORTAL_CONFIG_BILLING', 'when BILLING_PROVIDER=stripe');
+    }
+    if (env.STRIPE_SECRET_KEY?.startsWith('sk_live_') && env.APP_ENV !== 'prod') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['STRIPE_SECRET_KEY'],
+        message: 'STRIPE_SECRET_KEY must be a test key outside prod',
+      });
+    }
+    if (env.WEATHER_PROVIDER === 'nws') need('NWS_USER_AGENT', 'when WEATHER_PROVIDER=nws');
+    if (env.LINK_SAFETY_PROVIDER === 'webrisk') {
+      need('WEB_RISK_API_KEY', 'when LINK_SAFETY_PROVIDER=webrisk');
+    }
 
     if (env.APP_ENV !== 'dev') {
       need('CLERK_SECRET_KEY', `when APP_ENV=${env.APP_ENV}`);
       need('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY', `when APP_ENV=${env.APP_ENV}`);
       need('CLERK_WEBHOOK_SECRET', `when APP_ENV=${env.APP_ENV}`);
+      need('NEXT_PUBLIC_MAPBOX_TOKEN', `when APP_ENV=${env.APP_ENV}`);
 
       for (const key of PLACEHOLDER_CHECKED) {
         if (PUBLIC_PLACEHOLDER.test(env[key])) {
@@ -117,6 +158,10 @@ const schema = z
         'MALWARE_PROVIDER',
         'EMAIL_PROVIDER',
         'STORAGE_PROVIDER',
+        'BILLING_PROVIDER',
+        'GEOCODER_PROVIDER',
+        'WEATHER_PROVIDER',
+        'LINK_SAFETY_PROVIDER',
       ] as const;
       for (const name of providers) {
         const value: string = env[name];

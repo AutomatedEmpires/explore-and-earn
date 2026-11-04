@@ -6,6 +6,8 @@ import { unauthorized } from '@/lib/errors';
 import { enqueueDueSchedules, runWorker } from '@/modules/jobs';
 import { apiRoute } from '@/server/api';
 import { handlers, onDeadEvent } from '@/server/job-handlers';
+// SP2 module-load registrations, so every job sees them on a cold server.
+import '@/server/sp2-wiring';
 
 export const maxDuration = 60;
 
