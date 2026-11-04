@@ -27,6 +27,8 @@ import {
 } from './guards';
 import { registerRoute } from './openapi';
 import { REQUEST_ID_HEADER, requestIdFrom, runWithRequestContext } from './request-context';
+// SP2 module-load registrations (usage counters, subject handlers, providers) for every route.
+import '@/server/sp2-wiring';
 
 export type AuthMode = 'none' | 'user' | 'seeker' | 'host' | 'operator';
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
