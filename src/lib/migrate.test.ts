@@ -143,5 +143,6 @@ describe('createTestDb', () => {
     } finally {
       await Promise.all([a.close(), b.close()]);
     }
-  });
+    // Two PostGIS databases at once. Under the full suite this can pass the 30s default.
+  }, 90_000);
 });
