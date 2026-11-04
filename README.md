@@ -2,7 +2,9 @@
 
 Explore&Earn connects seekers with **Maritime, Seasonal, Farm, and Remote** work through three equal discovery modes: **Seek, Swipe, and Map**. Mobile seekers have pinned bottom navigation in this order: **Seek / Swipe / Map / Profile**.
 
-This fresh repository currently contains the V1 product architecture and implementation plan only. It does not contain an application, migrations, deployed services, or production configuration.
+This branch (`main`) contains the V1 product architecture and the 4 November 2026 founder decisions. It does not contain the application. Implementation is on open pull requests, not here.
+
+**Current authority:** [founder decisions, 4 November 2026](docs/decisions/2026-11-04-founder-decisions.md). Those decisions override this README's older V1 commercial notes and `docs/v1` where they disagree. The 3 November product design lives on the integration branches and is the build spec except where those decisions amend it.
 
 ## V1 specification
 
@@ -23,4 +25,4 @@ Read [Product and scope](docs/v1/00-product-and-scope.md) first, then the domain
 
 ## Working agreement
 
-Do not copy the old `explore-and-earn` application into this repository. Implement the scoped issues incrementally, keeping one listing model and one card system across all three discovery modes. Resolve the documented launch gates before accepting live users or payments. The linked GitHub issues are an implementation backlog; their creation does not mean features are implemented.
+Do not copy the predecessor app `AutomatedEmpires/exploreearn` into this repository. `AutomatedEmpires/explore-earn` is this repository's old name. Implement the scoped issues incrementally, keeping one listing model and one card system across Seek, Swipe, and Map. Browse by State is an additional surface, not a replacement for Map. Resolve the documented launch gates before accepting live users or payments. The linked GitHub issues are an implementation backlog. An open issue does not mean the work is absent from a branch, and a closed issue is not how completion is recorded today. Issues #1–#25 were opened before the implementation branches existed.

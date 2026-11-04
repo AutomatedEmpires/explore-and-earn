@@ -1,5 +1,7 @@
 # Sources, reference interpretation and decisions
 
+> **Historical register, not the current authority.** On 4 November 2026 the founder approved [ten decisions](../decisions/2026-11-04-founder-decisions.md). Those override this file. This copy is the original 2 November register kept on `main`. A later V1.2 revision exists on `docs/v1-product-vision` and on the integration branches. Do not delete either copy.
+
 ## 1. Source authority
 
 This specification was created for the explicit request to document the fresh **AutomatedEmpires/explore-earn** repository. Repository inspection on 2026-11-02 confirmed repository ID `1443407345`, default branch name `main`, empty contents and no branches. The older **AutomatedEmpires/explore-and-earn** is a different repository and is not a source of implementation requirements. No legacy files were imported and no existing working checkout was modified.

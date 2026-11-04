@@ -1,5 +1,7 @@
 # Pricing, entitlements and billing lifecycle
 
+> **The prices in this file are not current.** On 4 November 2026 the founder approved Starter $99, Professional $299, and Enterprise $599 per month, and a first-100-organization introductory discount. See [FD-6 and FD-7](../decisions/2026-11-04-founder-decisions.md). This file is the earlier commercial discussion and stays as history.
+
 ## 1. Commercial status
 
 All prices are **proposed USD launch hypotheses**, carried forward from brainstorming for validation. No checkout, vendor account, promotion or subscription is activated by this documentation. Product/business approval, payment-provider configuration, tax/terms review and a completed test lifecycle are required before charging anyone. Do not reuse earlier competitor prices as current market facts.
