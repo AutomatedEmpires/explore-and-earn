@@ -82,7 +82,7 @@ describe('runCheck: SP2 kinds', () => {
       expect.objectContaining({ queue: 'moderation', subject_id: subjectId }),
     ]);
     expect(await checkRow(result.checkId)).toEqual([
-      { kind: 'listing_moderation', prompt_version: 'listing_moderation@0' },
+      { kind: 'listing_moderation', prompt_version: 'listing_moderation@1' },
     ]);
   });
 

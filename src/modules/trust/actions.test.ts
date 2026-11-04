@@ -22,7 +22,10 @@ import { testItemLog } from './subjects';
 import { addOperator, auditActions, getItem, resetTrustTables, setShift } from './test-fixtures';
 import type { Queue } from './types';
 
-vi.mock('@/modules/notifications', () => ({
+// A partial mock: deciding an unknown subject loads every module (see findSubjectHandler), and
+// SP2 modules register notification types with defineType when they load.
+vi.mock('@/modules/notifications', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/modules/notifications')>()),
   notify: vi.fn(async () => {}),
   // SP2 modules define their notification types when they load (decide may load them all).
   defineType: vi.fn(),

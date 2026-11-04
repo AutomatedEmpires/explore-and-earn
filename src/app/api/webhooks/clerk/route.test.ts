@@ -102,6 +102,12 @@ const auditRows = () =>
 type Envelope = { error: { code: string; message: string; requestId: string } };
 
 describe('POST /api/webhooks/clerk', () => {
+  // The route's first import loads every SP2 module (src/server/sp2-wiring.ts); do it in a hook,
+  // whose timeout is longer, so a busy machine doesn't time out the first test.
+  beforeAll(async () => {
+    await import('./route');
+  });
+
   it('applies a signed event once, audits it, and treats a redelivery as a duplicate', async () => {
     const { POST } = await import('./route');
     const before = (await auditRows()).length;

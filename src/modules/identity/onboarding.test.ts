@@ -278,6 +278,12 @@ describe('completeOnboarding', () => {
 });
 
 describe('POST /api/v1/onboarding', () => {
+  // The route's first import loads every SP2 module (src/server/sp2-wiring.ts); do it in a hook,
+  // whose timeout is longer, so a busy machine doesn't time out the first test.
+  beforeAll(async () => {
+    await import('@/app/api/v1/onboarding/route');
+  });
+
   const post = async (body: unknown) => {
     const { POST } = await import('@/app/api/v1/onboarding/route');
     return POST(

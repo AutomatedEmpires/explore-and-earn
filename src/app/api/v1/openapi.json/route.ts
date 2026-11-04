@@ -15,6 +15,8 @@ import '@/app/api/v1/host/team/invitations/route';
 import '@/app/api/v1/host/team/members/[id]/route';
 import '@/app/api/v1/host/team/route';
 import '@/app/api/v1/host/team/transfer-ownership/route';
+import '@/app/api/v1/host/verification/info/route';
+import '@/app/api/v1/host/verification/route';
 import '@/app/api/v1/me/stream/route';
 import '@/app/api/v1/media/[id]/url/route';
 import '@/app/api/v1/media/uploads/[id]/complete/route';
