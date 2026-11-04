@@ -6,9 +6,27 @@ import type { DbOrTx } from '@/lib/db';
 import type { Category } from '@/lib/taxonomy';
 import type { HandlerMap } from '@/modules/jobs';
 import type { HostContext } from '@/server/guards';
+import type { ListingContent } from './content';
 
-/** Placeholder until Task 8 adds ListingContentSchema (src/modules/listings/content.ts). */
-export type ListingContent = Record<string, unknown>;
+export {
+  HOUSING_SLOTS,
+  LISTING_SCHEMA_VERSION,
+  ListingContentSchema,
+  ListingDraftSchema,
+  MEAL_SLOTS,
+  SECTION_CONTENT_KEYS,
+  type BuilderSection,
+  type Cost,
+  type DeepPartial,
+  type HousingSlot,
+  type ListingContent,
+  type ListingContentInput,
+  type ListingDraft,
+  type MealSlot,
+  type ScreeningQuestion,
+} from './content';
+export { normalizeSkill } from './skills';
+export { CATEGORIES, GENRES, PERKS, type Category } from '@/lib/taxonomy';
 
 export type ListingState = 'draft' | 'in_review' | 'active' | 'closed' | 'removed';
 
@@ -130,11 +148,6 @@ export function registerListingRowBadgeProvider(fn: ListingRowBadgeProvider): vo
 /** SP5 Home (section 7). */
 export async function getHomeSummary(_db: DbOrTx, _ctx: HostContext): Promise<HomeSummary> {
   return notImplemented('getHomeSummary');
-}
-
-/** SP4 and SP5 compare skills by key. Task 8 replaces this stub. */
-export function normalizeSkill(_label: string): { key: string; label: string } {
-  return notImplemented('normalizeSkill');
 }
 
 export async function listOccupations(

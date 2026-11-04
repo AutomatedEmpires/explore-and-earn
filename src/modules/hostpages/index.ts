@@ -4,6 +4,8 @@
 import type { DbOrTx } from '@/lib/db';
 import type { HandlerMap } from '@/modules/jobs';
 
+export { HostPageContentSchema, SOCIAL_KINDS, type HostPageContent } from './content';
+
 export type HostIdentity = {
   orgId: string;
   name: string;
