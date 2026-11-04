@@ -466,9 +466,10 @@ The operator console has its own address and sidebar. It is never mixed into the
 
 - The first 100 host organizations to sign up are the only cohort. The organization is who we charge. Staff do not each qualify. Organization 101 never gets the discount.
 - One organization, one discount shape, chosen by the first paid subscription.
-- Start on monthly: 50% off for the first six subscription months. A monthly tier change inside that window keeps 50% on the new monthly price and does not restart the six months. Switching to annual does not grant 50% off the annual term.
-- Start on annual: 50% off the first annual term (10× the monthly price). Switching to monthly does not grant a new six-month discount.
-- After the introductory period, the regular price applies. Eligibility is server-authoritative.
+- Start on monthly: 50% off for the first six subscription months. The six months begin when the first paid subscription activates, not when the host organization registered. A monthly tier change inside that window, including Starter to Professional or Enterprise, keeps 50% on the new monthly price and does not restart the six months. Switching to annual does not grant 50% off the annual term.
+- Start on annual: 50% off the first annual term (10× the monthly price), for Starter, Professional, and Enterprise alike. The year begins at the first paid activation. Switching to monthly does not grant a new six-month discount.
+- Changing billing interval never opens a second introductory period.
+- After the introductory period, the regular price applies. Eligibility is server-authoritative. The old coupon `founding_30_forever` is superseded and must not be offered.
 
 **Seekers pay nothing, ever.**
 
