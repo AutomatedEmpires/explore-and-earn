@@ -1,11 +1,18 @@
 // Public API of the billing module: Stripe customers, subscriptions, plan changes, founding
 // codes, webhooks and reconciliation (SP2 spec sections 3 and 8). W0 contract: typed stubs that
 // W2 (Tasks 11-16) replaces. Imports entitlements and orgs.
-import type { Db, DbOrTx } from '@/lib/db';
+import { z } from 'zod';
+import type { DbOrTx } from '@/lib/db';
 import type { Actor } from '@/modules/entitlements';
 import type { HandlerMap } from '@/modules/jobs';
 import type { BillingGateway } from './gateway';
-import type { BillingInterval, PlanCode } from './plans';
+import { notifyBillingContacts } from './notifications';
+import { getSubscriptionState } from './state';
+import { syncFromStripe } from './sync';
+import { SYNC_TOPIC } from './webhook';
+// Module-load registrations: notification types and the billing_account subject handlers.
+import './notifications';
+import './subjects';
 
 export type { Actor } from '@/modules/entitlements';
 
@@ -63,50 +70,38 @@ export {
   normalizeFoundingCode,
 } from './founding';
 
-export type SubscriptionState = {
-  status:
-    | 'none'
-    | 'incomplete'
-    | 'trialing'
-    | 'active'
-    | 'past_due'
-    | 'canceled'
-    | 'unpaid'
-    | 'incomplete_expired'
-    | 'paused';
-  plan: PlanCode | null;
-  interval: BillingInterval | null;
-  extraSlots: number;
-  entitled: boolean;
-  canPublish: boolean;
-  trialEnd: Date | null;
-  currentPeriodEnd: Date | null;
-  cancelAtPeriodEnd: boolean;
-  hostSince: Date | null;
-  founding: 'none' | 'active' | 'lapsed' | 'forfeited';
-};
+export {
+  foundingStatusOf,
+  getSubscriberBadges,
+  getSubscriptionState,
+  type SubscriptionState,
+} from './state';
+export {
+  BILLING_SUBJECT,
+  grantMonthCredits,
+  parsePlanItems,
+  syncFromStripe,
+  syncSubscription,
+  type ParsedPlan,
+  type SyncResult,
+} from './sync';
+export { SYNC_TOPIC, handleStripeWebhook, type SyncJob } from './webhook';
+export { finishCheckout } from './complete';
+export {
+  getBillingOverview,
+  getPublicPrices,
+  type BillingOverview,
+  type PlanPrices,
+  type PublicPrices,
+} from './overview';
+export {
+  BILLING_CONTACT_ROLES,
+  notifyBillingContacts,
+  type BillingNotificationType,
+} from './notifications';
 
 function notImplemented(name: string): never {
   throw new Error(`not implemented: ${name} (W2)`);
-}
-
-export async function getSubscriptionState(
-  _db: DbOrTx,
-  _orgId: string,
-): Promise<SubscriptionState> {
-  return notImplemented('getSubscriptionState');
-}
-
-/** The entitled orgs among `orgIds`, for subscriber badges (SP3 cards). */
-export async function getSubscriberBadges(
-  _db: DbOrTx,
-  _orgIds: string[],
-): Promise<Map<string, { hostSince: Date }>> {
-  return notImplemented('getSubscriberBadges');
-}
-
-export async function syncSubscription(_db: Db, _stripeSubscriptionId: string): Promise<void> {
-  return notImplemented('syncSubscription');
 }
 
 export async function getPendingKeepList(_db: DbOrTx, _orgId: string): Promise<string[] | null> {
@@ -160,9 +155,26 @@ export const privacyHandlers: {
 
 const noop = async () => {};
 
-/** W2 replaces each no-op (spec section 6, plus billing.cancel_subscription). */
+const syncJob = z.object({
+  subscriptionId: z.string().min(1),
+  notify: z.enum(['payment_failed', 'trial_ending']).optional(),
+});
+
+/** Outbox topics (spec section 6, plus billing.cancel_subscription). */
 export const jobHandlers: HandlerMap = {
-  'billing.sync_subscription': noop,
+  // A webhook's sync, then the notification the event asked for.
+  [SYNC_TOPIC]: async (payload, { db }) => {
+    const job = syncJob.parse(payload);
+    const result = await syncFromStripe(db, job.subscriptionId);
+    if (!result || !job.notify) return;
+    const state = await getSubscriptionState(db, result.orgId);
+    await notifyBillingContacts(
+      db,
+      result.orgId,
+      job.notify === 'payment_failed' ? 'billing.payment_failed' : 'billing.trial_ending',
+      { plan: state.plan, trialEnd: state.trialEnd?.toISOString() ?? null },
+    );
+  },
   'billing.grant_monthly_credits': noop,
   'billing.apply_launch_date': noop,
   'billing.reconcile': noop,
