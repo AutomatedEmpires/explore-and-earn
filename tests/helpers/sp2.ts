@@ -5,7 +5,7 @@ import { queryRows, type DbOrTx } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import type { CurrentUser, OrgRole } from '@/modules/identity';
 import type { HousingSlot, ListingContent } from '@/modules/listings';
-import type { MediaKind, MediaStatus } from '@/modules/media';
+import type { MediaKind, MediaStatus, RejectionReason } from '@/modules/media';
 import { slugify } from '@/modules/orgs';
 import type { HostContext } from '@/server/guards';
 
@@ -135,7 +135,10 @@ export async function seedSeeker(
   return { userId: user.id, user };
 }
 
-/** A media row owned by the org (and its Owner), `approved` with variants by default. */
+/**
+ * A media row owned by the org (and its Owner), `approved` with variants by default. A
+ * `rejected` row carries the reason `unsafe_content` (Foundation's `media_rejected_has_reason`).
+ */
 export async function seedMedia(
   db: DbOrTx,
   orgId: string,
@@ -152,13 +155,14 @@ export async function seedMedia(
   const variants = approved
     ? { '320': `${id}/320.webp`, '640': `${id}/640.webp`, '1280': `${id}/1280.webp` }
     : null;
+  const rejectionReason: RejectionReason | null = status === 'rejected' ? 'unsafe_content' : null;
   await db.execute(sql`
     insert into app.media (id, owner_user_id, owner_org_id, kind, status, bucket, path,
-      declared_mime, size_bytes, width, height, variants)
+      declared_mime, size_bytes, width, height, variants, rejection_reason)
     values (${id}, ${org.owner_user_id}, ${orgId}, ${kind}, ${status},
       ${approved ? 'media-public' : 'quarantine'}, ${id}, 'image/jpeg', 1000,
       ${approved ? 1280 : null}, ${approved ? 960 : null},
-      ${variants ? JSON.stringify(variants) : null}::jsonb)
+      ${variants ? JSON.stringify(variants) : null}::jsonb, ${rejectionReason})
   `);
   return id;
 }
