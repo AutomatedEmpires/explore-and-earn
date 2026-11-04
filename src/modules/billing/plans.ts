@@ -48,7 +48,7 @@ export const PLANS: Record<PlanCode, Plan> = {
 /** An extra slot on an annual plan costs 10× its monthly price (one subscription, one interval). */
 export const EXTRA_SLOT_ANNUAL_MULTIPLIER = 10;
 
-/** 30% off, forever, on the subscription (tier and extra slots, across plan changes). */
+/** Superseded 2026-11-04 (FD-7). This is the withdrawn "30% off for life" offer. Do not seed, display, or apply it to a new subscription. The approved offer is a later billing change: first 100 host organizations by signup, one discount shape, six-month clock starting at first paid activation. This id remains so existing tests of the old behavior stay identifiable. */
 export const FOUNDING_COUPON_ID = 'founding_30_forever';
 
 export type LookupKind = 'tier' | 'slot';
