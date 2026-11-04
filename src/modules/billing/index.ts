@@ -3,9 +3,8 @@
 // W2 (Tasks 11-16) replaces. Imports entitlements and orgs.
 import { z } from 'zod';
 import type { DbOrTx } from '@/lib/db';
-import type { Actor } from '@/modules/entitlements';
 import type { HandlerMap } from '@/modules/jobs';
-import type { BillingGateway } from './gateway';
+import { CANCEL_TOPIC, cancelSubscriptionNow } from './cancel';
 import { notifyBillingContacts } from './notifications';
 import { getSubscriptionState } from './state';
 import { syncFromStripe } from './sync';
@@ -95,6 +94,17 @@ export {
   type PublicPrices,
 } from './overview';
 export {
+  changePlan,
+  getPendingKeepList,
+  previewChange,
+  registerSlotHolderSource,
+  settlePendingChange,
+  type PlanChoice,
+  type SlotHolderSource,
+} from './change';
+export { createPortalSession } from './portal';
+export { CANCEL_TOPIC, cancelSubscriptionNow, getCardChecks, sanctionOrg } from './cancel';
+export {
   BILLING_CONTACT_ROLES,
   notifyBillingContacts,
   type BillingNotificationType,
@@ -102,42 +112,6 @@ export {
 
 function notImplemented(name: string): never {
   throw new Error(`not implemented: ${name} (W2)`);
-}
-
-export async function getPendingKeepList(_db: DbOrTx, _orgId: string): Promise<string[] | null> {
-  return notImplemented('getPendingKeepList');
-}
-
-/** Marks the org's pending plan change applied once listings has enforced its keep list. */
-export async function settlePendingChange(_db: DbOrTx, _orgId: string): Promise<void> {
-  return notImplemented('settlePendingChange');
-}
-
-/** Sets the org status; a ban also enqueues `billing.cancel_subscription`. */
-export async function sanctionOrg(
-  _db: DbOrTx,
-  _orgId: string,
-  _action: 'suspend' | 'ban',
-  _actor: Actor,
-): Promise<void> {
-  return notImplemented('sanctionOrg');
-}
-
-/** Cancels the org's current subscription at once, without proration. */
-export async function cancelSubscriptionNow(
-  _db: DbOrTx,
-  _orgId: string,
-  _gw?: BillingGateway,
-): Promise<void> {
-  return notImplemented('cancelSubscriptionNow');
-}
-
-/** The default card's Stripe checks, for business verification. */
-export async function getCardChecks(
-  _db: DbOrTx,
-  _orgId: string,
-): Promise<{ hasCard: boolean; cvcCheck: string | null; postalCheck: string | null }> {
-  return notImplemented('getCardChecks');
 }
 
 /** SP8 registers these with its privacy exporter and eraser. */
@@ -178,5 +152,9 @@ export const jobHandlers: HandlerMap = {
   'billing.grant_monthly_credits': noop,
   'billing.apply_launch_date': noop,
   'billing.reconcile': noop,
-  'billing.cancel_subscription': noop,
+  // A ban's Stripe cancellation, outside the sanction's transaction (SP2 plan, decision 4).
+  [CANCEL_TOPIC]: async (payload, { db }) => {
+    const { orgId } = z.object({ orgId: z.uuid() }).parse(payload);
+    await cancelSubscriptionNow(db, orgId);
+  },
 };
