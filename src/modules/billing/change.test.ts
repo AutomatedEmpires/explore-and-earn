@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { queryRows, type Db } from '@/lib/db';
 import { resetEnvCache } from '@/lib/env';
 import { newId } from '@/lib/ids';
+import { POST as portalRoute } from '@/app/api/v1/host/billing/portal/route';
 import { requireHost } from '@/server/guards';
 import { entitlementsFake } from '../../../tests/fakes/sp2/entitlements';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
@@ -339,8 +340,7 @@ describe('createPortalSession', () => {
   it('is forbidden to Recruiters through the route', async () => {
     const recruiter = await seedMember(t.db, org.orgId, 'recruiter');
     vi.mocked(requireHost).mockResolvedValue(recruiter.ctx);
-    const { POST } = await import('@/app/api/v1/host/billing/portal/route');
-    const res = await POST(
+    const res = await portalRoute(
       new Request('http://localhost:3000/api/v1/host/billing/portal', {
         method: 'POST',
         headers: { origin: 'http://localhost:3000' },

@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryRows, type Db } from '@/lib/db';
 import { newId } from '@/lib/ids';
+import { POST as stripeWebhookRoute } from '@/app/api/webhooks/stripe/route';
 import { decide } from '@/modules/trust';
 import { entitlementsFake } from '../../../tests/fakes/sp2/entitlements';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
@@ -204,10 +205,9 @@ describe('handleStripeWebhook', () => {
 
 describe('POST /api/webhooks/stripe', () => {
   it('answers 400 for a bad signature and 200 { received: true } for a good one', async () => {
-    const { POST } = await import('@/app/api/webhooks/stripe/route');
     const body = JSON.stringify({ id: `evt_${newId()}`, type: 'charge.refunded', data: { object: {} } });
     const send = (signature: string) =>
-      POST(
+      stripeWebhookRoute(
         new Request('http://localhost:3000/api/webhooks/stripe', {
           method: 'POST',
           headers: { 'content-type': 'application/json', 'stripe-signature': signature },
