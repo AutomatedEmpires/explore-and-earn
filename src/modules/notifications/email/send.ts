@@ -5,6 +5,8 @@
 // any of them can change between enqueueing and sending. Each send carries an idempotency key
 // (`notif:<id>:email` or `batch:<id>:email`), so a retry after a lost response never sends the
 // same email twice.
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { render } from '@react-email/components';
 import { sql } from 'drizzle-orm';
 import { createElement, type ReactElement } from 'react';
@@ -12,6 +14,7 @@ import { Resend } from 'resend';
 import { z } from 'zod';
 import { queryRows, type DbOrTx } from '@/lib/db';
 import { getEnv } from '@/lib/env';
+import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
 import { getSetting } from '@/modules/settings';
 import { jobKey } from '../notify';
@@ -23,11 +26,14 @@ import {
   type EmailTemplateName,
   type NotificationData,
 } from '../types';
+import BillingNotice from './templates/BillingNotice';
 import Digest, { digestSubject, type DigestItem } from './templates/Digest';
+import HostNotice from './templates/HostNotice';
 import type { FooterProps } from './templates/Layout';
 import OperatorAlert from './templates/OperatorAlert';
 import OperatorMention from './templates/OperatorMention';
 import SystemTest from './templates/SystemTest';
+import TeamInvite from './templates/TeamInvite';
 import { manageNotificationsUrl, unsubscribeUrl } from './unsubscribe';
 
 // --- Providers -------------------------------------------------------------------------------
@@ -49,14 +55,38 @@ export interface EmailProvider {
 /** Every message the stub provider "sent", oldest first. Tests read and clear it. */
 export const stubOutbox: Message[] = [];
 
-export function stubEmailProvider(): EmailProvider {
+/** Where the stub provider writes messages in local dev, so e2e tests can read them. */
+export const STUB_EMAIL_DIR = '.data/emails';
+
+/** Local dev only: never in tests (Vitest), preview or prod. */
+function writesToDisk(): boolean {
+  return getEnv().APP_ENV === 'dev' && !process.env.VITEST;
+}
+
+/**
+ * The stub provider keeps messages in `stubOutbox`. In dev outside Vitest it also writes each
+ * one to `<dir>/<id>.json` as `{ to, subject, html, text, sentAt }` (the dev server's memory is
+ * out of reach of an e2e test).
+ */
+export function stubEmailProvider(opts: { dir?: string } = {}): EmailProvider {
+  const dir = opts.dir ?? STUB_EMAIL_DIR;
   return {
     async send(m) {
       const duplicate =
         m.idempotencyKey !== undefined &&
         stubOutbox.some((sent) => sent.idempotencyKey === m.idempotencyKey);
-      if (!duplicate) stubOutbox.push(m);
-      return { id: `stub_${stubOutbox.length}` };
+      const id = `stub_${newId()}`;
+      if (duplicate) return { id };
+      stubOutbox.push(m);
+      if (writesToDisk()) {
+        await mkdir(dir, { recursive: true });
+        const file = { to: m.to, subject: m.subject, html: m.html, text: m.text };
+        await writeFile(
+          path.join(dir, `${id}.json`),
+          JSON.stringify({ ...file, sentAt: new Date().toISOString() }),
+        );
+      }
+      return { id };
     },
   };
 }
@@ -100,6 +130,21 @@ export function getEmailProvider(): EmailProvider {
 
 type Content = { title: string; body: string; url: string | null; data: NotificationData };
 
+/** A notice's button: `data.href` (absolute, or a path on APP_URL), else the notification's url. */
+function noticeButton(c: Content): { label: string; href: string } {
+  let href = c.url ?? getEnv().APP_URL;
+  if (typeof c.data.href === 'string') {
+    try {
+      const url = new URL(c.data.href, getEnv().APP_URL);
+      if (url.protocol === 'https:' || url.protocol === 'http:') href = url.toString();
+    } catch {
+      // Keep the notification's url.
+    }
+  }
+  const label = typeof c.data.buttonLabel === 'string' ? c.data.buttonLabel : 'Open Explore&Earn';
+  return { label, href };
+}
+
 function templateElement(name: EmailTemplateName, c: Content, footer: FooterProps): ReactElement {
   switch (name) {
     case 'SystemTest':
@@ -120,6 +165,23 @@ function templateElement(name: EmailTemplateName, c: Content, footer: FooterProp
         url: c.url,
         footer,
       });
+    case 'HostNotice':
+    case 'BillingNotice':
+      return createElement(name === 'HostNotice' ? HostNotice : BillingNotice, {
+        heading: c.title,
+        lines: c.body.split('\n').filter((line) => line.trim() !== ''),
+        button: noticeButton(c),
+        footer,
+      });
+    case 'TeamInvite':
+      return createElement(TeamInvite, {
+        orgName: String(c.data.orgName ?? ''),
+        inviterName: String(c.data.inviterName ?? ''),
+        role: String(c.data.role ?? ''),
+        acceptUrl: noticeButton(c).href,
+        expiresAt: String(c.data.expiresAt ?? ''),
+        footer,
+      });
   }
 }
 
@@ -134,7 +196,7 @@ const PLAIN_TEXT_OPTIONS = {
   },
 } as const;
 
-async function renderEmail(el: ReactElement): Promise<{ html: string; text: string }> {
+export async function renderEmail(el: ReactElement): Promise<{ html: string; text: string }> {
   const [html, text] = await Promise.all([render(el), render(el, PLAIN_TEXT_OPTIONS)]);
   return { html, text };
 }

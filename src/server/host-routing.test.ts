@@ -114,4 +114,23 @@ describe('shouldRedirectToOnboarding', () => {
     }
     expect(shouldRedirectToOnboarding({ ...base, isAdminHost: true })).toBe(false);
   });
+
+  it('lets an invitee open a team invitation before onboarding', () => {
+    expect(
+      shouldRedirectToOnboarding({
+        pathname: '/join/abc',
+        signedIn: true,
+        state: 'needed',
+        isAdminHost: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRedirectToOnboarding({
+        pathname: '/joined',
+        signedIn: true,
+        state: 'needed',
+        isAdminHost: false,
+      }),
+    ).toBe(true);
+  });
 });

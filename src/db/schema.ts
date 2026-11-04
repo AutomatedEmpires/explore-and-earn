@@ -9,3 +9,10 @@ export * from '../modules/operator/schema';
 export * from '../modules/orgs/schema';
 export * from '../modules/settings/schema';
 export * from '../modules/trust/schema';
+// SP2
+export * from '../modules/billing/schema';
+export * from '../modules/entitlements/schema';
+export * from '../modules/hostpages/schema';
+export * from '../modules/listings/schema';
+export * from '../modules/locations/schema';
+export * from '../modules/verification/schema';

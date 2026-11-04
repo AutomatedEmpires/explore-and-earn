@@ -119,3 +119,25 @@ export async function openReviewItem(db: DbOrTx, i: OpenReviewItemInput): Promis
     return { id };
   });
 }
+
+/**
+ * The unresolved review items (open, assigned or escalated) for one subject, oldest first.
+ * SP2 uses it so a subject with two items (moderation and fraud) is published only once both
+ * are approved.
+ */
+export async function listOpenReviewItems(
+  db: DbOrTx,
+  subjectType: string,
+  subjectId: string,
+): Promise<{ id: string; queue: Queue; reason: string }[]> {
+  return queryRows<{ id: string; queue: Queue; reason: string }>(
+    db,
+    sql`
+      select id, queue, reason from app.review_items
+      where subject_type = ${subjectType}
+        and subject_id = ${subjectId}
+        and status in ('open', 'assigned', 'escalated')
+      order by created_at, id
+    `,
+  );
+}
