@@ -69,14 +69,21 @@ Extra invite packs and extra seats still have no approved price. The product des
 
 ### FD-7 · Founding hosts
 
-The first 100 eligible host **organizations** are the only cohort. Staff seats do not each get a promotion. One organization, one redemption.
+Clarified by the founder on 4 November 2026, after the first writing of this file.
 
-- Monthly: 50% off the selected tier for the first six subscription months, then the regular monthly price.
-- Annual: 50% off the first annual term. That term is the documented annual price (10× monthly), not a separate invented yearly rate. After that year, the regular annual price applies.
-- The discount is available on any of the three tiers.
-- The discount starts when that organization's paid subscription starts.
-- The cohort closes at 100 redemptions. Later hosts pay the regular price.
-- Eligibility and redemption are server-authoritative. The system must prevent a 101st redemption, a second redemption by the same organization, and a price that does not match this rule.
+The customer we charge is the host organization: the organization that posts jobs. Staff seats are not separate customers and do not each qualify.
+
+The cohort is the first 100 host organizations to **sign up**, in signup order. It is not the first 100 to pay. Organization number 101 never receives the discount, even if an earlier organization has not subscribed yet. An organization inside the first 100 still receives it when that organization later starts a paid subscription. Signup means creating that host organization, not a staff member joining one that already exists.
+
+One organization gets one discount. The interval chosen on the first paid subscription fixes the shape:
+
+- **Start on monthly:** 50% off the monthly price for the first six subscription months, then the regular monthly price. A move to a higher or lower monthly tier inside those six months keeps the 50% on the new tier's monthly price. The six months do not start over.
+- **Start on monthly, then switch to annual:** the annual discount does not apply. There is no fresh 50% off an annual term in month six, or at any later switch.
+- **Start on annual:** 50% off the first annual term (the documented annual price, 10× monthly), then the regular annual price. Switching from annual to monthly does not grant a new six-month monthly discount.
+
+The discount is available on any of the three tiers. It starts when that organization's paid subscription starts. After the introductory period, the regular rate applies.
+
+The server decides eligibility from signup order and stores one discount shape per organization. It must refuse a 101st qualifying organization, a second discount shape, and a price that does not match the rule above.
 
 **Withdrawn:** the 3 November offer of 90 days free, then 30% off for life. The coupon id `founding_30_forever` in the SP2 billing code implements that withdrawn offer. It must be replaced before any founding checkout is shown or charged. This decision does not activate payment collection.
 
@@ -115,6 +122,6 @@ Nothing in FD-9 adds scope beyond the product design plus this file.
 | FD-4 | SP2 has both a subscriber "host since" badge and a separate business-verification flow | UI copy must not call the subscription badge "verified" in the trust sense. |
 | FD-5 | Not built | SP5. Not a third-party calendar placeholder. |
 | FD-6 | Prices and slot/seat/credit numbers match §16 in `plans.ts` | Do not present them as a live checkout until billing review. |
-| FD-7 | `FOUNDING_COUPON_ID` is `founding_30_forever` (30% off, not 50% for a limited term) | Replace the coupon, the 100-org cap behavior, and the tests before founding checkout. |
+| FD-7 | `FOUNDING_COUPON_ID` is `founding_30_forever` (30% off, not 50% for a limited term, and not tied to signup order) | Replace the coupon, reserve the first 100 host organizations at signup, lock one discount shape, let a monthly tier change keep the discount, and refuse a monthly-to-annual discount restart. Update the tests before founding checkout. |
 | FD-8 | Sample choropleth, uncommitted, not on GitHub | Rebuild against listing counts during discovery. Do not merge the sample data. |
 | FD-9 | `main` has no application. Integration PRs are open. | Public launch stays blocked until SP2–SP8 and the launch gates are actually done. |

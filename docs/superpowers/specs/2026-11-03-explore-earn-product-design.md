@@ -464,11 +464,11 @@ The operator console has its own address and sidebar. It is never mixed into the
 
 **Founding hosts** (replaced 2026-11-04, FD-7; the 90-days-free then 30%-off-for-life offer is withdrawn)
 
-- The first 100 host organizations are the only cohort. One redemption per organization.
-- Monthly: 50% off the selected tier for the first six subscription months, then the regular monthly price.
-- Annual: 50% off the first annual term (10× the monthly price), then the regular annual price.
-- Any of the three tiers. The discount starts when that organization's paid subscription starts.
-- The cohort closes at 100. Later hosts pay the regular price. Redemption is server-authoritative.
+- The first 100 host organizations to sign up are the only cohort. The organization is who we charge. Staff do not each qualify. Organization 101 never gets the discount.
+- One organization, one discount shape, chosen by the first paid subscription.
+- Start on monthly: 50% off for the first six subscription months. A monthly tier change inside that window keeps 50% on the new monthly price and does not restart the six months. Switching to annual does not grant 50% off the annual term.
+- Start on annual: 50% off the first annual term (10× the monthly price). Switching to monthly does not grant a new six-month discount.
+- After the introductory period, the regular price applies. Eligibility is server-authoritative.
 
 **Seekers pay nothing, ever.**
 
@@ -700,7 +700,7 @@ Phased build is how the work is sequenced (FD-9, 2026-11-04). It is not permissi
 | D25: map direction | Confirmed: host-location pins with a host preview |
 | D26: dashboards brainstorm | Defined in sections 9.3, 15 and 17 |
 | D27 / C18: tier prices, slots and analytics split open | Monthly prices approved 2026-11-04 (FD-6): $99 / $299 / $599. Section 16 entitlements stay, except the founding offer. **Analytics is the same on every tier.** |
-| Founding offer in the 3 November draft: 90 days free, then 30% off for life | **Withdrawn** 2026-11-04 (FD-7). First 100 organizations: 50% off for six monthly terms, or 50% off the first annual term. |
+| Founding offer in the 3 November draft: 90 days free, then 30% off for life | **Withdrawn** 2026-11-04 (FD-7). First 100 host organizations to sign up. One discount shape: 50% off for six monthly terms, kept across a monthly tier change, or 50% off the first annual term if they start on annual. Switching interval does not grant the other shape. |
 | D28: interviews as a pipeline view only | **Built-in scheduling** (section 11.4) |
 | Listings expired after a set time | **No timer.** Slots, reminders, and automatic close at a fixed end date. |
 | 8 platform staff roles | Operator roles Owner and Operator, assigned to queues (section 20) |
