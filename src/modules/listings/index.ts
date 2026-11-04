@@ -56,6 +56,17 @@ export {
 } from './checks';
 export { checkLinkSyntax, type LinkLists } from './links';
 export { hourlyPayCents } from './min-wage';
+export {
+  decideApproval,
+  publishRevision,
+  rejectRevision,
+  requestPublish,
+  type PublishState,
+} from './publish';
+export { listingTeamUserIds } from './team';
+export { LISTING_NOTIFICATION_TYPES } from './notifications';
+// Module-load registrations: the listing_slot usage counter.
+import './slots';
 export { CATEGORIES, GENRES, PERKS, type Category } from '@/lib/taxonomy';
 
 export type ListingState = 'draft' | 'in_review' | 'active' | 'closed' | 'removed';

@@ -2,11 +2,13 @@
 // code. Locations come from the locations fake, so tests that use this mock '@/modules/locations'.
 import { sql } from 'drizzle-orm';
 import { queryRows, type DbOrTx } from '@/lib/db';
+import { newId } from '@/lib/ids';
 import type { Location } from '@/modules/locations';
 import { locationsFake } from '../../../tests/fakes/sp2/locations';
 import { buildListingContent, seedMedia, type SeededOrg } from '../../../tests/helpers/sp2';
+import type { HostContext } from '@/server/guards';
 import type { HousingSlot, ListingContent } from './content';
-import { newId } from '@/lib/ids';
+import { createListing } from './drafts';
 
 export type ListingFixture = {
   locationId: string;
@@ -45,11 +47,30 @@ export async function seedListingFixture(
   };
 }
 
+/** A draft listing created by `ctx` holding `content` (title and location synced). */
+export async function seedDraftListing(
+  db: DbOrTx,
+  ctx: HostContext,
+  content: ListingContent,
+): Promise<string> {
+  const { id } = await createListing(db, ctx, { start: 'blank' });
+  const where = content.where;
+  await db.execute(sql`
+    update app.listings
+    set draft = ${JSON.stringify(content)}::jsonb, title = ${content.basics.title},
+      location_id = ${where.mode === 'remote' ? where.hostLocationId : where.locationId}
+    where id = ${id}
+  `);
+  return id;
+}
+
 /** The outbox rows of a topic, oldest first. */
 export async function outboxRows(
   db: DbOrTx,
   topic: string,
-): Promise<{ dedupe_key: string | null; payload: Record<string, unknown>; available_at: string }[]> {
+): Promise<
+  { dedupe_key: string | null; payload: Record<string, unknown>; available_at: string }[]
+> {
   return queryRows(
     db,
     sql`select dedupe_key, payload, available_at::text as available_at from app.outbox

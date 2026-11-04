@@ -53,7 +53,8 @@ async function check(edit?: (c: ListingContent) => void, draft?: unknown) {
   });
 }
 
-const brief = (issues: Issue[]) => issues.map(({ code, section, field }) => ({ code, section, field }));
+const brief = (issues: Issue[]) =>
+  issues.map(({ code, section, field }) => ({ code, section, field }));
 
 describe('runListingChecks', () => {
   it('passes the complete fixture', async () => {
@@ -167,7 +168,7 @@ describe('runListingChecks', () => {
       );
     });
 
-    it("doesn't fire for \"focus on citizens' only needs\"", async () => {
+    it('doesn\'t fire for "focus on citizens\' only needs"', async () => {
       const r = await check((c) => {
         c.job.description = `${DESCRIPTION} We focus on citizens' only needs.`;
       });
@@ -186,7 +187,10 @@ describe('runListingChecks', () => {
             allowMultiple: false,
           },
         ];
-        c.applying.additionalStep = { url: 'https://kettle.com/apply', note: 'Native English speaker' };
+        c.applying.additionalStep = {
+          url: 'https://kettle.com/apply',
+          note: 'Native English speaker',
+        };
       });
       expect(brief(r.errors)).toEqual([
         {

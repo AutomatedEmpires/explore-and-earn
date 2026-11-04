@@ -103,7 +103,8 @@ function phraseMatchers(phrases: string[]): { phrase: string; re: RegExp }[] {
 
 /** Every string in the draft with its path (arrays indexed), skipping ids. */
 function textFields(value: unknown, prefix = ''): { path: string; text: string }[] {
-  if (typeof value === 'string') return isUuid(value) || !prefix ? [] : [{ path: prefix, text: value }];
+  if (typeof value === 'string')
+    return isUuid(value) || !prefix ? [] : [{ path: prefix, text: value }];
   if (Array.isArray(value)) {
     return value.flatMap((v, i) => textFields(v, `${prefix}.${i}`));
   }
@@ -146,10 +147,14 @@ function payVague(pay: Json, ratio: number): string | null {
   const min = num(pay.minCents);
   const max = num(pay.maxCents);
   if (min === 0) return 'pay.minCents';
-  if (pay.unit === 'crew_share' && (pay.crewShareEstimate === null || pay.crewShareEstimate === undefined)) {
+  if (
+    pay.unit === 'crew_share' &&
+    (pay.crewShareEstimate === null || pay.crewShareEstimate === undefined)
+  ) {
     return 'pay.crewShareEstimate';
   }
-  if (pay.kind === 'range' && min !== null && max !== null && max > ratio * min) return 'pay.maxCents';
+  if (pay.kind === 'range' && min !== null && max !== null && max > ratio * min)
+    return 'pay.maxCents';
   return null;
 }
 
@@ -220,7 +225,9 @@ export async function runListingChecks(
         continue;
       }
       seen.add(field);
-      errors.push(issue('required_missing', field, isMissingValue(zi) ? MESSAGES.required : zi.message));
+      errors.push(
+        issue('required_missing', field, isMissingValue(zi) ? MESSAGES.required : zi.message),
+      );
     }
   }
   for (const [key, code] of costCodes) errors.push(issue(code, `${key}.cost`, MESSAGES[code]));
@@ -281,7 +288,10 @@ export async function runListingChecks(
 
   // Photos: the org's own, of the right kind, not rejected or blocked.
   const media = referencedMedia(draft);
-  const info = await getMediaInfo(db, media.map((m) => m.mediaId));
+  const info = await getMediaInfo(
+    db,
+    media.map((m) => m.mediaId),
+  );
   for (const m of media) {
     const mi = info.get(m.mediaId);
     if (
@@ -319,7 +329,7 @@ export async function runListingChecks(
       weeklyHours,
     );
     const remote = where.mode === 'remote';
-    const state = remote ? null : location?.state ?? null;
+    const state = remote ? null : (location?.state ?? null);
     const floor = remote
       ? FEDERAL_MIN_WAGE_CENTS
       : state && isUSStateCode(state)
@@ -337,7 +347,9 @@ export async function runListingChecks(
   }
 
   // Warning: a housing or meal photo that doesn't show its slot.
-  const slotted = media.filter((m) => m.field.startsWith('housing.') || m.field.startsWith('meals.'));
+  const slotted = media.filter(
+    (m) => m.field.startsWith('housing.') || m.field.startsWith('meals.'),
+  );
   if (slotted.length > 0) {
     const rows = await db
       .select({ mediaId: photoSlotChecks.mediaId, slot: photoSlotChecks.slot })
@@ -357,7 +369,9 @@ export async function runListingChecks(
       if (!mismatched.has(`${m.mediaId}:${slot}`)) continue;
       const label = (SLOT_LABELS[slot] ?? slot).toLowerCase();
       const article = /^[aeiou]/.test(label) ? 'an' : 'a';
-      warnings.push(issue('photo_slot_mismatch', m.field, `This doesn't look like ${article} ${label}.`));
+      warnings.push(
+        issue('photo_slot_mismatch', m.field, `This doesn't look like ${article} ${label}.`),
+      );
     }
   }
 
@@ -390,7 +404,11 @@ export async function checkListing(
   const l = await loadListing(db, ctx, id);
   const { errors, warnings } = await runListingChecks(db, {
     orgId: ctx.orgId,
-    listing: { id: l.id, firstPublishedAt: l.firstPublishedAt, sourceGenre: await sourceGenreOf(db, l) },
+    listing: {
+      id: l.id,
+      firstPublishedAt: l.firstPublishedAt,
+      sourceGenre: await sourceGenreOf(db, l),
+    },
     draft: l.draft,
     now,
   });

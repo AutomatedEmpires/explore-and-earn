@@ -23,7 +23,9 @@ export const BUILDER_SECTIONS = [
 ] as const satisfies readonly BuilderSection[];
 
 const SECTION_OF_KEY = new Map<string, BuilderSection>(
-  BUILDER_SECTIONS.flatMap((s) => SECTION_CONTENT_KEYS[s].map((k): [string, BuilderSection] => [k, s])),
+  BUILDER_SECTIONS.flatMap((s) =>
+    SECTION_CONTENT_KEYS[s].map((k): [string, BuilderSection] => [k, s]),
+  ),
 );
 
 /** The section a content path belongs to ('where.locationId' -> where_when). */

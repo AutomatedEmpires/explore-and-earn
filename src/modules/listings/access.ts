@@ -49,8 +49,9 @@ export async function findListing(
 
 /** The location a draft names: the onsite location, or a remote listing's host location. */
 export function draftLocationId(draft: unknown): string | null {
-  const where = (draft as { where?: { mode?: unknown; locationId?: unknown; hostLocationId?: unknown } })
-    ?.where;
+  const where = (
+    draft as { where?: { mode?: unknown; locationId?: unknown; hostLocationId?: unknown } }
+  )?.where;
   if (!where) return null;
   const id = where.mode === 'remote' ? where.hostLocationId : where.locationId;
   return isUuid(id) ? id : null;
@@ -63,4 +64,7 @@ export function draftTitle(draft: unknown): string | null {
 }
 
 /** The audit actor for a host member. */
-export const userActor = (ctx: HostContext) => ({ actorType: 'user' as const, actorId: ctx.user.id });
+export const userActor = (ctx: HostContext) => ({
+  actorType: 'user' as const,
+  actorId: ctx.user.id,
+});

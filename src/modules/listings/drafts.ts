@@ -34,9 +34,7 @@ import { listingRevisions, listings } from './schema';
 export const PHOTO_SLOT_CHECK_TOPIC = 'listings.photo_slot_check';
 
 export type CreateListingInput =
-  | { start: 'blank' }
-  | { start: 'copy'; listingId: string }
-  | { start: 'paste'; text: string };
+  { start: 'blank' } | { start: 'copy'; listingId: string } | { start: 'paste'; text: string };
 
 export type EditorListing = {
   id: string;

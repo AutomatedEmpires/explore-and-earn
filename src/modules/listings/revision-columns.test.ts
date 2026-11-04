@@ -7,7 +7,11 @@ import { toRevisionColumns } from './revision-columns';
 const locationId = newId();
 const hostLocationId = newId();
 const photos = { bedroom: newId(), bathroom: newId(), kitchen: newId(), exterior: newId() };
-const ctx = { timezone: 'America/Los_Angeles', publicPoint: { lat: 47.6, lng: -120.66 }, stateCode: 'WA' };
+const ctx = {
+  timezone: 'America/Los_Angeles',
+  publicPoint: { lat: 47.6, lng: -120.66 },
+  stateCode: 'WA',
+};
 
 const build = (edit?: (c: ListingContent) => void) =>
   buildListingContent({ locationId, coverMediaId: newId(), housingPhotos: photos }, edit);
