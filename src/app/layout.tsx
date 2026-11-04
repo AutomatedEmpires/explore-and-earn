@@ -19,7 +19,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // request's nonce ('strict-dynamic'), and Next.js adds the nonce only when it renders the page
   // per request; a page prerendered at build time would have every script blocked.
   await connection();
-  // `dynamic` renders Clerk's scripts on the server with this request's nonce (x-nonce).
+  // One ClerkProvider for the whole app (seeker, host and operator console). `dynamic` renders
+  // Clerk's scripts on the server with this request's nonce (x-nonce).
   return (
     <ClerkProvider dynamic {...clerkProviderProps}>
       <html lang="en" className={figtree.variable}>

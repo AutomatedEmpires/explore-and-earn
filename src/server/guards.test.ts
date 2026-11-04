@@ -2,6 +2,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type Db, queryRows } from '@/lib/db';
+import { resetEnvCache } from '@/lib/env';
 import { AppError } from '@/lib/errors';
 import {
   handleClerkEvent,
@@ -267,6 +268,18 @@ describe('requireOperator', () => {
       reason: 'needs_passkey',
       redirectTo: '/admin/passkey',
     });
+  });
+
+  it('lets an operator without a passkey in only when ALLOW_OPERATOR_WITHOUT_PASSKEY=true', async () => {
+    vi.stubEnv('ALLOW_OPERATOR_WITHOUT_PASSKEY', 'true');
+    resetEnvCache();
+    try {
+      await signIn(operatorUser({ passkey: false }));
+      expect((await requireOperator()).role).toBe('operator');
+    } finally {
+      vi.unstubAllEnvs();
+      resetEnvCache();
+    }
   });
 
   it('allows assigned queues and forbids the rest', async () => {
