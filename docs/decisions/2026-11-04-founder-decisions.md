@@ -81,11 +81,15 @@ One organization gets one discount. The interval chosen on the first paid subscr
 - **Start on monthly, then switch to annual:** the annual discount does not apply. There is no fresh 50% off an annual term in month six, or at any later switch.
 - **Start on annual:** 50% off the first annual term (the documented annual price, 10× monthly), then the regular annual price. Switching from annual to monthly does not grant a new six-month monthly discount.
 
-The discount is available on any of the three tiers. It starts when that organization's paid subscription starts. After the introductory period, the regular rate applies.
+The discount is available on Starter, Professional, and Enterprise. Annual Starter follows the same founding rules as annual Professional and annual Enterprise. There is no tier-specific exception.
 
-The server decides eligibility from signup order and stores one discount shape per organization. It must refuse a 101st qualifying organization, a second discount shape, and a price that does not match the rule above.
+The six-month clock begins when the first qualifying paid subscription activates. It does not begin on the host registration date. Registration only decides whether the organization is inside the first 100. The annual term likewise begins at that first paid activation.
 
-**Withdrawn:** the 3 November offer of 90 days free, then 30% off for life. The coupon id `founding_30_forever` in the SP2 billing code implements that withdrawn offer. It must be replaced before any founding checkout is shown or charged. This decision does not activate payment collection.
+After the introductory period, the regular rate for the current tier and interval applies.
+
+The server decides cohort membership from signup order and stores one discount shape per organization. It must refuse organization 101, a second introductory period after an interval change, and a price that does not match the rule above.
+
+**Superseded and disabled:** the 3 November offer of 90 days free, then 30% off for life. The coupon id `founding_30_forever` in the SP2 billing code is that withdrawn offer. It must not be seeded, shown, or applied to a new subscription. It stays in the code only so the old tests remain identifiable until a later billing change replaces it. That replacement is approved as a future implementation and is not authorized by this document. Do not collect payments until the ordinary billing, security, and testing gates are met.
 
 ### FD-8 · Browse by State
 
@@ -104,6 +108,12 @@ Public launch requires the full approved product design, as amended by this file
 Building Foundation, then SP2 through SP8, in order, is still the way the work is done. Previews and internal testing are allowed. Phased development is not a public launch.
 
 Nothing in FD-9 adds scope beyond the product design plus this file.
+
+## AgentOps handoff
+
+Agents start here, then the product design, then `docs/v1` only for topics this file and the product design do not cover.
+
+Do not merge pull requests #26 or #27 unless the founder says so. Do not start SP3–SP8. Do not turn on live billing. Do not show sample Browse-by-State counts as live jobs. Do not treat `founding_30_forever` as the current founding offer. Public launch requires the full approved scope. `main` has no application until an integration pull request is merged.
 
 ## What these decisions do not do
 

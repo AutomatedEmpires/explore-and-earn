@@ -133,7 +133,7 @@ Do not delete these.
 
 1. Review and, only with an explicit decision, merge the foundation PR into `feat/foundation-screens`. Do not merge to `main`.
 2. Review the SP2 PR. Re-run `pnpm lint`, `pnpm check:tokens`, `pnpm typecheck`, `pnpm test`, and `pnpm build` in `explore-and-earn-sp2-integrate`.
-3. Host UI that SP2 does not have yet: listing builder, billing, team, and public host page screens. Sandbox providers only. No live billing.
+3. Host UI that SP2 does not have yet: listing builder, billing, team, and public host page screens. Sandbox providers only. No live billing. Before any founding checkout, replace `founding_30_forever`. The approved offer is FD-7: first 100 host organizations by signup, one discount, six-month clock starting at the first paid activation, annual Starter included with the other annual tiers.
 4. SP3 discovery on top of `integrate/sp2-20261104`, using the recovery branches as notes, not as a merge.
 5. Restart SP4 from that tree. Do not resume the interrupted merge.
 6. Then SP5, SP6, SP7, SP8 in that dependency order.
