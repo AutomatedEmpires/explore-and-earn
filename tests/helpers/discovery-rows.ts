@@ -11,11 +11,10 @@ import { stateByCode } from '@/lib/discovery';
 import { newId } from '@/lib/ids';
 import { GENRES, type Category } from '@/lib/taxonomy';
 import { searchVectorSql, type ProjectionRowInput } from '@/modules/discovery';
+import { DEFAULT_LOCATION_ID, DEFAULT_ORG_ID } from '../fakes/listing-content';
 
-/** The default row's host (Kettle Ridge Lodge). The SP2 fakes use the same id. */
-export const DEFAULT_ORG_ID = '019a4a3c-0000-7000-8000-00000000a001';
-/** The default row's location (Breckenridge, CO). The SP2 fakes use the same id. */
-export const DEFAULT_LOCATION_ID = '019a4a3c-0000-7000-8000-00000000b001';
+// The default row's host and location are the SP2 fakes' defaults.
+export { DEFAULT_LOCATION_ID, DEFAULT_ORG_ID };
 
 const DAY_MS = 86_400_000;
 
