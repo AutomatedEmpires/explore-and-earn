@@ -157,9 +157,16 @@ describe('member_assignments', () => {
     );
     expect(neither).toMatch(/member_assignments_one_target/);
 
+    // location_id references app.locations since 1100_locations.
+    const locationId = newId();
+    await db.execute(sql`
+      insert into app.locations (id, org_id, name, kind, city, state, point, public_point, timezone)
+      values (${locationId}, ${orgId}, 'Dock', 'port', 'Seward', 'AK',
+        'SRID=4326;POINT(-149.44 60.10)', 'SRID=4326;POINT(-149.44 60.10)', 'America/Anchorage')
+    `);
     await db.execute(sql`
       insert into app.member_assignments (id, membership_id, location_id)
-      values (${newId()}, ${membershipId}, ${newId()})
+      values (${newId()}, ${membershipId}, ${locationId})
     `);
   });
 });

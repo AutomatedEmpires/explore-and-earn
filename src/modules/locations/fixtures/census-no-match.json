@@ -1,0 +1,19 @@
+{
+  "result": {
+    "input": {
+      "address": {
+        "street": "1 Nowhere Ln",
+        "city": "Seward",
+        "state": "AK",
+        "zip": ""
+      },
+      "benchmark": {
+        "isDefault": true,
+        "benchmarkDescription": "Public Address Ranges - Current Benchmark",
+        "id": "4",
+        "benchmarkName": "Public_AR_Current"
+      }
+    },
+    "addressMatches": []
+  }
+}
