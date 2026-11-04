@@ -1,6 +1,9 @@
-// PATCH /api/v1/host/org: organization settings (Owner or Admin). The primary location must be
-// one of the org's live locations. A new name or website re-runs business verification in the
-// background; live listings stay up.
+// /api/v1/host/org
+// PATCH: organization settings (Owner or Admin). The primary location must be one of the org's
+//   live locations. A new name or website re-runs business verification in the background;
+//   live listings stay up.
+// DELETE: the Owner deletes the organization after reverifying and typing its name.
+import { z } from 'zod';
 import { notFound, unauthorized } from '@/lib/errors';
 import { clerkAdmin } from '@/modules/identity';
 import { kickWorker } from '@/modules/jobs';
@@ -15,6 +18,8 @@ import {
 } from '@/modules/orgs';
 import { requestReverification } from '@/modules/verification';
 import { apiRoute } from '@/server/api';
+import { deleteHostOrganization } from '@/server/org-deletion';
+import { requireReverification } from '@/server/reverify';
 
 export const PATCH = apiRoute({
   auth: 'host',
@@ -45,5 +50,24 @@ export const PATCH = apiRoute({
       kickWorker();
     }
     return orgJson(org);
+  },
+});
+
+export const DELETE = apiRoute({
+  auth: 'host',
+  input: z.object({ confirmName: z.string().max(200) }),
+  openapi: {
+    method: 'DELETE',
+    path: '/api/v1/host/org',
+    summary: 'Delete the organization (the Owner, after reverifying and typing its name)',
+    output: z.object({ redirectTo: z.literal('/onboarding') }),
+  },
+  handler: async ({ db, host, input }) => {
+    if (!host) throw unauthorized();
+    requireCapability(host, 'org.delete');
+    await requireReverification();
+    const result = await deleteHostOrganization(db, clerkAdmin(), host, input.confirmName);
+    kickWorker();
+    return result;
   },
 });

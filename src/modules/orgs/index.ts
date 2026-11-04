@@ -1,10 +1,10 @@
 // Public API of the orgs module: host organizations and memberships. Owned by W2 (Tasks 6-7).
-// Depends on identity for types only; identity's Clerk sync calls into this module.
+// Identity's Clerk sync calls into this module, so orgs imports identity for types, and loads
+// it at runtime only when first needed (accepting an invitation sets the account type).
 //
 // SP2 (W3, Tasks 17-19) adds the team, invitations, recruiter scopes, org status and settings,
 // slugs and the activity log, and imports entitlements. Reverse flows to other SP2 modules go
 // through domain events (org.status_changed, org.member_removed, hostpage.updated).
-import type { DbOrTx } from '@/lib/db';
 import type { HandlerMap } from '@/modules/jobs';
 import { SEND_INVITATION_TOPIC, sendInvitationJob } from './invitations';
 
@@ -89,30 +89,21 @@ export { ROLE_LABELS, ROLE_PHRASES } from './notifications';
 
 export { INVITATION_ROLES, ORG_ROLES } from './schema';
 
-function notImplemented(name: string): never {
-  throw new Error(`not implemented: ${name} (W3)`);
-}
+export { changeMember, changeMemberSchema, removeMember, transferOwnership } from './member-admin';
 
-/** The org a slug belongs to; `retired` when it is no longer the org's current slug. */
-export async function resolveSlug(
-  _db: DbOrTx,
-  _slug: string,
-): Promise<{ orgId: string; currentSlug: string; retired: boolean } | null> {
-  return notImplemented('resolveSlug');
-}
+export { RESERVED_SLUGS, changeSlug, resolveSlug } from './slugs';
+
+export {
+  ACTIVITY_ACTION_PREFIXES,
+  ACTIVITY_PAGE_SIZE,
+  listActivity,
+  type ActivityItem,
+} from './activity';
+
+export { deleteOrganization } from './deletion';
 
 /** SP8 registers these with its privacy exporter and eraser. */
-export const privacyHandlers: {
-  export(db: DbOrTx, userId: string): Promise<Record<string, unknown>>;
-  erase(db: DbOrTx, userId: string): Promise<void>;
-} = {
-  async export() {
-    return notImplemented('privacyHandlers.export');
-  },
-  async erase() {
-    return notImplemented('privacyHandlers.erase');
-  },
-};
+export { privacyHandlers } from './privacy';
 
 export const jobHandlers: HandlerMap = {
   // Creates the invitation token and emails it in one step (SP2 plan decision 9).
