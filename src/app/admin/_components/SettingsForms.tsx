@@ -1,12 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import {
-  SETTING_DEFAULTS,
-  type SettingKey,
-  type SettingValues,
-  type Thresholds,
-} from '@/modules/settings';
+import type { SettingKey, SettingValues, Thresholds } from '@/modules/settings';
 import { Button, Input, Textarea } from '@/ui/components';
 import { updateSetting } from '../actions';
 import { ActionMessage } from './ActionMessage';
@@ -14,13 +9,9 @@ import { useConsoleAction } from './use-console-action';
 
 const FALLBACK_THRESHOLD: Thresholds = { approveBelow: 0.2, rejectAtOrAbove: 0.9 };
 
-/** A stored kind, else the registry default. Kinds are an open map, so an entry can be absent. */
+/** A stored kind, else the Foundation default. This file is a client component, so it cannot import the settings module's values. */
 function threshold(values: SettingValues, kind: string): Thresholds {
-  return (
-    values['trust.thresholds'][kind] ??
-    SETTING_DEFAULTS['trust.thresholds'][kind] ??
-    FALLBACK_THRESHOLD
-  );
+  return values['trust.thresholds'][kind] ?? FALLBACK_THRESHOLD;
 }
 
 /** One setting's form: its fields, a Save button and the result. */
