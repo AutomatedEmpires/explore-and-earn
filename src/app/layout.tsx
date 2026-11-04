@@ -1,3 +1,4 @@
+import { ClerkProvider } from '@clerk/nextjs';
 import type { Metadata } from 'next';
 import { Figtree } from 'next/font/google';
 import { connection } from 'next/server';
@@ -19,7 +20,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   await connection();
   return (
     <html lang="en" className={figtree.variable}>
-      <body className="font-sans">{children}</body>
+      <body className="font-sans">
+        {/* `dynamic` renders Clerk's scripts per request, with the CSP nonce (x-nonce). */}
+        <ClerkProvider dynamic>{children}</ClerkProvider>
+      </body>
     </html>
   );
 }

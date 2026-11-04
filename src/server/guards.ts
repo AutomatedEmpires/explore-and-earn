@@ -8,6 +8,7 @@
 // /admin/passkey and a user who hasn't onboarded to /onboarding.
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { getDb } from '@/lib/db';
+import { getEnv } from '@/lib/env';
 import { forbidden, unauthorized } from '@/lib/errors';
 import {
   evaluateHostAccess,
@@ -142,7 +143,11 @@ export async function requireOperator(opts?: {
 }): Promise<OperatorContext> {
   const user = await requireUser();
   const operator = user.accountType === 'operator' ? await getOperator(getDb(), user.id) : null;
-  const hasPasskey = operator ? userHasPasskey(await clerkUserJson()) : false;
+  // ALLOW_OPERATOR_WITHOUT_PASSKEY (never in prod, src/lib/env.ts) is for Clerk development
+  // instances where passkeys are not enabled, such as keyless mode in local and e2e runs.
+  const hasPasskey = operator
+    ? getEnv().ALLOW_OPERATOR_WITHOUT_PASSKEY || userHasPasskey(await clerkUserJson())
+    : false;
 
   const access = evaluateOperatorAccess({ operator, hasPasskey, queue: opts?.queue });
   if (!operator) throw deny('Operators only', { reason: 'not_an_operator' });

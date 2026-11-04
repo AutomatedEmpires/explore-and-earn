@@ -132,6 +132,28 @@ describe('parseEnv', () => {
     expect(() => parseEnv({ ...dev, JOBS_SECRET: 'short' })).toThrow(/JOBS_SECRET/);
     expect(() => parseEnv({ ...dev, UNSUBSCRIBE_SECRET: 'short' })).toThrow(/UNSUBSCRIBE_SECRET/);
   });
+
+  it('keeps the operator passkey requirement unless ALLOW_OPERATOR_WITHOUT_PASSKEY=true', () => {
+    expect(parseEnv(dev).ALLOW_OPERATOR_WITHOUT_PASSKEY).toBe(false);
+    expect(parseEnv({ ...dev, ALLOW_OPERATOR_WITHOUT_PASSKEY: 'false' })).toMatchObject({
+      ALLOW_OPERATOR_WITHOUT_PASSKEY: false,
+    });
+    expect(parseEnv({ ...dev, ALLOW_OPERATOR_WITHOUT_PASSKEY: 'true' })).toMatchObject({
+      ALLOW_OPERATOR_WITHOUT_PASSKEY: true,
+    });
+    expect(() => parseEnv({ ...dev, ALLOW_OPERATOR_WITHOUT_PASSKEY: 'yes' })).toThrow(
+      /ALLOW_OPERATOR_WITHOUT_PASSKEY/,
+    );
+  });
+
+  it('refuses ALLOW_OPERATOR_WITHOUT_PASSKEY=true in prod', () => {
+    expect(() => parseEnv({ ...prod, ALLOW_OPERATOR_WITHOUT_PASSKEY: 'true' })).toThrow(
+      'ALLOW_OPERATOR_WITHOUT_PASSKEY is not allowed in prod',
+    );
+    expect(parseEnv({ ...prod, ALLOW_OPERATOR_WITHOUT_PASSKEY: 'false' })).toMatchObject({
+      ALLOW_OPERATOR_WITHOUT_PASSKEY: false,
+    });
+  });
 });
 
 describe('getEnv', () => {

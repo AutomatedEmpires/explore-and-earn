@@ -52,6 +52,13 @@ const schema = z
     // Monitoring
     SENTRY_DSN: optional,
     NEXT_PUBLIC_POSTHOG_KEY: optional,
+
+    // Operators need a passkey (spec section 3). `true` lifts that for local and e2e runs on a
+    // Clerk development instance without passkeys enabled (keyless mode); refused in prod.
+    ALLOW_OPERATOR_WITHOUT_PASSKEY: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
   })
   .superRefine((env, ctx) => {
     const need = (key: keyof typeof env, because: string) => {
@@ -96,6 +103,13 @@ const schema = z
             message: `Stub provider not allowed in prod: ${name}`,
           });
         }
+      }
+      if (env.ALLOW_OPERATOR_WITHOUT_PASSKEY) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['ALLOW_OPERATOR_WITHOUT_PASSKEY'],
+          message: 'ALLOW_OPERATOR_WITHOUT_PASSKEY is not allowed in prod',
+        });
       }
     }
   });
