@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { hostPage, notFoundInProd } from '@/server/shell';
-import { Megaphone } from '@/ui/icons';
+import { hostNavIcons } from '@/ui/nav-icons';
 import { Placeholder } from '@/ui/patterns/Placeholder';
 
 export const metadata: Metadata = { title: 'Promote · Explore&Earn' };
@@ -13,7 +13,7 @@ export default async function PromotePage() {
       title="Promote"
       subProject={6}
       name="Paid add-ons"
-      icon={Megaphone}
+      icon={hostNavIcons.promote}
       description="Boosts, announcements and your credits."
     />
   );

@@ -1,16 +1,20 @@
 'use client';
 
 // The host workspace shell (product spec section 15.2):
-// - desktop: a sidebar with the organization switcher above Home ... Settings;
-// - phones: a top bar with the organization's logo and bottom tabs Home, Applicants, Messages,
-//   Listings and More.
+// - desktop: a sidebar with the organization switcher above Home ... Settings, and the account
+//   menu and Notifications below;
+// - phones: the top bar of the design system's top bar options (the wordmark, then
+//   Notifications and the organization's logo, which opens the switcher) and bottom tabs Home,
+//   Applicants, Messages, Listings and More. The account (settings, sign out) is on More.
 // Until an Owner or Admin sets up a passkey or two-step sign-in, the shell is `locked`: only the
 // top bar and the security screen, with no way into the rest of the workspace.
 import { UserButton, useOrganizationList } from '@clerk/nextjs';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { useLiveCounts } from '@/app/_components/useLiveCounts';
 import {
   BottomNav,
+  IconLink,
   OrgSwitcher,
   Sidebar,
   Skeleton,
@@ -20,9 +24,16 @@ import {
   type OrgOption,
   type SidebarItem,
 } from '@/ui/components';
-import { Ellipsis } from '@/ui/icons';
+import { hostNavIcons } from '@/ui/nav-icons';
 import { SkipLink } from '@/ui/patterns/SkipLink';
-import { HOST_MORE, HOST_MORE_HREF, HOST_NAV, HOST_TAB_HREFS, isHostCurrent } from './nav';
+import {
+  HOST_MORE,
+  HOST_MORE_HREF,
+  HOST_NAV,
+  HOST_NOTIFICATIONS_HREF,
+  HOST_TAB_HREFS,
+  isHostCurrent,
+} from './nav';
 
 export type HostShellOrg = {
   /** The organization the server is showing (Clerk's ID). */
@@ -62,14 +73,37 @@ function HostOrgSwitcher({ org, compact = false }: { org: HostShellOrg; compact?
   );
 }
 
+function withCount(label: string, count: number): string {
+  return count > 0 ? `${label}, ${count} unread` : label;
+}
+
+function NotificationsLink({ count, current }: { count: number; current: boolean }) {
+  return (
+    <IconLink
+      href={HOST_NOTIFICATIONS_HREF}
+      label={withCount('Notifications', count)}
+      icon={hostNavIcons.notifications}
+      badge={count}
+      current={current}
+    />
+  );
+}
+
 export type HostShellProps = {
   /** Null while the workspace is locked behind strong sign-in. */
   org: HostShellOrg | null;
+  /** Unread notifications when the page was rendered. */
+  initialNotifications?: number;
   children: ReactNode;
 };
 
-export function HostShell({ org, children }: HostShellProps) {
+export function HostShell({ org, initialNotifications = 0, children }: HostShellProps) {
   const pathname = usePathname();
+  // The unread count, kept live as in the seeker top bar (not while the workspace is locked).
+  const { notifications } = useLiveCounts(org !== null, {
+    inbox: 0,
+    notifications: initialNotifications,
+  });
 
   if (!org) {
     return (
@@ -94,6 +128,7 @@ export function HostShell({ org, children }: HostShellProps) {
   }
 
   const current = (href: string) => isHostCurrent(pathname, href);
+  const notificationsCurrent = current(HOST_NOTIFICATIONS_HREF);
   const items: SidebarItem[] = HOST_NAV.map((item) => ({ ...item, current: current(item.href) }));
   const tabs: NavItem[] = [
     ...HOST_TAB_HREFS.flatMap((href) => {
@@ -103,7 +138,7 @@ export function HostShell({ org, children }: HostShellProps) {
     {
       href: HOST_MORE_HREF,
       label: 'More',
-      icon: Ellipsis,
+      icon: hostNavIcons.more,
       current: current(HOST_MORE_HREF) || HOST_MORE.some((item) => current(item.href)),
     },
   ];
@@ -122,20 +157,21 @@ export function HostShell({ org, children }: HostShellProps) {
         }
         items={items}
         footer={
-          <div className="flex min-h-11 items-center border-t border-line px-1 pt-3">
+          <div className="flex min-h-11 items-center justify-between gap-2 border-t border-line px-1 pt-3">
             <UserButton showName />
+            <NotificationsLink count={notifications} current={notificationsCurrent} />
           </div>
         }
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
           className="sticky top-0 z-30 border-b border-line md:hidden"
-          start={<HostOrgSwitcher org={org} compact />}
           brand={<Wordmark href="/host" />}
           actions={
-            <div className="flex size-11 items-center justify-center">
-              <UserButton />
-            </div>
+            <>
+              <NotificationsLink count={notifications} current={notificationsCurrent} />
+              <HostOrgSwitcher org={org} compact />
+            </>
           }
         />
         <main

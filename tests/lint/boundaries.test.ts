@@ -9,8 +9,11 @@ const fixture = (name: string) => path.join(root, 'tests/lint/fixtures', name);
 
 let eslint: ESLint;
 
-beforeAll(() => {
+beforeAll(async () => {
   eslint = new ESLint({ cwd: root });
+  // The first lint loads the config, its plugins and parsers. Under the full suite's parallel
+  // load that can outlast a test's 30 s, so it happens here, within the 60 s hook timeout.
+  await eslint.lintText('export {};', { filePath: path.join(root, 'src/app/warm-up.ts') });
 });
 
 /** Lints a fixture's text as if it lived at `filePath`, so the real config globs apply. */

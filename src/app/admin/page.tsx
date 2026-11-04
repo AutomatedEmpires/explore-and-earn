@@ -5,7 +5,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getDb } from '@/lib/db';
 import { searchAudit } from '@/modules/audit';
-import { listReviewItems, queueCounts } from '@/modules/operator';
+import { coversQueue, listReviewItems, queueCounts } from '@/modules/operator';
 import { Button, EmptyState, StatTile } from '@/ui/components';
 import { CircleAlert, CircleCheck, Clock, Inbox, ListChecks, TriangleAlert } from '@/ui/icons';
 import {
@@ -20,6 +20,7 @@ import {
   thClass,
   TimeAgo,
 } from './_components/parts';
+import { itemViewer } from './_lib/access';
 import { QUEUE_DESCRIPTION, QUEUE_LABEL, subjectLabel } from './_lib/format';
 import { requireConsoleOperator } from './_lib/session';
 
@@ -32,11 +33,13 @@ function alertText(data: Record<string, unknown> | null): { message: string; cri
 
 export default async function ConsoleHome() {
   const operator = await requireConsoleOperator();
+  const viewer = itemViewer(operator);
   const db = getDb();
   const now = new Date();
   const counts = await queueCounts(db, now);
   const mine = await listReviewItems(db, {
     assigneeId: operator.user.id,
+    visibleTo: viewer,
     status: 'unresolved',
     limit: 8,
   });
@@ -94,13 +97,21 @@ export default async function ConsoleHome() {
                 {counts.map((c) => (
                   <tr key={c.queue}>
                     <th scope="row" className={`${tdClass} font-normal`}>
-                      <Link
-                        href={`/queues?queue=${c.queue}`}
-                        className="inline-flex min-h-11 flex-col justify-center rounded-sm text-ink no-underline hover:underline"
-                      >
-                        <span className="text-15 font-semibold">{QUEUE_LABEL[c.queue]}</span>
-                        <span className="text-13 text-muted">{QUEUE_DESCRIPTION[c.queue]}</span>
-                      </Link>
+                      {/* Only a queue the operator covers has a page to open. */}
+                      {coversQueue(viewer, c.queue) ? (
+                        <Link
+                          href={`/queues?queue=${c.queue}`}
+                          className="inline-flex min-h-11 flex-col justify-center rounded-sm text-ink no-underline hover:underline"
+                        >
+                          <span className="text-15 font-semibold">{QUEUE_LABEL[c.queue]}</span>
+                          <span className="text-13 text-muted">{QUEUE_DESCRIPTION[c.queue]}</span>
+                        </Link>
+                      ) : (
+                        <span className="inline-flex min-h-11 flex-col justify-center text-ink-2">
+                          <span className="text-15 font-semibold">{QUEUE_LABEL[c.queue]}</span>
+                          <span className="text-13 text-muted">{QUEUE_DESCRIPTION[c.queue]}</span>
+                        </span>
+                      )}
                     </th>
                     <td className={`${tdClass} text-right tabular-nums`}>{c.open}</td>
                     <td className={`${tdClass} text-right tabular-nums`}>{c.assigned}</td>
@@ -200,7 +211,7 @@ export default async function ConsoleHome() {
                               {' · '}
                               <Link
                                 href={`/queues/${alert.subjectId}`}
-                                className="text-ink underline underline-offset-2"
+                                className="inline-flex min-h-11 items-center text-ink underline underline-offset-2"
                               >
                                 Open the item
                               </Link>

@@ -260,6 +260,12 @@ test.describe('Operator console', () => {
       await visit(page, '/');
       await expect(page).toHaveURL(/\/passkey$/);
       await expect(page.getByRole('heading', { name: 'Add a passkey' })).toBeVisible();
+      // An operator who cannot add one on this device can still leave.
+      const signOut = page.getByRole('banner').getByRole('button', { name: 'Sign out' });
+      await expect(signOut).toBeVisible();
+      await expect(signOut).toBeEnabled();
+      await signOut.focus();
+      await expect(signOut).toBeFocused();
       await addPasskey(page);
     }
 
@@ -286,6 +292,9 @@ test.describe('Operator console', () => {
     await visit(page, '/queues?queue=moderation');
     const row = page.getByRole('row').filter({ has: page.locator(`a[href="/queues/${itemId}"]`) });
     await expect(row).toBeVisible();
+    // The row's way into the item is a full touch target (plan, Global Constraints: 44 px).
+    const itemLink = row.locator(`a[href="/queues/${itemId}"]`);
+    expect((await itemLink.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
 
     // Claim, note, approve.
     await visit(page, `/queues/${itemId}`);

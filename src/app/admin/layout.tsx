@@ -3,13 +3,15 @@
 // proxy rewrites admin.<domain>/x to /admin/x and answers 404 for /admin anywhere else.
 //
 // Only operators see it. Everyone else is sent to sign in or gets a 404 (see consoleViewer);
-// an operator without a passkey gets a bare frame, for the passkey page. Each page checks the
-// operator again itself, since a layout is not re-run on every navigation.
+// an operator without a passkey gets a bare frame, for the passkey page, with Sign out for one
+// who cannot add a passkey on this device. Each page checks the operator again itself, since a
+// layout is not re-run on every navigation.
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { getEnv } from '@/lib/env';
 import { Badge, Wordmark } from '@/ui/components';
 import { ConsoleNav } from './_components/ConsoleNav';
+import { ConsoleSignOut } from './_components/ConsoleSignOut';
 import { consoleViewer } from './_lib/session';
 
 export const metadata: Metadata = {
@@ -23,11 +25,14 @@ export default async function AdminLayout({ children }: Readonly<{ children: Rea
   if (viewer.state === 'needs_passkey') {
     return (
       <div className="flex min-h-dvh flex-col">
-        <header className="flex h-14 items-center gap-2 border-b border-line px-4">
-          <Wordmark />
-          <Badge size="sm" tone="inverse">
-            Operator
-          </Badge>
+        <header className="flex h-14 items-center justify-between gap-2 border-b border-line pr-2 pl-4">
+          <div className="flex min-w-0 items-center gap-2">
+            <Wordmark />
+            <Badge size="sm" tone="inverse">
+              Operator
+            </Badge>
+          </div>
+          <ConsoleSignOut />
         </header>
         <main id="main" className="mx-auto w-full max-w-xl flex-1 px-4 py-10">
           {children}

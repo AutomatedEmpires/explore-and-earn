@@ -190,7 +190,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Search
                               event.subjectType === 'review_item' ? (
                                 <Link
                                   href={`/queues/${event.subjectId}`}
-                                  className="font-mono text-13 text-ink-2 underline underline-offset-2"
+                                  className="inline-flex min-h-11 items-center font-mono text-13 break-all text-ink-2 underline underline-offset-2"
                                 >
                                   {event.subjectId}
                                 </Link>

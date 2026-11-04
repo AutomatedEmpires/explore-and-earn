@@ -5,20 +5,8 @@
 // a host, in light and dark.
 import { useState } from 'react';
 import { IconButton, Input, OrgSwitcher, Sheet, TopBar, type TopBarRole } from '@/ui/components';
-import {
-  Bell,
-  Briefcase,
-  ChevronRight,
-  House,
-  Inbox,
-  Menu,
-  MessageSquare,
-  Search,
-  Settings,
-  User,
-  Users,
-  type IconComponent,
-} from '@/ui/icons';
+import { ChevronRight, Menu, Search, type IconComponent } from '@/ui/icons';
+import { hostNavIcons as host, seekerNavIcons as seeker } from '@/ui/nav-icons';
 import { themes, type Theme } from '@/ui/tokens';
 import { hostOrgs } from '../_gallery/samples';
 
@@ -49,19 +37,19 @@ type MenuLink = { label: string; icon: IconComponent; detail?: string };
 
 const menuLinks: Record<'seeker' | 'host', MenuLink[]> = {
   seeker: [
-    { label: 'Community', icon: Users },
-    { label: 'Inbox', icon: MessageSquare, detail: '2 unread' },
-    { label: 'Notifications', icon: Bell },
-    { label: 'Profile', icon: User },
-    { label: 'Settings', icon: Settings },
+    { label: 'Community', icon: seeker.community },
+    { label: 'Inbox', icon: seeker.inbox, detail: '2 unread' },
+    { label: 'Notifications', icon: seeker.notifications },
+    { label: 'Profile', icon: seeker.profile },
+    { label: 'Settings', icon: seeker.settings },
   ],
   host: [
-    { label: 'Home', icon: House },
-    { label: 'Applicants', icon: Inbox },
-    { label: 'Messages', icon: MessageSquare, detail: '3 unread' },
-    { label: 'Listings', icon: Briefcase },
-    { label: 'Notifications', icon: Bell },
-    { label: 'Settings', icon: Settings },
+    { label: 'Home', icon: host.home },
+    { label: 'Applicants', icon: host.applicants },
+    { label: 'Messages', icon: host.messages, detail: '3 unread' },
+    { label: 'Listings', icon: host.listings },
+    { label: 'Notifications', icon: host.notifications },
+    { label: 'Settings', icon: host.settings },
   ],
 };
 
@@ -103,7 +91,7 @@ function HostSwitcher() {
 
 function Bar({ option, role }: { option: BarOption; role: 'seeker' | 'host' }) {
   const badge: TopBarRole | undefined = option === 'icons' ? undefined : role;
-  const inbox = <IconButton icon={MessageSquare} label="Inbox, 2 unread" badge={2} />;
+  const inbox = <IconButton icon={seeker.inbox} label="Inbox, 2 unread" badge={2} />;
   if (option === 'menu') {
     return (
       <TopBar
@@ -120,13 +108,13 @@ function Bar({ option, role }: { option: BarOption; role: 'seeker' | 'host' }) {
       actions={
         role === 'seeker' ? (
           <>
-            <IconButton icon={Users} label="Community" />
+            <IconButton icon={seeker.community} label="Community" />
             {inbox}
-            <IconButton icon={Bell} label="Notifications" />
+            <IconButton icon={seeker.notifications} label="Notifications" />
           </>
         ) : (
           <>
-            <IconButton icon={Bell} label="Notifications" />
+            <IconButton icon={host.notifications} label="Notifications" />
             <HostSwitcher />
           </>
         )

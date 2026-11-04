@@ -47,8 +47,16 @@ const HOST_DESKTOP = [
   '/host/team',
   '/host/billing',
   '/host/settings',
+  '/host/notifications',
 ];
-const HOST_MOBILE = ['/host', '/host/applicants', '/host/messages', '/host/listings', '/host/more'];
+const HOST_MOBILE = [
+  '/host/notifications',
+  '/host',
+  '/host/applicants',
+  '/host/messages',
+  '/host/listings',
+  '/host/more',
+];
 
 // --- Clerk -----------------------------------------------------------------------------------
 

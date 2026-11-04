@@ -34,6 +34,11 @@ vi.mock('@clerk/nextjs', () => ({
   }),
 }));
 
+// The live counts need a server; start from (and keep) the layout's count.
+vi.mock('@/app/_components/useLiveCounts', () => ({
+  useLiveCounts: (_enabled: boolean, initial: unknown) => initial,
+}));
+
 const { HostShell } = await import('./HostShell');
 
 const ORG = { clerkOrgId: 'org_1', roleLabel: 'Owner' };
@@ -50,7 +55,11 @@ beforeEach(() => {
 
 describe('HostShell', () => {
   it('lists the sidebar in the order of product spec section 15.2', () => {
-    render(<HostShell org={ORG}>page</HostShell>);
+    render(
+      <HostShell org={ORG} initialNotifications={0}>
+        page
+      </HostShell>,
+    );
     const [sidebar] = screen.getAllByRole('navigation', { name: 'Host' });
     if (!sidebar) throw new Error('no sidebar');
     expect(links(sidebar)).toEqual([
@@ -74,7 +83,11 @@ describe('HostShell', () => {
   });
 
   it('shows the organization switcher on the current organization', () => {
-    render(<HostShell org={ORG}>page</HostShell>);
+    render(
+      <HostShell org={ORG} initialNotifications={0}>
+        page
+      </HostShell>,
+    );
     // Named by its text (WCAG 2.5.3), so the sidebar's also reads the role label after the name.
     expect(
       screen.getAllByRole('button', {
@@ -85,7 +98,11 @@ describe('HostShell', () => {
   });
 
   it('gives phones Home, Applicants, Messages, Listings and More', () => {
-    render(<HostShell org={ORG}>page</HostShell>);
+    render(
+      <HostShell org={ORG} initialNotifications={0}>
+        page
+      </HostShell>,
+    );
     const tabs = screen.getAllByRole('navigation', { name: 'Host' }).at(-1);
     if (!tabs) throw new Error('no tabs');
     expect(links(tabs)).toEqual(['Home', 'Applicants', 'Messages', 'Listings', 'More']);
@@ -93,7 +110,11 @@ describe('HostShell', () => {
 
   it('marks More as current on a section that is not a tab', () => {
     nav.pathname = '/host/team';
-    render(<HostShell org={ORG}>page</HostShell>);
+    render(
+      <HostShell org={ORG} initialNotifications={0}>
+        page
+      </HostShell>,
+    );
     const [sidebar, tabs] = screen.getAllByRole('navigation', { name: 'Host' });
     if (!sidebar || !tabs) throw new Error('no navigation');
     expect(within(sidebar).getByRole('link', { name: 'Team' })).toHaveAttribute(
@@ -105,6 +126,40 @@ describe('HostShell', () => {
       'page',
     );
     expect(within(tabs).getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('builds the phone top bar like the top bar options: wordmark, Notifications, organization', () => {
+    render(
+      <HostShell org={ORG} initialNotifications={3}>
+        page
+      </HostShell>,
+    );
+    const bar = screen.getByRole('banner');
+    const controls = [...bar.querySelectorAll('a, button')].map(
+      (el) => el.getAttribute('aria-label') ?? el.textContent?.trim() ?? '',
+    );
+    expect(controls).toHaveLength(3);
+    expect(controls[0]).toBe('Explore&Earn');
+    expect(controls[1]).toBe('Notifications, 3 unread');
+    expect(controls[2]).toMatch(/^Switch organization, current: Kettle Ridge Lodge/);
+    expect(within(bar).getByRole('link', { name: /^Notifications/ })).toHaveAttribute(
+      'href',
+      '/host/notifications',
+    );
+    // The account menu is on the More page (and the desktop sidebar), not in the phone bar.
+    expect(within(bar).queryByRole('button', { name: 'Open user menu' })).not.toBeInTheDocument();
+  });
+
+  it('marks Notifications as current on the notifications page', () => {
+    nav.pathname = '/host/notifications';
+    render(
+      <HostShell org={ORG} initialNotifications={0}>
+        page
+      </HostShell>,
+    );
+    for (const link of screen.getAllByRole('link', { name: 'Notifications' })) {
+      expect(link).toHaveAttribute('aria-current', 'page');
+    }
   });
 
   it('shows only the page and a top bar while strong sign-in is missing', () => {

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { hostPage, notFoundInProd } from '@/server/shell';
-import { Bookmark } from '@/ui/icons';
+import { hostNavIcons } from '@/ui/nav-icons';
 import { Placeholder } from '@/ui/patterns/Placeholder';
 
 export const metadata: Metadata = { title: 'Candidates · Explore&Earn' };
@@ -13,7 +13,7 @@ export default async function CandidatesPage() {
       title="Candidates"
       subProject={5}
       name="Host hiring"
-      icon={Bookmark}
+      icon={hostNavIcons.candidates}
       description="Candidate pools, and seekers you can invite to apply."
     />
   );

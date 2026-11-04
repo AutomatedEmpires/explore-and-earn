@@ -1,6 +1,8 @@
 // One review item (spec section 12): a preview of the subject, the AI's reason and confidence,
 // the decisions, internal notes with @mentions, escalate and hand off, and a decision waiting
-// for a second sign-off.
+// for a second sign-off. It opens only for operators covering the item's queue (Owners cover
+// every queue), and for anyone who could give a waiting second sign-off (mayOpenItem); for
+// everyone else it does not exist.
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -8,12 +10,13 @@ import { getDb } from '@/lib/db';
 import { searchAudit } from '@/modules/audit';
 import { getMediaUrl, getStorage } from '@/modules/media';
 import {
+  coversQueue,
   getReviewItem,
   listOperators,
+  mayOpenItem,
   mediaSubject,
   testItemText,
   type ItemDetail,
-  type OperatorSummary,
 } from '@/modules/operator';
 import { getSetting } from '@/modules/settings';
 import type { OperatorContext } from '@/server/guards';
@@ -45,15 +48,12 @@ import {
   shortId,
   subjectLabel,
 } from '../../_lib/format';
+import { itemViewer } from '../../_lib/access';
 import { requireConsoleOperator } from '../../_lib/session';
 
 export const metadata: Metadata = { title: 'Review item' };
 
 type Params = Promise<{ id: string }>;
-
-function covers(op: Pick<OperatorSummary, 'role' | 'queues'>, queue: ItemDetail['queue']) {
-  return op.role === 'owner' || op.queues.includes(queue);
-}
 
 async function SubjectPreview({ item, operator }: { item: ItemDetail; operator: OperatorContext }) {
   const db = getDb();
@@ -130,6 +130,8 @@ export default async function ReviewItemPage({ params }: { params: Params }) {
   const db = getDb();
   const item = await getReviewItem(db, id);
   if (!item) notFound();
+  const viewer = itemViewer(operator);
+  if (!mayOpenItem(viewer, item)) notFound();
 
   const operators = await listOperators(db);
   const signOffCents = await getSetting(db, 'ops.second_signoff_refund_cents');
@@ -144,10 +146,11 @@ export default async function ReviewItemPage({ params }: { params: Params }) {
   const names = new Map(operators.map((o) => [o.userId, o.name]));
   const pending = item.actions.find((a) => a.status === 'pending_second');
   const resolved = item.status === 'resolved';
-  const mayAct = operator.role === 'owner' || operator.queues.includes(item.queue);
+  // Opened for a second sign-off from outside the queue, the item is read-only otherwise.
+  const mayAct = coversQueue(viewer, item.queue);
   const heldByOther = item.assigneeId !== null && item.assigneeId !== me;
   const mayDecide = mayAct && !resolved && !pending && (!heldByOther || operator.role === 'owner');
-  const coverage = operators.filter((o) => covers(o, item.queue));
+  const coverage = operators.filter((o) => coversQueue(o, item.queue));
   const checkThresholds =
     item.check && (item.check.kind === 'text_safety' || item.check.kind === 'image_safety')
       ? thresholds[item.check.kind]
@@ -156,7 +159,11 @@ export default async function ReviewItemPage({ params }: { params: Params }) {
   return (
     <>
       <PageHeader
-        back={{ href: `/queues?queue=${item.queue}`, label: `${QUEUE_LABEL[item.queue]} queue` }}
+        back={
+          mayAct
+            ? { href: `/queues?queue=${item.queue}`, label: `${QUEUE_LABEL[item.queue]} queue` }
+            : { href: '/queues', label: 'Review queues' }
+        }
         title={`${subjectLabel(item.subjectType)} review`}
         description={
           <span className="flex flex-wrap items-center gap-2">
@@ -311,7 +318,8 @@ export default async function ReviewItemPage({ params }: { params: Params }) {
               {mayAct && !resolved ? (
                 <NoteForm
                   itemId={item.id}
-                  operators={operators
+                  // Mention only operators who can open the item.
+                  operators={coverage
                     .filter((o) => o.userId !== me)
                     .map((o) => ({ userId: o.userId, name: o.name }))}
                 />
@@ -361,7 +369,7 @@ export default async function ReviewItemPage({ params }: { params: Params }) {
                           value: (
                             <Link
                               href={`/queues/${item.originalItemId}`}
-                              className="text-ink underline underline-offset-2"
+                              className="inline-flex min-h-11 items-center text-ink underline underline-offset-2"
                             >
                               Item {shortId(item.originalItemId)}
                             </Link>

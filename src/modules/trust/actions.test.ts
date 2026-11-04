@@ -31,6 +31,10 @@ let t: TestDb;
 
 beforeAll(async () => {
   t = await createTestDb();
+  // A decision on a subject type nobody has registered loads every module through the job
+  // handler registry (findSubjectHandler). Compiling that graph inside a test can outlast its
+  // 30 s under the full suite's parallel load, so it is loaded here, within the hook timeout.
+  await import('@/server/job-handlers');
 });
 
 afterAll(async () => {

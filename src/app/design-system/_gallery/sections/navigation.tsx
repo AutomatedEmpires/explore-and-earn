@@ -13,78 +13,61 @@ import {
   type SidebarItem,
 } from '@/ui/components';
 import {
-  Bell,
-  Briefcase,
-  ChartColumn,
-  Compass,
-  CreditCard,
-  GalleryHorizontal,
-  House,
-  Inbox,
-  ListChecks,
-  Map as MapIcon,
-  Megaphone,
-  Menu,
-  MessageSquare,
-  Search,
-  Settings,
-  ShieldCheck,
-  Store,
-  User,
-  Users,
-  CalendarDays,
-} from '@/ui/icons';
+  hostNavIcons as host,
+  operatorNavIcons as operator,
+  seekerNavIcons as seeker,
+} from '@/ui/nav-icons';
 import { hostOrgs, img } from '../samples';
 import { ForceFocus, Section, Specimen } from '../Specimen';
 
 const seekerTabs: NavItem[] = [
-  { href: '#seek', label: 'Seek', icon: Compass, current: true },
-  { href: '#swipe', label: 'Swipe', icon: GalleryHorizontal },
-  { href: '#map', label: 'Map', icon: MapIcon },
-  { href: '#profile', label: 'Profile', icon: User, attention: true },
+  { href: '#seek', label: 'Seek', icon: seeker.seek, current: true },
+  { href: '#swipe', label: 'Swipe', icon: seeker.swipe },
+  { href: '#map', label: 'Map', icon: seeker.map },
+  { href: '#profile', label: 'Profile', icon: seeker.profile, attention: true },
 ];
 
 const hostTabs: NavItem[] = [
-  { href: '#home', label: 'Home', icon: House },
-  { href: '#applicants', label: 'Applicants', icon: Inbox, current: true },
-  { href: '#messages', label: 'Messages', icon: MessageSquare, attention: true },
-  { href: '#listings', label: 'Listings', icon: Briefcase },
-  { href: '#more', label: 'More', icon: Menu },
+  { href: '#home', label: 'Home', icon: host.home },
+  { href: '#applicants', label: 'Applicants', icon: host.applicants, current: true },
+  { href: '#messages', label: 'Messages', icon: host.messages, attention: true },
+  { href: '#listings', label: 'Listings', icon: host.listings },
+  { href: '#more', label: 'More', icon: host.more },
 ];
 
 /** Product spec section 15.2, in order. */
 export const hostSidebarItems: SidebarItem[] = [
-  { href: '#home', label: 'Home', icon: House },
+  { href: '#home', label: 'Home', icon: host.home },
   {
     href: '#listings',
     label: 'Listings',
-    icon: Briefcase,
+    icon: host.listings,
     children: [
       { href: '#listings-active', label: 'Active', current: true },
       { href: '#listings-drafts', label: 'Drafts' },
       { href: '#listings-library', label: 'Library' },
     ],
   },
-  { href: '#applicants', label: 'Applicants', icon: Inbox, count: 8 },
-  { href: '#candidates', label: 'Candidates', icon: Search },
-  { href: '#interviews', label: 'Interviews', icon: CalendarDays },
-  { href: '#messages', label: 'Messages', icon: MessageSquare, count: 3 },
-  { href: '#promote', label: 'Promote', icon: Megaphone },
-  { href: '#analytics', label: 'Analytics', icon: ChartColumn },
-  { href: '#host-page', label: 'Host page', icon: Store },
-  { href: '#team', label: 'Team', icon: Users },
-  { href: '#billing', label: 'Billing', icon: CreditCard },
-  { href: '#settings', label: 'Settings', icon: Settings },
+  { href: '#applicants', label: 'Applicants', icon: host.applicants, count: 8 },
+  { href: '#candidates', label: 'Candidates', icon: host.candidates },
+  { href: '#interviews', label: 'Interviews', icon: host.interviews },
+  { href: '#messages', label: 'Messages', icon: host.messages, count: 3 },
+  { href: '#promote', label: 'Promote', icon: host.promote },
+  { href: '#analytics', label: 'Analytics', icon: host.analytics },
+  { href: '#host-page', label: 'Host page', icon: host.hostPage },
+  { href: '#team', label: 'Team', icon: host.team },
+  { href: '#billing', label: 'Billing', icon: host.billing },
+  { href: '#settings', label: 'Settings', icon: host.settings },
 ];
 
 /** Foundation spec section 11. */
 const operatorSidebarItems: SidebarItem[] = [
-  { href: '#console-home', label: 'Home', icon: House, current: true },
-  { href: '#queues', label: 'Review queues', icon: ListChecks, count: 4 },
-  { href: '#users', label: 'Users & orgs', icon: Users },
-  { href: '#audit', label: 'Audit log', icon: ShieldCheck },
-  { href: '#operators', label: 'Operators', icon: User },
-  { href: '#console-settings', label: 'Settings', icon: Settings },
+  { href: '#console-home', label: 'Home', icon: operator.home, current: true },
+  { href: '#queues', label: 'Review queues', icon: operator.queues, count: 4 },
+  { href: '#users', label: 'Users & orgs', icon: operator.users },
+  { href: '#audit', label: 'Audit log', icon: operator.audit },
+  { href: '#operators', label: 'Operators', icon: operator.operators },
+  { href: '#console-settings', label: 'Settings', icon: operator.settings },
 ];
 
 function Switcher({ compact = false }: { compact?: boolean }) {
@@ -103,9 +86,9 @@ function Switcher({ compact = false }: { compact?: boolean }) {
 function SeekerActions() {
   return (
     <>
-      <IconButton icon={Users} label="Community" />
-      <IconButton icon={MessageSquare} label="Inbox, 2 unread" badge={2} />
-      <IconButton icon={Bell} label="Notifications" />
+      <IconButton icon={seeker.community} label="Community" />
+      <IconButton icon={seeker.inbox} label="Inbox, 2 unread" badge={2} />
+      <IconButton icon={seeker.notifications} label="Notifications" />
     </>
   );
 }
@@ -144,8 +127,8 @@ export function NavigationSection() {
               ]}
               actions={
                 <>
-                  <IconButton icon={MessageSquare} label="Inbox, 2 unread" badge={2} />
-                  <IconButton icon={Bell} label="Notifications" />
+                  <IconButton icon={seeker.inbox} label="Inbox, 2 unread" badge={2} />
+                  <IconButton icon={seeker.notifications} label="Notifications" />
                   <AccountMenuButton />
                 </>
               }
@@ -174,7 +157,7 @@ export function NavigationSection() {
               className="max-w-sm"
               actions={
                 <>
-                  <IconButton icon={Bell} label="Notifications" />
+                  <IconButton icon={host.notifications} label="Notifications" />
                   <Switcher compact />
                 </>
               }

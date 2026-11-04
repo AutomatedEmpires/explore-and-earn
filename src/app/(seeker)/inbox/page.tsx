@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFoundInProd, seekerPage } from '@/server/shell';
-import { Inbox } from '@/ui/icons';
+import { seekerNavIcons } from '@/ui/nav-icons';
 import { Placeholder } from '@/ui/patterns/Placeholder';
 
 export const metadata: Metadata = { title: 'Inbox · Explore&Earn' };
@@ -13,7 +13,7 @@ export default async function InboxPage() {
       title="Inbox"
       subProject={4}
       name="Seeker"
-      icon={Inbox}
+      icon={seekerNavIcons.inbox}
       description="Messages from hosts, job invites and interview invites, all in one place."
     />
   );

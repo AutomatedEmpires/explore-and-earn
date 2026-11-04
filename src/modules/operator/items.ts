@@ -15,7 +15,16 @@ import {
   type ReviewAction,
   type ReviewStatus,
 } from '@/modules/trust';
-import { epochMs, isUuid, personName, requireDate, toArray, toDate, toNumber } from './rows';
+import {
+  epochMs,
+  isUuid,
+  personName,
+  requireDate,
+  textArrayLiteral,
+  toArray,
+  toDate,
+  toNumber,
+} from './rows';
 
 export const REVIEW_STATUSES: readonly ReviewStatus[] = [
   'open',
@@ -37,6 +46,48 @@ export function isStatusFilter(value: unknown): value is StatusFilter {
     value === 'all' ||
     (typeof value === 'string' && (REVIEW_STATUSES as readonly string[]).includes(value))
   );
+}
+
+// --- Access -----------------------------------------------------------------------------------
+
+/** The operator looking at the console: their user id, role and queues (from the guard). */
+export type ItemViewer = {
+  userId: string;
+  role: 'owner' | 'operator';
+  queues: readonly string[];
+};
+
+/** Owners cover every queue; an operator covers the queues assigned to them. */
+export function coversQueue(viewer: Pick<ItemViewer, 'role' | 'queues'>, queue: string): boolean {
+  return viewer.role === 'owner' || viewer.queues.includes(queue);
+}
+
+/**
+ * Whether `viewer` may open a review item. Queue assignment is the console's access boundary:
+ * an item opens for the operators covering its queue (and Owners). One exception follows the
+ * trust module's rule that any operator but a decision's author may give its second sign-off,
+ * whatever queues they cover (trust.approveSecond): a decision waiting for one opens for
+ * everyone who could give it, so it never waits on nobody.
+ */
+export function mayOpenItem(
+  viewer: ItemViewer,
+  item: { queue: string; actions: readonly Pick<ItemAction, 'status' | 'actorId'>[] },
+): boolean {
+  if (coversQueue(viewer, item.queue)) return true;
+  return item.actions.some((a) => a.status === 'pending_second' && a.actorId !== viewer.userId);
+}
+
+/** listReviewItems' version of mayOpenItem, as SQL on `r` (app.review_items). */
+function visibleTo(viewer: ItemViewer): SQL | null {
+  if (viewer.role === 'owner') return null;
+  const awaitingSignOff = isUuid(viewer.userId)
+    ? sql`exists (
+        select 1 from app.review_actions a
+        where a.item_id = r.id and a.status = 'pending_second'
+          and a.actor_operator_id <> ${viewer.userId}::uuid
+      )`
+    : sql`false`;
+  return sql`(r.queue = any(${textArrayLiteral(viewer.queues)}::text[]) or ${awaitingSignOff})`;
 }
 
 // --- Counts -----------------------------------------------------------------------------------
@@ -118,6 +169,8 @@ export type ItemSummary = {
 
 export type ItemFilter = {
   queue?: Queue;
+  /** Only the items this operator may open (see mayOpenItem). */
+  visibleTo?: ItemViewer;
   /** Default `unresolved`. */
   status?: StatusFilter;
   /** Only items held by this operator. */
@@ -193,6 +246,8 @@ export async function listReviewItems(
 
   const where: SQL[] = [];
   if (f.queue) where.push(sql`r.queue = ${f.queue}`);
+  const access = f.visibleTo ? visibleTo(f.visibleTo) : null;
+  if (access) where.push(access);
   if (status === 'unresolved') where.push(sql`r.status <> 'resolved'`);
   else if (status !== 'all') where.push(sql`r.status = ${status}`);
   if (f.assigneeId !== undefined) {

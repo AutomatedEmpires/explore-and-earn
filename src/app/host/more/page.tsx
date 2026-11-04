@@ -1,14 +1,16 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { AccountPanel } from '@/app/_components/AccountPanel';
 import { hostPage } from '@/server/shell';
 import { ChevronRight } from '@/ui/icons';
 import { HOST_MORE } from '../_components/nav';
 
 export const metadata: Metadata = { title: 'More · Explore&Earn' };
 
-// The phone bottom tabs end in "More": every workspace section that isn't a tab.
+// The phone bottom tabs end in "More": every workspace section that isn't a tab, and the
+// account (the phone top bar holds Notifications and the organization, not an avatar menu).
 export default async function HostMorePage() {
-  await hostPage('/host/more');
+  const { user } = await hostPage('/host/more');
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-28 font-extrabold tracking-tight text-ink">More</h1>
@@ -28,6 +30,7 @@ export default async function HostMorePage() {
           ))}
         </ul>
       </nav>
+      <AccountPanel email={user.email} />
     </div>
   );
 }

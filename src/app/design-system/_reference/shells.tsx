@@ -15,26 +15,7 @@ import {
   type SidebarItem,
 } from '@/ui/components';
 import { cn } from '@/ui/cn';
-import {
-  Bell,
-  Briefcase,
-  CalendarDays,
-  ChartColumn,
-  Compass,
-  CreditCard,
-  GalleryHorizontal,
-  House,
-  Inbox,
-  Map as MapIcon,
-  Megaphone,
-  Menu,
-  MessageSquare,
-  Search,
-  Settings,
-  Store,
-  User,
-  Users,
-} from '@/ui/icons';
+import { hostNavIcons as host, seekerNavIcons as seeker } from '@/ui/nav-icons';
 import { hostOrgs, img } from '../_gallery/samples';
 
 export type SeekerPlace = 'seek' | 'swipe' | 'map' | 'profile' | 'community' | null;
@@ -52,9 +33,9 @@ export function SeekerTopBar({ current, className }: { current: SeekerPlace; cla
         ]}
         actions={
           <>
-            <IconButton icon={Users} label="Community" className="md:hidden" />
-            <IconButton icon={MessageSquare} label="Inbox, 2 unread" badge={2} />
-            <IconButton icon={Bell} label="Notifications" />
+            <IconButton icon={seeker.community} label="Community" className="md:hidden" />
+            <IconButton icon={seeker.inbox} label="Inbox, 2 unread" badge={2} />
+            <IconButton icon={seeker.notifications} label="Notifications" />
             <button
               type="button"
               aria-label="Account menu"
@@ -71,10 +52,10 @@ export function SeekerTopBar({ current, className }: { current: SeekerPlace; cla
 
 export function SeekerBottomNav({ current }: { current: SeekerPlace }) {
   const items: NavItem[] = [
-    { href: '#seek', label: 'Seek', icon: Compass, current: current === 'seek' },
-    { href: '#swipe', label: 'Swipe', icon: GalleryHorizontal, current: current === 'swipe' },
-    { href: '#map', label: 'Map', icon: MapIcon, current: current === 'map' },
-    { href: '#profile', label: 'Profile', icon: User, current: current === 'profile' },
+    { href: '#seek', label: 'Seek', icon: seeker.seek, current: current === 'seek' },
+    { href: '#swipe', label: 'Swipe', icon: seeker.swipe, current: current === 'swipe' },
+    { href: '#map', label: 'Map', icon: seeker.map, current: current === 'map' },
+    { href: '#profile', label: 'Profile', icon: seeker.profile, current: current === 'profile' },
   ];
   return <BottomNav label="Main" items={items} className="sticky bottom-0 z-20 md:hidden" />;
 }
@@ -95,7 +76,7 @@ export function HostTopBar() {
       className="md:hidden"
       actions={
         <>
-          <IconButton icon={Bell} label="Notifications" />
+          <IconButton icon={host.notifications} label="Notifications" />
           <HostOrgSwitcher compact />
         </>
       }
@@ -105,17 +86,22 @@ export function HostTopBar() {
 
 export function HostBottomNav({ current }: { current: HostPlace }) {
   const items: NavItem[] = [
-    { href: '#home', label: 'Home', icon: House, current: current === 'home' },
-    { href: '#applicants', label: 'Applicants', icon: Inbox, current: current === 'applicants' },
+    { href: '#home', label: 'Home', icon: host.home, current: current === 'home' },
+    {
+      href: '#applicants',
+      label: 'Applicants',
+      icon: host.applicants,
+      current: current === 'applicants',
+    },
     {
       href: '#messages',
       label: 'Messages',
-      icon: MessageSquare,
+      icon: host.messages,
       current: current === 'messages',
       attention: true,
     },
-    { href: '#listings', label: 'Listings', icon: Briefcase, current: current === 'listings' },
-    { href: '#more', label: 'More', icon: Menu },
+    { href: '#listings', label: 'Listings', icon: host.listings, current: current === 'listings' },
+    { href: '#more', label: 'More', icon: host.more },
   ];
   return <BottomNav label="Host" items={items} className="sticky bottom-0 z-20 md:hidden" />;
 }
@@ -123,30 +109,30 @@ export function HostBottomNav({ current }: { current: HostPlace }) {
 /** Product spec section 15.2, in order. */
 export function HostSidebar({ current }: { current: HostPlace }) {
   const items: SidebarItem[] = [
-    { href: '#home', label: 'Home', icon: House, current: current === 'home' },
-    { href: '#listings', label: 'Listings', icon: Briefcase, current: current === 'listings' },
+    { href: '#home', label: 'Home', icon: host.home, current: current === 'home' },
+    { href: '#listings', label: 'Listings', icon: host.listings, current: current === 'listings' },
     {
       href: '#applicants',
       label: 'Applicants',
-      icon: Inbox,
+      icon: host.applicants,
       count: 8,
       current: current === 'applicants',
     },
-    { href: '#candidates', label: 'Candidates', icon: Search },
-    { href: '#interviews', label: 'Interviews', icon: CalendarDays },
+    { href: '#candidates', label: 'Candidates', icon: host.candidates },
+    { href: '#interviews', label: 'Interviews', icon: host.interviews },
     {
       href: '#messages',
       label: 'Messages',
-      icon: MessageSquare,
+      icon: host.messages,
       count: 3,
       current: current === 'messages',
     },
-    { href: '#promote', label: 'Promote', icon: Megaphone },
-    { href: '#analytics', label: 'Analytics', icon: ChartColumn },
-    { href: '#host-page', label: 'Host page', icon: Store },
-    { href: '#team', label: 'Team', icon: Users },
-    { href: '#billing', label: 'Billing', icon: CreditCard },
-    { href: '#settings', label: 'Settings', icon: Settings },
+    { href: '#promote', label: 'Promote', icon: host.promote },
+    { href: '#analytics', label: 'Analytics', icon: host.analytics },
+    { href: '#host-page', label: 'Host page', icon: host.hostPage },
+    { href: '#team', label: 'Team', icon: host.team },
+    { href: '#billing', label: 'Billing', icon: host.billing },
+    { href: '#settings', label: 'Settings', icon: host.settings },
   ];
   return (
     <Sidebar

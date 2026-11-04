@@ -1,20 +1,12 @@
 'use client';
 
-import { SignOutButton } from '@clerk/nextjs';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import {
-  Avatar,
-  Badge,
-  Button,
-  IconButton,
-  Sheet,
-  Sidebar,
-  TopBar,
-  Wordmark,
-} from '@/ui/components';
+import { Avatar, Badge, IconButton, Sheet, Sidebar, TopBar, Wordmark } from '@/ui/components';
 import type { SidebarItem } from '@/ui/components';
-import { FileText, House, ListChecks, Menu, Settings, ShieldCheck, Users } from '@/ui/icons';
+import { Menu } from '@/ui/icons';
+import { operatorNavIcons as icons } from '@/ui/nav-icons';
+import { ConsoleSignOut } from './ConsoleSignOut';
 import { ShiftSwitch } from './ShiftSwitch';
 
 export type ConsoleNavProps = {
@@ -41,12 +33,12 @@ function navItems(pathname: string, showPlaceholders: boolean): SidebarItem[] {
   const at = (href: string) =>
     href === '/' ? path === '/' : path === href || path.startsWith(`${href}/`);
   const items: SidebarItem[] = [
-    { href: '/', label: 'Home', icon: House },
-    { href: '/queues', label: 'Review queues', icon: ListChecks },
-    ...(showPlaceholders ? [{ href: '/users', label: 'Users & orgs', icon: Users }] : []),
-    { href: '/audit', label: 'Audit log', icon: FileText },
-    { href: '/operators', label: 'Operators', icon: ShieldCheck },
-    { href: '/settings', label: 'Settings', icon: Settings },
+    { href: '/', label: 'Home', icon: icons.home },
+    { href: '/queues', label: 'Review queues', icon: icons.queues },
+    ...(showPlaceholders ? [{ href: '/users', label: 'Users & orgs', icon: icons.users }] : []),
+    { href: '/audit', label: 'Audit log', icon: icons.audit },
+    { href: '/operators', label: 'Operators', icon: icons.operators },
+    { href: '/settings', label: 'Settings', icon: icons.settings },
   ];
   return items.map((item) => ({ ...item, current: at(item.href) }));
 }
@@ -75,11 +67,7 @@ function Account({ operator }: Pick<ConsoleNavProps, 'operator'>) {
         </div>
       </div>
       <ShiftSwitch userId={operator.userId} shiftStatus={operator.shiftStatus} label="On shift" />
-      <SignOutButton redirectUrl="/sign-in">
-        <Button variant="ghost" className="justify-start px-3">
-          Sign out
-        </Button>
-      </SignOutButton>
+      <ConsoleSignOut className="justify-start px-3" />
     </div>
   );
 }

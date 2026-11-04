@@ -5,7 +5,7 @@ import { logger } from '@/lib/logger';
 import { getCounts } from '@/server/counts';
 import { seekerAccess } from '@/server/shell';
 import { SeekerShell } from './_components/SeekerShell';
-import type { Counts } from './_components/useLiveCounts';
+import type { Counts } from '@/app/_components/useLiveCounts';
 
 const NO_COUNTS: Counts = { inbox: 0, notifications: 0 };
 

@@ -2,10 +2,12 @@
 import type { HandlerMap } from '@/modules/jobs';
 
 export {
+  coversQueue,
   getReviewItem,
   isQueue,
   isStatusFilter,
   listReviewItems,
+  mayOpenItem,
   mediaSubject,
   queueCounts,
   REVIEW_STATUSES,
@@ -17,6 +19,7 @@ export {
   type ItemFilter,
   type ItemNote,
   type ItemSummary,
+  type ItemViewer,
   type MediaSubject,
   type QueueCount,
   type StatusFilter,

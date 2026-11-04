@@ -278,8 +278,16 @@ describe('completeOnboarding', () => {
 });
 
 describe('POST /api/v1/onboarding', () => {
+  type Route = typeof import('@/app/api/v1/onboarding/route');
+  let POST: Route['POST'];
+
+  // Loading the route compiles its whole module graph; under the full suite's parallel load
+  // that can outlast a test's 30 s, so it happens here, within the 60 s hook timeout.
+  beforeAll(async () => {
+    ({ POST } = await import('@/app/api/v1/onboarding/route'));
+  });
+
   const post = async (body: unknown) => {
-    const { POST } = await import('@/app/api/v1/onboarding/route');
     return POST(
       new Request('http://localhost:3000/api/v1/onboarding', {
         method: 'POST',
@@ -303,7 +311,6 @@ describe('POST /api/v1/onboarding', () => {
   });
 
   it('returns 400 for a body that is not JSON', async () => {
-    const { POST } = await import('@/app/api/v1/onboarding/route');
     const res = await POST(
       new Request('http://localhost:3000/api/v1/onboarding', {
         method: 'POST',
@@ -326,7 +333,6 @@ describe('POST /api/v1/onboarding', () => {
   });
 
   it('returns 403 for a cross-site request', async () => {
-    const { POST } = await import('@/app/api/v1/onboarding/route');
     const res = await POST(
       new Request('http://localhost:3000/api/v1/onboarding', {
         method: 'POST',

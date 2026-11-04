@@ -10,10 +10,10 @@ import { UserButton } from '@clerk/nextjs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { useLiveCounts, type Counts } from '@/app/_components/useLiveCounts';
 import { BottomNav, Button, IconLink, TopBar, type NavItem } from '@/ui/components';
-import { Bell, GalleryHorizontal, Inbox, Map as MapIcon, Search, User, Users } from '@/ui/icons';
+import { seekerNavIcons as icons } from '@/ui/nav-icons';
 import { SkipLink } from '@/ui/patterns/SkipLink';
-import { useLiveCounts, type Counts } from './useLiveCounts';
 
 function withCount(label: string, count: number): string {
   return count > 0 ? `${label}, ${count} unread` : label;
@@ -25,9 +25,9 @@ function isCurrent(pathname: string, href: string): boolean {
 }
 
 const DISCOVERY = [
-  { href: '/', label: 'Seek', icon: Search },
-  { href: '/swipe', label: 'Swipe', icon: GalleryHorizontal },
-  { href: '/map', label: 'Map', icon: MapIcon },
+  { href: '/', label: 'Seek', icon: icons.seek },
+  { href: '/swipe', label: 'Swipe', icon: icons.swipe },
+  { href: '/map', label: 'Map', icon: icons.map },
 ] as const;
 
 export type SeekerShellProps = {
@@ -46,16 +46,17 @@ export function SeekerShell({ signedIn, initialCounts, children }: SeekerShellPr
     label: link.label,
     current: current(link.href),
   }));
-  const tabs: NavItem[] = [...DISCOVERY, { href: '/profile', label: 'Profile', icon: User }].map(
-    (item) => ({ ...item, current: current(item.href) }),
-  );
+  const tabs: NavItem[] = [
+    ...DISCOVERY,
+    { href: '/profile', label: 'Profile', icon: icons.profile },
+  ].map((item) => ({ ...item, current: current(item.href) }));
 
   // Community is a top-bar icon on phones; on desktop it is one of the links.
   const community = (
     <IconLink
       href="/community"
       label="Community"
-      icon={Users}
+      icon={icons.community}
       current={current('/community')}
       className="md:hidden"
     />
@@ -67,14 +68,14 @@ export function SeekerShell({ signedIn, initialCounts, children }: SeekerShellPr
       <IconLink
         href="/inbox"
         label={withCount('Inbox', counts.inbox)}
-        icon={Inbox}
+        icon={icons.inbox}
         badge={counts.inbox}
         current={current('/inbox')}
       />
       <IconLink
         href="/notifications"
         label={withCount('Notifications', counts.notifications)}
-        icon={Bell}
+        icon={icons.notifications}
         badge={counts.notifications}
         current={current('/notifications')}
       />
@@ -83,7 +84,7 @@ export function SeekerShell({ signedIn, initialCounts, children }: SeekerShellPr
           <UserButton.MenuItems>
             <UserButton.Link
               label="Profile"
-              labelIcon={<User className="size-4" />}
+              labelIcon={<icons.profile className="size-4" />}
               href="/profile"
             />
             <UserButton.Action label="manageAccount" />

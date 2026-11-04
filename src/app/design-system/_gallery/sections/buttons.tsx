@@ -12,6 +12,7 @@ import {
   X,
   type IconComponent,
 } from '@/ui/icons';
+import { seekerNavIcons as seeker } from '@/ui/nav-icons';
 import { img } from '../samples';
 import { ForceFocus, Section, Specimen, States } from '../Specimen';
 import { hoverLook, type ButtonVariant, type IconButtonVariant } from '../states';
@@ -209,11 +210,11 @@ export function ButtonsSection() {
                 },
                 {
                   label: 'Count',
-                  node: <IconButton icon={MessageSquare} label="Inbox, 2 unread" badge={2} />,
+                  node: <IconButton icon={seeker.inbox} label="Inbox, 2 unread" badge={2} />,
                 },
                 {
                   label: 'Over 99',
-                  node: <IconButton icon={MessageSquare} label="Inbox, 99+ unread" badge={120} />,
+                  node: <IconButton icon={seeker.inbox} label="Inbox, 99+ unread" badge={120} />,
                 },
                 {
                   label: 'Dot',

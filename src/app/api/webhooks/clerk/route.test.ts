@@ -102,8 +102,16 @@ const auditRows = () =>
 type Envelope = { error: { code: string; message: string; requestId: string } };
 
 describe('POST /api/webhooks/clerk', () => {
+  let POST: (typeof import('./route'))['POST'];
+
+  // Loading the route compiles its whole module graph; under the full suite's parallel load
+  // that can outlast a test's 30 s, so it happens here, within the 60 s hook timeout (after
+  // the file's beforeAll has set the webhook secret).
+  beforeAll(async () => {
+    ({ POST } = await import('./route'));
+  });
+
   it('applies a signed event once, audits it, and treats a redelivery as a duplicate', async () => {
-    const { POST } = await import('./route');
     const before = (await auditRows()).length;
 
     const first = await POST(delivery('msg_route_1', userCreated));
@@ -129,7 +137,6 @@ describe('POST /api/webhooks/clerk', () => {
   });
 
   it('returns 400 in the error envelope for a bad signature and applies nothing', async () => {
-    const { POST } = await import('./route');
     const wrongSecret = `whsec_${randomBytes(24).toString('base64')}`;
     const res = await POST(delivery('msg_route_2', userCreated, { secret: wrongSecret }));
 
@@ -144,7 +151,6 @@ describe('POST /api/webhooks/clerk', () => {
   });
 
   it('returns 400 for missing Svix headers', async () => {
-    const { POST } = await import('./route');
     const res = await POST(
       new Request('http://localhost:3000/api/webhooks/clerk', {
         method: 'POST',
@@ -157,7 +163,6 @@ describe('POST /api/webhooks/clerk', () => {
   });
 
   it('answers 200 for an event that can never apply, so Clerk stops retrying, and alerts', async () => {
-    const { POST } = await import('./route');
     const { logger } = await import('@/lib/logger');
     vi.spyOn(logger, 'error').mockImplementation(() => {});
     const invalid = { type: 'user.created', object: 'event', data: { id: 42 } };

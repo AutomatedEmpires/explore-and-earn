@@ -1,11 +1,20 @@
 // Review queues (spec section 12): every item waiting for a person, most urgent first, with
-// filters for queue, status and "assigned to me", and Claim for unassigned items. Outside prod
+// filters for queue, status and "assigned to me", and Claim for unassigned items. An operator
+// sees only the queues they cover (Owners cover every queue), plus any decision waiting for a
+// second sign-off they could give; another queue's page does not exist for them. Outside prod
 // it also has the "Create test item" button, which sends a flagged text through the real check.
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { getDb } from '@/lib/db';
 import { getEnv } from '@/lib/env';
-import { isQueue, isStatusFilter, listReviewItems, REVIEW_STATUSES } from '@/modules/operator';
+import {
+  coversQueue,
+  isQueue,
+  isStatusFilter,
+  listReviewItems,
+  REVIEW_STATUSES,
+} from '@/modules/operator';
 import { QUEUES } from '@/modules/trust';
 import { Avatar, EmptyState } from '@/ui/components';
 import { ListChecks } from '@/ui/icons';
@@ -29,6 +38,7 @@ import {
   STATUS_LABEL,
   subjectLabel,
 } from '../_lib/format';
+import { itemViewer } from '../_lib/access';
 import { requireConsoleOperator } from '../_lib/session';
 
 export const metadata: Metadata = { title: 'Review queues' };
@@ -45,10 +55,15 @@ export default async function QueuesPage({ searchParams }: { searchParams: Searc
   const queue = isQueue(queueParam) ? queueParam : undefined;
   const status = isStatusFilter(statusParam) ? statusParam : 'unresolved';
   const mine = one(params.mine) === '1';
+  const viewer = itemViewer(operator);
+  if (queue && !coversQueue(viewer, queue)) notFound();
+  const queues = QUEUES.filter((q) => coversQueue(viewer, q));
+  const allQueues = viewer.role === 'owner' ? 'All queues' : 'All your queues';
 
   const now = new Date();
   const { items, total } = await listReviewItems(getDb(), {
     ...(queue ? { queue } : {}),
+    visibleTo: viewer,
     status,
     ...(mine ? { assigneeId: operator.user.id } : {}),
     limit: 100,
@@ -65,8 +80,8 @@ export default async function QueuesPage({ searchParams }: { searchParams: Searc
 
       <QueueFilters
         queues={[
-          { value: 'all', label: 'All queues' },
-          ...QUEUES.map((q) => ({ value: q, label: QUEUE_LABEL[q] })),
+          { value: 'all', label: allQueues },
+          ...queues.map((q) => ({ value: q, label: QUEUE_LABEL[q] })),
         ]}
         statuses={[
           { value: 'unresolved', label: 'Waiting for review' },
@@ -81,7 +96,7 @@ export default async function QueuesPage({ searchParams }: { searchParams: Searc
       <Panel
         className="mt-6"
         bodyClassName="p-0"
-        title={queue ? QUEUE_LABEL[queue] : 'All queues'}
+        title={queue ? QUEUE_LABEL[queue] : allQueues}
         description={
           total > items.length
             ? `Showing the ${items.length} most urgent of ${total} items`
@@ -135,7 +150,7 @@ export default async function QueuesPage({ searchParams }: { searchParams: Searc
                           <Link
                             id={summaryId}
                             href={`/queues/${item.id}`}
-                            className="w-fit max-w-md rounded-sm text-15 font-semibold text-ink underline-offset-2 hover:underline"
+                            className="inline-flex min-h-11 w-fit max-w-md items-center rounded-sm text-15 font-semibold text-ink underline-offset-2 hover:underline"
                           >
                             {subjectLabel(item.subjectType)}: {item.reason}
                           </Link>

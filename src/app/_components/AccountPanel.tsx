@@ -6,7 +6,8 @@ import { Settings } from '@/ui/icons';
 
 /**
  * Account basics that already work: who is signed in, Clerk's account settings and signing out.
- * On phones this is the way to sign out (the avatar menu is in the desktop top bar).
+ * On phones this is the way to sign out (the avatar menu is on desktop only): the seeker's
+ * Profile and the host's More page.
  */
 export function AccountPanel({ email }: { email: string | null }) {
   const clerk = useClerk();

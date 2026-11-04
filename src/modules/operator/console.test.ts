@@ -5,7 +5,7 @@ import { queryRows } from '@/lib/db';
 import { AppError } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import { makeFakeClerkAdmin } from '@/modules/identity';
-import { addNote, claim, decide, openReviewItem } from '@/modules/trust';
+import { addNote, claim, decide, openReviewItem, type Queue } from '@/modules/trust';
 import {
   createTestItem,
   DEFAULT_TEST_ITEM_TEXT,
@@ -13,11 +13,13 @@ import {
   inviteOperator,
   listOperators,
   listReviewItems,
+  mayOpenItem,
   queueCounts,
   reviewItemQueue,
   setOperatorQueues,
   setShiftStatus,
   testItemText,
+  type ItemViewer,
 } from './index';
 
 let t: TestDb;
@@ -61,7 +63,7 @@ async function addOperator(
   return id;
 }
 
-const open = (queue: 'moderation' | 'fraud' = 'moderation', priority = 0) =>
+const open = (queue: Queue = 'moderation', priority = 0) =>
   openReviewItem(t.db, {
     queue,
     subjectType: 'test_item',
@@ -166,6 +168,77 @@ describe('review item reads', () => {
     expect(await reviewItemQueue(t.db, item.id)).toBe('moderation');
     expect(await getReviewItem(t.db, newId())).toBeNull();
     expect(await reviewItemQueue(t.db, 'nope')).toBeNull();
+  });
+});
+
+describe('queue access', () => {
+  // Queue assignment is the console's access boundary (spec section 12): an operator opens and
+  // lists only the items of queues they cover, and Owners cover every queue.
+  async function team() {
+    const avery = await addOperator('Avery', { role: 'owner' });
+    const bo = await addOperator('Bo', { queues: ['moderation'] });
+    const cy = await addOperator('Cy', { queues: ['fraud'] });
+    return {
+      avery: { userId: avery, role: 'owner' as const, queues: [] },
+      bo: { userId: bo, role: 'operator' as const, queues: ['moderation'] },
+      cy: { userId: cy, role: 'operator' as const, queues: ['fraud'] },
+    };
+  }
+
+  async function detail(id: string) {
+    const item = await getReviewItem(t.db, id);
+    if (!item) throw new Error('no item');
+    return item;
+  }
+
+  it('opens an item for operators covering its queue and for Owners only', async () => {
+    const { avery, bo, cy } = await team();
+    const childSafety = await detail((await open('child_safety')).id);
+    const moderation = await detail((await open('moderation')).id);
+
+    expect(mayOpenItem(bo, childSafety)).toBe(false);
+    expect(mayOpenItem(cy, childSafety)).toBe(false);
+    expect(mayOpenItem(avery, childSafety)).toBe(true);
+    expect(mayOpenItem(bo, moderation)).toBe(true);
+    expect(mayOpenItem(cy, moderation)).toBe(false);
+  });
+
+  it('opens a decision waiting for a second sign-off to anyone but its author', async () => {
+    // Any operator but the author may sign off (trust.approveSecond), whatever they cover, so a
+    // held ban never waits on nobody: they must be able to open it.
+    const { avery, bo, cy } = await team();
+    const item = await open('child_safety');
+    await claim(t.db, item.id, avery.userId);
+    await decide(t.db, item.id, avery.userId, 'ban');
+    const held = await detail(item.id);
+    expect(held.actions[0]?.status).toBe('pending_second');
+
+    expect(mayOpenItem(bo, held)).toBe(true);
+    expect(mayOpenItem(cy, held)).toBe(true);
+    // Its author, were they not an Owner, would still need to cover the queue.
+    expect(mayOpenItem({ ...avery, role: 'operator' }, held)).toBe(false);
+  });
+
+  it('lists only what the viewer may open', async () => {
+    const { avery, bo, cy } = await team();
+    const moderation = await open('moderation');
+    const fraud = await open('fraud');
+    const childSafety = await open('child_safety');
+    const held = await open('child_safety');
+    await claim(t.db, held.id, avery.userId);
+    await decide(t.db, held.id, avery.userId, 'ban');
+
+    const ids = async (viewer: ItemViewer, queue?: Queue) =>
+      (await listReviewItems(t.db, { visibleTo: viewer, ...(queue ? { queue } : {}) })).items
+        .map((i) => i.id)
+        .sort();
+
+    expect(await ids(avery)).toEqual([moderation.id, fraud.id, childSafety.id, held.id].sort());
+    expect(await ids(bo)).toEqual([moderation.id, held.id].sort());
+    expect(await ids(cy)).toEqual([fraud.id, held.id].sort());
+    expect(await ids(bo, 'fraud')).toEqual([]);
+    expect(await ids({ ...bo, queues: [] })).toEqual([held.id]);
+    expect((await listReviewItems(t.db, { visibleTo: bo })).total).toBe(2);
   });
 });
 
