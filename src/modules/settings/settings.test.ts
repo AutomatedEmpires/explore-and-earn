@@ -59,6 +59,10 @@ describe('registry', () => {
       'trust.thresholds': {
         image_safety: { approveBelow: 0.2, rejectAtOrAbove: 0.9 },
         text_safety: { approveBelow: 0.2, rejectAtOrAbove: 0.9 },
+        listing_moderation: { approveBelow: 0.2, rejectAtOrAbove: 0.9 },
+        listing_fraud: { approveBelow: 0.2, rejectAtOrAbove: 0.95 },
+        business_verification: { approveBelow: 0.3, rejectAtOrAbove: 1.01 },
+        photo_slot: { approveBelow: 0.5, rejectAtOrAbove: 0.5 },
       },
       'trust.audit_sample_rate': 0.01,
       'business.mailing_address': '',
@@ -116,11 +120,26 @@ describe('setSetting', () => {
 
   it('stores nested objects', async () => {
     const value = {
+      ...SETTING_DEFAULTS['trust.thresholds'],
       image_safety: { approveBelow: 0.1, rejectAtOrAbove: 0.8 },
       text_safety: { approveBelow: 0.6, rejectAtOrAbove: 0.9 },
     };
     await setSetting(t.db, 'trust.thresholds', value, { operatorId });
     expect(await getSetting(t.db, 'trust.thresholds')).toEqual(value);
+  });
+
+  it('reads thresholds stored before SP2 with defaults for the new kinds', async () => {
+    const stored = {
+      image_safety: { approveBelow: 0.1, rejectAtOrAbove: 0.8 },
+      text_safety: { approveBelow: 0.6, rejectAtOrAbove: 0.9 },
+    };
+    await t.db.execute(
+      sql`insert into app.settings (key, value) values ('trust.thresholds', ${JSON.stringify(stored)}::jsonb)`,
+    );
+    expect(await getSetting(t.db, 'trust.thresholds')).toEqual({
+      ...SETTING_DEFAULTS['trust.thresholds'],
+      ...stored,
+    });
   });
 
   it('rejects -1 invites per week with bad_request and stores nothing', async () => {
@@ -141,6 +160,7 @@ describe('setSetting', () => {
         t.db,
         'trust.thresholds',
         {
+          ...SETTING_DEFAULTS['trust.thresholds'],
           image_safety: { approveBelow: 0.9, rejectAtOrAbove: 0.2 },
           text_safety: { approveBelow: 0.2, rejectAtOrAbove: 0.9 },
         },
@@ -150,9 +170,7 @@ describe('setSetting', () => {
     await expectBadRequest(
       setSetting(t.db, 'business.support_email', 'not an email', { operatorId }),
     );
-    await expectBadRequest(
-      setSetting(t.db, 'ops.second_signoff_refund_cents', -5, { operatorId }),
-    );
+    await expectBadRequest(setSetting(t.db, 'ops.second_signoff_refund_cents', -5, { operatorId }));
   });
 
   it('accepts an empty or valid support email', async () => {

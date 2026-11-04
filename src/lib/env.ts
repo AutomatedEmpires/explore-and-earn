@@ -59,7 +59,10 @@ const schema = z
       .string()
       .regex(/^sk_(test|live)_/, 'must start with sk_test_ or sk_live_')
       .optional(),
-    STRIPE_WEBHOOK_SECRET: z.string().regex(/^whsec_/, 'must start with whsec_').optional(),
+    STRIPE_WEBHOOK_SECRET: z
+      .string()
+      .regex(/^whsec_/, 'must start with whsec_')
+      .optional(),
     STRIPE_PORTAL_CONFIG_FULL: z.string().regex(/^bpc_/, 'must start with bpc_').optional(),
     STRIPE_PORTAL_CONFIG_BILLING: z.string().regex(/^bpc_/, 'must start with bpc_').optional(),
 

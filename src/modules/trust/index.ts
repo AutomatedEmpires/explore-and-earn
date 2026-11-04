@@ -17,7 +17,7 @@ export {
 } from './actions';
 export { raiseAlert, type Alert } from './alerts';
 export { CLASSIFIER_ERROR, findLatestCheck, runCheck } from './checks';
-export { SLA_HOURS, openReviewItem, pickAssignee } from './routing';
+export { SLA_HOURS, listOpenReviewItems, openReviewItem, pickAssignee } from './routing';
 export { auditSample } from './sampling';
 export { slaSweep } from './sla';
 export {
@@ -27,6 +27,7 @@ export {
   type SubjectHandlers,
 } from './subjects';
 export {
+  CHECK_KINDS,
   QUEUES,
   REVIEW_ACTIONS,
   type ActionStatus,

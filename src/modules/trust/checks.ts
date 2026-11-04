@@ -14,7 +14,11 @@ import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
 import { getSetting } from '@/modules/settings';
 import { transact } from './internal';
+import * as businessVerificationPrompt from './prompts/business_verification';
 import * as imageSafetyPrompt from './prompts/image_safety';
+import * as listingFraudPrompt from './prompts/listing_fraud';
+import * as listingModerationPrompt from './prompts/listing_moderation';
+import * as photoSlotPrompt from './prompts/photo_slot';
 import * as textSafetyPrompt from './prompts/text_safety';
 import { openReviewItem } from './routing';
 import { trustChecks } from './schema';
@@ -33,12 +37,22 @@ const imageSafety = safety.extend({ altText: z.string() });
 
 type SafetyOutput = z.infer<typeof safety> & { altText?: string };
 
+/** Text kinds classify `text`; image kinds classify `image`, with `text` as its caption or label. */
 const KINDS: Record<
   CheckKind,
-  { prompt: { version: string; system: string }; schema: z.ZodType<SafetyOutput> }
+  {
+    input: 'text' | 'image';
+    prompt: { version: string; system: string };
+    schema: z.ZodType<SafetyOutput>;
+  }
 > = {
-  text_safety: { prompt: textSafetyPrompt, schema: safety },
-  image_safety: { prompt: imageSafetyPrompt, schema: imageSafety },
+  text_safety: { input: 'text', prompt: textSafetyPrompt, schema: safety },
+  image_safety: { input: 'image', prompt: imageSafetyPrompt, schema: imageSafety },
+  listing_moderation: { input: 'text', prompt: listingModerationPrompt, schema: safety },
+  listing_fraud: { input: 'text', prompt: listingFraudPrompt, schema: safety },
+  business_verification: { input: 'text', prompt: businessVerificationPrompt, schema: safety },
+  // The 640 px photo and its slot label; the score is the probability of a mismatch.
+  photo_slot: { input: 'image', prompt: photoSlotPrompt, schema: safety },
 };
 
 const MAX_LABELS = 10;
@@ -53,13 +67,13 @@ function wrapSubmittedText(text: string): string {
   return `<submitted_text>\n${safe}\n</submitted_text>`;
 }
 
-function buildContent(i: RunCheckInput): ClassifyContent[] {
+function buildContent(i: RunCheckInput, input: 'text' | 'image'): ClassifyContent[] {
   const text = i.text?.trim() ? i.text : undefined;
-  if (i.kind === 'text_safety') {
-    if (!text) throw badRequest('text_safety needs non-empty text');
+  if (input === 'text') {
+    if (!text) throw badRequest(`${i.kind} needs non-empty text`);
     return [{ type: 'text', text: wrapSubmittedText(text) }];
   }
-  if (!i.image || i.image.bytes.length === 0) throw badRequest('image_safety needs an image');
+  if (!i.image || i.image.bytes.length === 0) throw badRequest(`${i.kind} needs an image`);
   const instruction = text
     ? `Classify the image above. Text sent with it:\n${wrapSubmittedText(text)}`
     : 'Classify the image above.';
@@ -100,8 +114,9 @@ function describeError(err: unknown): string {
 
 /**
  * Classifies a subject and decides it: `score < approveBelow` is approved, `score >=
- * rejectAtOrAbove` is rejected, anything else is needs_review and opens a `moderation` review
- * item (thresholds from the `trust.thresholds` setting). Any classifier failure is needs_review
+ * rejectAtOrAbove` is rejected, anything else is needs_review and opens a review item in
+ * `reviewQueue` (default `moderation`; `null` opens none). Each kind reads its own thresholds
+ * from the `trust.thresholds` setting. Any classifier failure is needs_review
  * with reason 'classifier_error'; its returned `score` is 1 so no caller can read it as safe
  * (the stored score is null). Every call stores one `app.trust_checks` row.
  *
@@ -111,7 +126,8 @@ function describeError(err: unknown): string {
 export async function runCheck(db: DbOrTx, i: RunCheckInput): Promise<CheckResult> {
   const kind = Object.hasOwn(KINDS, i.kind) ? KINDS[i.kind] : undefined;
   if (!kind) throw badRequest(`Unknown check kind: ${String(i.kind)}`);
-  const content = buildContent(i);
+  const content = buildContent(i, kind.input);
+  const reviewQueue = i.reviewQueue === undefined ? 'moderation' : i.reviewQueue;
   const thresholds = (await getSetting(db, 'trust.thresholds'))[i.kind];
   const provider = getEnv().AI_PROVIDER;
 
@@ -169,9 +185,9 @@ export async function runCheck(db: DbOrTx, i: RunCheckInput): Promise<CheckResul
       error,
       altText: altText ?? null,
     });
-    if (decision === 'needs_review') {
+    if (decision === 'needs_review' && reviewQueue !== null) {
       await openReviewItem(tx, {
-        queue: 'moderation',
+        queue: reviewQueue,
         subjectType: i.subjectType,
         subjectId: i.subjectId,
         reason,

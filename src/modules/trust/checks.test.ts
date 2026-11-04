@@ -4,7 +4,7 @@ import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import type { ClassifyOptions } from '@/lib/ai';
 import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
-import { setSetting } from '@/modules/settings';
+import { SETTING_DEFAULTS, setSetting } from '@/modules/settings';
 import { findLatestCheck, runCheck } from './index';
 
 // classify() runs the real stub provider (AI_PROVIDER=stub in tests) unless a test overrides it.
@@ -197,7 +197,11 @@ describe('findLatestCheck', () => {
     const subject = { kind: 'text_safety' as const, subjectType: 'test_item', subjectId: newId() };
     const result = await runCheck(t.db, { ...subject, text: 'hello' });
     expect(await findLatestCheck(t.db, subject)).toEqual(result);
-    expect(result).toMatchObject({ decision: 'needs_review', score: 1, reason: 'classifier_error' });
+    expect(result).toMatchObject({
+      decision: 'needs_review',
+      score: 1,
+      reason: 'classifier_error',
+    });
   });
 });
 
@@ -207,6 +211,7 @@ describe('runCheck thresholds', () => {
       t.db,
       'trust.thresholds',
       {
+        ...SETTING_DEFAULTS['trust.thresholds'],
         image_safety: { approveBelow: 0.2, rejectAtOrAbove: 0.9 },
         text_safety: { approveBelow: 0.6, rejectAtOrAbove: 0.9 },
       },

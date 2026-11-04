@@ -187,15 +187,15 @@ describe('parseEnv: SP2 providers', () => {
   });
 
   it.each(['dev', 'preview'])('refuses a live Stripe key when APP_ENV=%s', (appEnv) => {
-    expect(() =>
-      parseEnv({ ...prod, APP_ENV: appEnv, STRIPE_SECRET_KEY: 'sk_live_x' }),
-    ).toThrow('STRIPE_SECRET_KEY must be a test key outside prod');
+    expect(() => parseEnv({ ...prod, APP_ENV: appEnv, STRIPE_SECRET_KEY: 'sk_live_x' })).toThrow(
+      'STRIPE_SECRET_KEY must be a test key outside prod',
+    );
   });
 
   it('accepts a test Stripe key in dev and either key in prod', () => {
-    expect(parseEnv({ ...prod, APP_ENV: 'dev', STRIPE_SECRET_KEY: 'sk_test_x' }).BILLING_PROVIDER).toBe(
-      'stripe',
-    );
+    expect(
+      parseEnv({ ...prod, APP_ENV: 'dev', STRIPE_SECRET_KEY: 'sk_test_x' }).BILLING_PROVIDER,
+    ).toBe('stripe');
     expect(parseEnv(prod).STRIPE_SECRET_KEY).toBe('sk_test_prod');
     expect(parseEnv({ ...prod, STRIPE_SECRET_KEY: 'sk_live_x' }).STRIPE_SECRET_KEY).toBe(
       'sk_live_x',
@@ -209,9 +209,7 @@ describe('parseEnv: SP2 providers', () => {
 
   it('requires WEB_RISK_API_KEY when LINK_SAFETY_PROVIDER=webrisk', () => {
     expect(() => parseEnv(without(prod, 'WEB_RISK_API_KEY'))).toThrow(/WEB_RISK_API_KEY/);
-    expect(() => parseEnv({ ...dev, LINK_SAFETY_PROVIDER: 'webrisk' })).toThrow(
-      /WEB_RISK_API_KEY/,
-    );
+    expect(() => parseEnv({ ...dev, LINK_SAFETY_PROVIDER: 'webrisk' })).toThrow(/WEB_RISK_API_KEY/);
   });
 
   it('requires NEXT_PUBLIC_MAPBOX_TOKEN in preview and prod, not in dev', () => {
