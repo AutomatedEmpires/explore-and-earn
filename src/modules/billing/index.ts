@@ -1,10 +1,10 @@
 // Public API of the billing module: Stripe customers, subscriptions, plan changes, founding
-// codes, webhooks and reconciliation (SP2 spec sections 3 and 8). W0 contract: typed stubs that
-// W2 (Tasks 11-16) replaces. Imports entitlements and orgs.
+// codes, webhooks and reconciliation (SP2 spec sections 3 and 8; W2, Tasks 11-16). Imports
+// entitlements and orgs. Every Stripe call goes through the BillingGateway (./gateway).
 import { z } from 'zod';
-import type { DbOrTx } from '@/lib/db';
 import type { HandlerMap } from '@/modules/jobs';
 import { CANCEL_TOPIC, cancelSubscriptionNow } from './cancel';
+import { applyLaunchDate, grantMonthlyCredits, reconcile } from './jobs';
 import { notifyBillingContacts } from './notifications';
 import { getSubscriptionState } from './state';
 import { syncFromStripe } from './sync';
@@ -104,30 +104,14 @@ export {
 } from './change';
 export { createPortalSession } from './portal';
 export { CANCEL_TOPIC, cancelSubscriptionNow, getCardChecks, sanctionOrg } from './cancel';
+export { applyLaunchDate, grantMonthlyCredits, reconcile } from './jobs';
+/** SP8 registers these with its privacy exporter and eraser. */
+export { privacyHandlers } from './privacy';
 export {
   BILLING_CONTACT_ROLES,
   notifyBillingContacts,
   type BillingNotificationType,
 } from './notifications';
-
-function notImplemented(name: string): never {
-  throw new Error(`not implemented: ${name} (W2)`);
-}
-
-/** SP8 registers these with its privacy exporter and eraser. */
-export const privacyHandlers: {
-  export(db: DbOrTx, userId: string): Promise<Record<string, unknown>>;
-  erase(db: DbOrTx, userId: string): Promise<void>;
-} = {
-  async export() {
-    return notImplemented('privacyHandlers.export');
-  },
-  async erase() {
-    return notImplemented('privacyHandlers.erase');
-  },
-};
-
-const noop = async () => {};
 
 const syncJob = z.object({
   subscriptionId: z.string().min(1),
@@ -149,9 +133,15 @@ export const jobHandlers: HandlerMap = {
       { plan: state.plan, trialEnd: state.trialEnd?.toISOString() ?? null },
     );
   },
-  'billing.grant_monthly_credits': noop,
-  'billing.apply_launch_date': noop,
-  'billing.reconcile': noop,
+  'billing.grant_monthly_credits': async (_payload, { db, now }) => {
+    await grantMonthlyCredits(db, now);
+  },
+  'billing.apply_launch_date': async (_payload, { db, now }) => {
+    await applyLaunchDate(db, now);
+  },
+  'billing.reconcile': async (_payload, { db, now }) => {
+    await reconcile(db, now);
+  },
   // A ban's Stripe cancellation, outside the sanction's transaction (SP2 plan, decision 4).
   [CANCEL_TOPIC]: async (payload, { db }) => {
     const { orgId } = z.object({ orgId: z.uuid() }).parse(payload);
