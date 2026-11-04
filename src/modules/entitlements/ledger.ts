@@ -420,3 +420,17 @@ export async function listOpenGrants(
     .where(and(...where))
     .orderBy(asc(grants.validFrom), asc(grants.id));
 }
+
+/** The total quantity of the grants of `kind` valid at `now` (capacity limits). Internal. */
+export async function sumValidGrants(
+  db: DbOrTx,
+  orgId: string,
+  kind: EntitlementKind,
+  now: Date,
+): Promise<number> {
+  const [row] = await db
+    .select({ total: sql<number>`coalesce(sum(${grants.quantity}), 0)::int` })
+    .from(grants)
+    .where(and(eq(grants.orgId, orgId), eq(grants.kind, kind), validAt(now)));
+  return Number(row?.total ?? 0);
+}
