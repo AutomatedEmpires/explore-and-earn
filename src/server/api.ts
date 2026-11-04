@@ -15,7 +15,8 @@ import { getDb, type Db } from '@/lib/db';
 import { getEnv, type Env } from '@/lib/env';
 import { AppError, badRequest, forbidden, isAppError, rateLimited } from '@/lib/errors';
 import { logger } from '@/lib/logger';
-import { consume } from '@/lib/rate-limit';
+import { scrubError } from '@/lib/scrub';
+import { consume } from '@/modules/ratelimit';
 import {
   requireHost,
   requireOperator,
@@ -26,7 +27,14 @@ import {
   type OperatorContext,
 } from './guards';
 import { registerRoute } from './openapi';
-import { REQUEST_ID_HEADER, requestIdFrom, runWithRequestContext } from './request-context';
+import {
+  clientIp,
+  hashIp,
+  REQUEST_ID_HEADER,
+  requestIdFrom,
+  runWithRequestContext,
+  type RequestContext,
+} from './request-context';
 
 export type AuthMode = 'none' | 'user' | 'seeker' | 'host' | 'operator';
 export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
@@ -94,7 +102,8 @@ function baseHeaders(requestId: string): Headers {
 /**
  * The error envelope `{ error: { code, message, details?, requestId } }` for any thrown value.
  * AppErrors keep their status, message and details. Anything else is logged, sent to Sentry and
- * returned as a bare 500 `internal`, so internal messages never reach the caller.
+ * returned as a bare 500 `internal`, so internal messages never reach the caller. What is logged
+ * and reported is scrubbed first: a failed query's parameters (emails, names) are dropped.
  */
 export function toErrorResponse(err: unknown, requestId: string): Response {
   let appError: AppError;
@@ -102,11 +111,11 @@ export function toErrorResponse(err: unknown, requestId: string): Response {
     appError = err;
     if (appError.status >= 500) {
       logger.error('API error', { requestId, err });
-      captureException(err, { tags: { requestId } });
+      captureException(scrubError(err), { tags: { requestId } });
     }
   } else {
     logger.error('Unhandled API error', { requestId, err });
-    captureException(err, { tags: { requestId } });
+    captureException(scrubError(err), { tags: { requestId } });
     appError = new AppError('internal');
   }
 
@@ -262,10 +271,14 @@ export function apiRoute<I = undefined, O = unknown>(opts: ApiRouteOptions<I, O>
   return async (req, route) => {
     const requestId = requestIdFrom(req);
     const path = new URL(req.url).pathname;
+    // Logs and audit rows written anywhere below read the id (and the hashed IP) from here.
+    const context: RequestContext = { requestId, method: req.method, path };
 
-    return runWithRequestContext({ requestId, method: req.method, path }, async () => {
+    return runWithRequestContext(context, async () => {
       try {
-        checkOrigin(req, getEnv());
+        const env = getEnv();
+        context.ipHash = hashIp(clientIp(req), env.JOBS_SECRET);
+        checkOrigin(req, env);
 
         const who = await authenticate(auth);
         const params = (await route?.params) ?? {};

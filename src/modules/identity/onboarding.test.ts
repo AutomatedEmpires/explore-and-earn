@@ -40,6 +40,9 @@ let t: TestDb;
 beforeAll(async () => {
   t = await createTestDb();
   dbHolder.current = t.db;
+  // createOrganization loads identity's index on first use (orgs/create.ts); pay that here, not
+  // inside the first host test on a loaded machine.
+  await import('./index');
 });
 
 afterAll(async () => {

@@ -193,6 +193,33 @@ defineType({
   push: true,
 });
 
+/** Why the media scan rejected a file, in words for its uploader (media's RejectionReason). */
+const MEDIA_REJECTION_TEXT: Record<string, string> = {
+  type_mismatch: "The file's contents don't match its type, or that type isn't accepted here.",
+  too_large: 'The file is larger than this upload allows.',
+  missing_file: 'The file never finished uploading. Try uploading it again.',
+  invalid_image: "The image couldn't be read. Try another copy of the photo.",
+  unsupported_format: "This image format isn't supported. Try a JPEG or PNG.",
+  invalid_pdf: "The PDF couldn't be read. Try saving it as a PDF again.",
+  malware: 'The file failed our security scan.',
+  unsafe_content: "The photo doesn't meet our content rules.",
+  removed_by_operator: 'It was removed after a review.',
+};
+
+defineType({
+  type: 'media.rejected',
+  category: 'account',
+  title: () => "Your upload couldn't be used",
+  body: (d) => {
+    const reason = text(d.reason);
+    return reason && Object.hasOwn(MEDIA_REJECTION_TEXT, reason)
+      ? (MEDIA_REJECTION_TEXT[reason] ?? '')
+      : "The file couldn't be used. Try another one.";
+  },
+  url: () => '/notifications',
+  push: true,
+});
+
 defineType({
   type: 'security.new_sign_in',
   category: 'security',

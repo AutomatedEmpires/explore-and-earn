@@ -74,9 +74,10 @@ describe('getSetting', () => {
   });
 
   it('returns a copy of an object default', async () => {
-    const thresholds = await getSetting(t.db, 'trust.thresholds');
-    thresholds.text_safety.approveBelow = 0.99;
-    expect((await getSetting(t.db, 'trust.thresholds')).text_safety.approveBelow).toBe(0.2);
+    const text = (await getSetting(t.db, 'trust.thresholds')).text_safety;
+    if (!text) throw new Error('the default has text_safety');
+    text.approveBelow = 0.99;
+    expect((await getSetting(t.db, 'trust.thresholds')).text_safety?.approveBelow).toBe(0.2);
   });
 
   it('falls back to the default, with a warning, when the stored value is invalid', async () => {
@@ -121,6 +122,37 @@ describe('setSetting', () => {
     };
     await setSetting(t.db, 'trust.thresholds', value, { operatorId });
     expect(await getSetting(t.db, 'trust.thresholds')).toEqual(value);
+  });
+
+  it('keys trust.thresholds by check kind: a kind it lacks falls back alone', async () => {
+    // A row stored before a later sub-project registered `listing`, tuned for text only.
+    await t.db.execute(sql`
+      insert into app.settings (key, value) values ('trust.thresholds',
+        '{"text_safety": {"approveBelow": 0.6, "rejectAtOrAbove": 0.95}}'::jsonb)
+    `);
+    expect(await getSetting(t.db, 'trust.thresholds')).toEqual({
+      image_safety: { approveBelow: 0.2, rejectAtOrAbove: 0.9 },
+      text_safety: { approveBelow: 0.6, rejectAtOrAbove: 0.95 },
+    });
+
+    // A kind the defaults don't list yet can be tuned too, and keeps the others.
+    const withListing = {
+      ...(await getSetting(t.db, 'trust.thresholds')),
+      listing: { approveBelow: 0.3, rejectAtOrAbove: 0.8 },
+    };
+    await setSetting(t.db, 'trust.thresholds', withListing, { operatorId });
+    expect(await getSetting(t.db, 'trust.thresholds')).toEqual(withListing);
+  });
+
+  it('rejects a trust.thresholds kind that is not a plain name', async () => {
+    await expectBadRequest(
+      setSetting(
+        t.db,
+        'trust.thresholds',
+        { 'Bad Kind!': { approveBelow: 0.2, rejectAtOrAbove: 0.9 } },
+        { operatorId },
+      ),
+    );
   });
 
   it('rejects -1 invites per week with bad_request and stores nothing', async () => {

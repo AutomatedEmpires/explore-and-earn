@@ -1,7 +1,8 @@
-// Postgres fixed-window rate limiter over app.rate_limits (drizzle/0300_rate_limits.sql).
+// Postgres fixed-window rate limiter over app.rate_limits (drizzle/0300_rate_limits.sql), the
+// ratelimit module's one table.
 // Used by apiRoute's `rateLimit` option; call it directly for limits outside an API route.
 import { sql } from 'drizzle-orm';
-import { queryRows, type DbOrTx } from './db';
+import { queryRows, type DbOrTx } from '@/lib/db';
 
 export type RateLimitResult = {
   /** False once this call pushed the window's count over `limit`. */

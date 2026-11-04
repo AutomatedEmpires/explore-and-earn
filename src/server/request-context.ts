@@ -1,6 +1,7 @@
 // Per-request context: the request id (set by the proxy, echoed in every response, logged and
 // sent to Sentry) and helpers to read the caller's address. Server only (Node.js runtime).
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { createHmac } from 'node:crypto';
 import { newId } from '@/lib/ids';
 
 export const REQUEST_ID_HEADER = 'x-request-id';
@@ -12,6 +13,8 @@ export type RequestContext = {
   requestId: string;
   method?: string;
   path?: string;
+  /** The caller's IP, hashed (`hashIp`), for audit rows. Never the address itself. */
+  ipHash?: string | null;
 };
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -47,6 +50,16 @@ export function getRequestId(): string | null {
  * The caller's IP address as reported by the platform (Vercel sets `x-forwarded-for`), or null.
  * Use it for rate-limit keys and hashed audit fields, never for authorization.
  */
+/**
+ * An IP address as audit rows store it (`ip_hash`): a keyed hash, so rows from one address can
+ * be matched without storing the address. A plain hash would not do: every IPv4 address can be
+ * hashed in minutes. `secret` is a server secret; the hash is labelled so it is no other use's.
+ */
+export function hashIp(ip: string | null, secret: string): string | null {
+  if (!ip) return null;
+  return createHmac('sha256', secret).update(`audit-ip:${ip}`).digest('hex').slice(0, 32);
+}
+
 export function clientIp(req: Request): string | null {
   const forwarded = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
   if (forwarded) return forwarded;

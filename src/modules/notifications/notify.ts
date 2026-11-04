@@ -8,6 +8,7 @@
 import { and, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { queryRows, type DbOrTx } from '@/lib/db';
 import { newId } from '@/lib/ids';
+import { getUserContact } from '@/modules/identity';
 import { enqueue } from '@/modules/jobs';
 import { emailSuppressions, notificationPreferences, notifications } from './schema';
 import {
@@ -47,17 +48,17 @@ type Recipient = {
 };
 
 /**
- * Everything notify() needs to pick channels, in one round trip. The address comes from
- * app.users (read-only; identity owns the table and exposes no lookup by id).
+ * Everything notify() needs to pick channels. The address comes from identity (which owns
+ * app.users); suppressions, subscriptions and preferences are this module's own tables.
  */
 async function loadRecipient(
   db: DbOrTx,
   userId: string,
   category: Category,
 ): Promise<Recipient | null> {
+  const user = await getUserContact(db, userId);
+  if (!user) return null;
   const [row] = await queryRows<{
-    email: string | null;
-    deleted: boolean;
     suppressed: boolean;
     has_push: boolean;
     email_enabled: boolean;
@@ -66,28 +67,24 @@ async function loadRecipient(
     db,
     sql`
       select
-        u.email,
-        u.deleted_at is not null as deleted,
         exists (
-          select 1 from app.email_suppressions s where s.email = lower(u.email)
+          select 1 from app.email_suppressions s where s.email = lower(${user.email}::text)
         ) as suppressed,
-        exists (select 1 from app.push_subscriptions p where p.user_id = u.id) as has_push,
+        exists (select 1 from app.push_subscriptions p where p.user_id = ${userId}) as has_push,
         coalesce((
           select enabled from app.notification_preferences
-          where user_id = u.id and category = ${category} and channel = 'email'
+          where user_id = ${userId} and category = ${category} and channel = 'email'
         ), true) as email_enabled,
         coalesce((
           select enabled from app.notification_preferences
-          where user_id = u.id and category = ${category} and channel = 'push'
+          where user_id = ${userId} and category = ${category} and channel = 'push'
         ), true) as push_enabled
-      from app.users u
-      where u.id = ${userId}
     `,
   );
   if (!row) return null;
   return {
-    email: row.email,
-    deleted: row.deleted,
+    email: user.email,
+    deleted: user.deleted,
     suppressed: row.suppressed,
     hasPush: row.has_push,
     emailEnabled: row.email_enabled,

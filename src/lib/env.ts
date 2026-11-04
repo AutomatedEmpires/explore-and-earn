@@ -3,6 +3,20 @@ import { z } from 'zod';
 const secret = z.string().min(32, 'must be at least 32 characters');
 const optional = z.string().min(1).optional();
 
+/**
+ * The values .env.local.example ships for its secrets ("dev-only-...", "dev-placeholder-...").
+ * The repo is public, so outside dev they are no secret at all: anyone could forge unsubscribe
+ * tokens or call the jobs endpoint. gitleaks allowlists them by value, so only this check
+ * stops a preview or prod deploy that was filled in from the example.
+ */
+const PUBLIC_PLACEHOLDER = /^dev-(only|placeholder)-/;
+const PLACEHOLDER_CHECKED = [
+  'JOBS_SECRET',
+  'UNSUBSCRIBE_SECRET',
+  'VAPID_PUBLIC_KEY',
+  'VAPID_PRIVATE_KEY',
+] as const;
+
 const schema = z
   .object({
     // App
@@ -84,6 +98,16 @@ const schema = z
       need('CLERK_SECRET_KEY', `when APP_ENV=${env.APP_ENV}`);
       need('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY', `when APP_ENV=${env.APP_ENV}`);
       need('CLERK_WEBHOOK_SECRET', `when APP_ENV=${env.APP_ENV}`);
+
+      for (const key of PLACEHOLDER_CHECKED) {
+        if (PUBLIC_PLACEHOLDER.test(env[key])) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [key],
+            message: `the public placeholder from .env.local.example is not allowed when APP_ENV=${env.APP_ENV}; generate a real value`,
+          });
+        }
+      }
     }
 
     if (env.APP_ENV === 'prod') {
@@ -116,6 +140,11 @@ const schema = z
 
 export type Env = z.output<typeof schema>;
 
+/** Whether `source` is a test runner's environment (Vitest sets VITEST). */
+function isTestRun(source: Record<string, string | undefined>): boolean {
+  return Boolean(source.VITEST) || source.NODE_ENV === 'test';
+}
+
 /**
  * Validates an environment record. Empty values count as missing.
  * Throws an Error listing every problem, one per line, each starting with the variable name.
@@ -126,12 +155,22 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
     if (value !== undefined && value.trim() !== '') cleaned[key] = value;
   }
 
+  const lines: string[] = [];
   const result = schema.safeParse(cleaned);
   if (!result.success) {
-    const lines = result.error.issues.map((issue) => {
+    for (const issue of result.error.issues) {
       const key = issue.path.map(String).join('.') || '(root)';
-      return `- ${key}: ${issue.message}`;
-    });
+      lines.push(`- ${key}: ${issue.message}`);
+    }
+  }
+  // In-memory storage lives in one process: a browser cannot upload to its memory:// URLs, and
+  // serverless instances do not share it. It exists for unit tests, which run under Vitest.
+  if (cleaned.STORAGE_PROVIDER === 'stub' && !isTestRun(source)) {
+    lines.push(
+      '- STORAGE_PROVIDER: stub (in-memory) is for unit tests only; use local in dev and supabase elsewhere',
+    );
+  }
+  if (!result.success || lines.length > 0) {
     throw new Error(`Invalid environment:\n${lines.join('\n')}`);
   }
   return result.data;

@@ -32,7 +32,11 @@ export type ActionStatus = (typeof ACTION_STATUSES)[number];
 export const CHECK_DECISIONS = ['approved', 'rejected', 'needs_review'] as const;
 export type CheckDecision = (typeof CHECK_DECISIONS)[number];
 
-export type CheckKind = 'image_safety' | 'text_safety';
+/**
+ * A check kind: Foundation's two, or one a later sub-project registers with registerCheckKind
+ * (listing, message scam, business verification, ...).
+ */
+export type CheckKind = 'image_safety' | 'text_safety' | (string & {});
 
 export type OpenReviewItemInput = {
   queue: Queue;

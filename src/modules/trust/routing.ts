@@ -4,12 +4,11 @@
 // fewest items in hand (assigned or escalated), ties to whoever was assigned longest ago, never
 // first. When nobody can take it, the item still opens, unassigned (`open`): the SLA sweep
 // alerts the Owner once it is overdue, so nothing is lost (Review Focus 4).
-import { sql } from 'drizzle-orm';
-import { queryRows, type DbOrTx } from '@/lib/db';
+import type { DbOrTx } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { record } from '@/modules/audit';
 import { raiseAlert } from './alerts';
-import { excludeOperators, touchOperator, transact } from './internal';
+import { leastLoadedOperator, touchOperator, transact } from './internal';
 import { reviewItems } from './schema';
 import type { OpenReviewItemInput, Queue } from './types';
 
@@ -41,25 +40,7 @@ export async function pickAssignee(
   queue: Queue,
   exclude: readonly (string | null | undefined)[] = [],
 ): Promise<string | null> {
-  const [row] = await queryRows<{ user_id: string }>(
-    db,
-    sql`
-      select o.user_id
-      from app.operators o
-      join app.users u on u.id = o.user_id and u.deleted_at is null
-      cross join lateral (
-        select count(*)::int as n
-        from app.review_items r
-        where r.assignee_operator_id = o.user_id and r.status in ('assigned', 'escalated')
-      ) held
-      where o.shift_status = 'on_shift'
-        and (o.role = 'owner' or ${queue}::text = any (o.queues))
-        ${excludeOperators(exclude)}
-      order by held.n, o.last_assigned_at asc nulls first, o.user_id
-      limit 1
-    `,
-  );
-  return row?.user_id ?? null;
+  return leastLoadedOperator(db, { queue, onShift: true, exclude });
 }
 
 /**

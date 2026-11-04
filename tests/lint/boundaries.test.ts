@@ -45,6 +45,46 @@ describe('module boundaries (ESLint)', () => {
     expect(await restrictedImportErrors('ok-import.ts', 'src/app/ok-import.ts')).toHaveLength(0);
   });
 
+  it("rejects a relative path from one module into another module's internals", async () => {
+    const [result] = await eslint.lintText(readFileSync(fixture('sibling-deep-import.ts'), 'utf8'), {
+      filePath: path.join(root, 'src/modules/media/x.ts'),
+    });
+    const lines = (result?.messages ?? [])
+      .filter((m) => m.ruleId === 'local/module-boundaries' && m.severity === 2)
+      .map((m) => m.line);
+    // The import, the re-export and the dynamic import.
+    expect(lines).toEqual([2, 3, 6]);
+  });
+
+  it('resolves relative paths from any depth inside a module', async () => {
+    const code = [
+      "import { transact } from '../../trust/internal';",
+      "import { jobKey } from '../notify';",
+      "import { reviewItems } from '../../../modules/trust/schema';",
+      'export const all = [transact, jobKey, reviewItems];',
+      '',
+    ].join('\n');
+    const [result] = await eslint.lintText(code, {
+      filePath: path.join(root, 'src/modules/notifications/email/x.ts'),
+    });
+    const lines = (result?.messages ?? [])
+      .filter((m) => m.ruleId === 'local/module-boundaries' && m.severity === 2)
+      .map((m) => m.line);
+    expect(lines).toEqual([1, 3]);
+  });
+
+  it("allows another module's index and the module's own files by relative path", async () => {
+    const [result] = await eslint.lintText(
+      readFileSync(fixture('sibling-index-import.ts'), 'utf8'),
+      { filePath: path.join(root, 'src/modules/media/x.ts') },
+    );
+    expect(
+      (result?.messages ?? []).filter(
+        (m) => m.ruleId === 'local/module-boundaries' || m.ruleId === 'no-restricted-imports',
+      ),
+    ).toEqual([]);
+  });
+
   it('rejects relative paths into module internals, except in src/db/schema.ts', async () => {
     expect(
       await restrictedImportErrors('relative-deep-import.ts', 'src/server/relative-deep-import.ts'),
@@ -73,6 +113,10 @@ describe('module boundaries (ESLint)', () => {
     expect(
       await restrictedImportErrors('uses-drizzle.ts', 'src/modules/jobs/outbox.ts'),
     ).toHaveLength(0);
+    // No other src/lib file, the rate limiter included (it lives in src/modules/ratelimit).
+    for (const file of ['src/lib/rate-limit.ts', 'src/lib/logger.ts']) {
+      expect(await restrictedImportErrors('uses-drizzle.ts', file), file).not.toHaveLength(0);
+    }
     expect(await restrictedImportErrors('uses-drizzle.ts', 'src/lib/db.ts')).toHaveLength(0);
     expect(await restrictedImportErrors('uses-drizzle.ts', 'src/lib/migrate.ts')).toHaveLength(0);
     expect(await restrictedImportErrors('uses-drizzle.ts', 'tests/helpers/db.ts')).toHaveLength(0);

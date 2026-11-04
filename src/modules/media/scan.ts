@@ -25,6 +25,7 @@ import { conflict, isAppError, notFound } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { record } from '@/modules/audit';
 import { enqueue, type HandlerMap } from '@/modules/jobs';
+import { notify } from '@/modules/notifications';
 import {
   findLatestCheck,
   openReviewItem,
@@ -132,6 +133,18 @@ async function removeQuietly(storage: Storage, bucket: Bucket, objectPath: strin
   }
 }
 
+/**
+ * Tells the uploader why their file was rejected (spec section 7, step 4), in the transaction
+ * that settles it, so they are told exactly once. Never used for a child-safety block.
+ */
+async function tellRejected(db: DbOrTx, row: MediaRow, reason: RejectionReason): Promise<void> {
+  await notify(db, row.ownerUserId, 'media.rejected', {
+    mediaId: row.id,
+    kind: row.kind,
+    reason,
+  });
+}
+
 async function reject(
   db: DbOrTx,
   deps: ScanDeps,
@@ -140,10 +153,14 @@ async function reject(
   facts: Partial<Facts>,
   log: Record<string, unknown> = {},
 ): Promise<MediaStatus> {
-  const settled = await settle(db, row.id, {
-    status: 'rejected',
-    rejectionReason: reason,
-    ...factColumns(facts),
+  const settled = await db.transaction(async (tx) => {
+    const done = await settle(tx, row.id, {
+      status: 'rejected',
+      rejectionReason: reason,
+      ...factColumns(facts),
+    });
+    if (done) await tellRejected(tx, row, reason);
+    return done;
   });
   if (!settled) return statusOf(db, row.id);
   logger.info('media rejected', { mediaId: row.id, kind: row.kind, reason, ...log });
@@ -342,16 +359,22 @@ async function scanImage(
     if (objectPath) await deps.storage.write(bucket, objectPath, v.bytes, 'image/webp');
   }
 
-  const settled = await settle(db, row.id, {
-    status,
-    ...(status === 'rejected' ? { rejectionReason: 'unsafe_content' satisfies RejectionReason } : {}),
-    bucket,
-    path: row.id,
-    variants,
-    width: processed.width,
-    height: processed.height,
-    altText: wantAltText ? (check.altText ?? null) : null,
-    ...factColumns(facts),
+  const settled = await db.transaction(async (tx) => {
+    const done = await settle(tx, row.id, {
+      status,
+      ...(status === 'rejected'
+        ? { rejectionReason: 'unsafe_content' satisfies RejectionReason }
+        : {}),
+      bucket,
+      path: row.id,
+      variants,
+      width: processed.width,
+      height: processed.height,
+      altText: wantAltText ? (check.altText ?? null) : null,
+      ...factColumns(facts),
+    });
+    if (done && status === 'rejected') await tellRejected(tx, row, 'unsafe_content');
+    return done;
   });
   if (!settled) return statusOf(db, row.id);
   if (status === 'rejected') {
@@ -554,8 +577,10 @@ export async function approveHeldMedia(
 /**
  * `remove`: a held or published file is rejected (`removed_by_operator`) and taken down. Its
  * copies are kept in media-private, never served to its owner, so an appeal can publish it
- * again; a held file the scanner could not read is deleted instead. On a blocked file (a
- * child-safety match) it confirms the block: nothing changes, and the evidence stays.
+ * again; a held file the scanner could not read is deleted instead. The owner is told, in the
+ * caller's transaction. On a blocked file (a child-safety match) it confirms the block: nothing
+ * changes, the evidence stays and nobody is told; nor is anyone told again when a removal is
+ * upheld.
  */
 export async function removeMedia(db: DbOrTx, storage: Storage, mediaId: string): Promise<void> {
   const row = await lockRow(db, mediaId);
@@ -576,6 +601,7 @@ export async function removeMedia(db: DbOrTx, storage: Storage, mediaId: string)
     .update(media)
     .set({ status: 'rejected', rejectionReason: 'removed_by_operator', bucket })
     .where(eq(media.id, mediaId));
+  await tellRejected(db, row, 'removed_by_operator');
   // The public copies are superseded by the private ones; an unscanned original is not kept.
   if (bucket !== row.bucket || row.bucket === 'quarantine') {
     await enqueueCleanup(

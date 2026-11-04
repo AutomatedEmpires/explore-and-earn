@@ -11,7 +11,7 @@
 //   decision held for one never waits on nobody.
 import { and, eq, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { queryRows, type DbOrTx, type Tx } from '@/lib/db';
+import type { DbOrTx, Tx } from '@/lib/db';
 import { badRequest, conflict, forbidden, notFound } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import { record } from '@/modules/audit';
@@ -21,10 +21,10 @@ import { getSetting } from '@/modules/settings';
 import {
   anyOperatorBesides,
   coversQueue,
-  excludeOperators,
   findOperator,
   findOperators,
   isUuid,
+  leastLoadedOperator,
   touchOperator,
   transact,
   type ActiveOperator,
@@ -271,28 +271,11 @@ export async function handOff(
 }
 
 /** The Owner holding the fewest assigned or escalated items (then: assigned longest ago). */
-async function leastLoadedOwner(
+function leastLoadedOwner(
   db: DbOrTx,
   exclude: readonly (string | null)[],
 ): Promise<string | null> {
-  const [row] = await queryRows<{ user_id: string }>(
-    db,
-    sql`
-      select o.user_id
-      from app.operators o
-      join app.users u on u.id = o.user_id and u.deleted_at is null
-      cross join lateral (
-        select count(*)::int as n
-        from app.review_items r
-        where r.assignee_operator_id = o.user_id and r.status in ('assigned', 'escalated')
-      ) held
-      where o.role = 'owner'
-        ${excludeOperators(exclude)}
-      order by held.n, o.last_assigned_at asc nulls first, o.user_id
-      limit 1
-    `,
-  );
-  return row?.user_id ?? null;
+  return leastLoadedOperator(db, { role: 'owner', exclude });
 }
 
 /**

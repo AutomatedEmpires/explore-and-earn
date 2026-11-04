@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import nextVitals from 'eslint-config-next/core-web-vitals';
 import nextTs from 'eslint-config-next/typescript';
@@ -5,6 +6,49 @@ import tseslint from 'typescript-eslint';
 
 // Import boundaries (spec section 1). ESLint replaces, not merges, a rule's options when a
 // later block matches the same file, so each block below lists its complete pattern set.
+
+/**
+ * `local/module-boundaries`: inside src/modules/<a>/, a relative import that resolves into
+ * another module <b> may only name <b>'s root (its index). A specifier like '../trust/internal'
+ * never spells out `modules/`, so the no-restricted-imports patterns below cannot see it; this
+ * rule resolves the path against the importing file instead, at any folder depth.
+ */
+const moduleBoundaries = {
+  meta: {
+    type: 'problem',
+    schema: [],
+    messages: {
+      deep: "Import the {{module}} module only through its public index: @/modules/{{module}}.",
+    },
+  },
+  create(context) {
+    const modulesRoot = path.join(context.cwd, 'src', 'modules');
+    const own = path.relative(modulesRoot, context.filename).split(/[\\/]/);
+    if (own.length < 2 || own[0] === '..' || path.isAbsolute(own[0] ?? '')) return {};
+    const ownModule = own[0];
+
+    const check = (source) => {
+      if (!source || typeof source.value !== 'string' || !source.value.startsWith('.')) return;
+      const target = path.relative(
+        modulesRoot,
+        path.resolve(path.dirname(context.filename), source.value),
+      );
+      const [module, ...rest] = target.split(/[\\/]/);
+      if (!module || module === '..' || path.isAbsolute(target) || module === ownModule) return;
+      const isIndex = rest.length === 0 || (rest.length === 1 && /^index(\.tsx?)?$/.test(rest[0]));
+      if (!isIndex) context.report({ node: source, messageId: 'deep', data: { module } });
+    };
+
+    return {
+      ImportDeclaration: (node) => check(node.source),
+      ExportNamedDeclaration: (node) => check(node.source),
+      ExportAllDeclaration: (node) => check(node.source),
+      ImportExpression: (node) => check(node.source.type === 'Literal' ? node.source : null),
+    };
+  },
+};
+
+const localPlugin = { rules: { 'module-boundaries': moduleBoundaries } };
 
 /** `@/modules/<name>/...` or a relative path into `.../modules/<name>/...`. */
 const deepModuleImport = {
@@ -40,6 +84,8 @@ export default defineConfig([
     '.data/**',
     '.clerk/**',
     'artifacts/**',
+    // Local agent settings and the git worktrees agents check out inside the repo folder.
+    '.claude/**',
     // Intentionally broken inputs for tests/lint/boundaries.test.ts.
     'tests/lint/fixtures/**',
   ]),
@@ -47,7 +93,9 @@ export default defineConfig([
   ...nextTs,
   ...tseslint.configs.strict,
   {
+    plugins: { local: localPlugin },
     rules: {
+      'local/module-boundaries': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': [
         'error',
@@ -61,8 +109,6 @@ export default defineConfig([
       'src/modules/**',
       'src/lib/db.ts',
       'src/lib/migrate.ts',
-      // The rate limiter's upsert is raw SQL over app.rate_limits (W4, Task 11).
-      'src/lib/rate-limit.ts',
       'tests/**',
       '**/*.test.ts',
       '**/*.test.tsx',

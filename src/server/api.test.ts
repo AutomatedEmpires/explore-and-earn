@@ -1,9 +1,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { createTestDb, type TestDb } from '../../tests/helpers/db';
-import type { Db } from '@/lib/db';
+import { sql } from 'drizzle-orm';
+import { users } from '@/db/schema';
+import { queryRows, type Db } from '@/lib/db';
 import { notFound, unauthorized } from '@/lib/errors';
+import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
+import { record } from '@/modules/audit';
 import { GET as health } from '@/app/api/v1/health/route';
 import { apiRoute, toErrorResponse } from './api';
 import { requireHost, requireUser, type CurrentUser } from './guards';
@@ -21,6 +25,12 @@ vi.mock('@/lib/db', async (importOriginal) => {
     },
   };
 });
+
+const sentry = vi.hoisted(() => ({ captureException: vi.fn() }));
+vi.mock('@sentry/nextjs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sentry/nextjs')>()),
+  captureException: sentry.captureException,
+}));
 
 // The real guards need a Clerk request; each test decides what they return.
 vi.mock('./guards', () => ({
@@ -102,6 +112,33 @@ describe('apiRoute errors', () => {
     logged.mockRestore();
   });
 
+  it("never sends a failed query's parameters to the log or to Sentry", async () => {
+    const email = 'maya.private@example.test';
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    sentry.captureException.mockClear();
+    const route = apiRoute({
+      handler: async ({ db }) => {
+        // Violates the account_type CHECK constraint; drizzle's message lists the values.
+        await db.insert(users).values({
+          id: newId(),
+          clerkUserId: 'user_api_pii',
+          email,
+          accountType: 'bogus' as 'seeker',
+        });
+      },
+    });
+
+    const res = await route(new Request(`${APP_URL}/api/v1/thing`));
+
+    expect(res.status).toBe(500);
+    const [reported] = sentry.captureException.mock.calls[0] ?? [];
+    expect(reported).toBeInstanceOf(Error);
+    expect((reported as Error).message).toContain('Failed query: insert into');
+    expect(`${(reported as Error).message}${(reported as Error).stack}`).not.toContain(email);
+    expect(logged.mock.calls.map((c) => String(c[0])).join('\n')).not.toContain(email);
+    logged.mockRestore();
+  });
+
   it('toErrorResponse keeps details and sets the request id header', async () => {
     const res = toErrorResponse(unauthorized('Sign in', { hint: 'cookie' }), 'req-12345678');
     expect(res.status).toBe(401);
@@ -114,6 +151,43 @@ describe('apiRoute errors', () => {
         requestId: 'req-12345678',
       },
     });
+  });
+});
+
+describe('apiRoute request context', () => {
+  it("gives audit rows and log lines written in a handler the request's id and hashed IP", async () => {
+    const action = `test.api_ctx.${newId()}`;
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((line: unknown) => void lines.push(String(line)));
+    const route = apiRoute({
+      handler: async ({ db, user }) => {
+        logger.info('deep inside a module');
+        await record(db, {
+          actorType: 'user',
+          actorId: user?.id ?? newId(),
+          action,
+          subjectType: 'test_item',
+          subjectId: null,
+        });
+      },
+    });
+
+    const res = await route(
+      new Request(`${APP_URL}/api/v1/thing`, { headers: { 'x-forwarded-for': '203.0.113.7' } }),
+    );
+    const requestId = res.headers.get('x-request-id');
+
+    const [row] = await queryRows<{ request_id: string | null; ip_hash: string | null }>(
+      state.db as Db,
+      sql`select request_id, ip_hash from app.audit_events where action = ${action}`,
+    );
+    expect(row?.request_id).toBe(requestId);
+    expect(row?.ip_hash).toMatch(/^[0-9a-f]{32}$/);
+    expect(row?.ip_hash).not.toContain('203.0.113.7');
+    expect(JSON.parse(lines.find((l) => l.includes('deep inside')) ?? '{}')).toMatchObject({
+      requestId,
+    });
+    vi.mocked(console.log).mockRestore();
   });
 });
 

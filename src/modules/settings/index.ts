@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger';
 import { record } from '@/modules/audit';
 import type { HandlerMap } from '@/modules/jobs';
 import {
+  MERGED_SETTINGS,
   SETTING_DEFAULTS,
   SETTING_KEYS,
   SETTING_SCHEMAS,
@@ -21,6 +22,7 @@ export {
   type SettingKey,
   type SettingValue,
   type SettingValues,
+  type Thresholds,
 } from './registry';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -29,11 +31,18 @@ function isSettingKey(key: string): key is SettingKey {
   return Object.hasOwn(SETTING_SCHEMAS, key);
 }
 
-/** The stored value if it is present and valid, else a copy of the default. */
+/**
+ * The stored value if it is present and valid, else a copy of the default. A map setting
+ * (MERGED_SETTINGS) is the stored value merged over a copy of the default, name by name.
+ */
 function resolve<K extends SettingKey>(key: K, storedJson: string | undefined): SettingValue<K> {
   if (storedJson === undefined) return structuredClone(SETTING_DEFAULTS[key]);
   const parsed = SETTING_SCHEMAS[key].safeParse(JSON.parse(storedJson));
-  if (parsed.success) return parsed.data;
+  if (parsed.success) {
+    if (!MERGED_SETTINGS.has(key)) return parsed.data;
+    const merged: object = { ...(structuredClone(SETTING_DEFAULTS[key]) as object) };
+    return Object.assign(merged, parsed.data) as SettingValue<K>;
+  }
   logger.warn('stored setting is invalid; using its default', {
     key,
     issues: parsed.error.issues,

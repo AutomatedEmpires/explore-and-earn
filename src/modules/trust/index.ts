@@ -16,7 +16,14 @@ export {
   type DecisionData,
 } from './actions';
 export { raiseAlert, type Alert } from './alerts';
-export { CLASSIFIER_ERROR, findLatestCheck, runCheck } from './checks';
+export {
+  CLASSIFIER_ERROR,
+  findLatestCheck,
+  registerCheckKind,
+  runCheck,
+  type CheckKindDef,
+  type CheckOutput,
+} from './checks';
 export { SLA_HOURS, openReviewItem, pickAssignee } from './routing';
 export { auditSample } from './sampling';
 export { slaSweep } from './sla';

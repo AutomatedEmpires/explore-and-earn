@@ -21,13 +21,13 @@ src/
     api/webhooks/        clerk, stripe (later), resend
     api/jobs/run         worker endpoint (called by the scheduler)
   modules/               one folder per domain module
-    identity/ orgs/ media/ trust/ audit/ jobs/ notifications/ operator/ settings/
+    identity/ orgs/ media/ trust/ audit/ jobs/ notifications/ operator/ settings/ ratelimit/
       index.ts           the module's public API (the only file other modules may import)
       schema.ts          Drizzle tables for this module
       service.ts         domain logic
       *.test.ts
   ui/                    design system: tokens.css, components/, icons, charts, patterns/
-  lib/                   env, db, ids, errors, logger, http, ai, rate-limit
+  lib/                   env, db, ids, errors, logger, http, ai
   server/                request context, auth guards (requireSeeker/Host/Operator)
 drizzle/                 generated SQL migrations (committed)
 tests/e2e/               Playwright
