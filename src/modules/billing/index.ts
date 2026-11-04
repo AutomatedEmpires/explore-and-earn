@@ -1,182 +1,150 @@
 // Public API of the billing module: Stripe customers, subscriptions, plan changes, founding
-// codes, webhooks and reconciliation (SP2 spec sections 3 and 8). W0 contract: typed stubs that
-// W2 (Tasks 11-16) replaces. Imports entitlements and orgs.
-import type { Db, DbOrTx } from '@/lib/db';
-import type { Actor } from '@/modules/entitlements';
+// codes, webhooks and reconciliation (SP2 spec sections 3 and 8; W2, Tasks 11-16). Imports
+// entitlements and orgs. Every Stripe call goes through the BillingGateway (./gateway).
+import { z } from 'zod';
 import type { HandlerMap } from '@/modules/jobs';
+import { CANCEL_TOPIC, cancelSubscriptionNow } from './cancel';
+import { applyLaunchDate, grantMonthlyCredits, reconcile } from './jobs';
+import { notifyBillingContacts } from './notifications';
+import { getSubscriptionState } from './state';
+import { syncFromStripe } from './sync';
+import { SYNC_TOPIC } from './webhook';
+// Module-load registrations: notification types and the billing_account subject handlers.
+import './notifications';
+import './subjects';
 
 export type { Actor } from '@/modules/entitlements';
 
-export type PlanCode = 'starter' | 'professional' | 'enterprise';
-export type BillingInterval = 'month' | 'year';
-
-/** Section 8.1 values. Stripe prices are authoritative for charging. */
-export const PLANS: Record<
-  PlanCode,
-  {
-    monthlyCents: number;
-    annualCents: number;
-    slots: number;
-    seats: number;
-    inviteCredits: number;
-    extraSlotMonthlyCents: number;
-  }
-> = {
-  starter: {
-    monthlyCents: 9900,
-    annualCents: 99000,
-    slots: 2,
-    seats: 1,
-    inviteCredits: 10,
-    extraSlotMonthlyCents: 3900,
-  },
-  professional: {
-    monthlyCents: 29900,
-    annualCents: 299000,
-    slots: 10,
-    seats: 5,
-    inviteCredits: 50,
-    extraSlotMonthlyCents: 2900,
-  },
-  enterprise: {
-    monthlyCents: 59900,
-    annualCents: 599000,
-    slots: 30,
-    seats: 15,
-    inviteCredits: 150,
-    extraSlotMonthlyCents: 1900,
-  },
-};
-
-export type SubscriptionState = {
-  status:
-    | 'none'
-    | 'incomplete'
-    | 'trialing'
-    | 'active'
-    | 'past_due'
-    | 'canceled'
-    | 'unpaid'
-    | 'incomplete_expired'
-    | 'paused';
-  plan: PlanCode | null;
-  interval: BillingInterval | null;
-  extraSlots: number;
-  entitled: boolean;
-  canPublish: boolean;
-  trialEnd: Date | null;
-  currentPeriodEnd: Date | null;
-  cancelAtPeriodEnd: boolean;
-  hostSince: Date | null;
-  founding: 'none' | 'active' | 'lapsed' | 'forfeited';
-};
-
-/**
- * The Stripe calls billing makes. W0 declares only what `cancelSubscriptionNow` needs; W2's
- * gateway (Task 11) defines the full interface.
- */
-export interface BillingGateway {
-  /** Cancels immediately, without proration. */
-  cancelSubscription(id: string, idempotencyKey: string): Promise<void>;
-}
-
-function notImplemented(name: string): never {
-  throw new Error(`not implemented: ${name} (W2)`);
-}
-
-export async function getSubscriptionState(
-  _db: DbOrTx,
-  _orgId: string,
-): Promise<SubscriptionState> {
-  return notImplemented('getSubscriptionState');
-}
-
-/** The entitled orgs among `orgIds`, for subscriber badges (SP3 cards). */
-export async function getSubscriberBadges(
-  _db: DbOrTx,
-  _orgIds: string[],
-): Promise<Map<string, { hostSince: Date }>> {
-  return notImplemented('getSubscriberBadges');
-}
-
+export {
+  BILLING_INTERVALS,
+  EXTRA_SLOT_ANNUAL_MULTIPLIER,
+  FOUNDING_COUPON_ID,
+  PLANS,
+  PLAN_CODES,
+  lookupKey,
+  monthlyEquivalentCents,
+  parseLookupKey,
+  planItems,
+  planLimits,
+  type BillingInterval,
+  type LookupKind,
+  type Plan,
+  type PlanCode,
+} from './plans';
+export {
+  BillingCardError,
+  billingGateway,
+  isBillingCardError,
+  stripeGateway,
+  type BillingGateway,
+  type CardChecks,
+  type CheckoutParams,
+  type GatewayItem,
+  type ProrationBehavior,
+  type SubSnapshot,
+  type SubscriptionStatus,
+  type SubscriptionUpdate,
+  type WebhookEvent,
+} from './gateway';
+export { makeFakeBillingGateway, type FakeBillingGateway } from './gateway-fake';
+export {
+  seedStripeCatalog,
+  stripeCatalogApi,
+  type CatalogApi,
+  type CatalogPrice,
+  type PortalConfigurationInput,
+} from './catalog';
+export {
+  computeFoundingTrialEnd,
+  createCheckout,
+  isReturningFounder,
+  type CheckoutInput,
+} from './checkout';
 /** SP6 one-time purchases. */
-export async function ensureStripeCustomer(_db: Db, _orgId: string): Promise<string> {
-  return notImplemented('ensureStripeCustomer');
-}
+export { ensureStripeCustomer } from './customers';
+export {
+  createFoundingCodes,
+  generateFoundingCode,
+  getFoundingCount,
+  normalizeFoundingCode,
+} from './founding';
 
-export async function syncSubscription(_db: Db, _stripeSubscriptionId: string): Promise<void> {
-  return notImplemented('syncSubscription');
-}
-
-export async function getPendingKeepList(_db: DbOrTx, _orgId: string): Promise<string[] | null> {
-  return notImplemented('getPendingKeepList');
-}
-
-export async function createFoundingCodes(
-  _db: Db,
-  _i: { count: number; note: string; operatorId: string | null },
-): Promise<string[]> {
-  return notImplemented('createFoundingCodes');
-}
-
-export async function getFoundingCount(
-  _db: DbOrTx,
-): Promise<{ redeemed: number; held: number; max: number }> {
-  return notImplemented('getFoundingCount');
-}
-
-/** Marks the org's pending plan change applied once listings has enforced its keep list. */
-export async function settlePendingChange(_db: DbOrTx, _orgId: string): Promise<void> {
-  return notImplemented('settlePendingChange');
-}
-
-/** Sets the org status; a ban also enqueues `billing.cancel_subscription`. */
-export async function sanctionOrg(
-  _db: DbOrTx,
-  _orgId: string,
-  _action: 'suspend' | 'ban',
-  _actor: Actor,
-): Promise<void> {
-  return notImplemented('sanctionOrg');
-}
-
-/** Cancels the org's current subscription at once, without proration. */
-export async function cancelSubscriptionNow(
-  _db: DbOrTx,
-  _orgId: string,
-  _gw?: BillingGateway,
-): Promise<void> {
-  return notImplemented('cancelSubscriptionNow');
-}
-
-/** The default card's Stripe checks, for business verification. */
-export async function getCardChecks(
-  _db: DbOrTx,
-  _orgId: string,
-): Promise<{ hasCard: boolean; cvcCheck: string | null; postalCheck: string | null }> {
-  return notImplemented('getCardChecks');
-}
-
+export {
+  foundingStatusOf,
+  getSubscriberBadges,
+  getSubscriptionState,
+  type SubscriptionState,
+} from './state';
+export {
+  BILLING_SUBJECT,
+  grantMonthCredits,
+  parsePlanItems,
+  syncFromStripe,
+  syncSubscription,
+  type ParsedPlan,
+  type SyncResult,
+} from './sync';
+export { SYNC_TOPIC, handleStripeWebhook, type SyncJob } from './webhook';
+export { finishCheckout } from './complete';
+export {
+  getBillingOverview,
+  getPublicPrices,
+  type BillingOverview,
+  type PlanPrices,
+  type PublicPrices,
+} from './overview';
+export {
+  changePlan,
+  getPendingKeepList,
+  previewChange,
+  registerSlotHolderSource,
+  settlePendingChange,
+  type PlanChoice,
+  type SlotHolderSource,
+} from './change';
+export { createPortalSession } from './portal';
+export { CANCEL_TOPIC, cancelSubscriptionNow, getCardChecks, sanctionOrg } from './cancel';
+export { applyLaunchDate, grantMonthlyCredits, reconcile } from './jobs';
 /** SP8 registers these with its privacy exporter and eraser. */
-export const privacyHandlers: {
-  export(db: DbOrTx, userId: string): Promise<Record<string, unknown>>;
-  erase(db: DbOrTx, userId: string): Promise<void>;
-} = {
-  async export() {
-    return notImplemented('privacyHandlers.export');
-  },
-  async erase() {
-    return notImplemented('privacyHandlers.erase');
-  },
-};
+export { privacyHandlers } from './privacy';
+export {
+  BILLING_CONTACT_ROLES,
+  notifyBillingContacts,
+  type BillingNotificationType,
+} from './notifications';
 
-const noop = async () => {};
+const syncJob = z.object({
+  subscriptionId: z.string().min(1),
+  notify: z.enum(['payment_failed', 'trial_ending']).optional(),
+});
 
-/** W2 replaces each no-op (spec section 6, plus billing.cancel_subscription). */
+/** Outbox topics (spec section 6, plus billing.cancel_subscription). */
 export const jobHandlers: HandlerMap = {
-  'billing.sync_subscription': noop,
-  'billing.grant_monthly_credits': noop,
-  'billing.apply_launch_date': noop,
-  'billing.reconcile': noop,
-  'billing.cancel_subscription': noop,
+  // A webhook's sync, then the notification the event asked for.
+  [SYNC_TOPIC]: async (payload, { db }) => {
+    const job = syncJob.parse(payload);
+    const result = await syncFromStripe(db, job.subscriptionId);
+    if (!result || !job.notify) return;
+    const state = await getSubscriptionState(db, result.orgId);
+    await notifyBillingContacts(
+      db,
+      result.orgId,
+      job.notify === 'payment_failed' ? 'billing.payment_failed' : 'billing.trial_ending',
+      { plan: state.plan, trialEnd: state.trialEnd?.toISOString() ?? null },
+    );
+  },
+  'billing.grant_monthly_credits': async (_payload, { db, now }) => {
+    await grantMonthlyCredits(db, now);
+  },
+  'billing.apply_launch_date': async (_payload, { db, now }) => {
+    await applyLaunchDate(db, now);
+  },
+  'billing.reconcile': async (_payload, { db, now }) => {
+    await reconcile(db, now);
+  },
+  // A ban's Stripe cancellation, outside the sanction's transaction (SP2 plan, decision 4).
+  [CANCEL_TOPIC]: async (payload, { db }) => {
+    const { orgId } = z.object({ orgId: z.uuid() }).parse(payload);
+    await cancelSubscriptionNow(db, orgId);
+  },
 };
