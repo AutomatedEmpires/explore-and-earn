@@ -48,6 +48,8 @@ const schema = z
     // Secrets
     JOBS_SECRET: secret,
     UNSUBSCRIBE_SECRET: secret,
+    // SP3: the HMAC key for view dedupe and the guest viewer key (spec 8.12).
+    ANALYTICS_HASH_SECRET: secret,
 
     // Monitoring
     SENTRY_DSN: optional,

@@ -56,6 +56,7 @@
     "react-email": "^6.11.6",
     "recharts": "^3.10.1",
     "resend": "^6.37.0",
+    "server-only": "0.0.1",
     "sharp": "^0.35.5",
     "stripe": "23.0.0",
     "svix": "^2.9.1",
