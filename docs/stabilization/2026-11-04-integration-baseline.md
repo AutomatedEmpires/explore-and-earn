@@ -16,7 +16,7 @@ This is the handoff for the next implementation agent. It is the source of truth
 | Branch | Role | HEAD at handoff |
 |---|---|---|
 | `main` | Docs only. No `src` tree. | `a5b407b` |
-| `integrate/foundation-20261104` | Foundation core hardening (`feat/foundation` `9425e95`) merged onto Foundation screens (`feat/foundation-screens` `b47e2fe`). | `beca01f` |
+| `integrate/foundation-20261104` | Foundation core hardening (`feat/foundation` `9425e95`) merged onto Foundation screens (`feat/foundation-screens` `b47e2fe`). | `19dae34` |
 | `integrate/sp2-20261104` | `feat/sp2` (`888205b`) merged onto that foundation baseline, then the combined-suite fixes below. | `9b86d38` plus this document |
 
 `feat/foundation`, `feat/foundation-screens`, and `feat/sp2` were not moved. Original worktrees were not cleaned.
@@ -53,7 +53,7 @@ Foundation (`integrate/foundation-20261104`):
 
 - Lint, design-token check, and `pnpm typecheck` passed.
 - Production `pnpm build` passed after the settings form stopped importing the server settings module (Next.js 16.4.5).
-- Unit suite, before the last client-only form fix: 698 passed, 1 failed (`createTestDb` isolation, 30s timeout under load). That test's timeout is now 90s. A focused rerun of `src/lib/migrate.test.ts` and `tests/lint/table-ownership.test.ts` passed, 10 tests.
+- Full unit suite on `19dae34`: 67 files passed, 699 tests passed, exit 0. An earlier run timed out once while opening two PostGIS databases; that test's limit is 90s.
 
 SP2 (`integrate/sp2-20261104`):
 
@@ -61,7 +61,7 @@ SP2 (`integrate/sp2-20261104`):
 - The 17 previously failing tests passed in a focused rerun of those seven files (88 tests) after the fixture and fake fixes, and the host-page file passed after the import-cycle fix (18 tests).
 - Full unit suite on `9b86d38`: 125 files passed, 1444 tests passed, exit 0. No uncaught errors.
 
-SP2 production build was not the gate for the unit fixes. Run `pnpm build` in the SP2 worktree before calling the host UI done.
+SP2 production `pnpm build` at `e2a4af9` exited 0. That is a local build with the gitignored `.env.local`, not a live-provider check.
 
 ## What is not implemented
 
