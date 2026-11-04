@@ -1,5 +1,7 @@
 # Monthly host subscriptions, capacity and focused upsells
 
+> **Prices in this file are not current.** On 4 November 2026 the founder approved Starter $99, Professional $299, and Enterprise $599 per month, and replaced the open D27 price table. The 3 November founding offer (90 days free, then 30% off for life) was also withdrawn. See [FD-6 and FD-7](../decisions/2026-11-04-founder-decisions.md). The rest of this file is the 2 November commercial discussion and is kept as history.
+
 ## 1. Commercial direction and status
 
 **Current user direction:** host monthly subscriptions named **Starter / Professional / Enterprise**. **Confirmed:** seekers free forever, including discovery, native resume build/reviewed import/export, applications and seeker community. Exact host prices, tier allowances, free host preview/trial, analytics split and optional credit products remain Open D27. Earlier free-Starter/Growth/Pro dollar amounts and numeric quotas are superseded assistant proposals; none are current defaults.

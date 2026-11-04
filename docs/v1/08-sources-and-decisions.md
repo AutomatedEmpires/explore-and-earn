@@ -2,7 +2,9 @@
 
 Version 1.2 · 2026-11-02. Living register for product/design/engineering/operations. This is vision and proposed contracts, not implemented features, vendor approval or market validation.
 
-> **Superseded in part (2026-11-03).** Where this register conflicts with [the product design spec](../superpowers/specs/2026-11-03-explore-earn-product-design.md), the spec wins. Its section 27 lists every decision it replaces.
+> **Superseded in part (2026-11-04).** The founder approved [ten decisions](../decisions/2026-11-04-founder-decisions.md): one account type, profile-as-resume with the upload kept from employers, no unknown housing or meals, a subscription badge that is not a trust mark, built-in interview scheduling, monthly prices $99 / $299 / $599, a first-100-organization introductory discount that replaces 90 days free and 30% off for life, Browse by State beside Map, and full-scope public launch with phased build. Those decisions win over this register and over the 3 November product design where they differ. The rows below are kept as the 2 November record.
+>
+> **Superseded in part (2026-11-03).** Where this register conflicts with [the product design spec](../superpowers/specs/2026-11-03-explore-earn-product-design.md), the spec wins, except where the 4 November decisions amend it. Section 27 of the product design lists the 3 November replacements.
 >
 > **Repository names corrected:** `explore-earn` is this repository's old name, which GitHub redirects here. It is not an archived predecessor. The predecessor app is `AutomatedEmpires/exploreearn`.
 

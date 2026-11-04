@@ -1,6 +1,6 @@
 # Explore&Earn product design spec (V1 public launch)
 
-- **Status:** approved in conversation on 2026-11-03. This is the source of truth for the build.
+- **Status:** approved in conversation on 2026-11-03, and amended by the founder on 2026-11-04. Where they disagree, [the 4 November decisions](../../decisions/2026-11-04-founder-decisions.md) win. Otherwise this spec is the source of truth for the build.
 - **Owner:** founder (AutomatedEmpires).
 - **Supersedes:** `docs/v1/*` wherever the two conflict (see section 27). Where `docs/v1` covers something this spec does not, it still applies.
 - **Design board:** https://claude.ai/artifact/TNVygmzxNpqZG3j5RDvgfK (Direction B mockups)
@@ -90,6 +90,7 @@ Seekers see jobs, and hosts see candidates, on **one card template with the same
 | **Seek** | Card feed: search box, filters, category chips, a "Starting soon" chip, result count and sort. |
 | **Swipe** | One card at a time. Left skips, right saves, up opens the apply review, and a tap opens details. Undo is available for 10 seconds. Skipped jobs are hidden and can be restored under Profile → Skipped. Buttons and the keyboard do the same things as the gestures. |
 | **Map** | Pins sit at **host locations**, grouped per location, in the category color with its icon. **Remote jobs are pinned at the host's location** with the laptop icon, and the preview reads "Remote · host based in X · work from: US". Pins cluster when zoomed out. Tapping a pin opens a small host preview (logo, name, location, category dots, number of active listings, View page) and that location's jobs. A pull-up list shows everything currently on the map. |
+| **Browse by State** | A separate surface, not a replacement for Map (founder decision FD-8, 2026-11-04). An original US state map. Choosing a state opens that state's canonical listings. Counts come from those listings. A state with none is an empty state, never a sample number. |
 
 Guests can browse every mode. Save, Apply and Skip ask a guest to sign in, and the action they started is kept and completed afterwards.
 
@@ -252,9 +253,10 @@ Weather comes from the US National Weather Service API, which is free and needs 
 
 ### 9.2 Resume
 
-- **The profile is the resume.** There are two PDF templates, Classic and Compact. A seeker can upload their own PDF instead.
-- **There are no multiple tailored resume versions.** Each application freezes a copy at the moment it's submitted.
-- **AI import:** the seeker uploads a resume and AI fills in the profile. The seeker reviews each field before it's saved. This requires consent, and the AI provider must not train on user data.
+- **The profile is the resume.** Classic and Compact are the generated PDFs. The seeker can also build every section by hand.
+- **An uploaded resume is an import source only** (founder decision FD-2, 2026-11-04). It is not forwarded to employers. The employer receives the Explore&Earn-generated profile or resume, under the seeker's application and privacy controls.
+- **There are no multiple tailored resume versions.** Each application freezes a copy of that generated representation at submit time.
+- **AI import:** the seeker uploads a resume and AI proposes profile fields. The seeker reviews each field before it is saved. This requires consent, and the AI provider must not train on user data.
 - **AI writing help** is available on bio, headline and experience. It's free.
 
 ### 9.3 Profile tab layout
@@ -457,14 +459,16 @@ The operator console has its own address and sidebar. It is never mixed into the
 
 **Verified badge**
 
-- **The badge means an active subscription**, and its tooltip says so honestly: "Active Explore&Earn host since [date]".
-- Automated fraud screening must pass before anything is published.
+- **The badge means an active subscription**, and its tooltip says so honestly: "Active Explore&Earn host since [date]" (FD-4, 2026-11-04). It is not a verification of legitimacy, safety, credentials, or trust. Business verification, if shown at all, uses different words and a different mark.
+- Automated fraud screening must pass before anything is published. Paying does not skip it.
 
-**Founding hosts**
+**Founding hosts** (replaced 2026-11-04, FD-7; the 90-days-free then 30%-off-for-life offer is withdrawn)
 
-- The first 100 hosts get **90 days free, then 30% off for life**.
-- The free period starts at public launch. Founding hosts onboard privately before that, using invite codes.
-- If a founding host cancels and returns within 6 months, they keep the founding rate.
+- The first 100 host organizations are the only cohort. One redemption per organization.
+- Monthly: 50% off the selected tier for the first six subscription months, then the regular monthly price.
+- Annual: 50% off the first annual term (10× the monthly price), then the regular annual price.
+- Any of the three tiers. The discount starts when that organization's paid subscription starts.
+- The cohort closes at 100. Later hosts pay the regular price. Redemption is server-authoritative.
 
 **Seekers pay nothing, ever.**
 
@@ -634,11 +638,13 @@ Analytics **never shows who viewed or saved** a listing.
 
 Eight sub-projects, built in this order. Each gets its own spec, plan and build cycle. Trust and safety hooks are part of every stage from Foundation onward.
 
+Phased build is how the work is sequenced (FD-9, 2026-11-04). It is not permission to launch publicly with a subset. Public launch waits until this spec, as amended by the 4 November decisions, is implemented and the launch gates are met. Previews and internal testing can happen earlier.
+
 | # | Sub-project | Scope | Done when |
 |---|---|---|---|
 | 1 | **Foundation** | Locked design system; app shell and navigation; Clerk identity, organizations and roles synced to Postgres; core database schema and conventions; API skeleton; file storage and scanning pipeline; moderation framework (AI checks, queues, thresholds); audit log; outbox and background jobs; notification channels; operator console skeleton with sign-in, queues and multi-operator routing; CI/CD and the three environments | The design system is approved. A signed-in seeker, host and operator each land in their own shell. An uploaded file goes through scanning. A test item flows through the moderation queue. Migrations deploy dev → preview → prod through CI. |
 | 2 | **Host supply and billing** | Organizations, team and roles; host page; listing builder; the publishing lifecycle, slots, reminders, library and repost; Stripe plans, annual billing, extra slots, coupons, founding-host codes; automated business verification | A founding host can sign up with a code, build their page, publish a listing, and be billed correctly in Stripe test mode. **Private pre-launch begins.** |
-| 3 | **Discovery** | Seek, Swipe, Map; search, filters and sort; listing detail; landing pages and SEO; saved searches and alerts; guest browsing | Every mode works on the real founding-host listings and meets the performance targets |
+| 3 | **Discovery** | Seek, Swipe, Map, and Browse by State; search, filters and sort; listing detail; landing pages and SEO; saved searches and alerts; guest browsing | Every mode works on the real founding-host listings, state counts are live, and the performance targets are met |
 | 4 | **Seeker** | Profile and resume; AI import and writing help; availability; visibility; applying; My jobs; invites inbox | A seeker can build a profile, apply, and track the application |
 | 5 | **Host hiring** | Pipeline; fit score; candidate pools and invites; interviews; offers; messaging; "As described"; analytics | The full journey runs end to end: invite → apply → interview → offer → hired |
 | 6 | **Paid add-ons** | Boosts (with all placements), announcements, extra invite packs and seats | Every add-on can be bought, is labeled, respects its caps, and is reported in analytics |
@@ -691,7 +697,8 @@ Eight sub-projects, built in this order. Each gets its own spec, plan and build 
 | D24: proposed tagline | Adopted, with the founder's story backing it |
 | D25: map direction | Confirmed: host-location pins with a host preview |
 | D26: dashboards brainstorm | Defined in sections 9.3, 15 and 17 |
-| D27 / C18: tier prices, slots and analytics split open | Priced (section 16). **Analytics is the same on every tier.** |
+| D27 / C18: tier prices, slots and analytics split open | Monthly prices approved 2026-11-04 (FD-6): $99 / $299 / $599. Section 16 entitlements stay, except the founding offer. **Analytics is the same on every tier.** |
+| Founding offer in the 3 November draft: 90 days free, then 30% off for life | **Withdrawn** 2026-11-04 (FD-7). First 100 organizations: 50% off for six monthly terms, or 50% off the first annual term. |
 | D28: interviews as a pipeline view only | **Built-in scheduling** (section 11.4) |
 | Listings expired after a set time | **No timer.** Slots, reminders, and automatic close at a fixed end date. |
 | 8 platform staff roles | Operator roles Owner and Operator, assigned to queues (section 20) |
