@@ -44,9 +44,7 @@ describe('getListingAccess and canAccessListing', () => {
       listingIds: [],
       locationIds: [l1],
     });
-    expect(await canAccessListing(t.db, recruiter.ctx, { id: newId(), locationId: l1 })).toBe(
-      true,
-    );
+    expect(await canAccessListing(t.db, recruiter.ctx, { id: newId(), locationId: l1 })).toBe(true);
     expect(await canAccessListing(t.db, recruiter.ctx, { id: newId(), locationId: l2 })).toBe(
       false,
     );
@@ -128,9 +126,9 @@ describe('getListingAccess and canAccessListing', () => {
   it('refuses to assign a listing to someone outside the org', async () => {
     const org = await seedHostOrg(t.db);
     const other = await seedHostOrg(t.db, { name: 'Other Lodge' });
-    await expect(
-      assignListing(t.db, org.orgId, other.owner.userId, newId()),
-    ).rejects.toMatchObject({ code: 'not_found' });
+    await expect(assignListing(t.db, org.orgId, other.owner.userId, newId())).rejects.toMatchObject(
+      { code: 'not_found' },
+    );
   });
 });
 

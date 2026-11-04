@@ -1,9 +1,16 @@
 // How team API routes send members and organizations: dates as ISO strings. The zod schemas
 // document the responses in /api/v1/openapi.json.
 import { z } from 'zod';
+import type { Invitation } from './invitations';
 import type { OrgSummary } from './org-settings';
-import { ORG_ROLES, ORG_STATUSES, VERIFICATION_STATUSES } from './schema';
 import type { Member } from './roles';
+import {
+  INVITATION_ROLES,
+  INVITATION_STATUSES,
+  ORG_ROLES,
+  ORG_STATUSES,
+  VERIFICATION_STATUSES,
+} from './schema';
 
 export const recruiterScopeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('all') }),
@@ -59,4 +66,22 @@ export function orgJson(o: OrgSummary): OrgJson {
     ownerUserId: o.ownerUserId,
     createdAt: o.createdAt.toISOString(),
   };
+}
+
+export const invitationJsonSchema = z.object({
+  id: z.uuid(),
+  email: z.string(),
+  role: z.enum(INVITATION_ROLES),
+  scope: recruiterScopeSchema.nullable(),
+  status: z.enum(INVITATION_STATUSES),
+  expired: z.boolean(),
+  expiresAt: z.iso.datetime(),
+  invitedBy: z.uuid().nullable(),
+  createdAt: z.iso.datetime(),
+});
+
+export type InvitationJson = z.infer<typeof invitationJsonSchema>;
+
+export function invitationJson(i: Invitation): InvitationJson {
+  return { ...i, expiresAt: i.expiresAt.toISOString(), createdAt: i.createdAt.toISOString() };
 }

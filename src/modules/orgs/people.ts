@@ -10,6 +10,7 @@ export type Person = {
   clerkUserId: string;
   email: string | null;
   displayName: string | null;
+  accountType: 'seeker' | 'host' | 'operator' | null;
   deleted: boolean;
 };
 
@@ -18,6 +19,7 @@ type PersonRow = {
   clerk_user_id: string;
   email: string | null;
   display_name: string | null;
+  account_type: Person['accountType'];
   deleted: boolean;
 };
 
@@ -35,7 +37,8 @@ export async function getPeople(
   if (unique.length === 0) return out;
   const rows = await queryRows<PersonRow>(
     db,
-    sql`select id, clerk_user_id, email, display_name, deleted_at is not null as deleted
+    sql`select id, clerk_user_id, email, display_name, account_type,
+          deleted_at is not null as deleted
         from app.users
         where id in (${sql.join(
           unique.map((id) => sql`${id}::uuid`),
@@ -48,6 +51,7 @@ export async function getPeople(
       clerkUserId: r.clerk_user_id,
       email: r.email,
       displayName: r.display_name,
+      accountType: r.account_type,
       deleted: r.deleted,
     });
   }

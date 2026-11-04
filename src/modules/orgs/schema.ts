@@ -84,7 +84,10 @@ export const memberAssignments = app.table(
   ],
 );
 
-/** Team invitations. The token is stored only as its sha256 hash. */
+/**
+ * Team invitations. The token is stored only as its sha256 hash, set when the invitation email
+ * is sent (null until then; drizzle/1050_orgs_invitations.sql).
+ */
 export const orgInvitations = app.table('org_invitations', {
   id: uuid('id').primaryKey(),
   orgId: uuid('org_id').notNull(),
@@ -94,7 +97,7 @@ export const orgInvitations = app.table('org_invitations', {
   recruiterScope: text('recruiter_scope', { enum: RECRUITER_SCOPES }).notNull().default('all'),
   assignListingIds: uuid('assign_listing_ids').array().notNull().default([]),
   assignLocationIds: uuid('assign_location_ids').array().notNull().default([]),
-  tokenHash: text('token_hash').notNull().unique(),
+  tokenHash: text('token_hash').unique(),
   status: text('status', { enum: INVITATION_STATUSES }).notNull().default('pending'),
   expiresAt: ts('expires_at').notNull(),
   invitedBy: uuid('invited_by'),

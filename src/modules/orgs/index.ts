@@ -6,6 +6,7 @@
 // through domain events (org.status_changed, org.member_removed, hostpage.updated).
 import type { DbOrTx } from '@/lib/db';
 import type { HandlerMap } from '@/modules/jobs';
+import { SEND_INVITATION_TOPIC, sendInvitationJob } from './invitations';
 
 export { createOrganization, organizationNameSchema } from './create';
 
@@ -34,12 +35,7 @@ export type { Actor } from '@/modules/entitlements';
 
 export { getMember, listMembers } from './members';
 
-export {
-  assignListing,
-  canAccessListing,
-  getListingAccess,
-  type ListingAccess,
-} from './scope';
+export { assignListing, canAccessListing, getListingAccess, type ListingAccess } from './scope';
 
 export {
   getOrgStatus,
@@ -59,14 +55,39 @@ export {
 } from './org-settings';
 
 export {
+  invitationJson,
+  invitationJsonSchema,
   memberJson,
   memberJsonSchema,
   orgJson,
   orgJsonSchema,
   recruiterScopeSchema,
+  type InvitationJson,
   type MemberJson,
   type OrgJson,
 } from './json';
+
+// Loading ./invitations registers the `seat` usage counter and (through ./notifications) the
+// team notification types.
+export {
+  acceptInvitation,
+  countSeats,
+  createInvitation,
+  createInvitationSchema,
+  listInvitations,
+  maskEmail,
+  previewInvitation,
+  revokeInvitation,
+  sendInvitationJob,
+  toClerkRole,
+  type CreateInvitationInput,
+  type Invitation,
+  type InvitationRole,
+} from './invitations';
+
+export { ROLE_LABELS, ROLE_PHRASES } from './notifications';
+
+export { INVITATION_ROLES, ORG_ROLES } from './schema';
 
 function notImplemented(name: string): never {
   throw new Error(`not implemented: ${name} (W3)`);
@@ -93,7 +114,9 @@ export const privacyHandlers: {
   },
 };
 
-/** W3 replaces the no-op: it creates the invitation token and sends it (Plan decision 9). */
 export const jobHandlers: HandlerMap = {
-  'orgs.send_invitation': async () => {},
+  // Creates the invitation token and emails it in one step (SP2 plan decision 9).
+  [SEND_INVITATION_TOPIC]: async (payload, { db, now }) => {
+    await sendInvitationJob(db, payload, now);
+  },
 };

@@ -50,10 +50,7 @@ function toSummary(o: OrgRow): OrgSummary {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Organizations by id, deleted ones included (flagged). Unknown ids are left out. */
-export async function getOrgSummaries(
-  db: DbOrTx,
-  ids: string[],
-): Promise<Map<string, OrgSummary>> {
+export async function getOrgSummaries(db: DbOrTx, ids: string[]): Promise<Map<string, OrgSummary>> {
   const valid = [...new Set(ids.filter((id) => UUID.test(id)))];
   const out = new Map<string, OrgSummary>();
   if (valid.length === 0) return out;
@@ -119,7 +116,10 @@ export async function updateOrg(
     ) {
       patch.requireRecruiterApproval = input.requireRecruiterApproval;
     }
-    if (input.primaryLocationId !== undefined && input.primaryLocationId !== org.primaryLocationId) {
+    if (
+      input.primaryLocationId !== undefined &&
+      input.primaryLocationId !== org.primaryLocationId
+    ) {
       patch.primaryLocationId = input.primaryLocationId;
     }
     if (Object.keys(patch).length === 0) return toSummary(org);

@@ -10,6 +10,8 @@ import { resetTrustTables } from './test-fixtures';
 
 vi.mock('@/modules/notifications', () => ({
   notify: vi.fn(async () => {}),
+  // Modules loaded through identity (orgs) register their notification types at load.
+  defineType: vi.fn(),
   jobHandlers: {},
 }));
 
