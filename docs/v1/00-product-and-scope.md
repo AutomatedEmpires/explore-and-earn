@@ -1,6 +1,8 @@
 # Explore&Earn V1 — product and scope
 
-Specification version: **1.0 · 2026-11-02**. Status: implementation baseline with explicitly proposed commercial and operational defaults. Audience: product, design, engineering, QA and marketplace operations.
+Specification version: **1.0 · 2026-11-02**. Status: historical baseline kept on `main`. Audience: product, design, engineering, QA and marketplace operations.
+
+> **Not the current authority.** Read [the 4 November 2026 founder decisions](../decisions/2026-11-04-founder-decisions.md) first. A later V1.2 of this document exists on other branches. Where either version disagrees with those decisions, the decisions win. In particular, one account is either a seeker or a host, not both.
 
 ## 1. Product promise and non-negotiable rules
 
