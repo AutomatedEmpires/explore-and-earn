@@ -34,14 +34,19 @@ export function OrgSwitcher({
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
+      {/* Named by its text, so the name contains what is shown (WCAG 2.5.3, label in name). */}
       <Popover.Trigger
-        aria-label={`Switch organization, current: ${current.name}`}
         className={cn(
           'flex min-h-11 items-center gap-3 rounded-md text-left hover:bg-surface-2 motion-safe:transition-colors',
           compact ? 'size-11 justify-center' : 'w-full px-2 py-1.5',
           className,
         )}
       >
+        <span className="sr-only">
+          {compact
+            ? `Switch organization, current: ${current.name}`
+            : 'Switch organization, current: '}
+        </span>
         <OrgLogo name={current.name} src={current.logoSrc} size="sm" decorative />
         {compact ? null : (
           <>

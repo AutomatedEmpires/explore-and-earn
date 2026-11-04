@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">
+<defs>
+<linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f5f86"></stop><stop offset="0.6" stop-color="#c99a8a"></stop><stop offset="1" stop-color="#f0b98a"></stop></linearGradient>
+<linearGradient id="w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4c6f93"></stop><stop offset="1" stop-color="#1f3550"></stop></linearGradient>
+</defs>
+<rect width="400" height="300" fill="url(#s)"></rect>
+<path d="M0 180 L60 150 L120 168 L190 138 L260 166 L330 146 L400 170 L400 196 L0 196 Z" fill="#4a5a74"></path>
+<rect y="194" width="400" height="106" fill="url(#w)"></rect>
+<rect x="168" y="150" width="3" height="64" fill="#2a2f38"></rect>
+<path d="M171 156 L230 194" stroke="#2a2f38" stroke-width="1.5"></path>
+<path d="M168 160 L130 214" stroke="#2a2f38" stroke-width="1.2"></path>
+<rect x="190" y="194" width="48" height="20" fill="#f4f0e8"></rect>
+<rect x="196" y="199" width="10" height="7" fill="#3a5170"></rect>
+<rect x="212" y="199" width="10" height="7" fill="#3a5170"></rect>
+<path d="M120 214 L280 214 L262 240 L140 240 Z" fill="#e9e4da"></path>
+<path d="M140 240 L262 240 L258 246 L144 246 Z" fill="#b5432f"></path>
+<rect x="140" y="254" width="110" height="2" fill="#e9e4da" opacity="0.35"></rect>
+<rect x="60" y="270" width="80" height="2" fill="#f0b98a" opacity="0.4"></rect>
+<rect x="250" y="262" width="90" height="2" fill="#f0b98a" opacity="0.35"></rect>
+</svg>

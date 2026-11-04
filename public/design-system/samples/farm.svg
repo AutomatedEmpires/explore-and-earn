@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">
+<defs>
+<linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a9cbe0"></stop><stop offset="1" stop-color="#f2e6c9"></stop></linearGradient>
+</defs>
+<rect width="400" height="300" fill="url(#s)"></rect>
+<circle cx="80" cy="70" r="26" fill="#f7e3a3"></circle>
+<path d="M0 170 Q100 130 200 160 T400 150 L400 300 L0 300 Z" fill="#8fb36a"></path>
+<rect x="270" y="128" width="56" height="40" fill="#a8432f"></rect>
+<path d="M264 130 L298 106 L332 130 Z" fill="#7d2f22"></path>
+<rect x="290" y="146" width="16" height="22" fill="#f1e6d2"></rect>
+<rect x="332" y="114" width="16" height="54" fill="#cfc8bb"></rect>
+<path d="M332 114 Q340 102 348 114 Z" fill="#b9b1a3"></path>
+<rect x="228" y="150" width="4" height="16" fill="#5b4632"></rect>
+<circle cx="230" cy="140" r="14" fill="#4d7a3a"></circle>
+<path d="M0 200 Q120 160 240 195 T400 185 L400 300 L0 300 Z" fill="#6e9a4c"></path>
+<path d="M0 230 Q140 200 400 222" stroke="#5a8440" stroke-width="5" fill="none"></path>
+<path d="M0 252 Q150 222 400 246" stroke="#5a8440" stroke-width="5" fill="none"></path>
+<path d="M0 276 Q160 246 400 272" stroke="#5a8440" stroke-width="5" fill="none"></path>
+<path d="M0 300 Q170 272 400 298" stroke="#5a8440" stroke-width="5" fill="none"></path>
+</svg>

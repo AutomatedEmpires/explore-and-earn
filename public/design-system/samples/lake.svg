@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">
+<defs>
+<linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fb5cf"></stop><stop offset="0.55" stop-color="#dcd3bf"></stop><stop offset="1" stop-color="#f1c48a"></stop></linearGradient>
+<linearGradient id="w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7aa0b4"></stop><stop offset="1" stop-color="#355a6c"></stop></linearGradient>
+</defs>
+<rect width="400" height="300" fill="url(#s)"></rect>
+<circle cx="300" cy="150" r="22" fill="#f8dca8" opacity="0.8"></circle>
+<path d="M0 185 L55 128 L92 160 L160 72 L222 150 L262 118 L318 170 L362 136 L400 160 L400 215 L0 215 Z" fill="#8a97a6"></path>
+<path d="M160 72 L140 98 L152 96 L160 108 L170 97 L182 101 Z" fill="#f5f2ec"></path>
+<path d="M55 128 L44 142 L56 140 L64 147 Z" fill="#f5f2ec"></path>
+<path d="M262 118 L252 131 L263 129 L272 128 Z" fill="#f5f2ec"></path>
+<path d="M0 205 L48 172 L110 198 L178 160 L250 200 L318 168 L400 196 L400 224 L0 224 Z" fill="#55705f"></path>
+<rect y="220" width="400" height="80" fill="url(#w)"></rect>
+<rect y="218" width="400" height="5" fill="#2e4a3d"></rect>
+<rect x="40" y="238" width="90" height="2" fill="#b9d0dc" opacity="0.7"></rect>
+<rect x="210" y="252" width="120" height="2" fill="#b9d0dc" opacity="0.6"></rect>
+<rect x="120" y="270" width="70" height="2" fill="#b9d0dc" opacity="0.5"></rect>
+<path d="M8 226 L22 176 L36 226 Z M28 226 L44 160 L60 226 Z M356 226 L372 168 L388 226 Z M378 226 L390 186 L402 226 Z" fill="#203529"></path>
+</svg>

@@ -1,7 +1,7 @@
 'use client';
 
 import * as RadixDialog from '@radix-ui/react-dialog';
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { cn } from '@/ui/cn';
 import { X, type IconComponent } from '@/ui/icons';
 import { IconButton } from './IconButton';
@@ -23,7 +23,9 @@ export type SheetProps = {
 
 /**
  * The chip pop-up: a bottom sheet below 768 px, a right-side panel from 768 px (md) up.
- * Radix Dialog handles focus trapping, Escape and returning focus to the trigger.
+ * Radix Dialog handles focus trapping, Escape and returning focus to the trigger. A controlled
+ * sheet without a trigger (one sheet for all of a card's chips) returns focus to whatever was
+ * focused when it opened.
  */
 export function Sheet({
   open,
@@ -37,6 +39,7 @@ export function Sheet({
   footer,
   className,
 }: SheetProps) {
+  const opener = useRef<HTMLElement | null>(null);
   return (
     <RadixDialog.Root open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange}>
       {trigger ? <RadixDialog.Trigger asChild>{trigger}</RadixDialog.Trigger> : null}
@@ -44,6 +47,17 @@ export function Sheet({
         <RadixDialog.Overlay className="fixed inset-0 z-50 bg-scrim motion-safe:data-[state=closed]:animate-fade-out motion-safe:data-[state=open]:animate-fade-in" />
         <RadixDialog.Content
           {...(description ? {} : { 'aria-describedby': undefined })}
+          onOpenAutoFocus={() => {
+            const active = document.activeElement;
+            opener.current =
+              active instanceof HTMLElement && active !== document.body ? active : null;
+          }}
+          onCloseAutoFocus={(event) => {
+            // With a trigger, Radix focuses it. Without one, Radix would leave focus on <body>.
+            if (trigger || !opener.current?.isConnected) return;
+            event.preventDefault();
+            opener.current.focus();
+          }}
           className={cn(
             'fixed inset-x-0 bottom-0 z-50 flex max-h-[90dvh] flex-col rounded-t-2xl bg-surface text-ink shadow-overlay',
             'motion-safe:data-[state=closed]:animate-sheet-down motion-safe:data-[state=open]:animate-sheet-up',
