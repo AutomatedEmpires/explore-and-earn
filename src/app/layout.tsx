@@ -1,7 +1,9 @@
+import { ClerkProvider } from '@clerk/nextjs';
 import type { Metadata } from 'next';
 import { Figtree } from 'next/font/google';
 import { connection } from 'next/server';
 import type { ReactNode } from 'react';
+import { clerkProviderProps } from '@/ui/clerk';
 import './globals.css';
 
 // Exposed as --font-sans, which the Tailwind theme in src/ui/tokens.css uses for font-sans.
@@ -17,9 +19,12 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // request's nonce ('strict-dynamic'), and Next.js adds the nonce only when it renders the page
   // per request; a page prerendered at build time would have every script blocked.
   await connection();
+  // `dynamic` renders Clerk's scripts on the server with this request's nonce (x-nonce).
   return (
-    <html lang="en" className={figtree.variable}>
-      <body className="font-sans">{children}</body>
-    </html>
+    <ClerkProvider dynamic {...clerkProviderProps}>
+      <html lang="en" className={figtree.variable}>
+        <body className="font-sans">{children}</body>
+      </html>
+    </ClerkProvider>
   );
 }
