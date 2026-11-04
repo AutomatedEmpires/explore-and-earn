@@ -31,18 +31,23 @@ export interface EventPayloads {
 
 /** The outbox topics each event fans out to. Every topic needs a handler in job-handlers.ts. */
 export const eventSubscribers: Record<keyof EventPayloads, string[]> = {
-  // Only a first publish notifies; the handler checks `first`.
-  'listing.published': ['hostpages.notify_followers'],
-  // SP3 projects these into search.
-  'listing.changed': [],
-  'listing.closed': [],
-  'listing.removed': [],
-  'org.status_changed': ['listings.close_for_org'],
+  // Only a first publish notifies; the handler checks `first`. SP3 projects every listing event
+  // into search (discovery.sync_listing) and re-syncs a host's rows when its public facts change
+  // (discovery.sync_host).
+  'listing.published': ['hostpages.notify_followers', 'discovery.sync_listing'],
+  'listing.changed': ['discovery.sync_listing'],
+  'listing.closed': ['discovery.sync_listing'],
+  'listing.removed': ['discovery.sync_listing'],
+  'org.status_changed': ['listings.close_for_org', 'discovery.sync_host'],
   // SP5 moves the member's threads and interviews.
   'org.member_removed': [],
-  'location.updated': ['locations.resolve_nws_grid'],
-  'hostpage.updated': [],
-  'subscription.changed': ['listings.enforce_slot_limit', 'hostpages.mark_public'],
+  'location.updated': ['locations.resolve_nws_grid', 'discovery.sync_host'],
+  'hostpage.updated': ['discovery.sync_host'],
+  'subscription.changed': [
+    'listings.enforce_slot_limit',
+    'hostpages.mark_public',
+    'discovery.sync_host',
+  ],
   'verification.decided': ['listings.resume_screening'],
   // SP6 subscribes for one-time payments.
   'billing.stripe_event': [],

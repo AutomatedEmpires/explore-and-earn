@@ -78,6 +78,7 @@ describe('emit', () => {
     };
     await emit(t.db, 'subscription.changed', payload, 'e5');
     expect((await rows()).map((r) => r.topic)).toEqual([
+      'discovery.sync_host',
       'hostpages.mark_public',
       'listings.enforce_slot_limit',
     ]);
@@ -85,23 +86,30 @@ describe('emit', () => {
 });
 
 describe('eventSubscribers', () => {
-  it('lists the SP2 subscribers of each event', () => {
-    expect(eventSubscribers['listing.published']).toEqual(['hostpages.notify_followers']);
-    expect(eventSubscribers['org.status_changed']).toEqual(['listings.close_for_org']);
-    expect(eventSubscribers['location.updated']).toEqual(['locations.resolve_nws_grid']);
+  it('lists the SP2 and SP3 subscribers of each event', () => {
+    expect(eventSubscribers['listing.published']).toEqual([
+      'hostpages.notify_followers',
+      'discovery.sync_listing',
+    ]);
+    expect(eventSubscribers['org.status_changed']).toEqual([
+      'listings.close_for_org',
+      'discovery.sync_host',
+    ]);
+    expect(eventSubscribers['location.updated']).toEqual([
+      'locations.resolve_nws_grid',
+      'discovery.sync_host',
+    ]);
     expect(eventSubscribers['subscription.changed']).toEqual([
       'listings.enforce_slot_limit',
       'hostpages.mark_public',
+      'discovery.sync_host',
     ]);
     expect(eventSubscribers['verification.decided']).toEqual(['listings.resume_screening']);
-    for (const event of [
-      'listing.changed',
-      'listing.closed',
-      'listing.removed',
-      'org.member_removed',
-      'hostpage.updated',
-      'billing.stripe_event',
-    ] as const) {
+    for (const event of ['listing.changed', 'listing.closed', 'listing.removed'] as const) {
+      expect(eventSubscribers[event]).toEqual(['discovery.sync_listing']);
+    }
+    expect(eventSubscribers['hostpage.updated']).toEqual(['discovery.sync_host']);
+    for (const event of ['org.member_removed', 'billing.stripe_event'] as const) {
       expect(eventSubscribers[event]).toEqual([]);
     }
   });

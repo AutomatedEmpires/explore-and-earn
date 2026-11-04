@@ -21,7 +21,11 @@
     "check:tokens": "node scripts/check-design-tokens.mjs",
     "ops:bootstrap-owner": "tsx scripts/ops-bootstrap-owner.ts",
     "ops:founding-codes": "tsx scripts/ops-founding-codes.ts",
-    "stripe:seed": "tsx scripts/stripe-seed.ts"
+    "stripe:seed": "tsx scripts/stripe-seed.ts",
+    "discovery:seed-synthetic": "tsx scripts/seed-synthetic.ts",
+    "discovery:rebuild": "tsx scripts/discovery-rebuild.ts",
+    "icons:gen": "tsx scripts/gen-icons.ts",
+    "e2e:seed": "tsx scripts/e2e-seed-discovery.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.4.0",
@@ -68,6 +72,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@clerk/testing": "^2.2.53",
+    "@lhci/cli": "0.15.1",
     "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",

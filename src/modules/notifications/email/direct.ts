@@ -58,6 +58,8 @@ function directEmail(
     case 'OperatorMention':
     case 'OperatorAlert':
     case 'Digest':
+    case 'JobAlertDaily':
+    case 'JobAlertWeekly':
       throw badRequest(`The ${template} email can't be sent as a direct email`);
     case 'HostNotice': {
       const d = parse(notice);

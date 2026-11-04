@@ -29,6 +29,8 @@ import {
 import BillingNotice from './templates/BillingNotice';
 import Digest, { digestSubject, type DigestItem } from './templates/Digest';
 import HostNotice from './templates/HostNotice';
+import JobAlertDaily from './templates/JobAlertDaily';
+import JobAlertWeekly from './templates/JobAlertWeekly';
 import type { FooterProps } from './templates/Layout';
 import OperatorAlert from './templates/OperatorAlert';
 import OperatorMention from './templates/OperatorMention';
@@ -182,6 +184,11 @@ function templateElement(name: EmailTemplateName, c: Content, footer: FooterProp
         expiresAt: String(c.data.expiresAt ?? ''),
         footer,
       });
+    // SP3 W4 feeds these the saved searches' jobs from `data` (Task 30).
+    case 'JobAlertDaily':
+      return createElement(JobAlertDaily, { title: c.title, body: c.body, footer });
+    case 'JobAlertWeekly':
+      return createElement(JobAlertWeekly, { title: c.title, body: c.body, footer });
   }
 }
 
