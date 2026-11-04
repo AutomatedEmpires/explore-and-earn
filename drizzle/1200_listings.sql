@@ -166,15 +166,17 @@ create trigger listing_revisions_set_updated_at before update on app.listing_rev
   for each row execute function app.set_updated_at();
 
 -- Once approved, a revision's content (and every other column) is fixed; its status may only
--- move on to `superseded`, which is final too.
+-- move on to `superseded`, which is final too. The one other change allowed is privacy
+-- erasure clearing `submitted_by`.
 create or replace function app.listing_revision_immutable() returns trigger
 language plpgsql as $$
 begin
   if old.status not in ('approved', 'superseded') then
     return new;
   end if;
-  if (to_jsonb(new) - 'status' - 'updated_at') is distinct from
-     (to_jsonb(old) - 'status' - 'updated_at') then
+  if (to_jsonb(new) - 'status' - 'updated_at' - 'submitted_by') is distinct from
+     (to_jsonb(old) - 'status' - 'updated_at' - 'submitted_by')
+     or (new.submitted_by is distinct from old.submitted_by and new.submitted_by is not null) then
     raise exception 'listing revision % is immutable once approved', old.id
       using errcode = 'check_violation';
   end if;

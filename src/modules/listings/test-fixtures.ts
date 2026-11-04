@@ -9,6 +9,7 @@ import { buildListingContent, seedMedia, type SeededOrg } from '../../../tests/h
 import type { HostContext } from '@/server/guards';
 import type { HousingSlot, ListingContent } from './content';
 import { createListing } from './drafts';
+import { publishRevision, requestPublish } from './publish';
 
 export type ListingFixture = {
   locationId: string;
@@ -62,6 +63,25 @@ export async function seedDraftListing(
     where id = ${id}
   `);
   return id;
+}
+
+/** Requests a publish of `content` and approves it at once (no screening); returns the ids. */
+export async function seedLiveListing(
+  db: DbOrTx,
+  ctx: HostContext,
+  content: ListingContent,
+  now: Date,
+): Promise<{ id: string; revisionId: string }> {
+  const id = await seedDraftListing(db, ctx, content);
+  await requestPublish(db, ctx, id, [], now);
+  const [rev] = await queryRows<{ id: string }>(
+    db,
+    sql`select id from app.listing_revisions where listing_id = ${id}
+      order by revision_number desc limit 1`,
+  );
+  if (!rev) throw new Error('no revision');
+  await publishRevision(db, rev.id, now);
+  return { id, revisionId: rev.id };
 }
 
 /** An Owner operator on shift (covers every queue); returns its user id. */
