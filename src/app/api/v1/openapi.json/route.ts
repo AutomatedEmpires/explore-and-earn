@@ -4,6 +4,9 @@
 // it registers itself before the document is built. src/server/openapi.test.ts fails when a
 // documented route is missing from this list. Keep it sorted.
 import '@/app/api/v1/health/route';
+import '@/app/api/v1/host/locations/[id]/route';
+import '@/app/api/v1/host/locations/geocode/route';
+import '@/app/api/v1/host/locations/route';
 import '@/app/api/v1/me/stream/route';
 import '@/app/api/v1/media/[id]/url/route';
 import '@/app/api/v1/media/uploads/[id]/complete/route';
