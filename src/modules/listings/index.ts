@@ -26,6 +26,8 @@ export {
   type ScreeningQuestion,
 } from './content';
 export { normalizeSkill } from './skills';
+export { listOccupations, type Occupation } from './occupations';
+export { toRevisionColumns, type RevisionColumns, type RevisionContext } from './revision-columns';
 export { CATEGORIES, GENRES, PERKS, type Category } from '@/lib/taxonomy';
 
 export type ListingState = 'draft' | 'in_review' | 'active' | 'closed' | 'removed';
@@ -148,12 +150,6 @@ export function registerListingRowBadgeProvider(fn: ListingRowBadgeProvider): vo
 /** SP5 Home (section 7). */
 export async function getHomeSummary(_db: DbOrTx, _ctx: HostContext): Promise<HomeSummary> {
   return notImplemented('getHomeSummary');
-}
-
-export async function listOccupations(
-  _db: DbOrTx,
-): Promise<{ code: string; label: string; socCode: string; categories: Category[] }[]> {
-  return notImplemented('listOccupations');
 }
 
 /** Active listings per location (location archiving, host page groups). */

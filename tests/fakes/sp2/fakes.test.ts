@@ -42,6 +42,13 @@ beforeEach(() => {
 
 const actor = { type: 'system' as const, id: null };
 
+/** A bare listing row: member assignments reference app.listings (drizzle/1200_listings.sql). */
+async function insertListing(orgId: string): Promise<string> {
+  const id = newId();
+  await t.db.execute(sql`insert into app.listings (id, org_id) values (${id}, ${orgId})`);
+  return id;
+}
+
 /** Runs `fn` and fails if it rejects with a W0 stub's "not implemented". */
 async function works(name: string, fn: () => unknown): Promise<void> {
   try {
@@ -155,8 +162,9 @@ describe('every consumed fake function works', () => {
       await works(name, fn);
     }
     const recruiter = await seedMember(db, org.orgId, 'recruiter', { scope: 'assigned' });
+    const assignedId = await insertListing(org.orgId);
     await works('assignListing', () =>
-      orgsFake.assignListing(db, org.orgId, recruiter.userId, newId()),
+      orgsFake.assignListing(db, org.orgId, recruiter.userId, assignedId),
     );
 
     const members = await orgsFake.listMembers(db, org.orgId);
@@ -295,7 +303,7 @@ describe('orgsFake', () => {
   it("lists an assigned Recruiter's listings after assignListing", async () => {
     const org = await seedHostOrg(t.db);
     const recruiter = await seedMember(t.db, org.orgId, 'recruiter', { scope: 'assigned' });
-    const listingId = newId();
+    const listingId = await insertListing(org.orgId);
     await orgsFake.assignListing(t.db, org.orgId, recruiter.userId, listingId);
 
     expect(await orgsFake.getListingAccess(t.db, recruiter.ctx)).toEqual({
