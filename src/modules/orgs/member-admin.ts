@@ -15,6 +15,7 @@ import type { HostContext } from '@/server/guards';
 import { toClerkRole, type InvitationRole } from './invitations';
 import { recruiterScopeSchema } from './json';
 import { getMember, liveMembershipById, scopesFor } from './members';
+import { registerOrgNotificationTypes } from './notifications';
 import { getPeople, personLabel } from './people';
 import { requireCapability, type Member, type RecruiterScope } from './roles';
 import { INVITATION_ROLES, memberAssignments, organizations, orgMemberships } from './schema';
@@ -117,6 +118,7 @@ export async function changeMember(
     }
     return { orgName: org.name, userId: target.userId, role, roleChanged };
   });
+  registerOrgNotificationTypes();
 
   if (change && change.userId !== ctx.user.id) {
     const actor = (await getPeople(db, [ctx.user.id])).get(ctx.user.id);
@@ -230,6 +232,7 @@ export async function transferOwnership(
     return { orgName: org.name, previousOwnerId: ctx.user.id, newOwnerId: target.userId };
   });
 
+  registerOrgNotificationTypes();
   const people = await getPeople(db, [done.previousOwnerId, done.newOwnerId]);
   const data = {
     orgName: done.orgName,

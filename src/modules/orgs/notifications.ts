@@ -37,7 +37,6 @@ let registered = false;
 /** Registers the team notification types. Safe to call more than once. */
 export function registerOrgNotificationTypes(): void {
   if (registered) return;
-  registered = true;
   defineType({
     type: 'orgs.member_joined',
     category: 'account',
@@ -76,11 +75,8 @@ export function registerOrgNotificationTypes(): void {
     url: () => '/host/team',
     email: { template: 'HostNotice' },
   });
+  registered = true;
 }
-
-// After the current import cycle finishes, defineType exists. Tests and routes that notify
-// before sp2-wiring's explicit call still get the types.
-queueMicrotask(registerOrgNotificationTypes);
 
 /** Notifies every live Owner and Admin of the org, except `exceptUserId`. */
 export async function notifyOwnerAdmins(
