@@ -40,3 +40,6 @@ npm-debug.log*
 
 # local git worktrees
 .worktrees/
+
+# local archives and non-git copies
+.archives/
