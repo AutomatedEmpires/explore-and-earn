@@ -37,3 +37,6 @@ artifacts/design-review/*.tmp
 # debug
 npm-debug.log*
 .pnpm-debug.log*
+
+# local git worktrees
+.worktrees/
