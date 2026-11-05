@@ -1,0 +1,24 @@
+---
+description: AE Control bootstrap for Explore&Earn agents
+alwaysApply: true
+---
+
+# Explore&Earn — AE Control bootstrap
+
+Product requirements in this repository stay authoritative. This rule does not replace `AGENTS.md` or the product decision files.
+
+Before substantive work:
+
+1. Read `AGENTS.md` and the requirement paths in `C:\Users\Cole0\AutomatedEmpires\Projects\AE-Control\registry\projects.json`.
+2. Read `policy\authority.md` and `policy\continuity.md` in that AE Control checkout. Pull requests #26, #27, and #32 stay unmerged until the founder merges them.
+3. Run:
+
+```powershell
+powershell -NoProfile -File C:\Users\Cole0\AutomatedEmpires\Projects\AE-Control\scripts\session.ps1 -Project explore-and-earn -Issue <number> -Agent <registry id>
+```
+
+4. The script checks the branch, HEAD, working tree, pause flag, decision pointers, owner, and latest handoff. Stop when it prints `EDIT: no`.
+5. Confirm you are `OWNER`, or that `TRANSFER` names you, before modifying files. Another model's chat is not ownership.
+6. Feature development stays paused. Do not merge, deploy, or activate billing.
+
+GitHub issues in `AutomatedEmpires/explore-and-earn` are the task record. If the script file is missing, stop.
