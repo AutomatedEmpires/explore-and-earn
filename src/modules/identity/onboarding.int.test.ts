@@ -19,6 +19,8 @@ const created: string[] = [];
 afterAll(async () => {
   for (const userId of created) {
     await db.execute(sql`delete from app.org_memberships where user_id = ${userId}`);
+    // org_slugs references organizations (org_slugs_org_id_fkey), so it is cleared first.
+    await db.execute(sql`delete from app.org_slugs where org_id in (select id from app.organizations where owner_user_id = ${userId})`);
     await db.execute(sql`delete from app.organizations where owner_user_id = ${userId}`);
     await db.execute(sql`delete from app.users where id = ${userId}`);
   }
