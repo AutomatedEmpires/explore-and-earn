@@ -1,0 +1,17 @@
+name: Actions bootstrap
+
+# main is documentation only and had no workflow file, and GitHub Actions never ran
+# for any pull request in this repository. This workflow registers Actions on the default
+# branch. Application CI is .github/workflows/ci.yml on the integration branch.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  registered:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "GitHub Actions is active for this repository."
