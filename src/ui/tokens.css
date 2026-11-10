@@ -275,6 +275,11 @@
   --shadow-overlay: var(--ee-shadow-overlay);
 }
 
+/* Bars pinned to the bottom of the screen clear the phone's home indicator. */
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
