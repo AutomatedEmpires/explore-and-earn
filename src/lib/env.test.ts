@@ -25,6 +25,7 @@ const dev = {
   VAPID_SUBJECT: 'mailto:dev@example.test',
   JOBS_SECRET: 'j'.repeat(32),
   UNSUBSCRIBE_SECRET: 'u'.repeat(32),
+  ANALYTICS_HASH_SECRET: 'a'.repeat(32),
   BILLING_PROVIDER: 'stub',
   GEOCODER_PROVIDER: 'stub',
   WEATHER_PROVIDER: 'stub',
@@ -302,7 +303,25 @@ describe('parseEnv: SP2 providers', () => {
   });
 });
 
+describe('parseEnv: SP3', () => {
+  it('requires ANALYTICS_HASH_SECRET of at least 32 characters, in every environment', () => {
+    expect(() => parseEnv(without(dev, 'ANALYTICS_HASH_SECRET'))).toThrow(/ANALYTICS_HASH_SECRET/);
+    expect(() => parseEnv(without(prod, 'ANALYTICS_HASH_SECRET'))).toThrow(/ANALYTICS_HASH_SECRET/);
+    expect(() => parseEnv({ ...dev, ANALYTICS_HASH_SECRET: 'a'.repeat(31) })).toThrow(
+      /ANALYTICS_HASH_SECRET/,
+    );
+    expect(parseEnv(dev).ANALYTICS_HASH_SECRET).toBe('a'.repeat(32));
+  });
+});
+
 describe('.env.local.example', () => {
+  it('has a dev ANALYTICS_HASH_SECRET', () => {
+    const file = readFileSync(path.resolve('.env.local.example'), 'utf8');
+    expect(parseEnv(parseDotenv(file)).ANALYTICS_HASH_SECRET).toBe(
+      'dev-only-analytics-hash-secret-0000000',
+    );
+  });
+
   it('parses, with the SP2 providers set to stub', () => {
     const file = readFileSync(path.resolve('.env.local.example'), 'utf8');
     const env = parseEnv(parseDotenv(file));

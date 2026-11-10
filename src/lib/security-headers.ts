@@ -165,6 +165,9 @@ export function buildSecurityHeaders(i: {
   };
   if (i.appEnv === 'prod') {
     headers['Strict-Transport-Security'] = 'max-age=63072000; includeSubDomains';
+  } else {
+    // Nothing outside prod is indexable (SP3 spec 8.11); robots.txt disallows it too.
+    headers['X-Robots-Tag'] = 'noindex';
   }
   return headers;
 }
