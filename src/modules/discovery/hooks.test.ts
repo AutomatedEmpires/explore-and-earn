@@ -189,10 +189,31 @@ describe('@/modules/discovery', () => {
     ]);
   });
 
-  it('acks every topic before the real handlers land, so nothing dead-letters', async () => {
-    for (const handler of Object.values(discovery.jobHandlers)) {
+  it('acks the topics whose real handlers have not landed, so nothing dead-letters', async () => {
+    // W1's sync handlers are real (sync.test.ts); the event and alert topics are still stubs.
+    const stubbed = Object.entries(discovery.jobHandlers).filter(
+      ([topic]) =>
+        !['discovery.sync_listing', 'discovery.sync_host', 'discovery.drift_check'].includes(topic),
+    );
+    expect(stubbed.map(([topic]) => topic).sort()).toEqual([
+      'discovery.alerts_daily',
+      'discovery.alerts_match',
+      'discovery.alerts_weekly',
+      'discovery.maintenance',
+    ]);
+    for (const [, handler] of stubbed) {
       await expect(handler({}, { db, now: new Date() })).resolves.toBeUndefined();
     }
+  });
+
+  it('rejects a sync event without its ids, so a malformed payload is retried and seen', async () => {
+    const now = new Date();
+    await expect(
+      discovery.jobHandlers['discovery.sync_listing']?.({}, { db, now }),
+    ).rejects.toThrow('listingId is required');
+    await expect(discovery.jobHandlers['discovery.sync_host']?.({}, { db, now })).rejects.toThrow(
+      'orgId is required',
+    );
   });
 });
 

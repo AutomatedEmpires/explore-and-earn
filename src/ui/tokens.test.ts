@@ -157,6 +157,12 @@ describe('tokens.css', () => {
     }
   });
 
+  it('defines pb-safe, which pads a bottom-pinned bar by the safe-area inset', () => {
+    expect(block(css, '@utility pb-safe {').trim()).toBe(
+      'padding-bottom: env(safe-area-inset-bottom);',
+    );
+  });
+
   it('only uses colors defined in tokens.ts', () => {
     expect(new Set(Object.keys(colors.light))).toEqual(new Set(colorTokenNames));
     expect(new Set(Object.keys(colors.dark))).toEqual(new Set(colorTokenNames));
