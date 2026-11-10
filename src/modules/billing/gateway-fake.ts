@@ -12,7 +12,7 @@ import {
   type SubSnapshot,
   type SubscriptionUpdate,
 } from './gateway';
-import { FOUNDING_COUPON_ID, parseLookupKey, unitAmountCents } from './plans';
+import { FOUNDING_PERCENT_OFF, isFoundingCoupon, parseLookupKey, unitAmountCents } from './plans';
 
 type Method = keyof BillingGateway;
 
@@ -61,13 +61,21 @@ const copy = (s: SubSnapshot): SubSnapshot => ({
   metadata: { ...s.metadata },
 });
 
+/**
+ * An invoice's amount. A founding coupon takes FOUNDING_PERCENT_OFF off the tier items only, as
+ * the seeded coupons' `applies_to` (the three tier products) does in Stripe. The fake does not
+ * model the coupon's duration.
+ */
 function amountOf(items: { lookupKey: string | null; quantity: number }[], couponId: string | null) {
   let total = 0;
   for (const i of items) {
     const parsed = i.lookupKey ? parseLookupKey(i.lookupKey) : null;
-    if (parsed) total += unitAmountCents(parsed.kind, parsed.plan, parsed.interval) * i.quantity;
+    if (!parsed) continue;
+    const amount = unitAmountCents(parsed.kind, parsed.plan, parsed.interval) * i.quantity;
+    const discounted = parsed.kind === 'tier' && isFoundingCoupon(couponId);
+    total += discounted ? Math.round((amount * (100 - FOUNDING_PERCENT_OFF)) / 100) : amount;
   }
-  return couponId === FOUNDING_COUPON_ID ? Math.round(total * 0.7) : total;
+  return total;
 }
 
 export function makeFakeBillingGateway(
@@ -127,7 +135,13 @@ export function makeFakeBillingGateway(
       cancelAtPeriodEnd: false,
       endedAt: null,
       startDate: at,
+      // Checkout's first invoice is paid as the subscription is created (no trial under FD-7).
+      activatedAt: p.trialEnd ? null : at,
+      // Stripe drops a `once` coupon from the subscription when the first invoice finalizes; the
+      // fake keeps it there (a test sets couponId to null to model that). The creation invoice
+      // keeps it either way.
       couponId: p.couponId,
+      initialCouponId: p.couponId,
       metadata: { ...p.metadata },
       created: at,
     };
@@ -207,6 +221,7 @@ export function makeFakeBillingGateway(
         await gw.hooks.updateSubscription?.(id, u, key);
         const s = requireSub(id);
         if (u.items) s.items = u.items.map((i: GatewayItem) => ({ ...i }));
+        if (u.removeDiscounts) s.couponId = null;
         if (u.trialEnd) {
           s.trialEnd = u.trialEnd;
           if (s.status === 'trialing') s.currentPeriodEnd = u.trialEnd;
@@ -230,7 +245,7 @@ export function makeFakeBillingGateway(
     async previewInvoice(i) {
       enter('previewInvoice', [i]);
       const s = requireSub(i.subscriptionId);
-      const next = amountOf(i.items, s.couponId);
+      const next = amountOf(i.items, i.removeDiscounts ? null : s.couponId);
       const current = amountOf(s.items, s.couponId);
       return {
         dueNowCents: i.prorationBehavior === 'always_invoice' ? Math.max(0, next - current) : 0,

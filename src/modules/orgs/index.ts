@@ -12,6 +12,14 @@ export { registerOrgNotificationTypes } from './notifications';
 
 export { createOrganization, organizationNameSchema } from './create';
 
+/** FD-7: the first 100 host organizations by signup order. Billing decides the discount. */
+export {
+  FOUNDING_COHORT_SIZE,
+  countFoundingCohort,
+  getFoundingNumber,
+  reserveFoundingNumber,
+} from './founding';
+
 export {
   applyClerkMembership,
   applyClerkOrganization,

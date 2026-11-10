@@ -1,15 +1,13 @@
-// The billing schedules (SP2 spec section 6): monthly invite credits, the founding trial
-// correction once launch.public_at is set, and the daily reconcile against Stripe. Each one
-// handles every subscription on its own, so one failure never stops the rest.
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+// The billing schedules (SP2 spec section 6): monthly invite credits and the daily reconcile
+// against Stripe. Each one handles every subscription on its own, so one failure never stops
+// the rest. The founding trial correction (billing.apply_launch_date) is retired by FD-7.
+import { eq, inArray, isNull } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { lockOrg } from '@/modules/entitlements';
-import { getSetting } from '@/modules/settings';
 import { raiseAlert } from '@/modules/trust';
 import { billingGateway, type BillingGateway } from './gateway';
-import { ENTITLED_STATUSES, addDays, parseLaunchAt, transact, type SubscriptionRow } from './internal';
-import { FOUNDING_COUPON_ID } from './plans';
+import { ENTITLED_STATUSES, addDays, transact, type SubscriptionRow } from './internal';
 import { subscriptions } from './schema';
 import { grantMonthCredits, syncFromStripe, syncSubscription } from './sync';
 
@@ -34,58 +32,18 @@ export async function grantMonthlyCredits(db: DbOrTx, now: Date = new Date()): P
   return granted;
 }
 
-const unix = (d: Date) => Math.floor(d.getTime() / 1000);
-
 /**
- * billing.apply_launch_date (spec section 8.7): once launch.public_at is set, each trialing
- * founding subscription's trial should end at max(launch, sign-up) + founding.free_days. A
- * subscription already there, or whose target has passed, is skipped with no Stripe call
- * (Review Focus 5); a Stripe error alerts and the loop goes on, so the job never fails in a loop.
+ * billing.apply_launch_date: retired with the 3 November founding offer, whose 90 free days
+ * started at launch. FD-7 has no free period (its clock starts at the first paid activation), so
+ * there is nothing to move. The handler stays only because src/server/schedules.ts still
+ * enqueues the topic every hour; it does nothing and calls Stripe for nothing.
  */
-export async function applyLaunchDate(
-  db: DbOrTx,
-  now: Date = new Date(),
-  gw: BillingGateway = billingGateway(),
-): Promise<{ updated: number; skipped: number; failed: number }> {
-  const out = { updated: 0, skipped: 0, failed: 0 };
-  const launch = parseLaunchAt(await getSetting(db, 'launch.public_at'));
-  if (!launch) return out;
-  const freeDays = await getSetting(db, 'founding.free_days');
-
-  const rows = await db
-    .select()
-    .from(subscriptions)
-    .where(and(eq(subscriptions.status, 'trialing'), eq(subscriptions.couponId, FOUNDING_COUPON_ID)));
-  for (const row of rows) {
-    const signedUp = row.stripeCreatedAt ?? row.createdAt;
-    const target = addDays(new Date(Math.max(launch.getTime(), signedUp.getTime())), freeDays);
-    if (row.trialEnd?.getTime() === target.getTime() || target <= now) {
-      out.skipped += 1;
-      continue;
-    }
-    try {
-      await gw.updateSubscription(
-        row.stripeSubscriptionId,
-        { trialEnd: target, prorationBehavior: 'none' },
-        `trial:${row.stripeSubscriptionId}:${unix(target)}`,
-      );
-      await syncSubscription(db, row.stripeSubscriptionId, gw);
-      out.updated += 1;
-    } catch (err) {
-      out.failed += 1;
-      logger.warn('billing: founding trial end not updated', {
-        subscriptionId: row.stripeSubscriptionId,
-        error: err,
-      });
-      await alertQuietly(db, {
-        kind: 'billing.trial_update_failed',
-        message:
-          "A founding host's free period couldn't be moved to the launch date. It is retried every hour.",
-        data: { orgId: row.orgId, subscriptionId: row.stripeSubscriptionId },
-      });
-    }
-  }
-  return out;
+export async function applyLaunchDate(): Promise<{
+  updated: number;
+  skipped: number;
+  failed: number;
+}> {
+  return { updated: 0, skipped: 0, failed: 0 };
 }
 
 /** A warning alert that never throws (a broken alert must not stop the loop). */
