@@ -59,4 +59,34 @@ describe('useDiscoveryQuery', () => {
     act(() => result.current.setQuery({}));
     expect(nav.replace).toHaveBeenCalledWith('/', { scroll: false });
   });
+
+  describe('the host filter', () => {
+    const host = { orgId: '019a4a3c-0000-7000-8000-00000000a001', slug: 'kettle-ridge-lodge' };
+
+    it("puts the host's orgId in the query when the server named it", () => {
+      nav.search = 'cat=farm&host=kettle-ridge-lodge';
+      const { result } = renderHook(() => useDiscoveryQuery(host));
+      expect(result.current.query).toEqual({ categories: ['farm'], orgId: host.orgId });
+      const other = renderHook(() => useDiscoveryQuery({ ...host, slug: 'someone-else' }));
+      expect(other.result.current.query).toEqual({ categories: ['farm'] });
+    });
+
+    it('stays while the query keeps its orgId', () => {
+      nav.search = 'cat=farm&host=kettle-ridge-lodge';
+      const { result } = renderHook(() => useDiscoveryQuery(host));
+      act(() => result.current.setQuery({ ...result.current.query, states: ['CO'] }));
+      expect(nav.replace).toHaveBeenLastCalledWith('/?cat=farm&state=CO&host=kettle-ridge-lodge', {
+        scroll: false,
+      });
+    });
+
+    it('goes when the query drops it, or on "Clear all"', () => {
+      nav.search = 'cat=farm&host=kettle-ridge-lodge';
+      const { result } = renderHook(() => useDiscoveryQuery(host));
+      act(() => result.current.setQuery({ categories: ['farm'] }));
+      expect(nav.replace).toHaveBeenLastCalledWith('/?cat=farm', { scroll: false });
+      act(() => result.current.setQuery({}));
+      expect(nav.replace).toHaveBeenLastCalledWith('/', { scroll: false });
+    });
+  });
 });
