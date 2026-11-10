@@ -42,10 +42,14 @@ const auditRows = (orgId: string, action: string) =>
   );
 
 const statusEvents = () =>
-  queryRows<{ topic: string; payload: { event: string; data: unknown } }>(
+  queryRows<{ topic: string; payload: { event: string; eventId: string; data: unknown } }>(
     t.db,
-    sql`select topic, payload from app.outbox where payload->>'event' = 'org.status_changed'`,
+    sql`select topic, payload from app.outbox where payload->>'event' = 'org.status_changed'
+        order by topic`,
   );
+
+// org.status_changed fans out to these topics (src/server/event-subscribers.ts), by topic.
+const STATUS_TOPICS = ['discovery.sync_host', 'listings.close_for_org'];
 
 describe('setOrgStatus', () => {
   it('emits one org.status_changed and records orgs.status_changed, once', async () => {
@@ -54,10 +58,13 @@ describe('setOrgStatus', () => {
     await setOrgStatus(t.db, org.orgId, 'suspended', operator, 'Fake listings');
     expect(await getOrgStatus(t.db, org.orgId)).toBe('suspended');
 
+    // One event: a row per subscriber topic, all carrying the same envelope.
     const events = await statusEvents();
-    expect(events).toHaveLength(1);
-    expect(events[0]?.topic).toBe('listings.close_for_org');
-    expect(events[0]?.payload.data).toEqual({ orgId: org.orgId, status: 'suspended' });
+    expect(events.map((e) => e.topic)).toEqual(STATUS_TOPICS);
+    expect(new Set(events.map((e) => e.payload.eventId)).size).toBe(1);
+    for (const e of events) {
+      expect(e.payload.data, e.topic).toEqual({ orgId: org.orgId, status: 'suspended' });
+    }
 
     const audit = await auditRows(org.orgId, 'orgs.status_changed');
     expect(audit).toHaveLength(1);
@@ -68,8 +75,30 @@ describe('setOrgStatus', () => {
     });
 
     await setOrgStatus(t.db, org.orgId, 'suspended', operator, 'Again');
-    expect(await statusEvents()).toHaveLength(1);
+    expect(await statusEvents()).toHaveLength(STATUS_TOPICS.length);
     expect(await auditRows(org.orgId, 'orgs.status_changed')).toHaveLength(1);
+  });
+
+  it('re-syncs search on a suspension and on a reinstatement (discovery.sync_host)', async () => {
+    const org = await seedHostOrg(t.db);
+    const syncHostJobs = async () =>
+      (await statusEvents()).filter((e) => e.topic === 'discovery.sync_host');
+
+    await setOrgStatus(t.db, org.orgId, 'suspended', operator, 'Fake listings');
+    const [suspended] = await syncHostJobs();
+    expect(suspended?.payload).toMatchObject({
+      event: 'org.status_changed',
+      data: { orgId: org.orgId, status: 'suspended' },
+    });
+
+    await setOrgStatus(t.db, org.orgId, 'active', operator, 'Appeal upheld');
+    const jobs = await syncHostJobs();
+    expect(jobs).toHaveLength(2);
+    const reinstated = jobs.find((e) => e.payload.eventId !== suspended?.payload.eventId);
+    expect(reinstated?.payload).toMatchObject({
+      event: 'org.status_changed',
+      data: { orgId: org.orgId, status: 'active' },
+    });
   });
 
   it('rolls back with the caller', async () => {
