@@ -1,6 +1,6 @@
-// Plans, Stripe lookup keys and the founding coupon (SP2 spec sections 8.1 and 8.7). PLANS is
-// for limits and display; the Stripe prices the seed creates from it are authoritative for
-// charging.
+// Plans, Stripe lookup keys and the founding coupons (SP2 spec section 8.1, FD-6 and FD-7).
+// PLANS is for limits and display; the Stripe prices the seed creates from it are authoritative
+// for charging.
 
 export type PlanCode = 'starter' | 'professional' | 'enterprise';
 export type BillingInterval = 'month' | 'year';
@@ -48,8 +48,36 @@ export const PLANS: Record<PlanCode, Plan> = {
 /** An extra slot on an annual plan costs 10× its monthly price (one subscription, one interval). */
 export const EXTRA_SLOT_ANNUAL_MULTIPLIER = 10;
 
-/** Superseded 2026-11-04 (FD-7). This is the withdrawn "30% off for life" offer. Do not seed, display, or apply it to a new subscription. The approved offer is a later billing change: first 100 host organizations by signup, one discount shape, six-month clock starting at first paid activation. This id remains so existing tests of the old behavior stay identifiable. */
-export const FOUNDING_COUPON_ID = 'founding_30_forever';
+// The founding offer (FD-7 in docs/decisions/2026-11-04-founder-decisions.md): the first 100
+// host organizations by signup get 50% off the plan price, in one of two shapes fixed by the
+// interval of their first paid subscription. Both coupons apply only to the three tier products,
+// so extra listing slots are charged in full (whether add-ons qualify is an open founder
+// question). ./founding.ts decides who gets which.
+
+/** Founding discount on the plan price, in percent. */
+export const FOUNDING_PERCENT_OFF = 50;
+/** Months the monthly shape lasts, counted from the first paid activation. */
+export const FOUNDING_MONTHLY_MONTHS = 6;
+/** Monthly start: Stripe `repeating` for 6 months, so a tier change inside them keeps it. */
+export const FOUNDING_MONTHLY_COUPON_ID = 'founding_50_six_months';
+/** Annual start: Stripe `once`, which is the first annual invoice, the first annual term. */
+export const FOUNDING_ANNUAL_COUPON_ID = 'founding_50_first_year';
+
+/**
+ * The withdrawn 3 November offer (90 days free, then 30% off for life). Never seeded, shown or
+ * applied. Sync reports a subscription that carries it as a founding mismatch.
+ */
+export const RETIRED_FOUNDING_COUPON_ID = 'founding_30_forever';
+
+/** The founding coupon for a first paid subscription on `interval`. */
+export function foundingCouponFor(interval: BillingInterval): string {
+  return interval === 'month' ? FOUNDING_MONTHLY_COUPON_ID : FOUNDING_ANNUAL_COUPON_ID;
+}
+
+/** Whether `couponId` is one of the two FD-7 founding coupons. */
+export function isFoundingCoupon(couponId: string | null | undefined): boolean {
+  return couponId === FOUNDING_MONTHLY_COUPON_ID || couponId === FOUNDING_ANNUAL_COUPON_ID;
+}
 
 export type LookupKind = 'tier' | 'slot';
 

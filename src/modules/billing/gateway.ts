@@ -58,6 +58,8 @@ export type SubscriptionUpdate = {
   trialEnd?: Date;
   prorationBehavior: ProrationBehavior;
   paymentBehavior?: 'error_if_incomplete';
+  /** Removes every discount (FD-7: a founding discount ends on an interval change). */
+  removeDiscounts?: boolean;
 };
 
 export type CardChecks = { hasCard: boolean; cvcCheck: string | null; postalCheck: string | null };
@@ -99,6 +101,8 @@ export interface BillingGateway {
     subscriptionId: string;
     items: GatewayItem[];
     prorationBehavior: ProrationBehavior;
+    /** Preview without the subscription's discounts, as SubscriptionUpdate.removeDiscounts. */
+    removeDiscounts?: boolean;
   }): Promise<{ dueNowCents: number; nextInvoiceCents: number; nextInvoiceAt: Date }>;
   createPortalSession(i: {
     customerId: string;
@@ -308,6 +312,8 @@ export function stripeGateway(stripe: Stripe, webhookSecret?: string): BillingGa
             ...(u.trialEnd ? { trial_end: toUnix(u.trialEnd) } : {}),
             proration_behavior: u.prorationBehavior,
             ...(u.paymentBehavior ? { payment_behavior: u.paymentBehavior } : {}),
+            // An empty value clears the subscription's discounts.
+            ...(u.removeDiscounts ? { discounts: '' as const } : {}),
             expand: SUB_EXPAND,
           },
           { idempotencyKey },
@@ -332,6 +338,8 @@ export function stripeGateway(stripe: Stripe, webhookSecret?: string): BillingGa
           customer: i.customerId,
           subscription: i.subscriptionId,
           subscription_details: { items, proration_behavior: behavior },
+          // An empty value previews without inheriting the subscription's discounts.
+          ...(i.removeDiscounts ? { discounts: '' as const } : {}),
         });
       const periodEnd = Math.min(...current.items.data.map((it) => it.current_period_end));
       if (i.prorationBehavior === 'always_invoice') {

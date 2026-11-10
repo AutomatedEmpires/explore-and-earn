@@ -1,193 +1,272 @@
-// Founding host codes (SP2 spec section 8.7). An operator creates codes with
-// `pnpm ops:founding-codes`; each is shown once and stored only as the sha256 of its normalized
-// form. At checkout a code is held (under one advisory lock, so redeemed + held never passes
-// founding.max_hosts) until its session expires, and redeemed when the subscription syncs.
-import { createHash, randomBytes } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
-import { queryRows, type Db, type DbOrTx, type Tx } from '@/lib/db';
-import { badRequest, conflict } from '@/lib/errors';
-import { newId } from '@/lib/ids';
+// The founding offer (FD-7 in docs/decisions/2026-11-04-founder-decisions.md).
+//
+// - Cohort: the first 100 host organizations by signup order. The orgs module numbers them when
+//   the app creates the organization; paying has nothing to do with it.
+// - One discount per organization, its shape fixed by the interval of its first paid
+//   subscription: monthly is 50% off the plan price for six subscription months (a tier change
+//   inside them keeps it), annual is 50% off the first annual term. Neither interval change ever
+//   grants a new discount. The clock starts at the first paid activation.
+// - The server decides: checkout applies the founding coupon only to an eligible organization's
+//   first subscription; a plan change that moves to the other interval removes it; sync locks
+//   the shape at the first paid activation and reports any founding coupon the rules don't allow
+//   (organization 101, a second introductory period, the wrong interval, the retired coupon).
+import { and, eq, ne, notInArray } from 'drizzle-orm';
+import type { DbOrTx, Tx } from '@/lib/db';
 import { record } from '@/modules/audit';
-import { getSetting } from '@/modules/settings';
-import { foundingCodes } from './schema';
+import { FOUNDING_COHORT_SIZE, countFoundingCohort, getFoundingNumber } from '@/modules/orgs';
+import type { SubSnapshot, SubscriptionStatus } from './gateway';
+import { addMonths, isLapse } from './internal';
+import {
+  FOUNDING_ANNUAL_COUPON_ID,
+  FOUNDING_MONTHLY_COUPON_ID,
+  FOUNDING_MONTHLY_MONTHS,
+  FOUNDING_PERCENT_OFF,
+  RETIRED_FOUNDING_COUPON_ID,
+  type BillingInterval,
+} from './plans';
+import { foundingDiscounts, subscriptions } from './schema';
 
-/** Crockford base32: no I, L, O or U. */
-const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-const NORMALIZED = /^EE[0-9A-HJKMNP-TV-Z]{8}$/;
-const MAX_CODES_PER_BATCH = 100;
-
-/** `EE-XXXX-XXXX`. `rand(n)` returns n random bytes; each byte picks one of the 32 letters. */
-export function generateFoundingCode(rand: (n: number) => Uint8Array = randomBytes): string {
-  const bytes = rand(8);
-  let body = '';
-  for (let i = 0; i < 8; i++) body += ALPHABET[(bytes[i] ?? 0) & 31];
-  return `EE-${body.slice(0, 4)}-${body.slice(4)}`;
-}
+export type FoundingShape = 'monthly' | 'annual';
 
 /**
- * The code as it is hashed: uppercase, without hyphens or spaces, with O read as 0 and I or L
- * as 1. Null unless it is `EE` plus 8 Crockford characters.
+ * - `none`: not a founding host, or its first subscription activated without the discount.
+ * - `eligible`: a founding host whose first paid subscription has not activated yet.
+ * - `active`: inside its introductory period.
+ * - `ended`: the introductory period is over (or ended early).
  */
-export function normalizeFoundingCode(input: string): string | null {
-  const s = input
-    .toUpperCase()
-    .replace(/[\s-]+/g, '')
-    .replace(/O/g, '0')
-    .replace(/[IL]/g, '1');
-  return NORMALIZED.test(s) ? s : null;
+export type FoundingStatus = 'none' | 'eligible' | 'active' | 'ended';
+
+export type FoundingDiscountRow = typeof foundingDiscounts.$inferSelect;
+
+export const shapeOfInterval = (interval: BillingInterval): FoundingShape =>
+  interval === 'month' ? 'monthly' : 'annual';
+
+export const intervalOfShape = (shape: FoundingShape): BillingInterval =>
+  shape === 'monthly' ? 'month' : 'year';
+
+/** The shape a founding coupon gives, or null for any other coupon. */
+export function shapeOfCoupon(couponId: string | null | undefined): FoundingShape | null {
+  if (couponId === FOUNDING_MONTHLY_COUPON_ID) return 'monthly';
+  if (couponId === FOUNDING_ANNUAL_COUPON_ID) return 'annual';
+  return null;
 }
 
-export function hashFoundingCode(normalized: string): string {
-  return createHash('sha256').update(normalized).digest('hex');
+/** When the introductory period ends on its own: six months, or one annual term, after it starts. */
+export function introEndsAt(shape: FoundingShape, startedAt: Date): Date {
+  return addMonths(startedAt, shape === 'monthly' ? FOUNDING_MONTHLY_MONTHS : 12);
 }
 
-/** Creates 1-100 codes and returns them in plaintext, once. Audit keeps only their last 4. */
-export async function createFoundingCodes(
-  db: Db,
-  i: { count: number; note: string; operatorId: string | null },
-): Promise<string[]> {
-  if (!Number.isInteger(i.count) || i.count < 1 || i.count > MAX_CODES_PER_BATCH) {
-    throw badRequest(`Create between 1 and ${MAX_CODES_PER_BATCH} codes at a time.`, {
-      reason: 'invalid_count',
-    });
-  }
-  return db.transaction(async (tx) => {
-    const codes: string[] = [];
-    while (codes.length < i.count) {
-      const code = generateFoundingCode();
-      const normalized = normalizeFoundingCode(code) as string;
-      const inserted = await tx
-        .insert(foundingCodes)
-        .values({
-          id: newId(),
-          codeHash: hashFoundingCode(normalized),
-          last4: normalized.slice(-4),
-          note: i.note,
-          createdBy: i.operatorId,
-        })
-        .onConflictDoNothing({ target: foundingCodes.codeHash })
-        .returning({ id: foundingCodes.id });
-      // A collision (1 in 2^40 per pair) just draws again.
-      if (inserted.length > 0) codes.push(code);
-    }
-    await record(tx, {
-      actorType: i.operatorId ? 'operator' : 'system',
-      actorId: i.operatorId,
-      action: 'billing.founding_codes_created',
-      subjectType: 'founding_codes',
-      subjectId: null,
-      data: { count: codes.length, note: i.note, last4: codes.map((c) => c.slice(-4)) },
-    });
-    return codes;
-  });
-}
+/** Statuses a subscription only reaches by activating (everything but never-paid incomplete). */
+const NEVER_ACTIVATED: readonly SubscriptionStatus[] = ['incomplete', 'incomplete_expired'];
 
-/** Redeemed codes, unexpired holds, and the founding.max_hosts cap. */
-export async function getFoundingCount(
+/** A first paid activation: the subscription is active (past_due was active before). */
+const isPaidActivation = (status: SubscriptionStatus) =>
+  status === 'active' || status === 'past_due';
+
+export async function getFoundingDiscount(
   db: DbOrTx,
+  orgId: string,
+  o: { forUpdate?: boolean } = {},
+): Promise<FoundingDiscountRow | null> {
+  const q = db.select().from(foundingDiscounts).where(eq(foundingDiscounts.orgId, orgId));
+  const [row] = o.forUpdate ? await q.for('update') : await q;
+  return row ?? null;
+}
+
+/** Whether the org has had a subscription that activated, other than `exceptStripeId`. */
+async function hasActivatedSubscription(
+  db: DbOrTx,
+  orgId: string,
+  exceptStripeId?: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: subscriptions.id })
+    .from(subscriptions)
+    .where(
+      and(
+        eq(subscriptions.orgId, orgId),
+        notInArray(subscriptions.status, [...NEVER_ACTIVATED]),
+        exceptStripeId === undefined
+          ? undefined
+          : ne(subscriptions.stripeSubscriptionId, exceptStripeId),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
+}
+
+export type FoundingEligibility =
+  | { eligible: true; foundingNumber: number }
+  | { eligible: false; reason: 'not_in_cohort' | 'intro_used'; foundingNumber: number | null };
+
+/**
+ * Whether the org's next subscription gets the founding discount: it is one of the first 100 by
+ * signup, and it has never had a founding discount or any subscription that activated.
+ */
+export async function getFoundingEligibility(
+  db: DbOrTx,
+  orgId: string,
+  o: { exceptStripeId?: string } = {},
+): Promise<FoundingEligibility> {
+  const foundingNumber = await getFoundingNumber(db, orgId);
+  if (foundingNumber === null) return { eligible: false, reason: 'not_in_cohort', foundingNumber };
+  if (
+    (await getFoundingDiscount(db, orgId)) ||
+    (await hasActivatedSubscription(db, orgId, o.exceptStripeId))
+  ) {
+    return { eligible: false, reason: 'intro_used', foundingNumber };
+  }
+  return { eligible: true, foundingNumber };
+}
+
+/** The founding status from the stored facts. */
+export function foundingStatusOf(
+  i: { eligibility: FoundingEligibility; discount: FoundingDiscountRow | null },
   now: Date = new Date(),
-): Promise<{ redeemed: number; held: number; max: number }> {
-  const [row] = await queryRows<{ redeemed: number; held: number }>(
-    db,
-    sql`
-      select
-        count(*) filter (where status = 'redeemed')::int as redeemed,
-        count(*) filter (where status = 'held' and held_until > ${now}::timestamptz)::int as held
-      from app.founding_codes
-    `,
-  );
+): FoundingStatus {
+  if (i.discount) {
+    return i.discount.endedAt === null && now < i.discount.endsAt ? 'active' : 'ended';
+  }
+  return i.eligibility.eligible ? 'eligible' : 'none';
+}
+
+export type FoundingSummary = {
+  status: FoundingStatus;
+  /** The org's place in signup order (1-100), or null when it is not a founding host. */
+  number: number | null;
+  shape: FoundingShape | null;
+  percentOff: number;
+  startedAt: Date | null;
+  /** When the introductory period ends (or ended). */
+  endsAt: Date | null;
+};
+
+/** What billing shows about the org's founding discount. */
+export async function getFoundingSummary(
+  db: DbOrTx,
+  orgId: string,
+  now: Date = new Date(),
+): Promise<FoundingSummary> {
+  const [eligibility, discount] = await Promise.all([
+    getFoundingEligibility(db, orgId),
+    getFoundingDiscount(db, orgId),
+  ]);
   return {
-    redeemed: row?.redeemed ?? 0,
-    held: row?.held ?? 0,
-    max: await getSetting(db, 'founding.max_hosts'),
+    status: foundingStatusOf({ eligibility, discount }, now),
+    number: eligibility.foundingNumber,
+    shape: discount?.shape ?? null,
+    percentOff: FOUNDING_PERCENT_OFF,
+    startedAt: discount?.startedAt ?? null,
+    endsAt: discount ? (discount.endedAt ?? discount.endsAt) : null,
   };
 }
 
-/** Serializes every hold and redemption, so the cap holds under concurrent checkouts. */
-async function lockFounding(tx: Tx): Promise<void> {
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtext('founding'))`);
+/** Founding numbers still free. */
+export async function foundingSpotsLeft(db: DbOrTx): Promise<number> {
+  return Math.max(0, FOUNDING_COHORT_SIZE - (await countFoundingCohort(db)));
 }
 
-const invalid = () => badRequest("That code isn't valid.", { reason: 'code_invalid' });
+/** Why a synced subscription's founding coupon breaks the FD-7 rules. */
+export type FoundingMismatch =
+  /** The org is not one of the first 100 (organization 101 and later). */
+  | 'not_in_cohort'
+  /** The org already used its one introductory period. */
+  | 'second_intro'
+  /** The coupon's shape does not match the subscription's interval. */
+  | 'wrong_interval'
+  /** The withdrawn founding_30_forever coupon. */
+  | 'retired_coupon';
 
 /**
- * Holds `code` for `orgId` until `until` (the Checkout session's expiry). The same org holding
- * it again moves the hold to `until`; an org holds at most one code at a time.
+ * Applies FD-7 to one synced subscription, inside sync's transaction (under the org lock):
+ * - at the first paid activation of an eligible org's subscription carrying a founding coupon,
+ *   stores the discount and its shape;
+ * - on the discount's own subscription, ends the introductory period early when it moves to the
+ *   other interval or ends.
+ * Returns the mismatch to report when the subscription carries a founding coupon the rules
+ * don't allow (nothing is stored for it), else null.
  */
-export async function holdFoundingCode(
+export async function syncFoundingDiscount(
   tx: Tx,
-  i: { orgId: string; code: string; until: Date },
-): Promise<{ codeId: string }> {
-  await lockFounding(tx);
-  const now = new Date();
-  const normalized = normalizeFoundingCode(i.code);
-  if (!normalized) throw invalid();
+  i: { orgId: string; snap: SubSnapshot; interval: BillingInterval; now: Date },
+): Promise<FoundingMismatch | null> {
+  const { orgId, snap, interval, now } = i;
+  const discount = await getFoundingDiscount(tx, orgId, { forUpdate: true });
+  const own = discount !== null && discount.stripeSubscriptionId === snap.id;
 
-  const [row] = await tx
-    .select()
-    .from(foundingCodes)
-    .where(eq(foundingCodes.codeHash, hashFoundingCode(normalized)))
-    .for('update');
-  if (!row || row.status === 'revoked' || row.status === 'redeemed') throw invalid();
-
-  const heldNow = row.status === 'held' && row.heldUntil !== null && row.heldUntil > now;
-  if (heldNow && row.heldByOrgId !== i.orgId) throw invalid();
-
-  // Another code this org was holding (an earlier checkout) is let go.
-  await tx.execute(sql`
-    update app.founding_codes
-    set status = 'available', held_by_org_id = null, held_until = null
-    where held_by_org_id = ${i.orgId}::uuid and status = 'held' and id <> ${row.id}::uuid
-  `);
-
-  if (!heldNow) {
-    const { redeemed, held, max } = await getFoundingCount(tx, now);
-    if (redeemed + held >= max) {
-      throw conflict('Founding spots are all taken.', { reason: 'founding_unavailable' });
+  if (own && discount.endedAt === null && now < discount.endsAt) {
+    const endedReason = isLapse(snap.status)
+      ? ('subscription_ended' as const)
+      : intervalOfShape(discount.shape) !== interval
+        ? ('interval_change' as const)
+        : null;
+    if (endedReason) {
+      await tx
+        .update(foundingDiscounts)
+        .set({ endedAt: now, endedReason })
+        .where(eq(foundingDiscounts.orgId, orgId));
+      await record(tx, {
+        actorType: 'system',
+        actorId: null,
+        orgId,
+        action: 'billing.founding_ended',
+        subjectType: 'organization',
+        subjectId: orgId,
+        data: { reason: endedReason, shape: discount.shape, subscriptionId: snap.id },
+      });
     }
   }
 
-  await tx
-    .update(foundingCodes)
-    .set({ status: 'held', heldByOrgId: i.orgId, heldUntil: i.until })
-    .where(eq(foundingCodes.id, row.id));
-  return { codeId: row.id };
-}
+  if (snap.couponId === RETIRED_FOUNDING_COUPON_ID) return 'retired_coupon';
+  const shape = shapeOfCoupon(snap.couponId);
+  if (!shape) return null;
 
-/**
- * Marks the code redeemed by `orgId` (when its founding subscription syncs). Returns whether it
- * changed anything: a code already redeemed, or an org that already redeemed one, is left alone.
- */
-export async function redeemFoundingCode(
-  tx: Tx,
-  i: { codeId: string; orgId: string },
-): Promise<boolean> {
-  await lockFounding(tx);
-  const [already] = await tx
-    .select({ id: foundingCodes.id })
-    .from(foundingCodes)
-    .where(eq(foundingCodes.redeemedOrgId, i.orgId));
-  if (already) return false;
-  const updated = await tx
-    .update(foundingCodes)
-    .set({
-      status: 'redeemed',
-      redeemedOrgId: i.orgId,
-      redeemedAt: new Date(),
-      heldByOrgId: null,
-      heldUntil: null,
+  if (discount) {
+    if (!own) return 'second_intro';
+    return discount.shape === shape && intervalOfShape(shape) === interval
+      ? null
+      : 'wrong_interval';
+  }
+  if (intervalOfShape(shape) !== interval) return 'wrong_interval';
+  // Not paid yet (or already over without ever being seen active): decided when it activates.
+  if (!isPaidActivation(snap.status)) return null;
+
+  const eligibility = await getFoundingEligibility(tx, orgId, { exceptStripeId: snap.id });
+  if (!eligibility.eligible) {
+    return eligibility.reason === 'not_in_cohort' ? 'not_in_cohort' : 'second_intro';
+  }
+
+  // The first paid activation: the shape is fixed and the clock starts.
+  const startedAt = snap.startDate;
+  const endsAt = introEndsAt(shape, startedAt);
+  const inserted = await tx
+    .insert(foundingDiscounts)
+    .values({
+      orgId,
+      shape,
+      couponId: snap.couponId as string,
+      stripeSubscriptionId: snap.id,
+      startedAt,
+      endsAt,
     })
-    .where(and(eq(foundingCodes.id, i.codeId), sql`${foundingCodes.status} <> 'redeemed'`))
-    .returning({ id: foundingCodes.id });
-  return updated.length > 0;
-}
-
-/** Lets go of any code the org holds (its Checkout session was replaced or failed). */
-export async function releaseHold(tx: Tx, orgId: string): Promise<void> {
-  await lockFounding(tx);
-  await tx.execute(sql`
-    update app.founding_codes
-    set status = 'available', held_by_org_id = null, held_until = null
-    where held_by_org_id = ${orgId}::uuid and status = 'held'
-  `);
+    .onConflictDoNothing()
+    .returning({ orgId: foundingDiscounts.orgId });
+  if (inserted.length > 0) {
+    await record(tx, {
+      actorType: 'system',
+      actorId: null,
+      orgId,
+      action: 'billing.founding_started',
+      subjectType: 'organization',
+      subjectId: orgId,
+      data: {
+        shape,
+        foundingNumber: eligibility.foundingNumber,
+        startedAt: startedAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        subscriptionId: snap.id,
+      },
+    });
+  }
+  return null;
 }

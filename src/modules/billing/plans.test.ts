@@ -5,9 +5,15 @@ import { billingGateway } from './gateway';
 import { makeFakeBillingGateway } from './gateway-fake';
 import {
   EXTRA_SLOT_ANNUAL_MULTIPLIER,
-  FOUNDING_COUPON_ID,
+  FOUNDING_ANNUAL_COUPON_ID,
+  FOUNDING_MONTHLY_COUPON_ID,
+  FOUNDING_MONTHLY_MONTHS,
+  FOUNDING_PERCENT_OFF,
   PLANS,
   PLAN_CODES,
+  RETIRED_FOUNDING_COUPON_ID,
+  foundingCouponFor,
+  isFoundingCoupon,
   lookupKey,
   monthlyEquivalentCents,
   parseLookupKey,
@@ -42,7 +48,25 @@ describe('PLANS', () => {
       },
     });
     expect(EXTRA_SLOT_ANNUAL_MULTIPLIER).toBe(10);
-    expect(FOUNDING_COUPON_ID).toBe('founding_30_forever');
+  });
+});
+
+describe('founding coupons (FD-7)', () => {
+  it('are 50% off: six months for a monthly start, the first annual term for an annual one', () => {
+    expect(FOUNDING_PERCENT_OFF).toBe(50);
+    expect(FOUNDING_MONTHLY_MONTHS).toBe(6);
+    expect(foundingCouponFor('month')).toBe(FOUNDING_MONTHLY_COUPON_ID);
+    expect(foundingCouponFor('year')).toBe(FOUNDING_ANNUAL_COUPON_ID);
+    expect(FOUNDING_MONTHLY_COUPON_ID).toBe('founding_50_six_months');
+    expect(FOUNDING_ANNUAL_COUPON_ID).toBe('founding_50_first_year');
+  });
+
+  it('never treat the retired founding_30_forever coupon as a founding coupon', () => {
+    expect(RETIRED_FOUNDING_COUPON_ID).toBe('founding_30_forever');
+    expect(isFoundingCoupon(RETIRED_FOUNDING_COUPON_ID)).toBe(false);
+    expect(isFoundingCoupon(null)).toBe(false);
+    expect(isFoundingCoupon(FOUNDING_MONTHLY_COUPON_ID)).toBe(true);
+    expect(isFoundingCoupon(FOUNDING_ANNUAL_COUPON_ID)).toBe(true);
   });
 });
 
@@ -178,6 +202,50 @@ describe('fake gateway', () => {
         'change:1',
       ),
     ).rejects.toMatchObject({ name: 'BillingCardError' });
+  });
+
+  it('takes the founding discount off the plan price only, and drops it on removeDiscounts', async () => {
+    const gw = makeFakeBillingGateway({ autoComplete: true });
+    const session = await gw.createCheckoutSession(
+      {
+        ...params('cus_f'),
+        items: [
+          { lookupKey: 'professional_month', quantity: 1 },
+          { lookupKey: 'slot_professional_month', quantity: 2 },
+        ],
+        couponId: FOUNDING_MONTHLY_COUPON_ID,
+        allowPromotionCodes: false,
+      },
+      'checkout:f',
+    );
+    const { subscriptionId } = await gw.retrieveCheckoutSession(session.id);
+    const sub = subscriptionId ?? '';
+    const preview = (removeDiscounts?: boolean) =>
+      gw.previewInvoice({
+        customerId: 'cus_f',
+        subscriptionId: sub,
+        items: [
+          { lookupKey: 'professional_month', quantity: 1 },
+          { lookupKey: 'slot_professional_month', quantity: 2 },
+        ],
+        prorationBehavior: 'create_prorations',
+        removeDiscounts,
+      });
+    expect(gw.getSubscription(sub)?.status).toBe('active');
+    // 50% of the $299 tier, and the two $29 extra slots in full.
+    expect((await preview()).nextInvoiceCents).toBe(14950 + 5800);
+    expect((await preview(true)).nextInvoiceCents).toBe(29900 + 5800);
+
+    await gw.updateSubscription(
+      sub,
+      {
+        items: [{ lookupKey: 'professional_year', quantity: 1 }],
+        prorationBehavior: 'none',
+        removeDiscounts: true,
+      },
+      'change:f',
+    );
+    expect(gw.getSubscription(sub)?.couponId).toBeNull();
   });
 
   it('verifies the signatures it makes', () => {

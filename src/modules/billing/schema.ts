@@ -1,4 +1,5 @@
-// Drizzle tables for the billing module. The DDL lives in drizzle/1500_billing.sql.
+// Drizzle tables for the billing module. The DDL lives in drizzle/1500_billing.sql and
+// drizzle/1510_billing_founding_offer.sql.
 // Only tables are exported here: src/db/schema.ts re-exports every module's schema file.
 import { boolean, integer, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
@@ -19,6 +20,7 @@ const SUBSCRIPTION_STATUS_VALUES = [
   'paused',
 ] as const;
 
+/** Retired by FD-7: founding codes no longer gate or grant a discount. */
 export const foundingCodes = app.table('founding_codes', {
   id: uuid('id').primaryKey(),
   /** sha256 hex of the normalized code; the plaintext is never stored. */
@@ -41,10 +43,13 @@ export const billingAccounts = app.table('billing_accounts', {
   orgId: uuid('org_id').primaryKey(),
   stripeCustomerId: text('stripe_customer_id').unique(),
   hostSince: ts('host_since'),
+  /** Retired by FD-7 (see foundingDiscounts); nothing writes it any more. */
   foundingStatus: text('founding_status', { enum: ['none', 'active', 'lapsed', 'forfeited'] })
     .notNull()
     .default('none'),
+  /** Retired by FD-7. */
   foundingCodeId: uuid('founding_code_id'),
+  /** Retired by FD-7. */
   foundingLapsedAt: ts('founding_lapsed_at'),
   openCheckoutSessionId: text('open_checkout_session_id'),
   openCheckoutExpiresAt: ts('open_checkout_expires_at'),
@@ -88,6 +93,25 @@ export const billingChanges = app.table('billing_changes', {
     .default('pending'),
   requestedBy: uuid('requested_by'),
   error: text('error'),
+  createdAt: ts('created_at').notNull().defaultNow(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+});
+
+/**
+ * FD-7: the one founding discount a host organization ever gets, written at the first paid
+ * activation of a subscription carrying a founding coupon. The shape (from that subscription's
+ * interval) never changes; ended_at marks an early end (interval change, or the subscription
+ * ended) before ends_at.
+ */
+export const foundingDiscounts = app.table('founding_discounts', {
+  orgId: uuid('org_id').primaryKey(),
+  shape: text('shape', { enum: ['monthly', 'annual'] }).notNull(),
+  couponId: text('coupon_id').notNull(),
+  stripeSubscriptionId: text('stripe_subscription_id').notNull().unique(),
+  startedAt: ts('started_at').notNull(),
+  endsAt: ts('ends_at').notNull(),
+  endedAt: ts('ended_at'),
+  endedReason: text('ended_reason', { enum: ['interval_change', 'subscription_ended'] }),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 });

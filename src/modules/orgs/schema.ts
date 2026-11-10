@@ -1,7 +1,7 @@
 // Drizzle tables for the orgs module (created in drizzle/0100_identity.sql, extended by
-// drizzle/1000_orgs.sql). Only this module reads or writes them; other code goes through
-// `@/modules/orgs`.
-import { boolean, pgSchema, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+// drizzle/1000_orgs.sql and drizzle/1060_orgs_founding_cohort.sql). Only this module reads or
+// writes them; other code goes through `@/modules/orgs`.
+import { boolean, pgSchema, smallint, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 
 const app = pgSchema('app');
 
@@ -113,4 +113,14 @@ export const orgSlugs = app.table('org_slugs', {
   retiredAt: ts('retired_at'),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
+});
+
+/**
+ * FD-7: the first 100 host organizations, numbered 1-100 in signup order. Written once, when the
+ * app records an organization's Owner (./founding.ts); numbers are never reissued.
+ */
+export const foundingCohort = app.table('founding_cohort', {
+  foundingNumber: smallint('founding_number').primaryKey(),
+  orgId: uuid('org_id').notNull().unique(),
+  createdAt: ts('created_at').notNull().defaultNow(),
 });

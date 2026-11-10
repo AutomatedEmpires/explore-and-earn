@@ -1,11 +1,20 @@
-// The Stripe catalog (SP2 spec section 8.1): three plan products with their tier and extra-slot
-// prices (monthly and annual, by lookup key), the founding coupon, and the two Billing Portal
-// configurations (SP2 plan, decision 10). `pnpm stripe:seed` runs it; it is idempotent by
-// lookup key, coupon id and the portal metadata `ee_portal`.
+// The Stripe catalog (SP2 spec section 8.1, FD-6 and FD-7): per plan, a tier product with its
+// monthly and annual tier prices and an extra-slot product with its slot prices (by lookup key);
+// the two founding coupons; and the two Billing Portal configurations (SP2 plan, decision 10).
+// `pnpm stripe:seed` runs it; it is idempotent by product metadata, lookup key, coupon id and
+// the portal metadata `ee_portal`.
+//
+// The founding coupons apply only to the tier products, so they take 50% off the plan price and
+// nothing off extra slots. That is why the slot prices live on products of their own. A slot
+// price an older seed put on the tier product is replaced on the slot product, and its lookup
+// key moves with it. The retired founding_30_forever coupon is never created.
 import type Stripe from 'stripe';
 import {
   BILLING_INTERVALS,
-  FOUNDING_COUPON_ID,
+  FOUNDING_ANNUAL_COUPON_ID,
+  FOUNDING_MONTHLY_COUPON_ID,
+  FOUNDING_MONTHLY_MONTHS,
+  FOUNDING_PERCENT_OFF,
   PLAN_CODES,
   lookupKey,
   unitAmountCents,
@@ -14,7 +23,23 @@ import {
   type PlanCode,
 } from './plans';
 
-export type CatalogPrice = { id: string; lookupKey: string; unitAmountCents: number };
+export type CatalogPrice = {
+  id: string;
+  lookupKey: string;
+  unitAmountCents: number;
+  productId: string;
+};
+
+export type CatalogCoupon = {
+  id: string;
+  name: string;
+  percentOff: number;
+  /** `repeating` needs durationInMonths. */
+  duration: 'once' | 'repeating';
+  durationInMonths?: number;
+  /** The products the coupon discounts; nothing else on the invoice is. */
+  appliesToProducts: string[];
+};
 
 export type PortalKind = 'full' | 'billing';
 
@@ -44,14 +69,11 @@ export interface CatalogApi {
     interval: BillingInterval;
     nickname: string;
     metadata: Record<string, string>;
+    /** Moves the lookup key from the price that has it now to this one. */
+    transferLookupKey?: boolean;
   }): Promise<{ id: string }>;
   getCoupon(id: string): Promise<{ id: string } | null>;
-  createCoupon(c: {
-    id: string;
-    name: string;
-    percentOff: number;
-    duration: 'forever';
-  }): Promise<{ id: string }>;
+  createCoupon(c: CatalogCoupon): Promise<{ id: string }>;
   listPortalConfigurations(): Promise<{ id: string; metadata: Record<string, string> }[]>;
   createPortalConfiguration(c: PortalConfigurationInput): Promise<{ id: string }>;
 }
@@ -93,29 +115,58 @@ const PORTALS: PortalConfigurationInput[] = [
   },
 ];
 
+/** The FD-7 founding coupons, each limited to the three tier products. */
+function foundingCoupons(tierProductIds: string[]): CatalogCoupon[] {
+  return [
+    {
+      id: FOUNDING_MONTHLY_COUPON_ID,
+      name: `Founding host: ${FOUNDING_PERCENT_OFF}% off the plan for ${FOUNDING_MONTHLY_MONTHS} months`,
+      percentOff: FOUNDING_PERCENT_OFF,
+      duration: 'repeating',
+      durationInMonths: FOUNDING_MONTHLY_MONTHS,
+      appliesToProducts: tierProductIds,
+    },
+    {
+      id: FOUNDING_ANNUAL_COUPON_ID,
+      name: `Founding host: ${FOUNDING_PERCENT_OFF}% off the first annual term`,
+      percentOff: FOUNDING_PERCENT_OFF,
+      duration: 'once',
+      appliesToProducts: tierProductIds,
+    },
+  ];
+}
+
+const productKind = (metadata: Record<string, string>): LookupKind =>
+  metadata.ee_kind === 'slot' ? 'slot' : 'tier';
+
 export async function seedStripeCatalog(
   api: CatalogApi,
 ): Promise<{ created: string[]; portalConfigFull: string; portalConfigBilling: string }> {
   const created: string[] = [];
 
-  // Products, one per plan, found again by metadata ee_plan.
+  // Products, two per plan (the tier and its extra slot), found again by metadata ee_plan and
+  // ee_kind. A tier product from an older seed has no ee_kind.
   const products = await api.listProducts();
-  const productIds = {} as Record<PlanCode, string>;
-  for (const plan of PLAN_CODES) {
-    const existing = products.find((p) => p.metadata.ee_plan === plan);
-    if (existing) {
-      productIds[plan] = existing.id;
-    } else {
+  const productIds = { tier: {}, slot: {} } as Record<LookupKind, Record<PlanCode, string>>;
+  for (const kind of ['tier', 'slot'] as const) {
+    for (const plan of PLAN_CODES) {
+      const existing = products.find(
+        (p) => p.metadata.ee_plan === plan && productKind(p.metadata) === kind,
+      );
+      if (existing) {
+        productIds[kind][plan] = existing.id;
+        continue;
+      }
       const { id } = await api.createProduct({
-        name: PRODUCT_NAMES[plan],
-        metadata: { ee_plan: plan },
+        name: kind === 'tier' ? PRODUCT_NAMES[plan] : `${PRODUCT_NAMES[plan]} extra listing slot`,
+        metadata: { ee_plan: plan, ee_kind: kind },
       });
-      productIds[plan] = id;
-      created.push(`product:${plan}`);
+      productIds[kind][plan] = id;
+      created.push(`product:${kind === 'tier' ? '' : 'slot_'}${plan}`);
     }
   }
 
-  // Prices, by lookup key: the tier and the extra slot, monthly and annual.
+  // Prices, by lookup key: the tier and the extra slot, monthly and annual, each on its product.
   const wanted: { kind: LookupKind; plan: PlanCode; interval: BillingInterval; key: string }[] =
     [];
   for (const kind of ['tier', 'slot'] as const) {
@@ -125,12 +176,16 @@ export async function seedStripeCatalog(
       }
     }
   }
-  const have = new Set((await api.listPrices(wanted.map((w) => w.key))).map((p) => p.lookupKey));
+  const have = new Map(
+    (await api.listPrices(wanted.map((w) => w.key))).map((p) => [p.lookupKey, p]),
+  );
   for (const w of wanted) {
-    if (have.has(w.key)) continue;
+    const productId = productIds[w.kind][w.plan];
+    const existing = have.get(w.key);
+    if (existing?.productId === productId) continue;
     const per = w.interval === 'month' ? 'monthly' : 'annual';
     await api.createPrice({
-      productId: productIds[w.plan],
+      productId,
       lookupKey: w.key,
       unitAmountCents: unitAmountCents(w.kind, w.plan, w.interval),
       interval: w.interval,
@@ -139,19 +194,17 @@ export async function seedStripeCatalog(
           ? `${PLAN_NAMES[w.plan]} (${per})`
           : `${PLAN_NAMES[w.plan]} extra listing slot (${per})`,
       metadata: { ee_kind: w.kind, ee_plan: w.plan },
+      ...(existing ? { transferLookupKey: true } : {}),
     });
-    created.push(`price:${w.key}`);
+    created.push(existing ? `price:${w.key}:moved` : `price:${w.key}`);
   }
 
-  // The founding coupon: 30% off, forever.
-  if (!(await api.getCoupon(FOUNDING_COUPON_ID))) {
-    await api.createCoupon({
-      id: FOUNDING_COUPON_ID,
-      name: 'Founding host: 30% off for life',
-      percentOff: 30,
-      duration: 'forever',
-    });
-    created.push(`coupon:${FOUNDING_COUPON_ID}`);
+  // The founding coupons (FD-7). Coupons can't be edited, so one that exists is left as it is.
+  const tierProductIds = PLAN_CODES.map((plan) => productIds.tier[plan]);
+  for (const coupon of foundingCoupons(tierProductIds)) {
+    if (await api.getCoupon(coupon.id)) continue;
+    await api.createCoupon(coupon);
+    created.push(`coupon:${coupon.id}`);
   }
 
   // Portal configurations, found again by metadata ee_portal.
@@ -187,7 +240,14 @@ export function stripeCatalogApi(stripe: Stripe): CatalogApi {
       const list = await stripe.prices.list({ lookup_keys: lookupKeys, active: true, limit: 100 });
       return list.data.flatMap((p) =>
         p.lookup_key
-          ? [{ id: p.id, lookupKey: p.lookup_key, unitAmountCents: p.unit_amount ?? 0 }]
+          ? [
+              {
+                id: p.id,
+                lookupKey: p.lookup_key,
+                unitAmountCents: p.unit_amount ?? 0,
+                productId: typeof p.product === 'string' ? p.product : p.product.id,
+              },
+            ]
           : [],
       );
     },
@@ -198,6 +258,7 @@ export function stripeCatalogApi(stripe: Stripe): CatalogApi {
         unit_amount: p.unitAmountCents,
         recurring: { interval: p.interval },
         lookup_key: p.lookupKey,
+        ...(p.transferLookupKey ? { transfer_lookup_key: true } : {}),
         nickname: p.nickname,
         metadata: p.metadata,
         tax_behavior: 'exclusive',
@@ -218,6 +279,8 @@ export function stripeCatalogApi(stripe: Stripe): CatalogApi {
         name: c.name,
         percent_off: c.percentOff,
         duration: c.duration,
+        ...(c.duration === 'repeating' ? { duration_in_months: c.durationInMonths } : {}),
+        applies_to: { products: c.appliesToProducts },
       });
       return { id: coupon.id };
     },

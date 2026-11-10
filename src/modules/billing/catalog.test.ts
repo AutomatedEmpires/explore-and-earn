@@ -1,18 +1,22 @@
-// The idempotent Stripe catalog seed (Task 11), against an in-memory CatalogApi.
+// The idempotent Stripe catalog seed (Task 11, with the FD-7 founding coupons), against an
+// in-memory CatalogApi.
 import { describe, expect, it } from 'vitest';
 import {
   seedStripeCatalog,
   type CatalogApi,
+  type CatalogCoupon,
   type CatalogPrice,
   type PortalConfigurationInput,
 } from './catalog';
+
+type MemoryPrice = Omit<CatalogPrice, 'lookupKey'> & { lookupKey: string | null; interval: string };
 
 function memoryCatalog() {
   let n = 0;
   const id = (prefix: string) => `${prefix}_${++n}`;
   const products: { id: string; name: string; metadata: Record<string, string> }[] = [];
-  const prices: (CatalogPrice & { productId: string; interval: string })[] = [];
-  const coupons: { id: string; percentOff: number; duration: string }[] = [];
+  const prices: MemoryPrice[] = [];
+  const coupons: CatalogCoupon[] = [];
   const portals: (PortalConfigurationInput & { id: string })[] = [];
 
   const api: CatalogApi = {
@@ -25,9 +29,17 @@ function memoryCatalog() {
       return { id: row.id };
     },
     async listPrices(lookupKeys) {
-      return prices.filter((p) => lookupKeys.includes(p.lookupKey));
+      return prices.flatMap((p) =>
+        p.lookupKey !== null && lookupKeys.includes(p.lookupKey)
+          ? [{ ...p, lookupKey: p.lookupKey }]
+          : [],
+      );
     },
     async createPrice(p) {
+      // As in Stripe: a lookup key names one price, and only transfer_lookup_key moves it.
+      const holder = prices.find((x) => x.lookupKey === p.lookupKey);
+      if (holder && !p.transferLookupKey) throw new Error(`lookup key ${p.lookupKey} is taken`);
+      if (holder) holder.lookupKey = null;
       const row = {
         id: id('price'),
         lookupKey: p.lookupKey,
@@ -42,7 +54,7 @@ function memoryCatalog() {
       return coupons.find((c) => c.id === couponId) ?? null;
     },
     async createCoupon(c) {
-      coupons.push({ id: c.id, percentOff: c.percentOff, duration: c.duration });
+      coupons.push({ ...c });
       return { id: c.id };
     },
     async listPortalConfigurations() {
@@ -57,12 +69,18 @@ function memoryCatalog() {
   return { api, products, prices, coupons, portals };
 }
 
+const PLANS = ['starter', 'professional', 'enterprise'];
+
+const productOf = (m: ReturnType<typeof memoryCatalog>, kind: string, plan: string) =>
+  m.products.find((p) => p.metadata.ee_plan === plan && (p.metadata.ee_kind ?? 'tier') === kind)
+    ?.id;
+
 describe('seedStripeCatalog', () => {
-  it('creates 3 products, 12 prices, the founding coupon and two portal configurations', async () => {
+  it('creates 6 products, 12 prices, the two founding coupons and two portal configurations', async () => {
     const m = memoryCatalog();
     const result = await seedStripeCatalog(m.api);
 
-    expect(m.products).toHaveLength(3);
+    expect(m.products).toHaveLength(6);
     expect(Object.fromEntries(m.prices.map((p) => [p.lookupKey, p.unitAmountCents]))).toEqual({
       starter_month: 9900,
       starter_year: 99000,
@@ -79,7 +97,41 @@ describe('seedStripeCatalog', () => {
     });
     expect(m.prices.find((p) => p.lookupKey === 'slot_enterprise_year')?.interval).toBe('year');
 
-    expect(m.coupons).toEqual([{ id: 'founding_30_forever', percentOff: 30, duration: 'forever' }]);
+    // Tier prices on the tier product, slot prices on a product of their own.
+    const productOfPrice = (key: string) => m.prices.find((p) => p.lookupKey === key)?.productId;
+    for (const plan of PLANS) {
+      const tier = productOf(m, 'tier', plan);
+      const slot = productOf(m, 'slot', plan);
+      expect(tier).toBeDefined();
+      expect(slot).toBeDefined();
+      expect(slot).not.toBe(tier);
+      for (const interval of ['month', 'year']) {
+        expect(productOfPrice(`${plan}_${interval}`)).toBe(tier);
+        expect(productOfPrice(`slot_${plan}_${interval}`)).toBe(slot);
+      }
+    }
+
+    // FD-7: 50% off the plan price only. The coupons apply to the three tier products, so extra
+    // slots (an add-on; whether add-ons qualify is an open founder question) are never discounted.
+    const tierProducts = PLANS.map((p) => productOf(m, 'tier', p));
+    expect(m.coupons).toEqual([
+      {
+        id: 'founding_50_six_months',
+        name: 'Founding host: 50% off the plan for 6 months',
+        percentOff: 50,
+        duration: 'repeating',
+        durationInMonths: 6,
+        appliesToProducts: tierProducts,
+      },
+      {
+        id: 'founding_50_first_year',
+        name: 'Founding host: 50% off the first annual term',
+        percentOff: 50,
+        duration: 'once',
+        appliesToProducts: tierProducts,
+      },
+    ]);
+    expect(m.coupons.map((c) => c.id)).not.toContain('founding_30_forever');
 
     const full = m.portals.find((p) => p.metadata.ee_portal === 'full');
     const billing = m.portals.find((p) => p.metadata.ee_portal === 'billing');
@@ -97,7 +149,7 @@ describe('seedStripeCatalog', () => {
     });
     expect(result.portalConfigFull).toBe(full?.id);
     expect(result.portalConfigBilling).toBe(billing?.id);
-    expect(result.created).toHaveLength(3 + 12 + 1 + 2);
+    expect(result.created).toHaveLength(6 + 12 + 2 + 2);
   });
 
   it('creates nothing on a second run and returns the same configuration ids', async () => {
@@ -108,8 +160,52 @@ describe('seedStripeCatalog', () => {
     expect(second.created).toEqual([]);
     expect(second.portalConfigFull).toBe(first.portalConfigFull);
     expect(second.portalConfigBilling).toBe(first.portalConfigBilling);
-    expect(m.products).toHaveLength(3);
+    expect(m.products).toHaveLength(6);
     expect(m.prices).toHaveLength(12);
+    expect(m.coupons).toHaveLength(2);
     expect(m.portals).toHaveLength(2);
+  });
+
+  it('moves slot prices an older seed put on the tier product, keeping its tier products', async () => {
+    const m = memoryCatalog();
+    // The catalog as the pre-FD-7 seed left it: one product per plan, with no ee_kind, for both.
+    for (const plan of PLANS) {
+      const { id: productId } = await m.api.createProduct({
+        name: plan,
+        metadata: { ee_plan: plan },
+      });
+      for (const key of [`${plan}_month`, `slot_${plan}_month`]) {
+        await m.api.createPrice({
+          productId,
+          lookupKey: key,
+          unitAmountCents: 1,
+          interval: 'month',
+          nickname: key,
+          metadata: {},
+        });
+      }
+    }
+
+    const result = await seedStripeCatalog(m.api);
+    expect(m.products).toHaveLength(6);
+    expect(result.created).toEqual(
+      expect.arrayContaining([
+        'product:slot_starter',
+        'price:slot_starter_month:moved',
+        'price:slot_enterprise_month:moved',
+        'price:starter_year',
+      ]),
+    );
+    expect(result.created).not.toContain('product:starter');
+    expect(result.created).not.toContain('price:starter_month');
+    expect(result.created).not.toContain('price:starter_month:moved');
+
+    const holders = (key: string) => m.prices.filter((p) => p.lookupKey === key);
+    expect(holders('slot_starter_month')).toHaveLength(1);
+    expect(holders('slot_starter_month')[0]?.productId).toBe(productOf(m, 'slot', 'starter'));
+    expect(holders('starter_month')[0]?.productId).toBe(productOf(m, 'tier', 'starter'));
+    expect(m.coupons[0]?.appliesToProducts).toEqual(PLANS.map((p) => productOf(m, 'tier', p)));
+
+    expect((await seedStripeCatalog(m.api)).created).toEqual([]);
   });
 });
