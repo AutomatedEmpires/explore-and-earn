@@ -5,7 +5,7 @@ import type Stripe from 'stripe';
 import { getEnv } from '@/lib/env';
 import { getStripe } from '@/lib/stripe';
 import { makeFakeBillingGateway, type FakeBillingGateway } from './gateway-fake';
-import type { BillingInterval } from './plans';
+import { lookupKey, parseLookupKey, type BillingInterval, type PlanCode } from './plans';
 
 export type SubscriptionStatus =
   | 'incomplete'
@@ -30,8 +30,24 @@ export type SubSnapshot = {
   trialEnd: Date | null;
   cancelAtPeriodEnd: boolean;
   endedAt: Date | null;
+  /** Stripe's `start_date`: when the subscription was created, paid or not. */
   startDate: Date;
+  /**
+   * When the subscription first became paid: its first invoice's payment time. Later than
+   * startDate when that payment came after creation (an incomplete subscription paid later).
+   * Null while it has never been paid (incomplete, incomplete_expired), and for one canceled
+   * before its first payment.
+   */
+  activatedAt: Date | null;
+  /** The coupon on the subscription now. */
   couponId: string | null;
+  /**
+   * The coupon on the invoice that created the subscription, while that is still its latest
+   * invoice. Stripe drops a `once` coupon (the annual founding coupon) from the subscription as
+   * that invoice finalizes, but the invoice keeps it, so sync reads the first paid term's coupon
+   * here.
+   */
+  initialCouponId: string | null;
   metadata: Record<string, string>;
   created: Date;
 };
@@ -58,6 +74,8 @@ export type SubscriptionUpdate = {
   trialEnd?: Date;
   prorationBehavior: ProrationBehavior;
   paymentBehavior?: 'error_if_incomplete';
+  /** Removes every discount (FD-7: a founding discount ends on an interval change). */
+  removeDiscounts?: boolean;
 };
 
 export type CardChecks = { hasCard: boolean; cvcCheck: string | null; postalCheck: string | null };
@@ -99,6 +117,8 @@ export interface BillingGateway {
     subscriptionId: string;
     items: GatewayItem[];
     prorationBehavior: ProrationBehavior;
+    /** Preview without the subscription's discounts, as SubscriptionUpdate.removeDiscounts. */
+    removeDiscounts?: boolean;
   }): Promise<{ dueNowCents: number; nextInvoiceCents: number; nextInvoiceAt: Date }>;
   createPortalSession(i: {
     customerId: string;
@@ -140,13 +160,65 @@ function idOf(value: string | { id: string } | null | undefined): string | null 
   return typeof value === 'string' ? value : value.id;
 }
 
-function couponOf(discounts: Stripe.Subscription['discounts']): string | null {
-  for (const d of discounts) {
+/** The first coupon among expanded discounts (a bare discount id is skipped). */
+function couponOf(
+  discounts: readonly (string | Stripe.Discount | Stripe.DeletedDiscount)[] | null | undefined,
+): string | null {
+  for (const d of discounts ?? []) {
     if (typeof d === 'string') continue;
     const coupon = idOf(d.source?.coupon ?? null);
     if (coupon) return coupon;
   }
   return null;
+}
+
+/**
+ * The lookup key a subscription item's price stands for. A price whose key a catalog re-seed
+ * moved to a replacement price (catalog.ts, transfer_lookup_key) has none any more, so its
+ * `ee_kind` and `ee_plan` metadata, which the seed has always set, and its interval name it
+ * instead. Subscriptions still on such a price keep syncing. Any other price gives null.
+ */
+function lookupKeyOf(price: Stripe.Price): string | null {
+  if (price.lookup_key) return price.lookup_key;
+  const kind = price.metadata?.ee_kind;
+  const plan = price.metadata?.ee_plan;
+  const interval = price.recurring?.interval;
+  if (kind !== 'tier' && kind !== 'slot') return null;
+  if (interval !== 'month' && interval !== 'year') return null;
+  if (!plan) return null;
+  const key = lookupKey(kind, plan as PlanCode, interval as BillingInterval);
+  return parseLookupKey(key) ? key : null;
+}
+
+/**
+ * When the subscription first became paid (FD-7's clock starts here, and it decides whether the
+ * founding discount is used up). Null while it has never been paid: incomplete, canceled before
+ * its first payment, or a free trial (its first invoice is $0 and pays nothing).
+ * - The invoice that created it was paid with money: that payment time.
+ * - Otherwise a later invoice was paid with money (a trial that converted), or it is active (or
+ *   past_due or unpaid with no trial, which only follow a payment): paid at the trial end, else
+ *   at its start, since the exact time is not on hand.
+ */
+function activatedAtOf(s: Stripe.Subscription): Date | null {
+  if (s.status === 'incomplete' || s.status === 'incomplete_expired') return null;
+  const creation = creationInvoiceOf(s);
+  const paidAt = creation && creation.amount_paid > 0 ? creation.status_transitions?.paid_at : null;
+  if (paidAt) return toDate(paidAt);
+  const latest = s.latest_invoice && typeof s.latest_invoice !== 'string' ? s.latest_invoice : null;
+  const paidLater =
+    latest !== null && latest !== creation && latest.status === 'paid' && latest.amount_paid > 0;
+  const paidStatus =
+    s.status === 'active' ||
+    (s.trial_end === null && (s.status === 'past_due' || s.status === 'unpaid'));
+  return paidLater || paidStatus ? toDate(s.trial_end ?? s.start_date) : null;
+}
+
+/** The subscription's latest invoice when it is the one that created it (and Stripe expanded it). */
+function creationInvoiceOf(s: Stripe.Subscription): Stripe.Invoice | null {
+  const invoice = s.latest_invoice;
+  return invoice && typeof invoice !== 'string' && invoice.billing_reason === 'subscription_create'
+    ? invoice
+    : null;
 }
 
 function toSnapshot(s: Stripe.Subscription): SubSnapshot {
@@ -158,14 +230,16 @@ function toSnapshot(s: Stripe.Subscription): SubSnapshot {
     id: s.id,
     customerId: idOf(s.customer) ?? '',
     status: s.status as SubscriptionStatus,
-    items: items.map((i) => ({ lookupKey: i.price.lookup_key ?? null, quantity: i.quantity ?? 1 })),
+    items: items.map((i) => ({ lookupKey: lookupKeyOf(i.price), quantity: i.quantity ?? 1 })),
     currentPeriodStart: toDate(starts.length > 0 ? Math.min(...starts) : s.start_date),
     currentPeriodEnd: toDate(ends.length > 0 ? Math.min(...ends) : s.start_date),
     trialEnd: s.trial_end === null ? null : toDate(s.trial_end),
     cancelAtPeriodEnd: s.cancel_at_period_end,
     endedAt: s.ended_at === null ? null : toDate(s.ended_at),
     startDate: toDate(s.start_date),
+    activatedAt: activatedAtOf(s),
     couponId: couponOf(s.discounts),
+    initialCouponId: couponOf(creationInvoiceOf(s)?.discounts),
     metadata: { ...(s.metadata ?? {}) },
     created: toDate(s.created),
   };
@@ -189,7 +263,7 @@ function mapCardError(err: unknown): never {
   throw err;
 }
 
-const SUB_EXPAND = ['discounts', 'items.data.price'];
+const SUB_EXPAND = ['discounts', 'items.data.price', 'latest_invoice.discounts'];
 
 /** The real gateway over a Stripe client. Price ids are looked up by lookup key and cached. */
 export function stripeGateway(stripe: Stripe, webhookSecret?: string): BillingGateway {
@@ -291,7 +365,7 @@ export function stripeGateway(stripe: Stripe, webhookSecret?: string): BillingGa
         created: { gte: toUnix(since) },
         status: 'all',
         limit: 100,
-        expand: ['data.discounts'],
+        expand: ['data.discounts', 'data.latest_invoice.discounts'],
       })) {
         out.push(toSnapshot(s));
       }
@@ -308,6 +382,8 @@ export function stripeGateway(stripe: Stripe, webhookSecret?: string): BillingGa
             ...(u.trialEnd ? { trial_end: toUnix(u.trialEnd) } : {}),
             proration_behavior: u.prorationBehavior,
             ...(u.paymentBehavior ? { payment_behavior: u.paymentBehavior } : {}),
+            // An empty value clears the subscription's discounts.
+            ...(u.removeDiscounts ? { discounts: '' as const } : {}),
             expand: SUB_EXPAND,
           },
           { idempotencyKey },
@@ -332,6 +408,8 @@ export function stripeGateway(stripe: Stripe, webhookSecret?: string): BillingGa
           customer: i.customerId,
           subscription: i.subscriptionId,
           subscription_details: { items, proration_behavior: behavior },
+          // An empty value previews without inheriting the subscription's discounts.
+          ...(i.removeDiscounts ? { discounts: '' as const } : {}),
         });
       const periodEnd = Math.min(...current.items.data.map((it) => it.current_period_end));
       if (i.prorationBehavior === 'always_invoice') {

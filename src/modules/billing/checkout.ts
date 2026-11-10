@@ -1,109 +1,44 @@
-// Hosted Checkout (SP2 spec sections 8.7 and 8.8). Founding pricing comes from a held founding
-// code, or from a founder returning within the return window; before launch a code is required.
-// One open session per org is reused while its parameters match. The founding hold and the
-// account update commit before Stripe is called, and a Stripe failure releases the hold.
+// Hosted Checkout (SP2 spec sections 8.7 and 8.8, with FD-7 pricing). A founding host's first
+// subscription gets the founding coupon for the interval it chooses (./founding.ts decides);
+// everyone else pays the regular price and may enter a Stripe promotion code. There is no free
+// period. One open session per org is reused while its parameters match. The account update
+// commits before Stripe is called, and a Stripe failure clears it again.
 import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import type { Db } from '@/lib/db';
-import { badRequest, conflict } from '@/lib/errors';
+import { conflict } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { record } from '@/modules/audit';
 import { lockOrg } from '@/modules/entitlements';
-import { getSetting } from '@/modules/settings';
 import type { HostContext } from '@/server/guards';
 import { ensureStripeCustomer } from './customers';
-import {
-  hashFoundingCode,
-  holdFoundingCode,
-  normalizeFoundingCode,
-  releaseHold,
-} from './founding';
+import { getFoundingEligibility, shapeOfInterval } from './founding';
 import { billingGateway, type BillingGateway } from './gateway';
 import {
-  addDays,
-  addMonths,
   appUrl,
   billingUnavailable,
   getAccount,
   getCurrentSubscription,
-  parseLaunchAt,
   transact,
-  type AccountRow,
 } from './internal';
-import { FOUNDING_COUPON_ID, planItems, type BillingInterval, type PlanCode } from './plans';
+import { foundingCouponFor, planItems, type BillingInterval, type PlanCode } from './plans';
 import { billingAccounts } from './schema';
 
 /** Stripe needs expires_at at least 30 minutes out; 31 survives request latency (decision 16). */
 const SESSION_MINUTES = 31;
 /** An open session closer than this to expiring is replaced rather than reused. */
 const REUSE_MARGIN_MS = 2 * 60 * 1000;
-/** Stripe's limit is 730 days; with no launch date yet the trial waits as long as it can. */
-const NO_LAUNCH_TRIAL_DAYS = 729;
 
 export type CheckoutInput = {
   plan: PlanCode;
   interval: BillingInterval;
   extraSlots: number;
+  /**
+   * Retired with founding codes (FD-7: signup order decides the founding cohort). Still
+   * accepted, so a client that sends one keeps working, and ignored.
+   */
   foundingCode?: string;
 };
-
-/** `max(launchAt, now) + freeDays` days, or `now + 729` days while launch isn't set. */
-export function computeFoundingTrialEnd(launchAt: Date | null, now: Date, freeDays: number): Date {
-  if (!launchAt) return addDays(now, NO_LAUNCH_TRIAL_DAYS);
-  return addDays(new Date(Math.max(launchAt.getTime(), now.getTime())), freeDays);
-}
-
-/** A founder whose subscription lapsed less than the return window ago. */
-export function isReturningFounder(
-  account: AccountRow | null,
-  now: Date,
-  windowMonths: number,
-): boolean {
-  return (
-    account?.foundingStatus === 'lapsed' &&
-    account.foundingLapsedAt !== null &&
-    addMonths(account.foundingLapsedAt, windowMonths) > now
-  );
-}
-
-type Pricing =
-  | { mode: 'none' }
-  | { mode: 'returning'; trialEnd: Date | null }
-  | { mode: 'code'; normalizedCode: string; trialEnd: Date };
-
-async function choosePricing(
-  db: Db,
-  orgId: string,
-  foundingCode: string | undefined,
-  now: Date,
-): Promise<Pricing> {
-  const launchAt = parseLaunchAt(await getSetting(db, 'launch.public_at'));
-  const freeDays = await getSetting(db, 'founding.free_days');
-  const windowMonths = await getSetting(db, 'founding.return_window_months');
-
-  if (isReturningFounder(await getAccount(db, orgId), now, windowMonths)) {
-    const inFreePeriod = launchAt === null || now < addDays(launchAt, freeDays);
-    return {
-      mode: 'returning',
-      trialEnd: inFreePeriod ? computeFoundingTrialEnd(launchAt, now, freeDays) : null,
-    };
-  }
-  if (foundingCode !== undefined && foundingCode.trim() !== '') {
-    const normalizedCode = normalizeFoundingCode(foundingCode);
-    if (!normalizedCode) throw badRequest("That code isn't valid.", { reason: 'code_invalid' });
-    return {
-      mode: 'code',
-      normalizedCode,
-      trialEnd: computeFoundingTrialEnd(launchAt, now, freeDays),
-    };
-  }
-  if (launchAt === null || launchAt > now) {
-    throw badRequest('Enter your founding host code to subscribe before launch.', {
-      reason: 'code_required',
-    });
-  }
-  return { mode: 'none' };
-}
 
 const hasSubscription = () =>
   conflict('You already have a plan. Change it from Billing instead.', {
@@ -121,7 +56,11 @@ export async function createCheckout(
   const now = new Date();
   if (await getCurrentSubscription(db, orgId)) throw hasSubscription();
 
-  const pricing = await choosePricing(db, orgId, i.foundingCode, now);
+  // FD-7: the founding coupon only on an eligible founding host's first subscription, chosen by
+  // the interval it starts on. Anyone else (organization 101 and later, or a second
+  // introductory period) pays the regular price.
+  const eligibility = await getFoundingEligibility(db, orgId);
+  const couponId = eligibility.eligible ? foundingCouponFor(i.interval) : null;
   const items = planItems(i.plan, i.interval, i.extraSlots);
   const paramsHash = createHash('sha256')
     .update(
@@ -129,8 +68,7 @@ export async function createCheckout(
         plan: i.plan,
         interval: i.interval,
         extraSlots: i.extraSlots,
-        mode: pricing.mode,
-        code: pricing.mode === 'code' ? hashFoundingCode(pricing.normalizedCode) : null,
+        couponId,
       }),
     )
     .digest('hex');
@@ -164,19 +102,10 @@ export async function createCheckout(
     }
 
     if (open && account?.openCheckoutParamsHash === paramsHash) {
-      // Same parameters: keep the session, and its code held for as long as it lives.
-      if (pricing.mode === 'code') {
-        await holdFoundingCode(tx, { orgId, code: pricing.normalizedCode, until: open.expiresAt });
-      }
+      // Same parameters: keep the session.
       return { kind: 'reuse', url: open.url } as const;
     }
 
-    await releaseHold(tx, orgId);
-    const codeId =
-      pricing.mode === 'code'
-        ? (await holdFoundingCode(tx, { orgId, code: pricing.normalizedCode, until: expiresAt }))
-            .codeId
-        : null;
     const pending = {
       openCheckoutSessionId: null,
       openCheckoutUrl: null,
@@ -187,7 +116,7 @@ export async function createCheckout(
       .insert(billingAccounts)
       .values({ orgId, ...pending })
       .onConflictDoUpdate({ target: billingAccounts.orgId, set: pending });
-    return { kind: 'create', replacedSessionId: open?.id ?? null, codeId } as const;
+    return { kind: 'create', replacedSessionId: open?.id ?? null } as const;
   });
 
   if (plan.kind === 'reuse') return { url: plan.url };
@@ -202,10 +131,12 @@ export async function createCheckout(
     }
   }
 
-  const founding = pricing.mode !== 'none';
+  const founding = couponId !== null;
   const metadata: Record<string, string> = { orgId };
-  if (plan.codeId) metadata.foundingCodeId = plan.codeId;
-  if (pricing.mode === 'returning') metadata.foundingReturn = 'true';
+  if (eligibility.eligible) {
+    metadata.foundingNumber = String(eligibility.foundingNumber);
+    metadata.foundingShape = shapeOfInterval(i.interval);
+  }
 
   let session: { id: string; url: string; expiresAt: Date };
   try {
@@ -213,8 +144,9 @@ export async function createCheckout(
       {
         customerId,
         items,
-        trialEnd: pricing.mode === 'none' ? null : pricing.trialEnd,
-        couponId: founding ? FOUNDING_COUPON_ID : null,
+        trialEnd: null,
+        couponId,
+        // Stripe takes either a coupon or promotion codes, never both.
         allowPromotionCodes: !founding,
         metadata,
         clientReferenceId: orgId,
@@ -227,7 +159,6 @@ export async function createCheckout(
   } catch (err) {
     logger.error('billing: Checkout session could not be created', { orgId, error: err });
     await transact(db, async (tx) => {
-      await releaseHold(tx, orgId);
       await tx
         .update(billingAccounts)
         .set({
@@ -258,6 +189,7 @@ export async function createCheckout(
         interval: i.interval,
         extraSlots: i.extraSlots,
         founding,
+        foundingShape: founding ? shapeOfInterval(i.interval) : null,
         sessionId: session.id,
       },
     });

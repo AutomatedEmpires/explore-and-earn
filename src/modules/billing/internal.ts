@@ -35,9 +35,18 @@ export const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const addDays = (d: Date, days: number) => new Date(d.getTime() + days * DAY_MS);
 
+/**
+ * `months` calendar months after `d` (UTC), at the same time of day. A day the target month
+ * doesn't have becomes its last day (31 August + 6 months is 28 February), as Stripe counts
+ * billing months, rather than spilling into the next month.
+ */
 export function addMonths(d: Date, months: number): Date {
   const out = new Date(d);
+  const day = out.getUTCDate();
+  out.setUTCDate(1);
   out.setUTCMonth(out.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(out.getUTCFullYear(), out.getUTCMonth() + 1, 0)).getUTCDate();
+  out.setUTCDate(Math.min(day, lastDay));
   return out;
 }
 

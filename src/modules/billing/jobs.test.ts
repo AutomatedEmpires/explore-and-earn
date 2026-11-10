@@ -1,5 +1,5 @@
-// The billing schedules (Task 16): monthly credits, the launch-date trial correction (Review
-// Focus 5), the daily reconcile, and the privacy hooks.
+// The billing schedules (Task 16): monthly credits, the retired launch-date job (FD-7), the
+// daily reconcile, and the privacy hooks.
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryRows } from '@/lib/db';
@@ -8,7 +8,7 @@ import { setSetting } from '@/modules/settings';
 import { entitlementsFake } from '../../../tests/fakes/sp2/entitlements';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { FIXED_NOW, seedHostOrg, type SeededOrg } from '../../../tests/helpers/sp2';
-import type { SubSnapshot, SubscriptionUpdate } from './gateway';
+import type { SubSnapshot } from './gateway';
 import { makeFakeBillingGateway, type FakeBillingGateway } from './gateway-fake';
 import { jobHandlers, privacyHandlers } from './index';
 import { applyLaunchDate, grantMonthlyCredits, reconcile } from './jobs';
@@ -68,7 +68,9 @@ function stripeSub(org: SeededOrg, o: Partial<SubSnapshot> = {}): SubSnapshot {
     cancelAtPeriodEnd: false,
     endedAt: null,
     startDate: now,
+    activatedAt: now,
     couponId: null,
+    initialCouponId: null,
     metadata: { orgId: org.orgId },
     created: now,
     ...o,
@@ -132,76 +134,21 @@ describe('billing.grant_monthly_credits', () => {
 });
 
 describe('billing.apply_launch_date', () => {
-  const founding = (o: Partial<SubSnapshot> = {}) =>
-    subscribed({
+  // FD-7 retired the launch-dated free period, so the still-scheduled job does nothing.
+  it('moves no trial and calls Stripe for nothing, even with a launch date set', async () => {
+    await subscribed({
       status: 'trialing',
       couponId: 'founding_30_forever',
-      created: new Date('2026-11-03T17:00:00Z'),
+      created: FIXED_NOW,
       trialEnd: new Date(FIXED_NOW.getTime() + 729 * DAY),
       items: items('professional'),
-      ...o,
     });
-
-  const launch = (iso: string | null) =>
-    setSetting(t.db, 'launch.public_at', iso, { operatorId });
-
-  it('moves a founding trial to launch + 90 days, once', async () => {
-    const { sub } = await founding();
-    await launch('2027-01-15T00:00:00.000Z');
-    await jobHandlers['billing.apply_launch_date']?.({}, { db: t.db, now: FIXED_NOW });
-
-    const calls = gw.callsTo('updateSubscription');
-    expect(calls).toEqual([
-      [
-        sub.id,
-        { trialEnd: new Date('2027-04-15T00:00:00Z'), prorationBehavior: 'none' },
-        `trial:${sub.id}:1807747200`,
-      ],
-    ]);
-    await applyLaunchDate(t.db, FIXED_NOW, gw);
-    expect(gw.callsTo('updateSubscription')).toHaveLength(1);
-  });
-
-  it('does nothing before a launch date is set', async () => {
-    await founding();
-    await applyLaunchDate(t.db, FIXED_NOW, gw);
-    expect(gw.callsTo('updateSubscription')).toHaveLength(0);
-  });
-
-  it('counts the free period from sign-up when the host signed up after launch', async () => {
-    const { sub } = await founding({ created: new Date('2027-02-01T00:00:00Z') });
-    await launch('2027-01-15T00:00:00.000Z');
-    await applyLaunchDate(t.db, FIXED_NOW, gw);
-    const [, update] = gw.callsTo('updateSubscription')[0] ?? [];
-    expect((update as SubscriptionUpdate).trialEnd).toEqual(new Date('2027-05-02T00:00:00Z'));
-    void sub;
-  });
-
-  it('skips active and already-past founding subscriptions, and survives a Stripe error', async () => {
-    // Review Focus 5.
-    await founding({ status: 'active', trialEnd: null });
-    await founding({ created: new Date('2026-01-02T00:00:00Z') });
-    const a = await founding();
-    const b = await founding();
-    await launch('2026-01-01T00:00:00.000Z');
-    // Targets for a and b: max(launch, created 2026-11-03) + 90 days, in the future.
-    gw.failNext('updateSubscription');
+    await setSetting(t.db, 'launch.public_at', '2027-01-15T00:00:00.000Z', { operatorId });
     await expect(
       jobHandlers['billing.apply_launch_date']?.({}, { db: t.db, now: FIXED_NOW }),
     ).resolves.toBeUndefined();
-
-    const tried = gw.callsTo('updateSubscription').map(([id]) => id);
-    expect(tried.sort()).toEqual([a.sub.id, b.sub.id].sort());
-    const fixed = gw
-      .callsTo('updateSubscription')
-      .map(([id]) => gw.getSubscription(id as string)?.trialEnd?.getTime());
-    expect(fixed.filter((ms) => ms === new Date('2027-02-01T17:00:00Z').getTime())).toHaveLength(1);
-    const alerts = await queryRows<{ data: string }>(
-      t.db,
-      sql`select data::text from app.audit_events where action = 'trust.alert'
-          and data::text like '%billing.trial_update_failed%'`,
-    );
-    expect(alerts.length).toBeGreaterThanOrEqual(1);
+    expect(await applyLaunchDate()).toEqual({ updated: 0, skipped: 0, failed: 0 });
+    expect(gw.callsTo('updateSubscription')).toHaveLength(0);
   });
 });
 
