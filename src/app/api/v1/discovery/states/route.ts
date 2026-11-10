@@ -1,9 +1,10 @@
 // GET /api/v1/discovery/states?tz=: Browse by State's live counts (FD-8 addendum, plan Task 49),
 // one per US_STATES code. Every count is the total Seek shows for that state; nothing here is
 // sample data. "Today" is in the `tz` param's zone, else the `ee_tz` cookie's, else Chicago.
+// @/server/api first: it loads identity before orgs (see _shared/params.ts).
+import { apiRoute } from '@/server/api';
 import { DEFAULT_TZ, resolveTimeZone } from '@/lib/discovery';
 import { countListingsByState } from '@/modules/discovery';
-import { apiRoute } from '@/server/api';
 import { privateJson, TZ_COOKIE } from '@/server/viewer';
 import { privateRoute, stateParams } from '../_shared/params';
 

@@ -1,9 +1,10 @@
 // GET /api/v1/listings/{id}: the public listing detail (SP3 spec section 5 and 8.9). An active
 // listing is read from SP2 on every request; a closed one is `{ status: 'closed', card }`; a
 // removed or unknown one is a 404.
+// @/server/api first: it loads identity before orgs (see _shared/params.ts).
+import { apiRoute } from '@/server/api';
 import { notFound } from '@/lib/errors';
 import { getListingDetail } from '@/modules/discovery';
-import { apiRoute } from '@/server/api';
 import { getViewer, privateJson } from '@/server/viewer';
 import { listingParams, privateRoute } from '../../discovery/_shared/params';
 

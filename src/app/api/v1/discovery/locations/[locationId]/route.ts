@@ -1,8 +1,9 @@
 // GET /api/v1/discovery/locations/{locationId}: the host preview for one map location, with its
 // matching jobs in pages of 20 (SP3 spec section 5 and 8.6). 404 when no listing there is active.
+// @/server/api first: it loads identity before orgs (see _shared/params.ts).
+import { apiRoute } from '@/server/api';
 import { notFound } from '@/lib/errors';
 import { locationPreview, prepareQuery } from '@/modules/discovery';
-import { apiRoute } from '@/server/api';
 import { getViewer, privateJson } from '@/server/viewer';
 import {
   filterParams,

@@ -1,7 +1,8 @@
 // GET /api/v1/discovery/deck: the Swipe deck (SP3 spec section 5 and 8.5). The same search as
 // Seek, without the viewer's saved, skipped and applied listings, in batches of up to 20.
-import { prepareQuery, searchListings } from '@/modules/discovery';
+// @/server/api first: it loads identity before orgs (see _shared/params.ts).
 import { apiRoute } from '@/server/api';
+import { prepareQuery, searchListings } from '@/modules/discovery';
 import { getViewer, privateJson } from '@/server/viewer';
 import {
   deckParams,

@@ -1,7 +1,8 @@
 // GET /api/v1/discovery/suggest?q=: the search box's Jobs, Places and Employers groups, up to 5
 // each (SP3 spec section 5). `q` is 2 to 100 characters.
-import { suggest } from '@/modules/discovery';
+// @/server/api first: it loads identity before orgs (see _shared/params.ts).
 import { apiRoute } from '@/server/api';
+import { suggest } from '@/modules/discovery';
 import { privateJson } from '@/server/viewer';
 import { privateRoute, redactingSearchText, suggestParams } from '../_shared/params';
 

@@ -2,6 +2,13 @@
 // geometry. These fail with a 400 and details; the filter params never do (prepareQuery drops
 // what is invalid, spec 8.1), and neither do `sort` and `tz`, which fall back to relevant and
 // America/Chicago (Review Focus 3).
+//
+// Every discovery route imports @/server/api before any module. @/modules/identity and
+// @/modules/orgs import each other, and identity builds onboardingRequestSchema from orgs'
+// organizationNameSchema when it loads. @/modules/discovery reaches orgs first (through
+// listings), so loading it first would leave that schema with an undefined member, and
+// /api/v1/openapi.json, which imports these routes first, would fail. @/server/api loads
+// identity (through its guards) before orgs.
 import { z } from 'zod';
 import { isAppError } from '@/lib/errors';
 import { scrubError, stripQueryParams } from '@/lib/logger';

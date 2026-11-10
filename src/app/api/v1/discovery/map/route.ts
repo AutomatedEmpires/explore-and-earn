@@ -1,7 +1,8 @@
 // GET /api/v1/discovery/map: pins in the viewport, or grid clusters above 2,000 locations (SP3
 // spec section 5 and 8.6). The bbox may cross the antimeridian (west > east, Review Focus 5).
-import { mapPins, prepareQuery } from '@/modules/discovery';
+// @/server/api first: it loads identity before orgs (see _shared/params.ts).
 import { apiRoute } from '@/server/api';
+import { mapPins, prepareQuery } from '@/modules/discovery';
 import { getViewer, privateJson } from '@/server/viewer';
 import { filterParams, mapParams, privateRoute, redactingSearchText } from '../_shared/params';
 

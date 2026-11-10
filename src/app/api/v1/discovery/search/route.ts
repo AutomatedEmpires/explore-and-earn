@@ -1,10 +1,11 @@
 // GET /api/v1/discovery/search: Seek, and the Map pull-up list with `surface=map_list` and a
 // bbox (SP3 spec section 5 and Plan decision 5). The filter params are read by prepareQuery;
 // the search text never reaches the logs or analytics (spec 10).
+// @/server/api first: it loads identity before orgs (see _shared/params.ts).
+import { apiRoute } from '@/server/api';
 import { track } from '@/lib/analytics';
 import { describeFilters } from '@/lib/discovery';
 import { prepareQuery, searchListings } from '@/modules/discovery';
-import { apiRoute } from '@/server/api';
 import { getViewer, privateJson } from '@/server/viewer';
 import {
   filterParams,
