@@ -37,11 +37,15 @@ create trigger founding_discounts_set_updated_at before update on app.founding_d
 alter table app.subscriptions add column activated_at timestamptz;
 
 -- Rows from before this column, including ones that have already ended (reconcile never syncs
--- those again). Sync raised plan_grant_seq the first time a subscription was entitled, so a
--- subscription that ever was carries it, while one canceled before it was paid never was. A
--- paid status counts as well. The exact payment time is unknown here, so it is the sign-up time.
+-- those again). Conservative on purpose: only a subscription that never had a trial and was
+-- entitled at some sync (plan_grant_seq > 0) counts as paid. Without a trial, an entitled
+-- subscription had to pay first, while one canceled before payment was never entitled. Every
+-- subscription that ever had a trial stays null, since a legacy free trial was entitled without
+-- paying. Reconcile sets the real paid-invoice time for live ones from Stripe. This is enough
+-- because Explore&Earn has never charged a real customer (billing has run in Stripe test mode or
+-- the stub only), so the backfill touches pre-launch data alone.
 update app.subscriptions set activated_at = coalesce(stripe_created_at, created_at)
-  where status in ('active', 'past_due', 'unpaid') or plan_grant_seq > 0;
+  where trial_end is null and status <> 'trialing' and plan_grant_seq > 0;
 
 -- The withdrawn 3 November offer (founding codes, 90 days free, 30% off for life). Nothing writes
 -- these any more; they stay until a later cleanup drops them.

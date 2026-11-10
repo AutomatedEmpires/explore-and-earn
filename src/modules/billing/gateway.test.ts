@@ -15,6 +15,7 @@ function subscription(o: {
   prices?: (Price & { quantity: number })[];
   latestInvoice?: unknown;
   coupon?: string;
+  trialEnd?: number;
 }) {
   const prices = o.prices ?? [
     { lookup_key: 'starter_month', metadata: {}, interval: 'month', quantity: 1 },
@@ -37,7 +38,7 @@ function subscription(o: {
         current_period_end: T0 + 30 * 86_400,
       })),
     },
-    trial_end: null,
+    trial_end: o.trialEnd ?? null,
     cancel_at_period_end: false,
     ended_at: null,
     start_date: T0,
@@ -95,6 +96,8 @@ describe('stripeGateway retrieveSubscription', () => {
   it('dates the first paid activation by the paid time of the invoice that created it', async () => {
     const created = {
       billing_reason: 'subscription_create',
+      status: 'paid',
+      amount_paid: 14950,
       status_transitions: { paid_at: PAID },
     };
     const paidLate = await gatewayFor(subscription({ latestInvoice: created })).gw.retrieveSubscription(
@@ -113,7 +116,12 @@ describe('stripeGateway retrieveSubscription', () => {
 
     // A renewal invoice, or an invoice Stripe didn't expand: the start date.
     for (const latestInvoice of [
-      { billing_reason: 'subscription_cycle', status_transitions: { paid_at: PAID } },
+      {
+        billing_reason: 'subscription_cycle',
+        status: 'paid',
+        amount_paid: 29900,
+        status_transitions: { paid_at: PAID },
+      },
       'in_123',
     ]) {
       const snap = await gatewayFor(subscription({ latestInvoice })).gw.retrieveSubscription('sub_1');
@@ -124,6 +132,8 @@ describe('stripeGateway retrieveSubscription', () => {
   it('reads the annual once coupon from the invoice that created it, after Stripe drops it', async () => {
     const creation = (coupon: string | object) => ({
       billing_reason: 'subscription_create',
+      status: 'paid',
+      amount_paid: 149500,
       status_transitions: { paid_at: PAID },
       discounts: [{ id: 'di_1', deleted: true, source: { coupon } }],
     });
@@ -159,8 +169,10 @@ describe('stripeGateway retrieveSubscription', () => {
   });
 
   it('dates a canceled subscription as paid only when its first invoice was paid', async () => {
-    const invoice = (paidAt: number | null, reason = 'subscription_create') => ({
+    const invoice = (paidAt: number | null, reason = 'subscription_create', amount = 14950) => ({
       billing_reason: reason,
+      status: paidAt ? 'paid' : 'open',
+      amount_paid: paidAt ? amount : 0,
       status_transitions: { paid_at: paidAt },
       discounts: [],
     });
@@ -184,5 +196,39 @@ describe('stripeGateway retrieveSubscription', () => {
     expect((await snap({ status: 'active', latestInvoice: null })).activatedAt).toEqual(
       new Date(T0 * 1000),
     );
+  });
+
+  it('never counts a free trial as paid, and dates a converted trial from its end', async () => {
+    const TRIAL_END = Date.parse('2027-02-01T12:00:00Z') / 1000;
+    // A trial's first invoice is $0, though Stripe marks it paid.
+    const trialStart = {
+      billing_reason: 'subscription_create',
+      status: 'paid',
+      amount_paid: 0,
+      status_transitions: { paid_at: T0 },
+      discounts: [],
+    };
+    const snap = (o: Parameters<typeof subscription>[0]) =>
+      gatewayFor(subscription({ trialEnd: TRIAL_END, ...o })).gw.retrieveSubscription('sub_1');
+
+    for (const status of ['trialing', 'canceled', 'paused', 'past_due', 'unpaid']) {
+      expect((await snap({ status, latestInvoice: trialStart })).activatedAt, status).toBeNull();
+    }
+    // The trial converted: its first charge came on the invoice after it.
+    const charged = {
+      billing_reason: 'subscription_cycle',
+      status: 'paid',
+      amount_paid: 29900,
+      status_transitions: { paid_at: TRIAL_END },
+      discounts: [],
+    };
+    for (const status of ['active', 'canceled']) {
+      expect((await snap({ status, latestInvoice: charged })).activatedAt, status).toEqual(
+        new Date(TRIAL_END * 1000),
+      );
+    }
+    // Its first charge failed after the trial: never paid.
+    const failed = { ...charged, status: 'open', amount_paid: 0, status_transitions: { paid_at: null } };
+    expect((await snap({ status: 'past_due', latestInvoice: failed })).activatedAt).toBeNull();
   });
 });

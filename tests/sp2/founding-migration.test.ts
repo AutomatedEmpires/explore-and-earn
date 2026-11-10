@@ -142,15 +142,15 @@ describe('1510_billing_founding_offer', () => {
     );
   });
 
-  it('backfills the first payment of subscriptions that were paid, including ended ones', async () => {
+  it('backfills the first payment of paid subscriptions without a trial, ended ones too', async () => {
     // One organization per row: an organization holds one current subscription at most.
-    const row = async (status: string, planGrantSeq: number) => {
+    const row = async (status: string, planGrantSeq: number, trialEnd: string | null = null) => {
       const stripeId = `sub_${newId()}`;
       await db.execute(sql`
         insert into app.subscriptions (id, org_id, stripe_subscription_id, status, plan, interval,
-          plan_grant_seq, stripe_created_at)
+          plan_grant_seq, stripe_created_at, trial_end)
         values (${newId()}, ${await org()}, ${stripeId}, ${status}, 'starter', 'month',
-          ${planGrantSeq}, '2026-11-02T08:00:00Z')
+          ${planGrantSeq}, '2026-11-02T08:00:00Z', ${trialEnd})
       `);
       return stripeId;
     };
@@ -160,11 +160,16 @@ describe('1510_billing_founding_offer', () => {
     await db.execute(
       sql`delete from app.schema_migrations where name = '1510_billing_founding_offer.sql'`,
     );
+    const TRIAL_END = '2027-02-01T00:00:00Z';
     const paidThenCanceled = await row('canceled', 1);
     const canceledUnpaid = await row('canceled', 0);
     const neverPaid = await row('incomplete_expired', 0);
     const live = await row('active', 1);
     const lapsed = await row('unpaid', 2);
+    // Legacy free trials got plan grants without paying, so any trial stays null.
+    const neverPaidTrial = await row('trialing', 1, TRIAL_END);
+    const canceledTrial = await row('canceled', 1, TRIAL_END);
+    const trialPastDue = await row('past_due', 1, TRIAL_END);
     expect(await runMigrations(db)).toEqual(['1510_billing_founding_offer.sql']);
 
     const rows = await queryRows<{ stripe_subscription_id: string; activated_at: string | null }>(
@@ -177,6 +182,9 @@ describe('1510_billing_founding_offer', () => {
     expect(activated.get(lapsed)).toBe('2026-11-02 08:00:00+00');
     expect(activated.get(canceledUnpaid)).toBeNull();
     expect(activated.get(neverPaid)).toBeNull();
+    expect(activated.get(neverPaidTrial)).toBeNull();
+    expect(activated.get(canceledTrial)).toBeNull();
+    expect(activated.get(trialPastDue)).toBeNull();
   });
 
   it('ties each shape to its coupon, and refuses the retired one', async () => {

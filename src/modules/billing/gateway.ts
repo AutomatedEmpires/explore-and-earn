@@ -190,22 +190,27 @@ function lookupKeyOf(price: Stripe.Price): string | null {
   return parseLookupKey(key) ? key : null;
 }
 
-/** Statuses only a subscription that was paid can be in. */
-const PAID_STATUSES: readonly string[] = ['active', 'past_due', 'unpaid'];
-
 /**
  * When the subscription first became paid (FD-7's clock starts here, and it decides whether the
- * founding discount is used up): the paid time of the invoice that created it. Null while it has
- * never been paid, including one canceled before its first payment. Without that invoice's paid
- * time, a later invoice (it renewed or changed) or a paid status means it was paid at its start.
+ * founding discount is used up). Null while it has never been paid: incomplete, canceled before
+ * its first payment, or a free trial (its first invoice is $0 and pays nothing).
+ * - The invoice that created it was paid with money: that payment time.
+ * - Otherwise a later invoice was paid with money (a trial that converted), or it is active (or
+ *   past_due or unpaid with no trial, which only follow a payment): paid at the trial end, else
+ *   at its start, since the exact time is not on hand.
  */
 function activatedAtOf(s: Stripe.Subscription): Date | null {
   if (s.status === 'incomplete' || s.status === 'incomplete_expired') return null;
   const creation = creationInvoiceOf(s);
-  const paidAt = creation?.status_transitions?.paid_at;
+  const paidAt = creation && creation.amount_paid > 0 ? creation.status_transitions?.paid_at : null;
   if (paidAt) return toDate(paidAt);
-  const laterInvoice = s.latest_invoice !== null && creation === null;
-  return laterInvoice || PAID_STATUSES.includes(s.status) ? toDate(s.start_date) : null;
+  const latest = s.latest_invoice && typeof s.latest_invoice !== 'string' ? s.latest_invoice : null;
+  const paidLater =
+    latest !== null && latest !== creation && latest.status === 'paid' && latest.amount_paid > 0;
+  const paidStatus =
+    s.status === 'active' ||
+    (s.trial_end === null && (s.status === 'past_due' || s.status === 'unpaid'));
+  return paidLater || paidStatus ? toDate(s.trial_end ?? s.start_date) : null;
 }
 
 /** The subscription's latest invoice when it is the one that created it (and Stripe expanded it). */
