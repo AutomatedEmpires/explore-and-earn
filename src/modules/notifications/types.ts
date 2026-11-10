@@ -42,6 +42,9 @@ export const EMAIL_TEMPLATE_NAMES = [
   'HostNotice',
   'TeamInvite',
   'BillingNotice',
+  // SP3: the daily job alert email and the weekly digest.
+  'JobAlertDaily',
+  'JobAlertWeekly',
 ] as const;
 export type EmailTemplateName = (typeof EMAIL_TEMPLATE_NAMES)[number];
 

@@ -192,6 +192,34 @@ describe('SP2 settings', () => {
   });
 });
 
+describe('SP3 settings', () => {
+  it('lists the SP3 discovery limits with their defaults (spec 8.8)', async () => {
+    expect(await getSetting(t.db, 'discovery.saved_jobs_per_user')).toBe(1000);
+    expect(await getSetting(t.db, 'discovery.saved_searches_per_user')).toBe(20);
+    expect(await getSetting(t.db, 'discovery.alert_push_daily_cap')).toBe(5);
+  });
+
+  it('validates the SP3 values', async () => {
+    await expectBadRequest(setSetting(t.db, 'discovery.saved_jobs_per_user', 0, { operatorId }));
+    await expectBadRequest(
+      setSetting(t.db, 'discovery.saved_jobs_per_user', 100_001, { operatorId }),
+    );
+    await expectBadRequest(
+      setSetting(t.db, 'discovery.saved_searches_per_user', 0, { operatorId }),
+    );
+    await expectBadRequest(
+      setSetting(t.db, 'discovery.saved_searches_per_user', 1001, { operatorId }),
+    );
+    await expectBadRequest(setSetting(t.db, 'discovery.alert_push_daily_cap', -1, { operatorId }));
+    await expectBadRequest(setSetting(t.db, 'discovery.alert_push_daily_cap', 51, { operatorId }));
+    await expectBadRequest(setSetting(t.db, 'discovery.alert_push_daily_cap', 2.5, { operatorId }));
+    await setSetting(t.db, 'discovery.alert_push_daily_cap', 0, { operatorId });
+    expect(await getSetting(t.db, 'discovery.alert_push_daily_cap')).toBe(0);
+    await setSetting(t.db, 'discovery.saved_jobs_per_user', 3, { operatorId });
+    expect(await getSetting(t.db, 'discovery.saved_jobs_per_user')).toBe(3);
+  });
+});
+
 describe('getSetting', () => {
   it('returns the default when nothing is stored', async () => {
     expect(await getSetting(t.db, 'limits.invites_per_seeker_per_week')).toBe(10);

@@ -16,12 +16,16 @@
     "test": "vitest run --project unit",
     "test:integration": "vitest run --project integration --passWithNoTests",
     "e2e": "playwright test",
-    "db:local": "tsx scripts/db-local.ts",
-    "db:migrate": "tsx scripts/db-migrate.ts",
+    "db:local": "tsx --import ./scripts/register-server-only.mjs scripts/db-local.ts",
+    "db:migrate": "tsx --import ./scripts/register-server-only.mjs scripts/db-migrate.ts",
     "check:tokens": "node scripts/check-design-tokens.mjs",
-    "ops:bootstrap-owner": "tsx scripts/ops-bootstrap-owner.ts",
-    "ops:founding-codes": "tsx scripts/ops-founding-codes.ts",
-    "stripe:seed": "tsx scripts/stripe-seed.ts"
+    "ops:bootstrap-owner": "tsx --import ./scripts/register-server-only.mjs scripts/ops-bootstrap-owner.ts",
+    "ops:founding-codes": "tsx --import ./scripts/register-server-only.mjs scripts/ops-founding-codes.ts",
+    "stripe:seed": "tsx --import ./scripts/register-server-only.mjs scripts/stripe-seed.ts",
+    "discovery:seed-synthetic": "tsx --import ./scripts/register-server-only.mjs scripts/seed-synthetic.ts",
+    "discovery:rebuild": "tsx --import ./scripts/register-server-only.mjs scripts/discovery-rebuild.ts",
+    "icons:gen": "tsx --import ./scripts/register-server-only.mjs scripts/gen-icons.ts",
+    "e2e:seed": "tsx --import ./scripts/register-server-only.mjs scripts/e2e-seed-discovery.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.4.0",
@@ -56,6 +60,7 @@
     "react-email": "^6.11.6",
     "recharts": "^3.10.1",
     "resend": "^6.37.0",
+    "server-only": "0.0.1",
     "sharp": "^0.35.5",
     "stripe": "23.0.0",
     "svix": "^2.9.1",
@@ -67,6 +72,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@clerk/testing": "^2.2.53",
+    "@lhci/cli": "0.15.1",
     "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",

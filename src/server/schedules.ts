@@ -17,4 +17,11 @@ export const schedules: { topic: string; cron: string }[] = [
   { topic: 'billing.grant_monthly_credits', cron: '10 0 * * *' },
   { topic: 'billing.apply_launch_date', cron: '20 * * * *' },
   { topic: 'billing.reconcile', cron: '0 7 * * *' },
+  // SP3 discovery: the nightly drift repair, saved-search matching, the daily and weekly alert
+  // emails, and the listing event rollup and retention.
+  { topic: 'discovery.drift_check', cron: '30 3 * * *' },
+  { topic: 'discovery.alerts_match', cron: '*/15 * * * *' },
+  { topic: 'discovery.alerts_daily', cron: '0 14 * * *' },
+  { topic: 'discovery.alerts_weekly', cron: '0 14 * * 1' },
+  { topic: 'discovery.maintenance', cron: '15 4 * * *' },
 ];

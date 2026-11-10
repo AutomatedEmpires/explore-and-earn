@@ -17,3 +17,8 @@ export * from '../modules/hostpages/schema';
 export * from '../modules/listings/schema';
 export * from '../modules/locations/schema';
 export * from '../modules/verification/schema';
+// SP3
+export * from '../modules/discovery/schema';
+export * from '../modules/landing/schema';
+// SP8 (types only until SP8 W0)
+export * from '../modules/privacy/schema';
