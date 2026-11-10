@@ -2,6 +2,11 @@
 // before Stripe is called, and stay pending until listings has enforced the new slot limit and
 // called settlePendingChange (SP2 plan, decision 2), so the keep list survives a crash between
 // the Stripe call and enforcement.
+//
+// FD-7: a change of tier on the same interval keeps a founding discount (Stripe keeps the
+// subscription's coupon, which covers every tier). A change to the other interval removes it,
+// so monthly to annual never gets 50% off an annual term and annual to monthly never starts six
+// discounted months. A plan change never adds a discount.
 import { and, eq } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
 import { badRequest, conflict } from '@/lib/errors';
@@ -19,6 +24,7 @@ import {
   type SubscriptionRow,
 } from './internal';
 import {
+  isFoundingCoupon,
   monthlyEquivalentCents,
   planItems,
   planLimits,
@@ -67,6 +73,10 @@ const choiceOf = (s: SubscriptionRow): PlanChoice => ({
   extraSlots: s.extraSlots,
 });
 
+/** FD-7: moving a founding-discounted subscription to the other interval ends the discount. */
+const dropsFoundingDiscount = (sub: SubscriptionRow, to: PlanChoice) =>
+  sub.interval !== to.interval && isFoundingCoupon(sub.couponId);
+
 /** What the change costs, the new limits, and how many listings the host must let go. */
 export async function previewChange(
   db: DbOrTx,
@@ -90,6 +100,7 @@ export async function previewChange(
       subscriptionId: sub.stripeSubscriptionId,
       items: planItems(i.plan, i.interval, i.extraSlots),
       prorationBehavior: isUpgrade(choiceOf(sub), i) ? 'always_invoice' : 'create_prorations',
+      ...(dropsFoundingDiscount(sub, i) ? { removeDiscounts: true } : {}),
     });
     return { ...preview, newLimits, mustChooseListings: Math.max(0, used - newLimits.listingSlots) };
   } catch (err) {
@@ -197,6 +208,7 @@ export async function changePlan(
     throw err;
   }
 
+  const dropDiscount = dropsFoundingDiscount(sub, to);
   const audit = (status: 'applied' | 'failed') =>
     record(db, {
       actorType: 'user',
@@ -205,7 +217,7 @@ export async function changePlan(
       action: 'billing.plan_changed',
       subjectType: 'billing_change',
       subjectId: changeId,
-      data: { changeId, from, to, status },
+      data: { changeId, from, to, status, ...(dropDiscount ? { foundingDiscountRemoved: true } : {}) },
     });
 
   const upgrade = isUpgrade(from, to);
@@ -216,6 +228,7 @@ export async function changePlan(
         items: planItems(to.plan, to.interval, to.extraSlots),
         prorationBehavior: upgrade ? 'always_invoice' : 'create_prorations',
         ...(upgrade ? { paymentBehavior: 'error_if_incomplete' as const } : {}),
+        ...(dropDiscount ? { removeDiscounts: true } : {}),
       },
       `change:${changeId}`,
     );
