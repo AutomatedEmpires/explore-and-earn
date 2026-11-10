@@ -90,6 +90,15 @@ describe('1060_orgs_founding_cohort', () => {
     expect(rows.at(-1)?.founding_number).toBe(100);
   });
 
+  it("keeps a number taken when its organization's row is hard-deleted", async () => {
+    const a = await org();
+    await db.execute(sql`insert into app.founding_cohort (founding_number, org_id) values (1, ${a})`);
+    // org_slugs (written by a trigger) references the organization too.
+    await db.execute(sql`delete from app.org_slugs where org_id = ${a}`);
+    await db.execute(sql`delete from app.organizations where id = ${a}`);
+    expect(await cohort()).toEqual([{ founding_number: 1, org_id: null }]);
+  });
+
   it('refuses number 101, a second number for one organization, and a shared number', async () => {
     const a = await org();
     const b = await org();
@@ -131,6 +140,43 @@ describe('1510_billing_founding_offer', () => {
     expect(await dbError(insert(a, { shape: 'annual', coupon: 'founding_50_first_year' }))).toMatch(
       /founding_discounts_pkey/,
     );
+  });
+
+  it('backfills the first payment of subscriptions that were paid, including ended ones', async () => {
+    // One organization per row: an organization holds one current subscription at most.
+    const row = async (status: string, planGrantSeq: number) => {
+      const stripeId = `sub_${newId()}`;
+      await db.execute(sql`
+        insert into app.subscriptions (id, org_id, stripe_subscription_id, status, plan, interval,
+          plan_grant_seq, stripe_created_at)
+        values (${newId()}, ${await org()}, ${stripeId}, ${status}, 'starter', 'month',
+          ${planGrantSeq}, '2026-11-02T08:00:00Z')
+      `);
+      return stripeId;
+    };
+    // Run 1510 again over rows from before activated_at existed.
+    await db.execute(sql`drop table app.founding_discounts`);
+    await db.execute(sql`alter table app.subscriptions drop column activated_at`);
+    await db.execute(
+      sql`delete from app.schema_migrations where name = '1510_billing_founding_offer.sql'`,
+    );
+    const paidThenCanceled = await row('canceled', 1);
+    const canceledUnpaid = await row('canceled', 0);
+    const neverPaid = await row('incomplete_expired', 0);
+    const live = await row('active', 1);
+    const lapsed = await row('unpaid', 2);
+    expect(await runMigrations(db)).toEqual(['1510_billing_founding_offer.sql']);
+
+    const rows = await queryRows<{ stripe_subscription_id: string; activated_at: string | null }>(
+      db,
+      sql`select stripe_subscription_id, activated_at::text from app.subscriptions`,
+    );
+    const activated = new Map(rows.map((r) => [r.stripe_subscription_id, r.activated_at]));
+    expect(activated.get(paidThenCanceled)).toBe('2026-11-02 08:00:00+00');
+    expect(activated.get(live)).toBe('2026-11-02 08:00:00+00');
+    expect(activated.get(lapsed)).toBe('2026-11-02 08:00:00+00');
+    expect(activated.get(canceledUnpaid)).toBeNull();
+    expect(activated.get(neverPaid)).toBeNull();
   });
 
   it('ties each shape to its coupon, and refuses the retired one', async () => {

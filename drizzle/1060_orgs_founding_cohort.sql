@@ -6,11 +6,12 @@
 -- Owner). Numbers are permanent: once 1-100 are taken, no later organization joins, even when an
 -- earlier one never subscribes. Billing reads the number to decide the founding discount.
 --
--- The app only ever soft-deletes an organization. `on delete cascade` is there so test and ops
--- cleanups that hard-delete an organization are not blocked by its number.
+-- The app only ever soft-deletes an organization. A hard delete (a test or ops cleanup) keeps
+-- the number's row with org_id null (`on delete set null`), so the number stays taken: it is
+-- never reissued, and numbers taken always equals the highest number.
 create table app.founding_cohort (
   founding_number smallint primary key check (founding_number between 1 and 100),
-  org_id uuid not null unique references app.organizations (id) on delete cascade,
+  org_id uuid unique references app.organizations (id) on delete set null,
   created_at timestamptz not null default now()
 );
 alter table app.founding_cohort enable row level security;

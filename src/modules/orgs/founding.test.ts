@@ -174,6 +174,26 @@ describe('the founding cohort', () => {
     expect(await countFoundingCohort(t.db)).toBe(0);
   });
 
+  it("never reissues a number, or frees a spot, when an organization's row is hard-deleted", async () => {
+    await signUp('First Lodge');
+    const second = await signUp('Second Lodge');
+    // The app only soft-deletes; a cleanup outside it may still remove the row.
+    await t.db.execute(sql`delete from app.org_memberships where org_id = ${second.id}`);
+    await t.db.execute(sql`delete from app.org_slugs where org_id = ${second.id}`);
+    await t.db.execute(sql`delete from app.organizations where id = ${second.id}`);
+
+    const kept = await queryRows<{ founding_number: number; org_id: string | null }>(
+      t.db,
+      sql`select founding_number, org_id from app.founding_cohort where founding_number = 2`,
+    );
+    expect(kept).toEqual([{ founding_number: 2, org_id: null }]);
+    expect(await countFoundingCohort(t.db)).toBe(2);
+
+    const third = await signUp('Third Lodge');
+    expect(await getFoundingNumber(t.db, third.id)).toBe(3);
+    expect(await countFoundingCohort(t.db)).toBe(3);
+  });
+
   it('rolls back with the signup that failed', async () => {
     const owner = await newUser();
     await t.db

@@ -13,7 +13,9 @@ export const FOUNDING_COHORT_SIZE = 100;
 /**
  * Gives `orgId` the next founding number and returns it, or returns null once all 100 are
  * taken. An org that already has one keeps it. Signups take the lock one at a time, so numbers
- * follow signup order and two signups can never share the last one.
+ * follow signup order and two signups can never share the last one. The next number is one past
+ * the highest ever given: a number is never reissued, even after its organization's row is
+ * hard-deleted (the number's row stays, with no org).
  */
 export async function reserveFoundingNumber(db: DbOrTx, orgId: string): Promise<number | null> {
   // A savepoint inside the caller's transaction (the lock lasts until that one ends).
@@ -42,10 +44,8 @@ export async function getFoundingNumber(db: DbOrTx, orgId: string): Promise<numb
   return row?.n ?? null;
 }
 
-/** How many founding numbers are taken. */
+/** How many founding numbers are taken: the highest one given, since none is ever reissued. */
 export async function countFoundingCohort(db: DbOrTx): Promise<number> {
-  const [row] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(foundingCohort);
-  return row?.n ?? 0;
+  const [row] = await db.select({ last: max(foundingCohort.foundingNumber) }).from(foundingCohort);
+  return row?.last ?? 0;
 }

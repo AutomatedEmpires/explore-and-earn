@@ -117,10 +117,11 @@ export const orgSlugs = app.table('org_slugs', {
 
 /**
  * FD-7: the first 100 host organizations, numbered 1-100 in signup order. Written once, when the
- * app records an organization's Owner (./founding.ts); numbers are never reissued.
+ * app records an organization's Owner (./founding.ts); numbers are never reissued. org_id is null
+ * only after the organization row was hard-deleted, which keeps its number taken.
  */
 export const foundingCohort = app.table('founding_cohort', {
   foundingNumber: smallint('founding_number').primaryKey(),
-  orgId: uuid('org_id').notNull().unique(),
+  orgId: uuid('org_id').unique(),
   createdAt: ts('created_at').notNull().defaultNow(),
 });
