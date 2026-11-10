@@ -140,16 +140,16 @@ Read the SP3 spec before any task.
 2. **Swipe keyboard shortcuts fire while the user types or drags a slider.** On `/swipe`, ArrowLeft and ArrowRight in the filter sheet's pay slider or the search box would skip or save cards. The expected behavior: shortcuts act only when focus is not in a text field, select, slider or contenteditable, no sheet or dialog is open, and no text is selected. Pinned in Task 14.
 3. **An unrecognized time zone breaks every discovery request.** Some browsers report `Etc/Unknown`, and a cookie can be garbled. The expected behavior: an invalid `tz` or `ee_tz` falls back to `America/Chicago` and the request succeeds. Pinned in Tasks 1 and 22.
 4. **The bell fails on a heavily filtered search.** The default name is the filter summary, which can pass the 80-character CHECK. The expected behavior: the name is truncated to 80 characters ending in "…", and the alert is created. Pinned in Tasks 17 and 28.
-5. **The map breaks when panned across the antimeridian (western Alaska, the Aleutians).** Mapbox reports unwrapped longitudes such as −190, and an east edge below the west edge. The expected behavior: the client wraps longitudes into ±180, the server accepts `west > east`, and pins on both sides show. Pinned in Tasks 20 and 38.
+5. **The map breaks when panned across the antimeridian (western Alaska, the Aleutians).** Mapbox reports unwrapped longitudes such as −190, and an east edge below the west edge. The expected behavior: the client wraps longitudes into ±180, the server accepts `west > east`, and pins on both sides show. Pinned in Tasks 20 and 11A.
 
 ## Plan decisions beyond the spec
 
 1. **W0 writes all four SP3 migrations and both Drizzle schemas (Task 2).** Every workstream reads tables that another one owns. For example, sync deletes dispositions and matches, and search excludes skipped listings. Owners keep their follow-up ranges.
 2. **Additions to the module indexes.** Foundation's ESLint `deepModuleImport` rule lets `src/app`, `scripts` and `tests/**` import a module only through `@/modules/<name>`, so every name used outside its module is in the index from W0:
-   - `@/modules/discovery`: `prepareQuery`, `getQueryLabels`, `getFilterOptions`, `SavedSearchItem`, `dedupeKeyFor` (the events route), `searchVectorSql`, `SearchVectorFields` and `ProjectionRowInput` (`tests/helpers/discovery-rows.ts`), and SP8's `privacyHandler` and `retentionRules`.
+   - `@/modules/discovery`: `prepareQuery`, `getQueryLabels`, `getFilterOptions`, `SavedSearchItem`, `dedupeKeyFor` (the events route), `searchVectorSql`, `SearchVectorFields` and `ProjectionRowInput` (`tests/helpers/discovery-rows.ts`), SP8's `privacyHandler` and `retentionRules`, and `countListingsByState` (the FD-8 addendum).
    - `@/modules/landing`: `renderSitemapIndex`, `renderUrlset` and `buildRobots` (the sitemap routes and `robots.ts`), `OFFICIAL_VISA_LINKS` (`/international`), `listLandingCopy` and `getLandingCopy` (the operator editor), and SP8's `privacyHandler` and `retentionRules`.
 3. **Additions to `src/lib/discovery`:**
-   - `resolveTimeZone`, `safeReturnTo`, `US_STATES`, `describeFilters`, `removeFilter`, `summarizeQuery`, `discoveryQuerySchema`, `useDiscoveryQuery`, `toJobCardProps`, `chipSheetContent` and `toApiBbox`.
+   - `resolveTimeZone`, `safeReturnTo`, `US_STATES`, `describeFilters`, `removeFilter`, `summarizeQuery`, `discoveryQuerySchema`, `useDiscoveryQuery`, `toJobCardProps`, `chipSheetContent`, `toApiBbox` and the `StateCount` type (the FD-8 addendum).
    - `parseQuery` also returns `hostSlug`, and `serializeQuery` takes `opts.hostSlug`.
 4. **The cursor also carries `pi`,** the page index for `PlacementInput.pageIndex`.
 5. **The search API also accepts `bbox` for the Map pull-up list** (`surface: 'map_list'`).
@@ -170,14 +170,27 @@ Read the SP3 spec before any task.
 
 ## Phases, workstreams and shared touchpoints
 
+**Sequencing update, 10 November 2026.** The founder approved these changes. They are recorded on [explore-and-earn#45](https://github.com/AutomatedEmpires/explore-and-earn/issues/45).
+
+- **SP3 may overlap SP2** where the lead (claude-code) judges it reasonable ([#45, comment 6776883039](https://github.com/AutomatedEmpires/explore-and-earn/issues/45#issuecomment-6776883039)). This replaces FD-9's strict build order for development. Public launch still needs the full product (FD-9).
+  - Each phase still starts only when the code it consumes is merged on the integration branch, or when this plan's stubs and fakes stand in for it.
+  - The lead decides which workstreams start early. "SP2 merged" in the table below means the SP2 pieces that phase calls, not all of SP2.
+- **UI waits for design approval.** Screens and UI patterns are built only after the founder approves their key screens in Figma (same comment). "Design gate approved" below means that approval. W5's patterns are UI, so W5 waits for it too.
+- **W1 now owns `card-props.ts` and `map-view.ts`** (Task 11A). They are pure functions with no visual output, so the data work no longer waits for design:
+  - `card-props.ts` moved from W5's Task 12.
+  - `map-view.ts` moved from W7's Task 38.
+  - W2, and W3's Tasks 23, 24 and 26, now start when W1 is merged. W3's Task 25 still needs W5 merged, because it renders W5's `SignInPrompt` and `JobChipSheet`.
+- **FD-8 Browse by State is added** as Tasks 49–51. See the addendum at the end of this plan.
+- **FD-7 founding offer** is approved to build in Stripe test mode only ([#45, comment 6777814785](https://github.com/AutomatedEmpires/explore-and-earn/issues/45#issuecomment-6777814785)). SP3 has no billing work.
+
 | Phase | Workstreams and tasks | Starts when |
 |---|---|---|
 | **A** (one agent) | W0 contracts and touchpoints: Tasks 1–5 | Prerequisites above |
-| **B1** (parallel) | W1 projection and sync: Tasks 6–11 · W5 design-system patterns: Tasks 12–16 | A merged |
-| **B2** (parallel) | W2 query engine and read APIs: Tasks 17–22 · W3 dispositions, events and client actions: Tasks 23–26 | W1 and W5 merged |
-| **B3** (fixtures first, then parallel) | Task 27, W9's e2e fixtures (one agent), then in parallel: W4 saved searches and alerts (Tasks 28–31) · W6 Seek, Swipe, detail and PWA (Tasks 32–37) · W7 Map (Tasks 38–39) | W2 and W3 merged, SP2 merged, design gate approved |
+| **B1** (parallel) | W1 projection and sync: Tasks 6–11 and 11A · W5 design-system patterns: Tasks 12–16 and 50 | A merged. W5 also needs the design gate approved (10 November update). |
+| **B2** (parallel) | W2 query engine and read APIs: Tasks 17–22 and 49 · W3 dispositions, events and client actions: Tasks 23–26 | W1 merged. W3's Task 25 also needs W5 merged. |
+| **B3** (fixtures first, then parallel) | Task 27, W9's e2e fixtures (one agent), then in parallel: W4 saved searches and alerts (Tasks 28–31) · W6 Seek, Swipe, detail and PWA (Tasks 32–37) · W7 Map and Browse by State (Tasks 38, 39 and 51) | W2 and W3 merged, SP2 merged, design gate approved |
 | **B4** | W8 landing and SEO: Tasks 40–44 | W6 merged (feed embed) |
-| **C** | W9 verification: Tasks 45–48 | Everything above |
+| **C** | W9 verification: Tasks 45–48, with the FD-8 additions in the addendum | Everything above |
 
 **Shared touchpoints.** Only the owner listed edits a file outside its workstream's own files. Every other workstream only reads it.
 
@@ -201,15 +214,15 @@ drizzle/2000_discovery.sql 2010_discovery.sql 2020_discovery.sql 2100_landing.sq
 src/lib/discovery/            client-safe
   types.ts states.ts tz.ts return-to.ts install-events.ts index.ts client.ts      W0
   pay.ts dates.ts                                                                 W1
+  card-props.ts map-view.ts                     W1 (moved from W5 and W7 on 10 November 2026)
   query.ts use-discovery-query.ts                                                 W2
   bots.ts intents.ts disposition-client.ts use-listing-actions.ts sign-in-intent.tsx   W3
-  card-props.ts                                                                   W5
   install.ts use-install-prompt.tsx                                               W6
-  map-view.ts                                                                     W7
 src/modules/discovery/
   index.ts schema.ts projection-columns.ts search-vector.ts hooks.ts              W0
   projection.ts sync.ts cards.ts media.ts seed.ts                                 W1
   filters.ts cursor.ts search.ts placement.ts map.ts suggest.ts detail.ts query-context.ts   W2
+  state-counts.ts                                                     W2 (FD-8 addendum)
   dispositions.ts events.ts privacy.ts                                            W3
   saved-searches.ts alerts.ts notification-types.ts                               W4
 src/modules/landing/  index.ts schema.ts privacy.ts (W0) · resolve.ts jsonld.ts sitemaps.ts copy.ts (W8)
@@ -217,9 +230,11 @@ src/server/placement-hook.ts viewer.ts page-guards.ts                           
 src/ui/patterns/  ActionBar SignInPrompt OffsiteNotice JobChipSheet SearchBox FilterPanel
   ActiveFilterChips SwipeDeck swipe-gesture MapCanvas MapPin HostPreview PullUpSheet
   LandingHero InstallPrompt                                                       W5
+  StateMap us-state-shapes                                            W5 (FD-8 addendum)
 src/app/design-system/discovery/page.tsx                                          W5
 src/app/api/v1/discovery/{search,deck,map,suggest}/route.ts, locations/[locationId]/route.ts,
   _shared/params.ts, listings/[id]/route.ts                                       W2
+src/app/api/v1/discovery/states/route.ts                              W2 (FD-8 addendum)
 src/app/api/v1/listings/[id]/events/route.ts, me/dispositions/**                  W3
 src/app/api/v1/me/{saved-searches/**,alert-settings/route.ts}                     W4
 src/app/api/v1/landing/route.ts                                                   W8
@@ -230,6 +245,7 @@ src/app/(seeker)/
   page.tsx swipe/** jobs/view/** @panel/**                                        W6
     (jobs/view/_components/detail-view-props.ts is the server-side SP2 mapper call)
   map/**                                                                          W7
+  states/**                                                           W7 (FD-8 addendum)
   profile/alerts/**                                                               W4
   jobs/[segment]/** seasons/** destinations/** international/**                   W8
   apply/[listingId]/page.tsx (placeholder)                                        W0
@@ -252,11 +268,10 @@ tests/e2e/fixtures/* (incl. sp2-writes.ts) scripts/e2e-seed-discovery.ts tests/p
 - Create: `src/lib/discovery/types.ts`, `states.ts`, `tz.ts`, `return-to.ts`, `install-events.ts`, `index.ts` (the pure barrel) and `client.ts` (a `'use client'` barrel).
 - Create the stub files. Each exports the signatures named in its owner's Interfaces block, with bodies that throw `new Error('not implemented: <name>')`:
   - `pay.ts`, `dates.ts` (W1)
+  - `card-props.ts`, `map-view.ts` (W1, Task 11A; moved from W5 and W7 on 10 November 2026)
   - `query.ts`, `use-discovery-query.ts` (W2)
   - `bots.ts`, `intents.ts`, `disposition-client.ts`, `use-listing-actions.ts`, `sign-in-intent.tsx` (W3)
-  - `card-props.ts` (W5)
   - `install.ts`, `use-install-prompt.tsx` (W6)
-  - `map-view.ts` (W7)
 - Test: `src/lib/discovery/contract.test.ts`
 
 **Interfaces:**
@@ -879,24 +894,19 @@ tests/e2e/fixtures/* (incl. sp2-writes.ts) scripts/e2e-seed-discovery.ts tests/p
 - [ ] **Step 4:** Run the test. Expected: PASS.
 - [ ] **Step 5: Commit** with the message `feat(discovery): deterministic synthetic projection seeder`.
 
-### Task 12 (W5): JobCard labels, card mapping and the small patterns
+### Task 11A (W1): Card props and map bounds (moved here on 10 November 2026)
+
+These two files moved here from W5's Task 12 and W7's Task 38, so the data work does not wait for design ([explore-and-earn#45](https://github.com/AutomatedEmpires/explore-and-earn/issues/45)). Both are pure `src/lib/discovery` code with no visual output. Their behavior is unchanged from those tasks.
 
 **Files:**
-- Modify: `src/ui/components/JobCard.tsx` and `JobCard.test.tsx`; `src/ui/icons.ts` (add `Share`, `SquarePlus`, `LocateFixed`, `Flag`, `ExternalLink`); `src/ui/tokens.css` (add `@utility pb-safe { padding-bottom: env(safe-area-inset-bottom); }`).
-- Create: `src/ui/patterns/ActionBar.tsx`, `SignInPrompt.tsx`, `OffsiteNotice.tsx`, `JobChipSheet.tsx` and `src/ui/patterns/discovery-basic.test.tsx`; `src/lib/discovery/card-props.ts` (replacing the stub) with `card-props.test.ts`; `src/app/design-system/discovery/page.tsx`; `tests/e2e/discovery-patterns.spec.ts`.
+- Modify: `src/lib/discovery/card-props.ts` and `src/lib/discovery/map-view.ts` (replacing the stubs)
+- Test: `src/lib/discovery/card-props.test.ts`, `src/lib/discovery/map-view.test.ts`
 
 **Interfaces:**
-- **JobCard changes:**
-  - `pay` becomes `Pay | { label: string }`.
-  - `starts` gains `{ label: string }`.
-  - New optional props: `endLabel?: string`, rendered as `· {endLabel}` in place of `· Ends …`, and `applied?: boolean`, which makes the Apply button read "Applied" and be disabled.
-  - Foundation call sites still compile.
-- **`ActionBar`:** `{ saved: boolean; applied: boolean; closed: boolean; onSkip(): void; onApply(): void; onSave(): void }`. It is pinned to the bottom with `pb-safe`.
-  - A closed listing has no Apply, and Save reads "Remove" when saved.
-  - Applied shows "Applied", disabled.
-- **`SignInPrompt`:** `{ open; onOpenChange; action: 'save' | 'apply' | 'skip' | 'alert'; variant: 'guest' | 'wrong_account'; signInHref: string; signUpHref: string }`. It is a bottom sheet below 768 px and a `Dialog` above.
-- **`OffsiteNotice`:** `{ open; onOpenChange; url: string; domain: string }`.
-- **`JobChipSheet`:** `{ open; onOpenChange; title: string; icon; lines: string[]; footer: { label: string; href: string } }`.
+- **Consumes:**
+  - `JobCardData` (Task 1).
+  - `JobCardProps` (type-only), with the label props from Task 12's **JobCard changes**: `pay: Pay | { label: string }`, `starts` with `{ label: string }`, `endLabel` and `applied`.
+  - The lead's component task D1 ([explore-and-earn#48](https://github.com/AutomatedEmpires/explore-and-earn/issues/48)) covers the JobCard labels. If those props are not on the integration branch yet, this task waits for them.
 - **`card-props.ts`:**
   - `toJobCardProps(d: JobCardData, h: { onSave?; onSkip?; onApply?; onOpenChip?; onOpen?; onInfo?; hideActions?; titleAs? }): JobCardProps`
   - The mapping:
@@ -918,6 +928,49 @@ tests/e2e/fixtures/* (incl. sp2-writes.ts) scripts/e2e-seed-discovery.ts tests/p
     - **housing:** the lines are `[costLine, note]`, without nulls, or `['No housing']`. The footer reads "All housing details on the listing".
     - **meals:** the same, with "No meals" and "All meal details on the listing".
     - **pay:** the lines are `[full, ...details]`, and the footer reads "All pay details on the listing".
+- **`map-view.ts`:**
+  - `DEFAULT_BOUNDS = [-125, 24, -66, 50] as const`
+  - `toApiBbox(b: { west: number; south: number; east: number; north: number }): [number, number, number, number]`:
+    - Longitudes wrap into [−180, 180], and latitudes are clamped to ±90.
+    - A span of 360° or more becomes `[-180, s, 180, n]`.
+    - The result may have `west > east`.
+  - `readSavedBounds(): [number, number, number, number] | null` and `saveBounds(b): void` use `sessionStorage.ee_map_bounds` inside try/catch.
+
+- [ ] **Step 1: Write the failing tests.**
+  - `toJobCardProps(card)` maps `saved`, `boosted`, the subscriber flag, `host.href === '/hosts/kettle-ridge-lodge'` and the 3-width `srcSet`.
+  - `chipSheetContent(card, 'housing').lines` is `['$150/week · deducted from pay', <note>]`.
+  - `toApiBbox`:
+    - `{ west: -190, south: 50, east: -150, north: 70 }` gives `[170, 50, -150, 70]`.
+    - `{ west: 170, east: 200 }` gives `[170, s, -160, n]`.
+    - `{ west: -400, east: 400 }` gives `[-180, s, 180, n]`.
+    - A latitude of 95 is clamped to 90.
+    *(Review Focus 5, client)*
+  - When `sessionStorage` throws, `readSavedBounds()` returns null.
+- [ ] **Step 2:** Run `pnpm test src/lib/discovery/card-props.test.ts src/lib/discovery/map-view.test.ts`. Expected: FAIL.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run the tests and `pnpm typecheck`. Expected: PASS.
+- [ ] **Step 5: Commit** with the message `feat(discovery): card props, chip sheet content and antimeridian-safe map bounds`.
+
+### Task 12 (W5): JobCard labels and the small patterns
+
+`card-props.ts` (`toJobCardProps` and `chipSheetContent`) moved to W1's Task 11A on 10 November 2026. This task still owns the JobCard changes that Task 11A maps to.
+
+**Files:**
+- Modify: `src/ui/components/JobCard.tsx` and `JobCard.test.tsx`; `src/ui/icons.ts` (add `Share`, `SquarePlus`, `LocateFixed`, `Flag`, `ExternalLink`); `src/ui/tokens.css` (add `@utility pb-safe { padding-bottom: env(safe-area-inset-bottom); }`).
+- Create: `src/ui/patterns/ActionBar.tsx`, `SignInPrompt.tsx`, `OffsiteNotice.tsx`, `JobChipSheet.tsx` and `src/ui/patterns/discovery-basic.test.tsx`; `src/app/design-system/discovery/page.tsx`; `tests/e2e/discovery-patterns.spec.ts`.
+
+**Interfaces:**
+- **JobCard changes:**
+  - `pay` becomes `Pay | { label: string }`.
+  - `starts` gains `{ label: string }`.
+  - New optional props: `endLabel?: string`, rendered as `· {endLabel}` in place of `· Ends …`, and `applied?: boolean`, which makes the Apply button read "Applied" and be disabled.
+  - Foundation call sites still compile.
+- **`ActionBar`:** `{ saved: boolean; applied: boolean; closed: boolean; onSkip(): void; onApply(): void; onSave(): void }`. It is pinned to the bottom with `pb-safe`.
+  - A closed listing has no Apply, and Save reads "Remove" when saved.
+  - Applied shows "Applied", disabled.
+- **`SignInPrompt`:** `{ open; onOpenChange; action: 'save' | 'apply' | 'skip' | 'alert'; variant: 'guest' | 'wrong_account'; signInHref: string; signUpHref: string }`. It is a bottom sheet below 768 px and a `Dialog` above.
+- **`OffsiteNotice`:** `{ open; onOpenChange; url: string; domain: string }`.
+- **`JobChipSheet`:** `{ open; onOpenChange; title: string; icon; lines: string[]; footer: { label: string; href: string } }`. Its `title`, `lines` and `footer` come from Task 11A's `chipSheetContent`.
 - **Gallery:** `/design-system/discovery` shows every SP3 pattern in each of its states, in light and dark. Each later W5 task adds its entries.
 
 - [ ] **Step 1: Write the failing tests.**
@@ -927,8 +980,6 @@ tests/e2e/fixtures/* (incl. sp2-writes.ts) scripts/e2e-seed-discovery.ts tests/p
     - `endLabel="Ongoing"` renders "· Ongoing" with no "Ends".
     - `applied` renders a disabled "Applied" button.
     - The existing JobCard tests still pass.
-  - `toJobCardProps(card)` maps `saved`, `boosted`, the subscriber flag, `host.href === '/hosts/kettle-ridge-lodge'` and the 3-width `srcSet`.
-  - `chipSheetContent(card, 'housing').lines` is `['$150/week · deducted from pay', <note>]`.
   - SignInPrompt titles: "Sign in to save jobs", "Sign in to apply", "Sign in to hide this job", "Sign in to get job alerts".
     - `wrong_account` shows "Saving and applying need a seeker account."
     - The "Sign in" and "Create account" links point to the given hrefs.
@@ -943,7 +994,7 @@ tests/e2e/fixtures/* (incl. sp2-writes.ts) scripts/e2e-seed-discovery.ts tests/p
   - E2E `discovery-patterns.spec.ts`:
     - `/design-system/discovery` has 0 serious or critical axe violations in light and dark, at 390 px and 1280 px.
     - The screenshot baselines are created.
-- [ ] **Step 2:** Run `pnpm test src/ui src/lib/discovery/card-props.test.ts`. Expected: FAIL.
+- [ ] **Step 2:** Run `pnpm test src/ui`. Expected: FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run the tests, `pnpm check:tokens` and `pnpm e2e tests/e2e/discovery-patterns.spec.ts`. Expected: PASS.
 - [ ] **Step 5: Commit** with the message `feat(ui): JobCard labels, ActionBar, SignInPrompt, OffsiteNotice, chip sheets`.
@@ -2130,38 +2181,25 @@ tests/e2e/fixtures/* (incl. sp2-writes.ts) scripts/e2e-seed-discovery.ts tests/p
 - [ ] **Step 5: Commit** with the message `feat(discovery): installable PWA, offline page, Add to Home Screen prompt`.
 - [ ] **Step 6: Gate.** The orchestrator asks the founder for the final `app-icon.svg` (spec 13). W6 merges only after the artwork is in place and `pnpm icons:gen` has been rerun.
 
-### Task 38 (W7): CSP additions and map view helpers
+### Task 38 (W7): CSP additions
+
+The map view helpers (`map-view.ts`: `DEFAULT_BOUNDS`, `toApiBbox`, `readSavedBounds` and `saveBounds`) moved to W1's Task 11A on 10 November 2026. Task 39 still consumes them.
 
 **Files:**
-- Modify: `src/lib/security-headers.ts` and `security-headers.test.ts`, `src/lib/discovery/map-view.ts`
-- Test: `src/lib/discovery/map-view.test.ts`
+- Modify: `src/lib/security-headers.ts` and `security-headers.test.ts`
 
 **Interfaces:**
 - **CSP:**
   - `connect-src` gains `https://api.mapbox.com` and `https://events.mapbox.com` (if SP2 didn't add them) and `https://*.tiles.mapbox.com`.
   - Add `child-src blob:`.
   - `img-src blob: data:`, `worker-src 'self' blob:` and `manifest-src 'self'` are already present; assert them.
-- **`map-view.ts`:**
-  - `DEFAULT_BOUNDS = [-125, 24, -66, 50] as const`
-  - `toApiBbox(b: { west: number; south: number; east: number; north: number }): [number, number, number, number]`:
-    - Longitudes wrap into [−180, 180], and latitudes are clamped to ±90.
-    - A span of 360° or more becomes `[-180, s, 180, n]`.
-    - The result may have `west > east`.
-  - `readSavedBounds(): [number, number, number, number] | null` and `saveBounds(b): void` use `sessionStorage.ee_map_bounds` inside try/catch.
 
 - [ ] **Step 1: Write the failing tests.**
   - The prod CSP's `connect-src` contains `https://*.tiles.mapbox.com`, and the CSP contains `child-src blob:` and `worker-src 'self' blob:`.
-  - `toApiBbox`:
-    - `{ west: -190, south: 50, east: -150, north: 70 }` gives `[170, 50, -150, 70]`.
-    - `{ west: 170, east: 200 }` gives `[170, s, -160, n]`.
-    - `{ west: -400, east: 400 }` gives `[-180, s, 180, n]`.
-    - A latitude of 95 is clamped to 90.
-    *(Review Focus 5, client)*
-  - When `sessionStorage` throws, `readSavedBounds()` returns null.
-- [ ] **Step 2:** Run `pnpm test src/lib/security-headers.test.ts src/lib/discovery/map-view.test.ts`. Expected: FAIL.
+- [ ] **Step 2:** Run `pnpm test src/lib/security-headers.test.ts`. Expected: FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run the tests. Expected: PASS.
-- [ ] **Step 5: Commit** with the message `feat(discovery): Mapbox CSP and antimeridian-safe map bounds`.
+- [ ] **Step 5: Commit** with the message `feat(discovery): Mapbox CSP additions`.
 
 ### Task 39 (W7): Map screen
 
@@ -2555,3 +2593,160 @@ tests/e2e/fixtures/* (incl. sp2-writes.ts) scripts/e2e-seed-discovery.ts tests/p
 - [ ] **Step 3:** Write the runbook.
 - [ ] **Step 4:** Run the full suite: `pnpm lint && pnpm check:tokens && pnpm typecheck && pnpm test && pnpm e2e`. Expected: all pass.
 - [ ] **Step 5: Commit** with the message `test(discovery): production smoke run; docs: SP3 runbook`.
+
+---
+
+## Addendum, 10 November 2026: FD-8 Browse by State
+
+**Why this exists.**
+
+- FD-8 in `docs/decisions/2026-11-04-founder-decisions.md` adds Browse by State to discovery.
+- The product design now lists it as a discovery mode (section 5.1), and SP3's done-when includes "state counts are live" (section 25).
+- The SP3 spec was written before FD-8 and does not cover it, so this addendum is the plan for it. Where it and the spec disagree, FD-8 and the product design win.
+- It is built under the founder's 10 November program approval ([explore-and-earn#45](https://github.com/AutomatedEmpires/explore-and-earn/issues/45#issuecomment-6776883039)).
+
+**What FD-8 requires:**
+
+- **A separate surface.** Browse by State does not replace Map. Map keeps its host-location pins with category icons, Remote jobs pinned at the host's location, clustering only as a zoom behavior, and the host preview. Tasks 20, 38 and 39 are unchanged.
+- **An original map.** It is an original Explore&Earn map of the United States. Choosing a state opens that state's listings from the canonical listing data.
+- **Real counts only.** Every count comes from those listings. A state with none shows an empty state, never a made-up number.
+- **Keyboard and phone.** It works with a keyboard and on a phone.
+- **No sample data.** The uncommitted Jobs by State experiment on `integrate/foundation-20261104` uses sample counts, including "31 open jobs" in Wyoming. None of its numbers may reach a seeker-facing page. It may be reused only as interaction structure, wired to live counts.
+
+**Plan decisions for Browse by State.** These are engineering decisions where FD-8 and the product design are silent.
+
+1. **Route.** `/states`, in the seeker shell, open to guests like every other mode. Choosing a state opens Seek filtered to it, `/?state=<code>`, which is the canonical listing query.
+2. **What a count means.**
+   - A state's count is the `total` that Seek returns for `{ states: [code] }` with no viewer. It uses Task 18's `states` rule, so it includes Remote listings open to that state or to the whole US.
+   - The number on the map therefore always equals the number on the page it opens.
+   - Seek's cap applies. Above 10,000 the count is 10,000 with `capped: true`, and it reads "10,000+ jobs".
+   - A signed-in seeker can see fewer jobs on the opened page, because Seek hides their skipped jobs. They never see more.
+   - If the founder wants on-site-only counts, change the `states` rule for this surface and the count together, never one without the other.
+3. **What is drawn.** The map draws the 50 states and DC (the `US_STATES` entries with `landing: true`), with Alaska and Hawaii as insets. The list beside or below the map has all 56 `US_STATES` entries, so territory listings stay reachable.
+4. **The artwork is ours.**
+   - It is an SVG drawn for Explore&Earn to the approved design, stored as path data keyed by USPS code.
+   - Shapes may be traced from public-domain US Census cartographic boundary files.
+   - This surface uses no third-party map artwork, no map tiles and no Mapbox.
+5. **Keyboard and phone.**
+   - Every state is a link with an accessible name, such as "Colorado, 12 jobs" or "Wyoming, no open jobs", and a visible focus ring.
+   - Focus moves through the states in alphabetical order of name.
+   - Below 768 px the alphabetical list comes first. Rhode Island, Delaware and DC cannot meet the 44 px touch target on a phone-width map, and every list row is at least 44 px tall.
+   - The list is always on the page, as the map's text alternative.
+6. **Empty states.**
+   - A state with no listings reads "No open jobs", not "0".
+   - Opening it shows Seek's usual empty state for that query.
+   - When no state has listings, every state reads "No open jobs", and the page says so once.
+7. **Design and entry point.**
+   - The visual design comes from the approved Figma seeker screens (F2 on #45). That includes any shading by count, and where the entry link sits: ModeNav, Map or the Seek toolbar.
+   - The owner of the file that holds the entry link adds it.
+   - No Browse by State screen or pattern is built before the founder approves its design.
+
+**W0 additions.** These keep the barrels complete from W0:
+
+- Task 1 adds `StateCount = { code: string; count: number; capped: boolean }` to `src/lib/discovery/types.ts`.
+- Task 3 adds the `countListingsByState` stub to `src/modules/discovery/index.ts`.
+
+### Task 49 (W2): State counts
+
+This is non-UI work. It does not wait for design.
+
+**Files:**
+- Create: `src/modules/discovery/state-counts.ts`, `src/app/api/v1/discovery/states/route.ts`
+- Test: `src/modules/discovery/state-counts.test.ts`, `src/app/api/v1/discovery/states/route.test.ts`
+
+**Interfaces:**
+- **Consumes:** `buildFilterSql` (Task 18), `US_STATES`, `resolveTimeZone`, `apiRoute`, `privateJson`.
+- **`countListingsByState(db: DbOrTx, i: { tz: string }): Promise<StateCount[]>`:**
+  - It returns one entry for each of the 56 `US_STATES` codes, in `US_STATES` order.
+  - The base filter is `buildFilterSql({}, { today, viewerUserId: null, surface: 'seek', applied: [], hidden: [] })`, with `today` taken in `i.tz`.
+  - One statement adds up three groups over the active rows:
+    - on-site rows, grouped by `state`;
+    - Remote rows open to named states, grouped by `unnest(remote_states)`;
+    - Remote rows open to the whole US (`'US' = any(remote_states)`), whose count is added to every code.
+  - Each count is capped at 10,000 with `capped: true`, the same cap as Seek's `total`.
+- **Route:**
+  - `GET /api/v1/discovery/states?tz=` returns `{ states: StateCount[] }`.
+  - It uses `apiRoute` with `auth: 'none'`, a zod input and an `openapi` entry, and responds through `privateJson` (`Cache-Control: private, no-store`).
+
+- [ ] **Step 1: Write the failing tests.**
+  - **The count matches Seek** (FD-8). Seed through the Task 5 fakes and `syncListing`:
+    - 3 on-site CO listings;
+    - 1 on-site WY listing, then closed;
+    - 1 Remote listing open to `{CO, UT}`;
+    - 1 Remote listing open to the whole US.
+
+    Then CO is 5, UT is 2, WY is 1 and VT is 1. The closed WY listing is not counted. For every one of the 56 codes, `count` equals `searchListings(db, { query: { states: [code] }, sort: 'relevant', surface: 'seek', tz, viewerUserId: null, viewerKey }).total`.
+  - With no active listings, all 56 entries are `{ count: 0, capped: false }`.
+  - 10,001 on-site TX rows, inserted with `generate_series`, give `{ code: 'TX', count: 10000, capped: true }`.
+  - The route returns 56 entries for a guest, with `cache-control: private, no-store`. `tz=Etc/Unknown` still returns 200 *(Review Focus 3)*. `buildOpenApi().paths` contains the path.
+- [ ] **Step 2:** Run `pnpm test src/modules/discovery/state-counts.test.ts src/app/api/v1/discovery/states`. Expected: FAIL.
+- [ ] **Step 3:** Implement. Task 47's performance run covers this read at 50,000 listings.
+- [ ] **Step 4:** Run the tests and `pnpm typecheck`. Expected: PASS.
+- [ ] **Step 5: Commit** with the message `feat(discovery): live listing counts by state for Browse by State`.
+
+### Task 50 (W5): StateMap and StateList
+
+This task waits for the founder's approval of the Browse by State design. Build it to the approved frames.
+
+**Files:**
+- Create: `src/ui/patterns/StateMap.tsx`, `src/ui/patterns/us-state-shapes.ts`, `src/ui/patterns/state-map.test.tsx`
+- Modify: `src/app/design-system/discovery/page.tsx` (gallery entries) and `tests/e2e/discovery-patterns.spec.ts`
+
+**Interfaces:**
+- **`us-state-shapes.ts`:** `US_STATE_SHAPES: Readonly<Record<string, { d: string }>>` for the 50 states and DC, in one `viewBox`, with Alaska and Hawaii as insets (Plan decision 4 above).
+- **`StateMap.tsx`:**
+  - `StateMapItem = { code: string; name: string; count: number; capped: boolean; href: string }`.
+  - `stateCountLabel(item)` returns "No open jobs", "1 job", "12 jobs" or "10,000+ jobs".
+  - `StateMap({ items: StateMapItem[] })` draws one `<a>` per drawn state. Each link is named "<name>, <label>", where the label starts lowercase in the name ("Wyoming, no open jobs"). Links are in alphabetical DOM order.
+  - `StateList({ items: StateMapItem[] })` renders every item as a row link at least 44 px tall.
+  - Both take every number from `items`. They hold no counts of their own and no fallback data.
+
+- [ ] **Step 1: Write the failing tests** (`state-map.test.tsx`).
+  - `stateCountLabel` covers 0, 1, 12 and capped.
+  - `US_STATE_SHAPES` has exactly the 51 `US_STATES` codes with `landing: true`.
+  - With 51 items, `StateMap` renders 51 links with the given hrefs and names, in alphabetical order: the first is Alabama and the second is Alaska.
+  - With every count at 0, every state reads "No open jobs", and no link text contains a digit.
+  - `StateList` with all 56 items renders 56 links.
+  - E2E (`discovery-patterns.spec.ts`): the gallery entries have 0 serious or critical axe violations in light and dark, at 390 px and 1280 px.
+- [ ] **Step 2:** Run `pnpm test src/ui/patterns/state-map.test.tsx`. Expected: FAIL.
+- [ ] **Step 3:** Implement. Draw the shapes to the approved design (Plan decision 4).
+- [ ] **Step 4:** Run the tests, `pnpm check:tokens` and `pnpm e2e tests/e2e/discovery-patterns.spec.ts`. Expected: PASS.
+- [ ] **Step 5: Commit** with the message `feat(ui): StateMap and StateList for Browse by State`.
+
+### Task 51 (W7): Browse by State screen
+
+This task waits for Task 49, Task 50 and the founder's approval of the Browse by State design.
+
+**Files:**
+- Create: `src/app/(seeker)/states/page.tsx`, `src/app/(seeker)/states/page.test.tsx`, `tests/e2e/discovery-states.spec.ts`
+
+**Interfaces:**
+- **Consumes:** `countListingsByState`, `US_STATES`, `resolveTimeZone`, `StateMap`, `StateList`, Foundation `ErrorState` and the seeker shell.
+- **Behavior:**
+  - The page is a server component. It reads the counts with `countListingsByState(getDb(), { tz })`, where `tz` comes from the `ee_tz` cookie through `resolveTimeZone`.
+  - It builds the items from `US_STATES` joined to the counts. Each `href` is `/?state=<code>`, the parameter `parseQuery` reads (Task 17).
+  - When the count read fails, it shows the ErrorState "Job counts couldn't load. Try again." with no numbers. The state links still work.
+  - With no active listings anywhere, it shows "No open jobs anywhere yet." once.
+  - **Metadata:** title "Browse jobs by state" and `canonical: '/states'`. Indexing follows the site rule: nothing outside prod is indexable.
+
+- [ ] **Step 1: Write the failing tests.**
+  - **Unit** (`page.test.tsx`, with `countListingsByState` mocked):
+    - CO 12 and WY 0 give a link named "Colorado, 12 jobs" to `/?state=CO`, and one named "Wyoming, no open jobs".
+    - When the read throws, the ErrorState shows, and no state link text contains a digit.
+  - **E2E** (`discovery-states.spec.ts`, on Task 27's fixtures):
+    - For each seeded state, a guest on `/states` sees the same count that `/?state=<code>` shows as its result count.
+    - A state with no fixture listings reads "No open jobs", and its Seek page shows the empty state.
+    - Tab reaches the first state link with a visible focus ring, and Enter opens `/?state=AL`.
+    - At 390 px the list comes before the map, and every row is at least 44 px tall.
+    - No request goes to `mapbox.com` while `/states` loads.
+- [ ] **Step 2:** Run `pnpm test "src/app/(seeker)/states"` and `pnpm e2e tests/e2e/discovery-states.spec.ts`. Expected: FAIL.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run them again. Expected: PASS.
+- [ ] **Step 5: Commit** with the message `feat(discovery): Browse by State with live counts`.
+
+### W9 additions for Browse by State
+
+- **Task 45 (exit criteria):** the freshness test also checks the state count. Publishing a listing raises its state's count on `/api/v1/discovery/states`, and closing it lowers the count, within the same 60 s.
+- **Task 46 (accessibility):** add `/states` to the axe list, in light and dark, at 390 px and 1280 px. Add a keyboard check: every state link is reachable with Tab and opens with Enter.
+- **Task 47 (performance):** the read scenario sends 5% of its requests to `GET /api/v1/discovery/states`, taken from search (now 50%). The same p95 ≤ 800 ms threshold applies.
+- **Task 48 (smoke test):** the guest opens `/states` and finds at least one state with a count above zero. That count matches its Seek result count.

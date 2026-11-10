@@ -42,6 +42,7 @@ export {
   formatPay,
   formatStart,
   JobCard,
+  payLabel,
   type JobCardChip,
   type JobCardProps,
   type Pay,
