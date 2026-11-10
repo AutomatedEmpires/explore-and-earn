@@ -19,7 +19,8 @@ import {
 import { loadCards } from './cards';
 import { cursorHash, decodeCursor, encodeCursor, staleCursor, type Cursor } from './cursor';
 import { buildFilterSql, tsQuerySql, uuidArray, type FilterContext } from './filters';
-import { overlayApplied, overlayHidden } from './hooks';
+import { overlayApplied, overlayHidden, type PlacementOutput } from './hooks';
+import { place } from './placement';
 
 export type SearchInput = {
   query: DiscoveryQuery;
@@ -239,17 +240,60 @@ export async function searchListings(db: DbOrTx, i: SearchInput): Promise<Search
   };
   const where = buildFilterSql(i.query, ctx);
   const rows = await keyedPage(db, where, keys, cursor, limit + 1);
-  const page = rows.slice(0, limit);
-  const last = page[page.length - 1];
+  const organic = rows.slice(0, limit);
+  const pageIndex = cursor ? cursor.pi + 1 : 0;
+
+  // Seek and the deck go through the placement hook; the Map list never does (spec 8.13).
+  let placed: PlacementOutput = {
+    items: organic.map((r) => ({ listingId: r.id, boostId: null })),
+    organicConsumed: organic.length,
+    state: cursor?.ps ?? null,
+  };
+  if (i.surface !== 'map_list') {
+    const surface = i.surface;
+    placed = await place(db, {
+      surface,
+      pageIndex,
+      pageSize: limit,
+      organic: organic.map((r) => r.id),
+      matchIds: (listingIds) =>
+        filterListingIds(db, {
+          listingIds,
+          query: i.query,
+          viewerUserId: i.viewerUserId,
+          surface,
+          today: asOf,
+        }),
+      viewerKey: i.viewerKey,
+      state: cursor?.ps ?? null,
+      now: new Date(),
+    });
+  }
+
+  // The next page continues after the last organic item the page used.
+  const last = organic[placed.organicConsumed - 1];
   const nextCursor =
-    rows.length > limit && last
-      ? encodeCursor({ v: 1, h: hash, s: last.s, id: last.id, asOf, ps: null, pi: 0 })
+    rows.length > placed.organicConsumed && last
+      ? encodeCursor({
+          v: 1,
+          h: hash,
+          s: last.s,
+          id: last.id,
+          asOf,
+          ps: placed.state,
+          pi: pageIndex,
+        })
       : null;
 
+  const seen = new Set<string>();
+  const slots = placed.items.filter((x) => !seen.has(x.listingId) && seen.add(x.listingId));
+  const boostIds = new Map(
+    slots.flatMap((x) => (x.boostId ? [[x.listingId, x.boostId] as const] : [])),
+  );
   const items = await loadCards(
     db,
-    page.map((r) => r.id),
-    { viewerUserId: i.viewerUserId, tz: i.tz, source: SOURCE[i.surface] },
+    slots.map((x) => x.listingId),
+    { viewerUserId: i.viewerUserId, tz: i.tz, source: SOURCE[i.surface], boostIds },
   );
   const { total, capped } = await countMatches(db, where);
   return { items, nextCursor, total, totalCapped: capped };
