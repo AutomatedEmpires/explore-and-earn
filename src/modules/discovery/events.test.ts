@@ -227,8 +227,9 @@ describe('runMaintenance', () => {
     await rawEvent(t.db, { listingId: a, at: at(yesterday), source: 'map' });
     await rawEvent(t.db, { listingId: a, at: at(yesterday), type: 'save' });
     await rawEvent(t.db, { listingId: otherOrgListing, at: at(yesterday), orgId: OTHER_ORG });
-    // Not yesterday: the day before, and today.
+    // Not yesterday: the day before (already rolled up, so left as it is), and today.
     await rawEvent(t.db, { listingId: a, at: at('2026-11-08', '23:59:59') });
+    await dailyRow({ listingId: a, day: '2026-11-08', count: 1 });
     await rawEvent(t.db, { listingId: a, at: at('2026-11-10', '00:00:00') });
     // A stale row for yesterday is replaced, not added to.
     await dailyRow({ listingId: b, day: yesterday, count: 9 });
@@ -238,6 +239,7 @@ describe('runMaintenance', () => {
     expect(first.rolledUp).toBe(4);
     expect(rows).toEqual(
       [
+        { listingId: a, day: '2026-11-08', type: 'view', source: 'seek', count: 1 },
         { listingId: a, day: yesterday, type: 'save', source: 'seek', count: 1 },
         { listingId: a, day: yesterday, type: 'view', source: 'map', count: 1 },
         { listingId: a, day: yesterday, type: 'view', source: 'seek', count: 2 },
@@ -247,6 +249,29 @@ describe('runMaintenance', () => {
 
     const second = await runMaintenance(t.db, NOW);
     expect(second.rolledUp).toBe(4);
+    expect(await daily()).toEqual(rows);
+  });
+
+  it('rolls up a day a skipped run left behind, before its raw events are deleted', async () => {
+    // Nothing ran on 2026-11-04 or 2026-11-05; 2026-08-01 is past raw retention.
+    await rawEvent(t.db, { listingId: a, at: at('2026-11-04') });
+    await rawEvent(t.db, { listingId: a, at: at('2026-11-04'), source: 'map' });
+    await rawEvent(t.db, { listingId: b, at: at('2026-11-05') });
+    await rawEvent(t.db, { listingId: b, at: at('2026-11-05') });
+    await rawEvent(t.db, { listingId: a, at: at('2026-08-01') });
+
+    const first = await runMaintenance(t.db, NOW);
+    expect(first).toMatchObject({ rolledUp: 4, deletedEvents: 1 });
+    const rows = await daily();
+    expect(rows).toEqual(
+      [
+        { listingId: a, day: '2026-08-01', type: 'view', source: 'seek', count: 1 },
+        { listingId: a, day: '2026-11-04', type: 'view', source: 'map', count: 1 },
+        { listingId: a, day: '2026-11-04', type: 'view', source: 'seek', count: 1 },
+        { listingId: b, day: '2026-11-05', type: 'view', source: 'seek', count: 2 },
+      ].sort(byListing),
+    );
+    expect((await runMaintenance(t.db, NOW)).rolledUp).toBe(0);
     expect(await daily()).toEqual(rows);
   });
 

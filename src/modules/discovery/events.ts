@@ -239,8 +239,12 @@ export async function deleteRawEventsBefore(
   return Number(rows[0]?.n ?? 0);
 }
 
-/** Recomputes the daily rows of `day` from the raw events and returns how many were written. */
-async function rollUpDay(db: Db, day: string): Promise<number> {
+/**
+ * Recomputes the daily rows of `day` from the raw events, and rolls up every earlier
+ * listing-day that still has raw events but no daily rows (a run the scheduler skipped, or one
+ * that failed), so nothing is lost when the raw events are deleted. Returns the rows written.
+ */
+async function rollUp(db: Db, day: string): Promise<number> {
   return withTx(db, async (tx) => {
     // Two overlapping runs would otherwise both insert the day's rows.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('discovery.rollup'))::text`);
@@ -248,7 +252,7 @@ async function rollUpDay(db: Db, day: string): Promise<number> {
     const rows = await queryRows<{ n: number }>(
       tx,
       sql`
-        with written as (
+        with recomputed as (
           insert into app.listing_event_daily (listing_id, org_id, day, type, source, count)
           select listing_id, org_id, ${day}::date, type, source, count(*)::int
           from app.listing_events
@@ -257,24 +261,45 @@ async function rollUpDay(db: Db, day: string): Promise<number> {
           group by listing_id, org_id, type, source
           returning 1
         )
-        select count(*)::int as n from written
+        select count(*)::int as n from recomputed
       `,
     );
-    return Number(rows[0]?.n ?? 0);
+    // Earlier days are filled in only where a listing has no row for the day, so a day that was
+    // rolled up is never counted twice.
+    const missed = await queryRows<{ n: number }>(
+      tx,
+      sql`
+        with backfilled as (
+          insert into app.listing_event_daily (listing_id, org_id, day, type, source, count)
+          select e.listing_id, e.org_id, (e.occurred_at at time zone 'UTC')::date, e.type,
+            e.source, count(*)::int
+          from app.listing_events e
+          where e.occurred_at < ${dayStart(day)}::timestamptz
+            and not exists (select 1 from app.listing_event_daily d
+              where d.listing_id = e.listing_id
+                and d.day = (e.occurred_at at time zone 'UTC')::date)
+          group by 1, 2, 3, 4, 5
+          returning 1
+        )
+        select count(*)::int as n from backfilled
+      `,
+    );
+    return Number(rows[0]?.n ?? 0) + Number(missed[0]?.n ?? 0);
   });
 }
 
 /**
- * The nightly `discovery.maintenance` job (spec section 6): recompute yesterday's daily rows,
- * null the viewer hash and dedupe key after 24 hours, delete raw events after 90 days, and
- * delete closed projection rows 365 days after `closed_at` with their dispositions and alert
- * matches. Each step is idempotent, so a retried run changes nothing more.
+ * The nightly `discovery.maintenance` job (spec section 6): recompute yesterday's daily rows
+ * (and roll up any earlier day a skipped run left behind), null the viewer hash and dedupe key
+ * after 24 hours, delete raw events after 90 days, and delete closed projection rows 365 days
+ * after `closed_at` with their dispositions and alert matches. Each step is idempotent, so a
+ * retried run changes nothing more.
  */
 export async function runMaintenance(
   db: Db,
   now: Date,
 ): Promise<{ rolledUp: number; scrubbed: number; deletedEvents: number; deletedClosed: number }> {
-  const rolledUp = await rollUpDay(db, addDays(utcDay(now), -1));
+  const rolledUp = await rollUp(db, addDays(utcDay(now), -1));
 
   const scrubRows = await queryRows<{ n: number }>(
     db,
