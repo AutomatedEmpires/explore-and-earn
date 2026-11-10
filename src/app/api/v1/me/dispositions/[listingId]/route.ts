@@ -4,11 +4,12 @@
 //   409 when expectedState no longer matches ("This job changed in another tab.") or at the
 //   saved limit; 404 "This job just closed." when the listing is not active.
 // DELETE { expectedState? }: clear the save or skip, returning { previous }.
+// @/server/api first: it loads identity before orgs (see discovery/_shared/params.ts).
+import { apiRoute, type ApiContext } from '@/server/api';
 import { z } from 'zod';
 import { DISCOVERY_SOURCES } from '@/lib/discovery';
 import { unauthorized } from '@/lib/errors';
 import { clearDisposition, setDisposition } from '@/modules/discovery';
-import { apiRoute, type ApiContext } from '@/server/api';
 import { privateJson } from '@/server/viewer';
 
 const state = z.enum(['saved', 'skipped']);

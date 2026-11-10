@@ -3,10 +3,11 @@
 // bots, repeats within 30 minutes and unknown listings are dropped silently. A source outside
 // the known list is attributed to 'other'. The viewer is the user id, or for a guest a keyed
 // hash of address and browser; only its HMAC is stored, and only for 24 hours.
+// @/server/api first: it loads identity before orgs (see discovery/_shared/params.ts).
+import { apiRoute } from '@/server/api';
 import { z } from 'zod';
 import { DISCOVERY_SOURCES, isBot } from '@/lib/discovery';
 import { dedupeKeyFor, recordListingEvent } from '@/modules/discovery';
-import { apiRoute } from '@/server/api';
 import { getViewer } from '@/server/viewer';
 
 const input = z.object({

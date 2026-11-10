@@ -2,10 +2,11 @@
 // closed listings included (SP3 spec 5 and 8.8). `before` is the previous page's `nextBefore`;
 // a malformed one is a 400. The date lines use the viewer's time zone (`tz` or the ee_tz
 // cookie).
+// @/server/api first: it loads identity before orgs (see discovery/_shared/params.ts).
+import { apiRoute } from '@/server/api';
 import { z } from 'zod';
 import { unauthorized } from '@/lib/errors';
 import { listSavedJobs, listSkippedJobs } from '@/modules/discovery';
-import { apiRoute } from '@/server/api';
 import { getViewer, privateJson } from '@/server/viewer';
 
 const input = z.object({
