@@ -3,7 +3,7 @@
 // invite credits, applies the founding offer (FD-7, ./founding.ts), sets host_since, applies a
 // lapse, emits `subscription.changed` and records audit. Webhooks, the success page and the daily
 // reconcile all end here.
-import { and, eq, inArray, ne } from 'drizzle-orm';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import type { DbOrTx, Tx } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
@@ -262,8 +262,18 @@ async function applySnapshot(tx: Tx, orgId: string, snap: SubSnapshot): Promise<
   };
   const [row] = (await tx
     .insert(subscriptions)
-    .values({ id: newId(), orgId, stripeSubscriptionId: snap.id, ...values })
-    .onConflictDoUpdate({ target: subscriptions.stripeSubscriptionId, set: values })
+    .values({
+      id: newId(),
+      orgId,
+      stripeSubscriptionId: snap.id,
+      ...values,
+      activatedAt: snap.activatedAt,
+    })
+    .onConflictDoUpdate({
+      target: subscriptions.stripeSubscriptionId,
+      // The first payment is kept once seen, whatever later snapshots say.
+      set: { ...values, activatedAt: sql`coalesce(${subscriptions.activatedAt}, excluded.activated_at)` },
+    })
     .returning()) as [SubscriptionRow];
 
   await tx.insert(billingAccounts).values({ orgId }).onConflictDoNothing();

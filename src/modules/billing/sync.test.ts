@@ -609,6 +609,38 @@ describe('founding discount (FD-7)', () => {
     });
   });
 
+  it("doesn't use up the discount on a subscription canceled before its first payment", async () => {
+    const failed = stripeSub({
+      status: 'incomplete',
+      couponId: 'founding_50_six_months',
+      activatedAt: null,
+    });
+    await syncSubscription(t.db, failed.id, gw);
+    update(failed, { status: 'canceled', endedAt: new Date() });
+    await syncSubscription(t.db, failed.id, gw);
+    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('eligible');
+
+    // The next subscription, paid, gets the one discount.
+    const paid = stripeSub({ couponId: 'founding_50_six_months', startDate: START });
+    await syncSubscription(t.db, paid.id, gw);
+    expect((await discountOf(org.orgId))?.stripe_subscription_id).toBe(paid.id);
+    expect(await billingItems(org.orgId)).toEqual([]);
+  });
+
+  it('remembers the first payment after the subscription ends', async () => {
+    const s = stripeSub();
+    await syncSubscription(t.db, s.id, gw);
+    // Even a later snapshot without the payment time leaves the stored one.
+    update(s, { status: 'canceled', endedAt: new Date(), activatedAt: null });
+    await syncSubscription(t.db, s.id, gw);
+    const [row] = await queryRows<{ activated_at: string | null }>(
+      t.db,
+      sql`select activated_at::text from app.subscriptions where stripe_subscription_id = ${s.id}`,
+    );
+    expect(row?.activated_at).toBe('2026-11-01 12:00:00+00');
+    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('none');
+  });
+
   it('keeps the discount, and its end date, through monthly tier changes', async () => {
     let s = stripeSub({ couponId: 'founding_50_six_months', startDate: START });
     await syncSubscription(t.db, s.id, gw);

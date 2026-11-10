@@ -10,7 +10,7 @@
 //   first subscription; a plan change that moves to the other interval removes it; sync locks
 //   the shape at the first paid activation and reports any founding coupon the rules don't allow
 //   (organization 101, a second introductory period, the wrong interval, the retired coupon).
-import { and, eq, ne, notInArray } from 'drizzle-orm';
+import { and, eq, isNotNull, ne } from 'drizzle-orm';
 import type { DbOrTx, Tx } from '@/lib/db';
 import { record } from '@/modules/audit';
 import { FOUNDING_COHORT_SIZE, countFoundingCohort, getFoundingNumber } from '@/modules/orgs';
@@ -56,9 +56,6 @@ export function introEndsAt(shape: FoundingShape, startedAt: Date): Date {
   return addMonths(startedAt, shape === 'monthly' ? FOUNDING_MONTHLY_MONTHS : 12);
 }
 
-/** Statuses a subscription only reaches by activating (everything but never-paid incomplete). */
-const NEVER_ACTIVATED: readonly SubscriptionStatus[] = ['incomplete', 'incomplete_expired'];
-
 /** A first paid activation: the subscription is active (past_due was active before). */
 const isPaidActivation = (status: SubscriptionStatus) =>
   status === 'active' || status === 'past_due';
@@ -73,7 +70,11 @@ export async function getFoundingDiscount(
   return row ?? null;
 }
 
-/** Whether the org has had a subscription that activated, other than `exceptStripeId`. */
+/**
+ * Whether the org has had a subscription that was paid, other than `exceptStripeId`. Sync
+ * stores the first payment (subscriptions.activated_at), so one canceled before it was ever paid
+ * doesn't count, and one that was paid still counts after it ends.
+ */
 async function hasActivatedSubscription(
   db: DbOrTx,
   orgId: string,
@@ -85,7 +86,7 @@ async function hasActivatedSubscription(
     .where(
       and(
         eq(subscriptions.orgId, orgId),
-        notInArray(subscriptions.status, [...NEVER_ACTIVATED]),
+        isNotNull(subscriptions.activatedAt),
         exceptStripeId === undefined
           ? undefined
           : ne(subscriptions.stripeSubscriptionId, exceptStripeId),
@@ -101,7 +102,7 @@ export type FoundingEligibility =
 
 /**
  * Whether the org's next subscription gets the founding discount: it is one of the first 100 by
- * signup, and it has never had a founding discount or any subscription that activated.
+ * signup, and it has never had a founding discount or any subscription that was paid.
  */
 export async function getFoundingEligibility(
   db: DbOrTx,

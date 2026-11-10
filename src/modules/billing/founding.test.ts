@@ -52,10 +52,14 @@ function discount(o: Partial<FoundingDiscountRow> = {}): FoundingDiscountRow {
   };
 }
 
-async function subscriptionRow(status: string, stripeId = `sub_${newId()}`) {
+/** A subscription row as sync leaves it; `paid` sets activated_at (its first payment). */
+async function subscriptionRow(status: string, o: { paid?: boolean } = {}) {
+  const stripeId = `sub_${newId()}`;
   await t.db.execute(sql`
-    insert into app.subscriptions (id, org_id, stripe_subscription_id, status, plan, interval)
-    values (${newId()}, ${org.orgId}, ${stripeId}, ${status}, 'starter', 'month')
+    insert into app.subscriptions (id, org_id, stripe_subscription_id, status, plan, interval,
+      activated_at)
+    values (${newId()}, ${org.orgId}, ${stripeId}, ${status}, 'starter', 'month',
+      ${o.paid ? START : null})
   `);
   return stripeId;
 }
@@ -119,13 +123,16 @@ describe('getFoundingEligibility', () => {
     });
   });
 
-  it('is used up by a founding discount or any subscription that activated', async () => {
+  it('is used up by a founding discount or any subscription that was paid', async () => {
     await reserveFoundingNumber(t.db, org.orgId);
     await subscriptionRow('incomplete');
     await subscriptionRow('incomplete_expired');
+    // Canceled before its first payment: never paid, so nothing was used up.
+    await subscriptionRow('canceled');
     expect((await getFoundingEligibility(t.db, org.orgId)).eligible).toBe(true);
 
-    const activated = await subscriptionRow('canceled');
+    // Paid, then canceled: the paid term counts after it ends.
+    const activated = await subscriptionRow('canceled', { paid: true });
     expect(await getFoundingEligibility(t.db, org.orgId)).toMatchObject({
       eligible: false,
       reason: 'intro_used',

@@ -69,10 +69,13 @@ async function fillCohort() {
   }
 }
 
-async function subscriptionRow(status: string, orgId = org.orgId) {
+/** A subscription row as sync leaves it; `paid` sets activated_at (its first payment). */
+async function subscriptionRow(status: string, orgId = org.orgId, o: { paid?: boolean } = {}) {
   await t.db.execute(sql`
-    insert into app.subscriptions (id, org_id, stripe_subscription_id, status, plan, interval)
-    values (${newId()}, ${orgId}, ${`sub_${newId()}`}, ${status}, 'starter', 'month')
+    insert into app.subscriptions (id, org_id, stripe_subscription_id, status, plan, interval,
+      activated_at)
+    values (${newId()}, ${orgId}, ${`sub_${newId()}`}, ${status}, 'starter', 'month',
+      ${o.paid ? FIXED_NOW : null})
   `);
 }
 
@@ -145,10 +148,10 @@ describe('founding hosts (FD-7)', () => {
       expect(sessionParams()).toMatchObject({ couponId: null, allowPromotionCodes: true });
     }
 
-    // A founding host whose first subscription activated (and ended) without it.
+    // A founding host whose first subscription was paid (and ended) without it.
     const other = await seedHostOrg(t.db);
     await joinCohort(other.orgId);
-    await subscriptionRow('canceled', other.orgId);
+    await subscriptionRow('canceled', other.orgId, { paid: true });
     await createCheckout(t.db, other.owner.ctx, professional, gw);
     expect(sessionParams()).toMatchObject({ couponId: null, allowPromotionCodes: true });
   });
@@ -156,6 +159,8 @@ describe('founding hosts (FD-7)', () => {
   it('still offers it after a first checkout that never paid', async () => {
     await joinCohort(org.orgId);
     await subscriptionRow('incomplete_expired');
+    // Its first payment failed and it was canceled before anyone paid.
+    await subscriptionRow('canceled');
     await createCheckout(t.db, org.owner.ctx, professional, gw);
     expect(sessionParams().couponId).toBe('founding_50_six_months');
   });

@@ -30,6 +30,14 @@ alter table app.founding_discounts enable row level security;
 create trigger founding_discounts_set_updated_at before update on app.founding_discounts
   for each row execute function app.set_updated_at();
 
+-- When each subscription was first paid. Sync sets it from the paid time of the invoice that
+-- created the subscription and never clears it. A subscription canceled before its first payment
+-- has none, so it does not use up an organization's founding discount; one that was paid keeps
+-- it after it ends. Rows from before this column count as paid while they are live.
+alter table app.subscriptions add column activated_at timestamptz;
+update app.subscriptions set activated_at = coalesce(stripe_created_at, created_at)
+  where status in ('active', 'past_due', 'unpaid');
+
 -- The withdrawn 3 November offer (founding codes, 90 days free, 30% off for life). Nothing writes
 -- these any more; they stay until a later cleanup drops them.
 comment on table app.founding_codes is

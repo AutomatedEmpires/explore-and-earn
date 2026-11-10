@@ -157,4 +157,32 @@ describe('stripeGateway retrieveSubscription', () => {
     ).gw.retrieveSubscription('sub_1');
     expect(renewed.initialCouponId).toBeNull();
   });
+
+  it('dates a canceled subscription as paid only when its first invoice was paid', async () => {
+    const invoice = (paidAt: number | null, reason = 'subscription_create') => ({
+      billing_reason: reason,
+      status_transitions: { paid_at: paidAt },
+      discounts: [],
+    });
+    const snap = (o: Parameters<typeof subscription>[0]) =>
+      gatewayFor(subscription(o)).gw.retrieveSubscription('sub_1');
+
+    // Its first payment failed and it was canceled: never paid.
+    expect((await snap({ status: 'canceled', latestInvoice: invoice(null) })).activatedAt).toBeNull();
+    // Paid, then canceled.
+    expect((await snap({ status: 'canceled', latestInvoice: invoice(PAID) })).activatedAt).toEqual(
+      new Date(PAID * 1000),
+    );
+    // It renewed (or changed) before it was canceled, so it was paid.
+    expect(
+      (await snap({ status: 'canceled', latestInvoice: invoice(PAID, 'subscription_cycle') }))
+        .activatedAt,
+    ).toEqual(new Date(T0 * 1000));
+    // A trial that ended without a card, with no invoice: never paid.
+    expect((await snap({ status: 'paused', latestInvoice: null })).activatedAt).toBeNull();
+    // Active with no invoice to read: paid at its start.
+    expect((await snap({ status: 'active', latestInvoice: null })).activatedAt).toEqual(
+      new Date(T0 * 1000),
+    );
+  });
 });

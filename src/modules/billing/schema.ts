@@ -75,6 +75,8 @@ export const subscriptions = app.table('subscriptions', {
   couponId: text('coupon_id'),
   /** Stripe's `created`: when the host signed up for this subscription. */
   stripeCreatedAt: ts('stripe_created_at'),
+  /** When it was first paid (FD-7 eligibility); set once by sync, never cleared. */
+  activatedAt: ts('activated_at'),
   lastSyncedAt: ts('last_synced_at'),
   planGrantSeq: integer('plan_grant_seq').notNull().default(0),
   createdAt: ts('created_at').notNull().defaultNow(),

@@ -35,7 +35,8 @@ export type SubSnapshot = {
   /**
    * When the subscription first became paid: its first invoice's payment time. Later than
    * startDate when that payment came after creation (an incomplete subscription paid later).
-   * Null while it has never been paid (incomplete, incomplete_expired).
+   * Null while it has never been paid (incomplete, incomplete_expired), and for one canceled
+   * before its first payment.
    */
   activatedAt: Date | null;
   /** The coupon on the subscription now. */
@@ -189,14 +190,22 @@ function lookupKeyOf(price: Stripe.Price): string | null {
   return parseLookupKey(key) ? key : null;
 }
 
+/** Statuses only a subscription that was paid can be in. */
+const PAID_STATUSES: readonly string[] = ['active', 'past_due', 'unpaid'];
+
 /**
- * When the subscription first became paid (FD-7's clock starts here): the paid time of the
- * invoice that created it, else its start date. Null while it has never been paid.
+ * When the subscription first became paid (FD-7's clock starts here, and it decides whether the
+ * founding discount is used up): the paid time of the invoice that created it. Null while it has
+ * never been paid, including one canceled before its first payment. Without that invoice's paid
+ * time, a later invoice (it renewed or changed) or a paid status means it was paid at its start.
  */
 function activatedAtOf(s: Stripe.Subscription): Date | null {
   if (s.status === 'incomplete' || s.status === 'incomplete_expired') return null;
-  const paidAt = creationInvoiceOf(s)?.status_transitions?.paid_at;
-  return toDate(paidAt ?? s.start_date);
+  const creation = creationInvoiceOf(s);
+  const paidAt = creation?.status_transitions?.paid_at;
+  if (paidAt) return toDate(paidAt);
+  const laterInvoice = s.latest_invoice !== null && creation === null;
+  return laterInvoice || PAID_STATUSES.includes(s.status) ? toDate(s.start_date) : null;
 }
 
 /** The subscription's latest invoice when it is the one that created it (and Stripe expanded it). */
