@@ -153,3 +153,9 @@ export type QueryLabels = {
 
 /** One removable active filter; `key` is what removeFilter takes. */
 export type FilterChip = { key: string; label: string };
+
+/**
+ * Browse by State (FD-8 addendum): one entry per `US_STATES` code. `count` is the active
+ * listings a seeker there can take, capped at 10,000 with `capped: true` (the cap on Seek's total).
+ */
+export type StateCount = { code: string; count: number; capped: boolean };

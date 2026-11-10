@@ -162,6 +162,8 @@ describe('@/modules/discovery', () => {
       'getFilterOptions',
       'dedupeKeyFor',
       'searchVectorSql',
+      // FD-8 addendum
+      'countListingsByState',
     ] as const;
     for (const name of functions) {
       expect(typeof discovery[name], name).toBe('function');

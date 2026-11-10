@@ -29,6 +29,7 @@ export type {
   MapPin,
   QueryLabels,
   Season,
+  StateCount,
 } from '@/lib/discovery';
 
 export {
@@ -40,6 +41,8 @@ export {
 } from './search';
 export { locationPreview, mapPins } from './map';
 export { suggest } from './suggest';
+// Browse by State (FD-8 addendum).
+export { countListingsByState } from './state-counts';
 export { getListingDetail } from './detail';
 export { getFilterOptions, getQueryLabels, prepareQuery } from './query-context';
 export { toHourlyCents } from './projection';
