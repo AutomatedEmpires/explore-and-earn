@@ -18,7 +18,14 @@ import {
   resetSeekerOverlayForTests,
   setPlacementHookForTests,
 } from './hooks';
-import { filterListingIds, searchListings, type SearchInput } from './search';
+import {
+  countNewListings,
+  filterListingIds,
+  getJobCards,
+  matchListingIds,
+  searchListings,
+  type SearchInput,
+} from './search';
 
 let t: TestDb;
 const DAY = 86_400_000;
@@ -446,5 +453,52 @@ describe('count', () => {
     await t.db.execute(sql`delete from app.discovery_listings`);
     await seed([{}, {}, {}]);
     expect(await search({ limit: 1 })).toMatchObject({ total: 3, totalCapped: false });
+  });
+});
+
+describe('cards by id and counts', () => {
+  it('getJobCards keeps active cards in input order, labeled when boosted', async () => {
+    const [a, closed, b] = (await seed([{}, { isActive: false, closedAt: NOW }, {}])) as [
+      string,
+      string,
+      string,
+    ];
+    setPlacementHookForTests({ ...noopHook, boostedAmong: async () => new Map([[b, 'b4']]) });
+    const cards = await getJobCards(t.db, [b, closed, a]);
+    expect(cards.map((c) => c.listingId)).toEqual([b, a]);
+    expect(cards[0]?.boosted).toEqual({ boostId: 'b4' });
+    expect(cards[0]?.href.endsWith('source=boost')).toBe(true);
+    expect(cards[1]?.boosted).toBeNull();
+    expect(cards[1]?.href.endsWith('source=other')).toBe(true);
+  });
+
+  it('matchListingIds is the Seek filter for this viewer', async () => {
+    const [farm, sea] = (await seed([{ category: 'farm' }, { category: 'maritime' }])) as [
+      string,
+      string,
+    ];
+    expect(
+      await matchListingIds(t.db, {
+        listingIds: [sea, farm],
+        query: { categories: ['farm'] },
+        viewerUserId: null,
+      }),
+    ).toEqual([farm]);
+  });
+
+  it('countNewListings counts active listings first active since the date', async () => {
+    const since = new Date(NOW.getTime() - 2 * DAY);
+    const other = newId();
+    await seed([
+      { firstActiveAt: new Date(NOW.getTime() - DAY), housingProvided: true },
+      { firstActiveAt: since, housingProvided: false, orgId: other },
+      { firstActiveAt: new Date(NOW.getTime() - 3 * DAY) },
+      { firstActiveAt: new Date(NOW.getTime() - DAY), isActive: false, closedAt: NOW },
+    ]);
+    expect(await countNewListings(t.db, { since })).toEqual({
+      listings: 2,
+      hosts: 2,
+      withHousing: 1,
+    });
   });
 });

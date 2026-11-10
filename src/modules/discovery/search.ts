@@ -9,6 +9,7 @@
 import { sql, type SQL } from 'drizzle-orm';
 import { queryRows, type DbOrTx } from '@/lib/db';
 import {
+  DEFAULT_TZ,
   stateByCode,
   todayIn,
   type DiscoveryQuery,
@@ -16,7 +17,7 @@ import {
   type DiscoverySource,
   type JobCardData,
 } from '@/lib/discovery';
-import { loadCards } from './cards';
+import { boostedLabels, loadCards } from './cards';
 import { cursorHash, decodeCursor, encodeCursor, staleCursor, type Cursor } from './cursor';
 import { buildFilterSql, tsQuerySql, uuidArray, type FilterContext } from './filters';
 import { overlayApplied, overlayHidden, type PlacementOutput } from './hooks';
@@ -336,27 +337,44 @@ export async function filterListingIds(
   return i.limit === undefined ? kept : kept.slice(0, Math.max(0, i.limit));
 }
 
-/** Active cards only, in input order. */
+/**
+ * Active cards only, in input order (SP7's feed cards and others). A boosted card links with
+ * `source=boost`, every other one with `source=other`.
+ */
 export async function getJobCards(
-  _db: DbOrTx,
-  _listingIds: string[],
-  _opts?: { viewerUserId?: string | null; tz?: string },
+  db: DbOrTx,
+  listingIds: string[],
+  opts?: { viewerUserId?: string | null; tz?: string },
 ): Promise<JobCardData[]> {
-  throw new Error('not implemented: getJobCards');
+  const now = new Date();
+  return loadCards(db, listingIds, {
+    viewerUserId: opts?.viewerUserId ?? null,
+    tz: opts?.tz ?? DEFAULT_TZ,
+    source: 'other',
+    boostIds: await boostedLabels(db, [...new Set(listingIds)], now),
+    now,
+  });
 }
 
-/** The ids among `listingIds` that match `query` for this viewer (SP6 placement). */
+/** The ids among `listingIds` that match `query` for this viewer on Seek (SP6 placement). */
 export async function matchListingIds(
-  _db: DbOrTx,
-  _i: { listingIds: string[]; query: DiscoveryQuery; viewerUserId: string | null },
+  db: DbOrTx,
+  i: { listingIds: string[]; query: DiscoveryQuery; viewerUserId: string | null },
 ): Promise<string[]> {
-  throw new Error('not implemented: matchListingIds');
+  return filterListingIds(db, { ...i, surface: 'seek', today: todayIn(DEFAULT_TZ) });
 }
 
-/** New active listings since `since` (SP7's community digest). */
+/** Active listings first active since `since` (SP7's community digest). */
 export async function countNewListings(
-  _db: DbOrTx,
-  _i: { since: Date },
+  db: DbOrTx,
+  i: { since: Date },
 ): Promise<{ listings: number; hosts: number; withHousing: number }> {
-  throw new Error('not implemented: countNewListings');
+  const [row] = await queryRows<{ listings: number; hosts: number; withHousing: number }>(
+    db,
+    sql`select count(*)::int as listings, count(distinct dl.org_id)::int as hosts,
+        (count(*) filter (where dl.housing_provided))::int as "withHousing"
+      from app.discovery_listings dl
+      where dl.is_active and dl.first_active_at >= ${i.since.toISOString()}::timestamptz`,
+  );
+  return row ?? { listings: 0, hosts: 0, withHousing: 0 };
 }
