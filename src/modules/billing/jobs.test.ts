@@ -70,6 +70,7 @@ function stripeSub(org: SeededOrg, o: Partial<SubSnapshot> = {}): SubSnapshot {
     startDate: now,
     activatedAt: now,
     couponId: null,
+    initialCouponId: null,
     metadata: { orgId: org.orgId },
     created: now,
     ...o,

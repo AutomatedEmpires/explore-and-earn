@@ -217,16 +217,28 @@ export async function syncFoundingDiscount(
     }
   }
 
-  if (snap.couponId === RETIRED_FOUNDING_COUPON_ID) return 'retired_coupon';
-  const shape = shapeOfCoupon(snap.couponId);
-  if (!shape) return null;
+  if (
+    snap.couponId === RETIRED_FOUNDING_COUPON_ID ||
+    snap.initialCouponId === RETIRED_FOUNDING_COUPON_ID
+  ) {
+    return 'retired_coupon';
+  }
+  // The coupon on the subscription now, and the one its first invoice used: Stripe drops the
+  // annual `once` coupon from the subscription as that invoice finalizes.
+  const currentShape = shapeOfCoupon(snap.couponId);
+  const initialShape = shapeOfCoupon(snap.initialCouponId);
 
   if (discount) {
-    if (!own) return 'second_intro';
-    return discount.shape === shape && intervalOfShape(shape) === interval
+    if (!own) return currentShape || initialShape ? 'second_intro' : null;
+    // The discount's own subscription: only a coupon still on it can be on the wrong interval.
+    if (!currentShape) return null;
+    return discount.shape === currentShape && intervalOfShape(currentShape) === interval
       ? null
       : 'wrong_interval';
   }
+  const shape = currentShape ?? initialShape;
+  if (!shape) return null;
+  const couponId = (currentShape ? snap.couponId : snap.initialCouponId) as string;
   if (intervalOfShape(shape) !== interval) return 'wrong_interval';
   // Not paid yet (or already over without ever being seen active): decided when it activates.
   if (!isPaidActivation(snap.status)) return null;
@@ -245,7 +257,7 @@ export async function syncFoundingDiscount(
     .values({
       orgId,
       shape,
-      couponId: snap.couponId as string,
+      couponId,
       stripeSubscriptionId: snap.id,
       startedAt,
       endsAt,

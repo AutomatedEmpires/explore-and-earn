@@ -14,6 +14,7 @@ function subscription(o: {
   status?: string;
   prices?: (Price & { quantity: number })[];
   latestInvoice?: unknown;
+  coupon?: string;
 }) {
   const prices = o.prices ?? [
     { lookup_key: 'starter_month', metadata: {}, interval: 'month', quantity: 1 },
@@ -40,7 +41,7 @@ function subscription(o: {
     cancel_at_period_end: false,
     ended_at: null,
     start_date: T0,
-    discounts: [],
+    discounts: o.coupon ? [{ id: 'di_1', source: { coupon: o.coupon } }] : [],
     metadata: { orgId: 'org-1' },
     created: T0,
     latest_invoice: o.latestInvoice ?? null,
@@ -86,7 +87,9 @@ describe('stripeGateway retrieveSubscription', () => {
       { lookupKey: null, quantity: 1 },
       { lookupKey: null, quantity: 1 },
     ]);
-    expect(calls[0]?.[1]).toMatchObject({ expand: expect.arrayContaining(['latest_invoice']) });
+    expect(calls[0]?.[1]).toMatchObject({
+      expand: expect.arrayContaining(['latest_invoice.discounts']),
+    });
   });
 
   it('dates the first paid activation by the paid time of the invoice that created it', async () => {
@@ -116,5 +119,42 @@ describe('stripeGateway retrieveSubscription', () => {
       const snap = await gatewayFor(subscription({ latestInvoice })).gw.retrieveSubscription('sub_1');
       expect(snap.activatedAt).toEqual(new Date(T0 * 1000));
     }
+  });
+
+  it('reads the annual once coupon from the invoice that created it, after Stripe drops it', async () => {
+    const creation = (coupon: string | object) => ({
+      billing_reason: 'subscription_create',
+      status_transitions: { paid_at: PAID },
+      discounts: [{ id: 'di_1', deleted: true, source: { coupon } }],
+    });
+    // Paid: the coupon is off the subscription, and still on its first invoice.
+    const paid = await gatewayFor(
+      subscription({ latestInvoice: creation('founding_50_first_year') }),
+    ).gw.retrieveSubscription('sub_1');
+    expect(paid.couponId).toBeNull();
+    expect(paid.initialCouponId).toBe('founding_50_first_year');
+
+    // An expanded coupon object reads the same.
+    const expanded = await gatewayFor(
+      subscription({ latestInvoice: creation({ id: 'founding_50_first_year' }) }),
+    ).gw.retrieveSubscription('sub_1');
+    expect(expanded.initialCouponId).toBe('founding_50_first_year');
+
+    // A monthly coupon stays on the subscription, and on the first invoice.
+    const monthly = await gatewayFor(
+      subscription({ coupon: 'founding_50_six_months', latestInvoice: creation('founding_50_six_months') }),
+    ).gw.retrieveSubscription('sub_1');
+    expect(monthly).toMatchObject({
+      couponId: 'founding_50_six_months',
+      initialCouponId: 'founding_50_six_months',
+    });
+
+    // Once a renewal is the latest invoice, the first term's coupon is no longer read.
+    const renewed = await gatewayFor(
+      subscription({
+        latestInvoice: { ...creation('founding_50_first_year'), billing_reason: 'subscription_cycle' },
+      }),
+    ).gw.retrieveSubscription('sub_1');
+    expect(renewed.initialCouponId).toBeNull();
   });
 });

@@ -137,7 +137,11 @@ export function makeFakeBillingGateway(
       startDate: at,
       // Checkout's first invoice is paid as the subscription is created (no trial under FD-7).
       activatedAt: p.trialEnd ? null : at,
+      // Stripe drops a `once` coupon from the subscription when the first invoice finalizes; the
+      // fake keeps it there (a test sets couponId to null to model that). The creation invoice
+      // keeps it either way.
       couponId: p.couponId,
+      initialCouponId: p.couponId,
       metadata: { ...p.metadata },
       created: at,
     };

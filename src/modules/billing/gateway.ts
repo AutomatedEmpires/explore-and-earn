@@ -38,7 +38,15 @@ export type SubSnapshot = {
    * Null while it has never been paid (incomplete, incomplete_expired).
    */
   activatedAt: Date | null;
+  /** The coupon on the subscription now. */
   couponId: string | null;
+  /**
+   * The coupon on the invoice that created the subscription, while that is still its latest
+   * invoice. Stripe drops a `once` coupon (the annual founding coupon) from the subscription as
+   * that invoice finalizes, but the invoice keeps it, so sync reads the first paid term's coupon
+   * here.
+   */
+  initialCouponId: string | null;
   metadata: Record<string, string>;
   created: Date;
 };
@@ -151,8 +159,11 @@ function idOf(value: string | { id: string } | null | undefined): string | null 
   return typeof value === 'string' ? value : value.id;
 }
 
-function couponOf(discounts: Stripe.Subscription['discounts']): string | null {
-  for (const d of discounts) {
+/** The first coupon among expanded discounts (a bare discount id is skipped). */
+function couponOf(
+  discounts: readonly (string | Stripe.Discount | Stripe.DeletedDiscount)[] | null | undefined,
+): string | null {
+  for (const d of discounts ?? []) {
     if (typeof d === 'string') continue;
     const coupon = idOf(d.source?.coupon ?? null);
     if (coupon) return coupon;
@@ -184,12 +195,16 @@ function lookupKeyOf(price: Stripe.Price): string | null {
  */
 function activatedAtOf(s: Stripe.Subscription): Date | null {
   if (s.status === 'incomplete' || s.status === 'incomplete_expired') return null;
-  const invoice = s.latest_invoice;
-  const paidAt =
-    invoice && typeof invoice !== 'string' && invoice.billing_reason === 'subscription_create'
-      ? invoice.status_transitions?.paid_at
-      : null;
+  const paidAt = creationInvoiceOf(s)?.status_transitions?.paid_at;
   return toDate(paidAt ?? s.start_date);
+}
+
+/** The subscription's latest invoice when it is the one that created it (and Stripe expanded it). */
+function creationInvoiceOf(s: Stripe.Subscription): Stripe.Invoice | null {
+  const invoice = s.latest_invoice;
+  return invoice && typeof invoice !== 'string' && invoice.billing_reason === 'subscription_create'
+    ? invoice
+    : null;
 }
 
 function toSnapshot(s: Stripe.Subscription): SubSnapshot {
@@ -210,6 +225,7 @@ function toSnapshot(s: Stripe.Subscription): SubSnapshot {
     startDate: toDate(s.start_date),
     activatedAt: activatedAtOf(s),
     couponId: couponOf(s.discounts),
+    initialCouponId: couponOf(creationInvoiceOf(s)?.discounts),
     metadata: { ...(s.metadata ?? {}) },
     created: toDate(s.created),
   };
@@ -233,7 +249,7 @@ function mapCardError(err: unknown): never {
   throw err;
 }
 
-const SUB_EXPAND = ['discounts', 'items.data.price', 'latest_invoice'];
+const SUB_EXPAND = ['discounts', 'items.data.price', 'latest_invoice.discounts'];
 
 /** The real gateway over a Stripe client. Price ids are looked up by lookup key and cached. */
 export function stripeGateway(stripe: Stripe, webhookSecret?: string): BillingGateway {
@@ -335,7 +351,7 @@ export function stripeGateway(stripe: Stripe, webhookSecret?: string): BillingGa
         created: { gte: toUnix(since) },
         status: 'all',
         limit: 100,
-        expand: ['data.discounts', 'data.latest_invoice'],
+        expand: ['data.discounts', 'data.latest_invoice.discounts'],
       })) {
         out.push(toSnapshot(s));
       }

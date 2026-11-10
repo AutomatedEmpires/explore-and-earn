@@ -98,6 +98,7 @@ function stripeSub(o: Partial<SubSnapshot> & { orgId?: string } = {}): SubSnapsh
     startDate: new Date('2026-11-01T12:00:00Z'),
     activatedAt: new Date('2026-11-01T12:00:00Z'),
     couponId: null,
+    initialCouponId: o.couponId ?? null,
     metadata: { orgId: o.orgId ?? org.orgId },
     created: new Date('2026-11-01T12:00:00Z'),
     ...o,
@@ -554,10 +555,37 @@ describe('founding discount (FD-7)', () => {
     await syncSubscription(t.db, s.id, gw);
     expect(await discountOf(org.orgId)).toMatchObject({
       shape: 'annual',
+      coupon_id: 'founding_50_first_year',
       started_at: '2026-11-01 12:00:00+00',
       ends_at: '2027-11-01 12:00:00+00',
       ended_reason: null,
     });
+  });
+
+  it('locks the annual shape from the first invoice once Stripe drops the once coupon', async () => {
+    // As Stripe returns a paid annual founding subscription: the `once` coupon is gone from the
+    // subscription, and only the invoice that created it still has it.
+    const s = stripeSub({
+      couponId: null,
+      initialCouponId: 'founding_50_first_year',
+      items: yearItems('professional'),
+      startDate: START,
+    });
+    await syncSubscription(t.db, s.id, gw);
+    expect(await discountOf(org.orgId)).toMatchObject({
+      shape: 'annual',
+      coupon_id: 'founding_50_first_year',
+      ends_at: '2027-11-01 12:00:00+00',
+      ended_reason: null,
+    });
+    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('active');
+    expect(await billingItems(org.orgId)).toEqual([]);
+
+    // A switch to monthly (no new invoice yet) ends it, with no false wrong-interval report.
+    update(s, { items: items('professional') });
+    await syncSubscription(t.db, s.id, gw);
+    expect((await discountOf(org.orgId))?.ended_reason).toBe('interval_change');
+    expect(await billingItems(org.orgId)).toEqual([]);
   });
 
   it('waits for the first paid activation, and starts the clock there, not at creation', async () => {

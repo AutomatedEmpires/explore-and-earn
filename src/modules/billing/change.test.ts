@@ -84,7 +84,7 @@ const items = (plan: string, extra = 0, interval: 'month' | 'year' = 'month') =>
 async function subscribe(
   plan: string,
   extra = 0,
-  o: { interval?: 'month' | 'year'; couponId?: string } = {},
+  o: { interval?: 'month' | 'year'; couponId?: string | null; initialCouponId?: string } = {},
 ) {
   const { id: customerId } = await gw.createCustomer(
     { orgId: org.orgId, name: 'Kettle', email: null },
@@ -107,6 +107,7 @@ async function subscribe(
     startDate: now,
     activatedAt: now,
     couponId: o.couponId ?? null,
+    initialCouponId: o.initialCouponId ?? o.couponId ?? null,
     metadata: { orgId: org.orgId },
     created: now,
   };
@@ -391,6 +392,36 @@ describe('founding discount across plan changes (FD-7)', () => {
     expect(back).not.toHaveProperty('removeDiscounts');
     expect(gw.getSubscription(sub.id)?.couponId).toBeNull();
     expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('ended');
+  });
+
+  it('moves an annual founder whose once coupon Stripe already dropped to monthly at full price', async () => {
+    // As Stripe holds a paid annual founding subscription: no coupon left on it.
+    org = await seedHostOrg(t.db);
+    await reserveFoundingNumber(t.db, org.orgId);
+    entitlementsFake.setUsed(org.orgId, 'listing_slot', 1);
+    entitlementsFake.setUsed(org.orgId, 'seat', 1);
+    await subscribe('professional', 0, {
+      interval: 'year',
+      couponId: null,
+      initialCouponId: 'founding_50_first_year',
+    });
+    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('active');
+
+    await changePlan(t.db, choice('professional', 'month'), gw);
+    const [, update] = gw.callsTo('updateSubscription').at(-1) ?? [];
+    // Nothing to remove, and nothing added.
+    expect(update).toEqual({
+      items: [{ lookupKey: 'professional_month', quantity: 1 }],
+      prorationBehavior: 'create_prorations',
+    });
+    expect(gw.getSubscription(sub.id)?.couponId).toBeNull();
+    expect(await endedReason()).toBe('interval_change');
+    const [item] = await queryRows(
+      t.db,
+      sql`select 1 from app.review_items where subject_type = 'billing_account'
+          and subject_id = ${org.orgId}`,
+    );
+    expect(item).toBeUndefined();
   });
 
   it('never starts six discounted months on a move from annual to monthly', async () => {
