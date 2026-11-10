@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { JobCard, type JobCardProps } from './JobCard';
+import {
+  formatPay,
+  formatStart,
+  JobCard,
+  payLabel,
+  type JobCardProps,
+  type PayPeriod,
+} from './JobCard';
 
 const base: JobCardProps = {
   href: '/jobs/lodge-housekeeper',
@@ -73,6 +80,33 @@ describe('JobCard', () => {
     expect(screen.getByText('$18.50–22/hr')).toBeInTheDocument();
   });
 
+  it('shows yearly pay in the Pay chip', () => {
+    render(<JobCard {...base} pay={{ amountCents: 4500000, per: 'year' }} />);
+    expect(within(chip(/^Pay/)).getByText('$45,000/yr')).toBeInTheDocument();
+  });
+
+  it('shows preformatted pay and start labels as given', () => {
+    render(<JobCard {...base} pay={{ label: '$52k/yr' }} starts={{ label: 'Summer 2027' }} />);
+    expect(within(chip(/^Pay/)).getByText('$52k/yr')).toBeInTheDocument();
+    expect(screen.getByText('Summer 2027')).toBeInTheDocument();
+  });
+
+  it('shows the end label in place of "Ends ..."', () => {
+    render(<JobCard {...base} endLabel="Ongoing" />);
+    expect(screen.getByText('· Ongoing')).toBeInTheDocument();
+    expect(screen.queryByText(/Ends/)).toBeNull();
+  });
+
+  it('shows a disabled "Applied" button once the seeker has applied', () => {
+    const onApply = vi.fn();
+    render(<JobCard {...base} applied onApply={onApply} />);
+    const applied = screen.getByRole('button', { name: 'Applied' });
+    expect(applied).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
+    fireEvent.click(applied);
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
   it('opens chips and runs the Skip, Apply and Save actions', () => {
     const onOpenChip = vi.fn();
     const onSkip = vi.fn();
@@ -97,5 +131,42 @@ describe('JobCard', () => {
     expect(save).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(save);
     expect([onSkip, onApply, onSave].map((f) => f.mock.calls.length)).toEqual([1, 1, 1]);
+  });
+});
+
+describe('formatPay', () => {
+  it.each<[PayPeriod, string]>([
+    ['hour', '$19/hr'],
+    ['day', '$19/day'],
+    ['week', '$19/wk'],
+    ['month', '$19/mo'],
+    ['season', '$19/season'],
+    ['year', '$19/yr'],
+  ])('labels %s pay "%s"', (per, label) => {
+    expect(formatPay({ amountCents: 1900, per })).toBe(label);
+  });
+
+  it('writes yearly amounts and ranges with thousands separators', () => {
+    expect(formatPay({ amountCents: 4500000, per: 'year' })).toBe('$45,000/yr');
+    expect(formatPay({ amountCents: 4500000, maxAmountCents: 5200000, per: 'year' })).toBe(
+      '$45,000–52,000/yr',
+    );
+  });
+
+  it('ignores a maximum that is not above the minimum', () => {
+    expect(formatPay({ amountCents: 4500000, maxAmountCents: 4500000, per: 'year' })).toBe(
+      '$45,000/yr',
+    );
+  });
+});
+
+describe('payLabel and formatStart', () => {
+  it('pass a preformatted label through and format the rest', () => {
+    expect(payLabel({ label: '$19–$22/hr' })).toBe('$19–$22/hr');
+    expect(payLabel({ amountCents: 4500000, per: 'year' })).toBe('$45,000/yr');
+    expect(formatStart({ label: 'Summer 2027' })).toBe('Summer 2027');
+    expect(formatStart({ on: 'May 10' })).toBe('Begins May 10');
+    expect(formatStart({ inDays: 1 })).toBe('Starts in 1 day');
+    expect(formatStart({ inDays: 0 })).toBe('Starts today');
   });
 });
