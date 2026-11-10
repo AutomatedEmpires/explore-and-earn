@@ -39,6 +39,11 @@ export interface SettingValues {
   'links.blocked_domains': string[];
   'links.shortener_domains': string[];
   'verification.blocked_domains': string[];
+  // SP3: discovery limits (SP3 spec 8.8).
+  'discovery.saved_jobs_per_user': number;
+  'discovery.saved_searches_per_user': number;
+  /** Alert pushes per user per UTC day; over the cap, matches still go to the daily email. */
+  'discovery.alert_push_daily_cap': number;
 }
 
 export type SettingKey = keyof SettingValues;
@@ -95,6 +100,9 @@ export const SETTING_DEFAULTS: { readonly [K in SettingKey]: SettingValues[K] } 
     't.ly',
   ],
   'verification.blocked_domains': [],
+  'discovery.saved_jobs_per_user': 1000,
+  'discovery.saved_searches_per_user': 20,
+  'discovery.alert_push_daily_cap': 5,
 };
 
 export const SETTING_KEYS = Object.keys(SETTING_DEFAULTS) as readonly SettingKey[];
@@ -173,4 +181,7 @@ export const SETTING_SCHEMAS: { readonly [K in SettingKey]: z.ZodType<SettingVal
   'links.blocked_domains': hostnames,
   'links.shortener_domains': hostnames,
   'verification.blocked_domains': hostnames,
+  'discovery.saved_jobs_per_user': int(1, 100_000),
+  'discovery.saved_searches_per_user': int(1, 1000),
+  'discovery.alert_push_daily_cap': int(0, 50),
 };

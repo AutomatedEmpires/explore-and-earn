@@ -91,6 +91,14 @@ describe('buildSecurityHeaders', () => {
     expect(prod.get('connect-src')).not.toContain('https://*.clerk.accounts.dev');
   });
 
+  it('keeps everything outside prod out of search engines (SP3 spec 8.11)', () => {
+    expect(buildSecurityHeaders({ nonce: 'abc', appEnv: 'preview' })['X-Robots-Tag']).toBe(
+      'noindex',
+    );
+    expect(buildSecurityHeaders({ nonce: 'abc', appEnv: 'dev' })['X-Robots-Tag']).toBe('noindex');
+    expect(buildSecurityHeaders({ nonce: 'abc', appEnv: 'prod' })['X-Robots-Tag']).toBeUndefined();
+  });
+
   it('sends the standard hardening headers', () => {
     const h = buildSecurityHeaders({ nonce: 'abc', appEnv: 'dev' });
     expect(h['X-Content-Type-Options']).toBe('nosniff');
