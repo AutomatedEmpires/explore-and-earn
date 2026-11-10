@@ -8,7 +8,7 @@
 // - closed: the row stays, inactive, with closed_at set.
 // - anything else, or no listing at all: the row goes, and in the same transaction the
 //   listing's dispositions and alert matches (spec failure mode 1).
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import { queryRows, withTx, type Db, type DbOrTx, type Tx } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { record } from '@/modules/audit';
@@ -24,7 +24,7 @@ import {
 import { getLocations, listDestinations } from '@/modules/locations';
 import { raiseAlert } from '@/modules/trust';
 import { mediaAlt, publicMediaUrls } from './media';
-import { buildProjectionRow, upsertProjectionRow } from './projection';
+import { buildProjectionRow, hostSinceOf, upsertProjectionRow } from './projection';
 import type { ProjectionRowInput } from './projection-columns';
 
 export type SyncResult = 'upserted' | 'closed' | 'removed';
@@ -103,6 +103,21 @@ async function rowFor(
   });
 }
 
+/**
+ * The host columns a closed row still shows (saved jobs list closed cards): the host's current
+ * name, slug, logo and subscriber date, so a lapsed subscription loses its badge there too. A
+ * host that is no longer public keeps its name and loses the badge; closing never waits on it.
+ */
+async function closedHostColumns(tx: Tx, orgId: string): Promise<SQL> {
+  const host = (await hostIdentities(tx, [orgId])).get(orgId);
+  if (!host) return sql`host_since = null`;
+  const logo = host.logoMediaId
+    ? ((await publicMediaUrls(tx, [host.logoMediaId])).get(host.logoMediaId)?.[320] ?? null)
+    : null;
+  return sql`host_name = ${host.name}, host_slug = ${host.slug}, host_logo_url = ${logo},
+    host_since = ${hostSinceOf(host)}::date`;
+}
+
 /** Deletes the row with the listing's dispositions and alert matches. */
 async function removeListing(tx: Tx, listingId: string): Promise<void> {
   await tx.execute(sql`delete from app.saved_search_matches where listing_id = ${listingId}::uuid`);
@@ -131,7 +146,8 @@ async function syncWith(
     if (summary?.state === 'closed') {
       await tx.execute(sql`
         update app.discovery_listings
-        set is_active = false, closed_at = coalesce(closed_at, ${now.toISOString()}::timestamptz)
+        set is_active = false, closed_at = coalesce(closed_at, ${now.toISOString()}::timestamptz),
+          ${await closedHostColumns(tx, summary.orgId)}
         where listing_id = ${listingId}::uuid
       `);
       return 'closed';
@@ -180,7 +196,8 @@ type Counts = { upserted: number; removed: number };
 
 /**
  * The two drift passes: every SP2 listing whose row is missing, inactive or on another
- * revision, then every active row SP2 no longer reports as active.
+ * revision; then every row, active or closed, that SP2 no longer reports in its state (an
+ * active row whose listing closed, or any row whose listing was removed or is gone).
  */
 async function reconcile(db: Db, now: Date): Promise<Counts> {
   const lookups = await loadLookups(db);
@@ -214,10 +231,13 @@ async function reconcile(db: Db, now: Date): Promise<Counts> {
 
   let cursor: string | null = null;
   for (;;) {
-    const rows: { id: string }[] = await queryRows<{ id: string }>(
+    const rows: { id: string; active: boolean }[] = await queryRows<{
+      id: string;
+      active: boolean;
+    }>(
       db,
-      sql`select listing_id::text as id from app.discovery_listings
-        where is_active ${cursor ? sql`and listing_id > ${cursor}::uuid` : sql``}
+      sql`select listing_id::text as id, is_active as active from app.discovery_listings
+        ${cursor ? sql`where listing_id > ${cursor}::uuid` : sql``}
         order by listing_id limit ${DRIFT_PAGE_SIZE}`,
     );
     if (rows.length === 0) break;
@@ -226,7 +246,9 @@ async function reconcile(db: Db, now: Date): Promise<Counts> {
       rows.map((r) => r.id),
     );
     for (const r of rows) {
-      if (summaries.get(r.id)?.state === 'active') continue;
+      const state = summaries.get(r.id)?.state;
+      // Active listings were checked in the first pass; a closed row of a closed listing is right.
+      if (state === 'active' || (state === 'closed' && !r.active)) continue;
       tally(await syncWith(db, r.id, now, lookups));
     }
     if (rows.length < DRIFT_PAGE_SIZE) break;

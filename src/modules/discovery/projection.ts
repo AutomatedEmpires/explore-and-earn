@@ -91,6 +91,11 @@ export function costLine(cost: Cost): string {
 
 const nonEmpty = (s: string | null | undefined) => (s ? s : null);
 
+/** The subscriber badge's date, YYYY-MM-DD, or null for a host without a subscription. */
+export function hostSinceOf(host: HostIdentity): string | null {
+  return host.subscriber ? host.subscriber.hostSince.toISOString().slice(0, 10) : null;
+}
+
 /** The projection row for an active listing (spec section 4). */
 export function buildProjectionRow(i: ProjectionSources): ProjectionRowInput {
   const { published, host, location, now } = i;
@@ -131,7 +136,7 @@ export function buildProjectionRow(i: ProjectionSources): ProjectionRowInput {
     hostName: host.name,
     hostSlug: host.slug,
     hostLogoUrl: i.hostLogoUrl,
-    hostSince: host.subscriber ? host.subscriber.hostSince.toISOString().slice(0, 10) : null,
+    hostSince: hostSinceOf(host),
     state: location.state,
     lat: location.publicPoint.lat,
     lng: location.publicPoint.lng,

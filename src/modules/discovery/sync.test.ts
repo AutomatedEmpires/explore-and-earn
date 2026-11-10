@@ -222,6 +222,48 @@ describe('syncListing', () => {
     expect((await rowOf(l.listingId))?.closedAt).toBe(NOW.toISOString());
   });
 
+  it("refreshes a closed row's host, so a lapsed subscription loses its badge", async () => {
+    const l = fakeSp2.putListing();
+    await syncListing(t.db, l.listingId, NOW);
+    fakeSp2.setListingState(l.listingId, 'closed');
+    await syncListing(t.db, l.listingId, NOW);
+    expect((await rowOf(l.listingId))?.hostSince).toBe('2026-11-03');
+
+    const logo = newId();
+    fakeSp2.putHost({
+      orgId: DEFAULT_ORG_ID,
+      name: 'Kettle Ridge Resort',
+      subscriber: null,
+      logoMediaId: logo,
+    });
+    await syncHandlers['discovery.sync_host']?.(
+      envelope('subscription.changed', { orgId: DEFAULT_ORG_ID, status: 'canceled', plan: null }),
+      ctx(LATER),
+    );
+    expect(await rowOf(l.listingId)).toMatchObject({
+      isActive: false,
+      closedAt: NOW.toISOString(),
+      hostName: 'Kettle Ridge Resort',
+      hostSince: null,
+      hostLogoUrl: `https://media.test/${logo}/320.webp`,
+    });
+  });
+
+  it('drops the badge of a closed row whose host is no longer public', async () => {
+    const org = newId();
+    const l = fakeSp2.putListing({ orgId: org });
+    fakeSp2.setListingState(l.listingId, 'closed');
+    await insertProjectionRows(t.db, [
+      { listingId: l.listingId, orgId: org, hostSince: '2026-01-01', hostName: 'Gone Host' },
+    ]);
+    expect(await syncListing(t.db, l.listingId, NOW)).toBe('closed');
+    expect(await rowOf(l.listingId)).toMatchObject({
+      isActive: false,
+      hostName: 'Gone Host',
+      hostSince: null,
+    });
+  });
+
   it('leaves a closed listing absent when it was never projected', async () => {
     const l = fakeSp2.putListing();
     fakeSp2.setListingState(l.listingId, 'closed');
@@ -555,6 +597,31 @@ describe('driftCheck and rebuildSearchProjection', () => {
     await insertProjectionRows(t.db, [{}, {}]);
     expect(await driftCheck(t.db, NOW)).toEqual({ upserted: 0, removed: 2, repaired: 2 });
     expect(await count(sql`select count(*)::int as n from app.discovery_listings`)).toBe(0);
+  });
+
+  it('removes a closed row whose listing was removed later, and keeps a closed one', async () => {
+    const seeker = await seedSeeker();
+    const removedLater = fakeSp2.putListing();
+    const stillClosed = fakeSp2.putListing();
+    for (const l of [removedLater, stillClosed]) {
+      await syncListing(t.db, l.listingId, NOW);
+      fakeSp2.setListingState(l.listingId, 'closed');
+      await syncListing(t.db, l.listingId, NOW);
+    }
+    await seedSeekerState(seeker, removedLater.listingId);
+    // The removal's own sync never ran (say it dead-lettered).
+    fakeSp2.setListingState(removedLater.listingId, 'removed');
+
+    expect(await driftCheck(t.db, LATER)).toEqual({ upserted: 0, removed: 1, repaired: 1 });
+    expect(await rowOf(removedLater.listingId)).toBeUndefined();
+    expect(
+      await count(sql`select count(*)::int as n from app.listing_dispositions
+        where listing_id = ${removedLater.listingId}`),
+    ).toBe(0);
+    expect(await rowOf(stillClosed.listingId)).toMatchObject({
+      isActive: false,
+      closedAt: NOW.toISOString(),
+    });
   });
 
   it('rebuilds with the same passes and records the rebuild', async () => {
