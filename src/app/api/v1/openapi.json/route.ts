@@ -3,6 +3,12 @@
 // Shared touchpoint: every route file that passes `openapi` to apiRoute is imported below, so
 // it registers itself before the document is built. src/server/openapi.test.ts fails when a
 // documented route is missing from this list. Keep it sorted.
+import '@/app/api/v1/discovery/deck/route';
+import '@/app/api/v1/discovery/locations/[locationId]/route';
+import '@/app/api/v1/discovery/map/route';
+import '@/app/api/v1/discovery/search/route';
+import '@/app/api/v1/discovery/states/route';
+import '@/app/api/v1/discovery/suggest/route';
 import '@/app/api/v1/health/route';
 import '@/app/api/v1/host/locations/[id]/route';
 import '@/app/api/v1/host/locations/geocode/route';
@@ -17,6 +23,7 @@ import '@/app/api/v1/host/team/route';
 import '@/app/api/v1/host/team/transfer-ownership/route';
 import '@/app/api/v1/host/verification/info/route';
 import '@/app/api/v1/host/verification/route';
+import '@/app/api/v1/listings/[id]/route';
 import '@/app/api/v1/me/stream/route';
 import '@/app/api/v1/media/[id]/url/route';
 import '@/app/api/v1/media/uploads/[id]/complete/route';
