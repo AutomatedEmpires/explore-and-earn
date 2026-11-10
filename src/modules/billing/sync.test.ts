@@ -96,6 +96,7 @@ function stripeSub(o: Partial<SubSnapshot> & { orgId?: string } = {}): SubSnapsh
     cancelAtPeriodEnd: false,
     endedAt: null,
     startDate: new Date('2026-11-01T12:00:00Z'),
+    activatedAt: new Date('2026-11-01T12:00:00Z'),
     couponId: null,
     metadata: { orgId: o.orgId ?? org.orgId },
     created: new Date('2026-11-01T12:00:00Z'),
@@ -522,7 +523,7 @@ describe('founding discount (FD-7)', () => {
   });
 
   it('locks the monthly shape at the first paid activation, and starts the six months there', async () => {
-    const s = stripeSub({ couponId: 'founding_50_six_months', startDate: START });
+    const s = stripeSub({ couponId: 'founding_50_six_months', startDate: START, activatedAt: START });
     await syncSubscription(t.db, s.id, gw);
     expect(await discountOf(org.orgId)).toEqual({
       shape: 'monthly',
@@ -559,13 +560,20 @@ describe('founding discount (FD-7)', () => {
     });
   });
 
-  it('waits for the first paid activation before starting the clock', async () => {
-    const s = stripeSub({ status: 'incomplete', couponId: 'founding_50_six_months' });
+  it('waits for the first paid activation, and starts the clock there, not at creation', async () => {
+    // Created on 1 November, but its first payment failed.
+    const s = stripeSub({
+      status: 'incomplete',
+      couponId: 'founding_50_six_months',
+      startDate: START,
+      activatedAt: null,
+    });
     await syncSubscription(t.db, s.id, gw);
     expect(await discountOf(org.orgId)).toBeUndefined();
     expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('eligible');
 
-    update(s, { status: 'active', startDate: new Date('2026-12-15T00:00:00Z') });
+    // Paid on 15 December. Stripe's start_date stays at creation.
+    update(s, { status: 'active', activatedAt: new Date('2026-12-15T00:00:00Z') });
     await syncSubscription(t.db, s.id, gw);
     expect(await discountOf(org.orgId)).toMatchObject({
       started_at: '2026-12-15 00:00:00+00',

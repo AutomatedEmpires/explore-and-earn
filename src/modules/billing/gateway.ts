@@ -5,7 +5,7 @@ import type Stripe from 'stripe';
 import { getEnv } from '@/lib/env';
 import { getStripe } from '@/lib/stripe';
 import { makeFakeBillingGateway, type FakeBillingGateway } from './gateway-fake';
-import type { BillingInterval } from './plans';
+import { lookupKey, parseLookupKey, type BillingInterval, type PlanCode } from './plans';
 
 export type SubscriptionStatus =
   | 'incomplete'
@@ -30,7 +30,14 @@ export type SubSnapshot = {
   trialEnd: Date | null;
   cancelAtPeriodEnd: boolean;
   endedAt: Date | null;
+  /** Stripe's `start_date`: when the subscription was created, paid or not. */
   startDate: Date;
+  /**
+   * When the subscription first became paid: its first invoice's payment time. Later than
+   * startDate when that payment came after creation (an incomplete subscription paid later).
+   * Null while it has never been paid (incomplete, incomplete_expired).
+   */
+  activatedAt: Date | null;
   couponId: string | null;
   metadata: Record<string, string>;
   created: Date;
@@ -153,6 +160,38 @@ function couponOf(discounts: Stripe.Subscription['discounts']): string | null {
   return null;
 }
 
+/**
+ * The lookup key a subscription item's price stands for. A price whose key a catalog re-seed
+ * moved to a replacement price (catalog.ts, transfer_lookup_key) has none any more, so its
+ * `ee_kind` and `ee_plan` metadata, which the seed has always set, and its interval name it
+ * instead. Subscriptions still on such a price keep syncing. Any other price gives null.
+ */
+function lookupKeyOf(price: Stripe.Price): string | null {
+  if (price.lookup_key) return price.lookup_key;
+  const kind = price.metadata?.ee_kind;
+  const plan = price.metadata?.ee_plan;
+  const interval = price.recurring?.interval;
+  if (kind !== 'tier' && kind !== 'slot') return null;
+  if (interval !== 'month' && interval !== 'year') return null;
+  if (!plan) return null;
+  const key = lookupKey(kind, plan as PlanCode, interval as BillingInterval);
+  return parseLookupKey(key) ? key : null;
+}
+
+/**
+ * When the subscription first became paid (FD-7's clock starts here): the paid time of the
+ * invoice that created it, else its start date. Null while it has never been paid.
+ */
+function activatedAtOf(s: Stripe.Subscription): Date | null {
+  if (s.status === 'incomplete' || s.status === 'incomplete_expired') return null;
+  const invoice = s.latest_invoice;
+  const paidAt =
+    invoice && typeof invoice !== 'string' && invoice.billing_reason === 'subscription_create'
+      ? invoice.status_transitions?.paid_at
+      : null;
+  return toDate(paidAt ?? s.start_date);
+}
+
 function toSnapshot(s: Stripe.Subscription): SubSnapshot {
   const items = s.items.data;
   // The pinned API version keeps the billing period on each item, not on the subscription.
@@ -162,13 +201,14 @@ function toSnapshot(s: Stripe.Subscription): SubSnapshot {
     id: s.id,
     customerId: idOf(s.customer) ?? '',
     status: s.status as SubscriptionStatus,
-    items: items.map((i) => ({ lookupKey: i.price.lookup_key ?? null, quantity: i.quantity ?? 1 })),
+    items: items.map((i) => ({ lookupKey: lookupKeyOf(i.price), quantity: i.quantity ?? 1 })),
     currentPeriodStart: toDate(starts.length > 0 ? Math.min(...starts) : s.start_date),
     currentPeriodEnd: toDate(ends.length > 0 ? Math.min(...ends) : s.start_date),
     trialEnd: s.trial_end === null ? null : toDate(s.trial_end),
     cancelAtPeriodEnd: s.cancel_at_period_end,
     endedAt: s.ended_at === null ? null : toDate(s.ended_at),
     startDate: toDate(s.start_date),
+    activatedAt: activatedAtOf(s),
     couponId: couponOf(s.discounts),
     metadata: { ...(s.metadata ?? {}) },
     created: toDate(s.created),
@@ -193,7 +233,7 @@ function mapCardError(err: unknown): never {
   throw err;
 }
 
-const SUB_EXPAND = ['discounts', 'items.data.price'];
+const SUB_EXPAND = ['discounts', 'items.data.price', 'latest_invoice'];
 
 /** The real gateway over a Stripe client. Price ids are looked up by lookup key and cached. */
 export function stripeGateway(stripe: Stripe, webhookSecret?: string): BillingGateway {
@@ -295,7 +335,7 @@ export function stripeGateway(stripe: Stripe, webhookSecret?: string): BillingGa
         created: { gte: toUnix(since) },
         status: 'all',
         limit: 100,
-        expand: ['data.discounts'],
+        expand: ['data.discounts', 'data.latest_invoice'],
       })) {
         out.push(toSnapshot(s));
       }

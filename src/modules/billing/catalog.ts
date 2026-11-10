@@ -7,7 +7,10 @@
 // The founding coupons apply only to the tier products, so they take 50% off the plan price and
 // nothing off extra slots. That is why the slot prices live on products of their own. A slot
 // price an older seed put on the tier product is replaced on the slot product, and its lookup
-// key moves with it. The retired founding_30_forever coupon is never created.
+// key moves with it. Subscriptions still on the old price keep syncing: the gateway names a
+// price without a lookup key by its ee_kind and ee_plan metadata (gateway.ts, lookupKeyOf), and
+// their next plan change moves them to the new price. The retired founding_30_forever coupon is
+// never created.
 import type Stripe from 'stripe';
 import {
   BILLING_INTERVALS,

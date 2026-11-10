@@ -77,6 +77,7 @@ async function subscribe(): Promise<SubSnapshot> {
     cancelAtPeriodEnd: false,
     endedAt: null,
     startDate: now,
+    activatedAt: now,
     couponId: null,
     metadata: { orgId: org.orgId },
     created: now,

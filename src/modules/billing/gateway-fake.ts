@@ -135,6 +135,8 @@ export function makeFakeBillingGateway(
       cancelAtPeriodEnd: false,
       endedAt: null,
       startDate: at,
+      // Checkout's first invoice is paid as the subscription is created (no trial under FD-7).
+      activatedAt: p.trialEnd ? null : at,
       couponId: p.couponId,
       metadata: { ...p.metadata },
       created: at,

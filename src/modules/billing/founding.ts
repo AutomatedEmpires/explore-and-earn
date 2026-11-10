@@ -236,8 +236,9 @@ export async function syncFoundingDiscount(
     return eligibility.reason === 'not_in_cohort' ? 'not_in_cohort' : 'second_intro';
   }
 
-  // The first paid activation: the shape is fixed and the clock starts.
-  const startedAt = snap.startDate;
+  // The first paid activation: the shape is fixed and the clock starts. Stripe's start_date is
+  // only creation, which is earlier when the first payment came later.
+  const startedAt = snap.activatedAt ?? snap.startDate;
   const endsAt = introEndsAt(shape, startedAt);
   const inserted = await tx
     .insert(foundingDiscounts)

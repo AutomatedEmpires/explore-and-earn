@@ -105,6 +105,7 @@ async function subscribe(
     cancelAtPeriodEnd: false,
     endedAt: null,
     startDate: now,
+    activatedAt: now,
     couponId: o.couponId ?? null,
     metadata: { orgId: org.orgId },
     created: now,
