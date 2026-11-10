@@ -5,7 +5,8 @@
 // the portal metadata `ee_portal`.
 //
 // The founding coupons apply only to the tier products, so they take 50% off the plan price and
-// nothing off extra slots. That is why the slot prices live on products of their own. A slot
+// nothing off extra slots: FD-7 covers the plan subscription only and never an add-on (founder
+// decision, 2026-11-10, #45). That is why the slot prices live on products of their own. A slot
 // price an older seed put on the tier product is replaced on the slot product, and its lookup
 // key moves with it. Subscriptions still on the old price keep syncing: the gateway names a
 // price without a lookup key by its ee_kind and ee_plan metadata (gateway.ts, lookupKeyOf), and

@@ -50,9 +50,10 @@ export const EXTRA_SLOT_ANNUAL_MULTIPLIER = 10;
 
 // The founding offer (FD-7 in docs/decisions/2026-11-04-founder-decisions.md): the first 100
 // host organizations by signup get 50% off the plan price, in one of two shapes fixed by the
-// interval of their first paid subscription. Both coupons apply only to the three tier products,
-// so extra listing slots are charged in full (whether add-ons qualify is an open founder
-// question). ./founding.ts decides who gets which.
+// interval of their first paid subscription. The founder decided on 2026-11-10 (#45) that it
+// covers the plan subscription only, monthly or annual, on any tier, and never an add-on. Both
+// coupons therefore apply only to the three tier products, and extra listing slots are charged
+// in full. ./founding.ts decides who gets which.
 
 /** Founding discount on the plan price, in percent. */
 export const FOUNDING_PERCENT_OFF = 50;

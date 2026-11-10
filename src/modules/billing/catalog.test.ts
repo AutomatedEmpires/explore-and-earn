@@ -111,8 +111,8 @@ describe('seedStripeCatalog', () => {
       }
     }
 
-    // FD-7: 50% off the plan price only. The coupons apply to the three tier products, so extra
-    // slots (an add-on; whether add-ons qualify is an open founder question) are never discounted.
+    // FD-7: 50% off the plan subscription only; add-ons never get it (founder decision,
+    // 2026-11-10). The coupons apply to the three tier products and to no extra-slot product.
     const tierProducts = PLANS.map((p) => productOf(m, 'tier', p));
     expect(m.coupons).toEqual([
       {
@@ -132,6 +132,11 @@ describe('seedStripeCatalog', () => {
       },
     ]);
     expect(m.coupons.map((c) => c.id)).not.toContain('founding_30_forever');
+    for (const coupon of m.coupons) {
+      for (const plan of PLANS) {
+        expect(coupon.appliesToProducts).not.toContain(productOf(m, 'slot', plan));
+      }
+    }
 
     const full = m.portals.find((p) => p.metadata.ee_portal === 'full');
     const billing = m.portals.find((p) => p.metadata.ee_portal === 'billing');

@@ -248,6 +248,46 @@ describe('fake gateway', () => {
     expect(gw.getSubscription(sub)?.couponId).toBeNull();
   });
 
+  it('never discounts an add-on (an extra slot), under either founding coupon', async () => {
+    // FD-7, founder decision 2026-11-10: the plan subscription only, never add-ons.
+    for (const [interval, couponId, slotCents] of [
+      ['month', FOUNDING_MONTHLY_COUPON_ID, 2900],
+      ['year', FOUNDING_ANNUAL_COUPON_ID, 29000],
+    ] as const) {
+      const gw = makeFakeBillingGateway({ autoComplete: true });
+      const session = await gw.createCheckoutSession(
+        {
+          ...params(`cus_${interval}`),
+          items: [
+            { lookupKey: `professional_${interval}`, quantity: 1 },
+            { lookupKey: `slot_professional_${interval}`, quantity: 3 },
+          ],
+          couponId,
+          allowPromotionCodes: false,
+        },
+        `checkout:addon:${interval}`,
+      );
+      const { subscriptionId } = await gw.retrieveCheckoutSession(session.id);
+      const preview = (items: { lookupKey: string; quantity: number }[]) =>
+        gw.previewInvoice({
+          customerId: `cus_${interval}`,
+          subscriptionId: subscriptionId ?? '',
+          items,
+          prorationBehavior: 'create_prorations',
+        });
+      // The add-on alone: full price.
+      const slotsOnly = await preview([{ lookupKey: `slot_professional_${interval}`, quantity: 3 }]);
+      expect(slotsOnly.nextInvoiceCents, interval).toBe(3 * slotCents);
+      // With the plan: half the plan, and the add-on still in full.
+      const tier = interval === 'month' ? 29900 : 299000;
+      const withPlan = await preview([
+        { lookupKey: `professional_${interval}`, quantity: 1 },
+        { lookupKey: `slot_professional_${interval}`, quantity: 3 },
+      ]);
+      expect(withPlan.nextInvoiceCents, interval).toBe(tier / 2 + 3 * slotCents);
+    }
+  });
+
   it('verifies the signatures it makes', () => {
     const gw = makeFakeBillingGateway();
     const body = JSON.stringify({
