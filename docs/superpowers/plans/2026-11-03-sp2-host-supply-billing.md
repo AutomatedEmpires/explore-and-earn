@@ -84,6 +84,25 @@ The spec leaves these choices open, or two sibling specs disagree on them. Each 
 
 ## Phases
 
+**Sequencing update, 10 November 2026.** The founder approved these changes. They are recorded on [explore-and-earn#45](https://github.com/AutomatedEmpires/explore-and-earn/issues/45).
+
+- **FD-7 founding offer is approved to build in Stripe test mode only** ([#45, comment 6777814785](https://github.com/AutomatedEmpires/explore-and-earn/issues/45#issuecomment-6777814785)). Build it as FD-7 in `docs/decisions/2026-11-04-founder-decisions.md` states it:
+  - The first 100 host organizations by signup order qualify.
+  - Monthly start: 50% off the first six subscription months. Annual start: 50% off the first annual term.
+  - One discount shape per organization, with no restart when the interval changes.
+  - `founding_30_forever` is retired.
+  - Live billing, live-mode settings, collecting payments, production merges, deploys and public launch stay excluded.
+- **These tasks describe the withdrawn offer.** They were written for a founding code as the gate to the discount, 90 days free from launch, 30% off for life, and the founding rate kept on a return within six months. Build the founding behavior from FD-7, not from their text:
+  - Task 5: the `founding.free_days` and `founding.return_window_months` settings.
+  - Task 11: the `founding_30_forever` coupon and its seed.
+  - Tasks 12 and 13: founding codes and founding pricing at checkout. Under FD-7, signup order decides the cohort, not a code.
+  - Task 14: founding redemption, lapse and return.
+  - Task 16: the founding trial end set by `billing.apply_launch_date`.
+  - Task 39: the "Founding host · 30% off for life" line.
+  - Tasks 42–44: the founding cases in the cross-module proofs, the test-clock totals and `sp2-founding.spec.ts`.
+- **SP3–SP8 may overlap SP2** where the lead (claude-code) judges it reasonable ([#45, comment 6776883039](https://github.com/AutomatedEmpires/explore-and-earn/issues/45#issuecomment-6776883039)). This replaces FD-9's strict build order for development. Public launch still needs the full product (FD-9). A later sub-project's task may start once the SP2 pieces it calls are merged, or its plan's stubs and fakes stand in for them.
+- **UI waits for design approval.** Phase B2 screens are built only after the founder approves their key screens in Figma (same comment). "Design gate approved" below means that approval.
+
 | Phase | Tasks | Runs | Depends on |
 |---|---|---|---|
 | **A: Contracts and touchpoints** (W0) | 1–8 | One agent, in order | Foundation B2 merged (trust, notifications and media touchpoints edit its code) |
