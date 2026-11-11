@@ -21,9 +21,8 @@ try {
   const counts = await rebuildSearchProjection(getDb());
   logger.info('search projection rebuilt', counts);
 } catch (err) {
-  logger.error('discovery:rebuild failed', {
-    error: err instanceof Error ? err.message : String(err),
-  });
+  // The error itself, not its message: the logger drops a failed query's parameter values.
+  logger.error('discovery:rebuild failed', { err });
   process.exitCode = 1;
 } finally {
   await closeDb();

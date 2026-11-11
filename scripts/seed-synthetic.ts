@@ -34,9 +34,8 @@ try {
   await seedSynthetic(getDb(), { count, seed });
   logger.info('synthetic listings seeded', { count, seed });
 } catch (err) {
-  logger.error('discovery:seed-synthetic failed', {
-    error: err instanceof Error ? err.message : String(err),
-  });
+  // The error itself, not its message: the logger drops a failed query's parameter values.
+  logger.error('discovery:seed-synthetic failed', { err });
   process.exitCode = 1;
 } finally {
   await closeDb();

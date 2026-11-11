@@ -141,6 +141,30 @@ describe('pnpm discovery:seed-synthetic', () => {
     }
     expect(await projectionCount(local.db)).toBe(0);
   }, 120_000);
+
+  it("logs a failed insert without the rows' values", async () => {
+    const local = await localDb();
+    // Every new row now fails the check, so the seeder's first insert does.
+    await local.db.execute(
+      sql`alter table app.discovery_listings add constraint ee_59_reject check (false) not valid`,
+    );
+
+    const run = await runScript(
+      'discovery:seed-synthetic',
+      ['--count', '5', '--seed', '7'],
+      local.url,
+    );
+    expect(run.code).toBe(1);
+    // The insert's parameters carry the rows' values, such as their host names.
+    expect(run.stderr).not.toContain('params:');
+    expect(run.stderr).not.toContain('Synthetic Host');
+    const failed = logLines(run.stderr).find((l) => l.msg === 'discovery:seed-synthetic failed');
+    expect(failed?.err).toMatchObject({
+      message: expect.stringMatching(/^Failed query:\s+insert into app\.discovery_listings/),
+      cause: { message: expect.stringMatching(/violates check constraint "ee_59_reject"/) },
+    });
+    expect(await projectionCount(local.db)).toBe(0);
+  }, 60_000);
 });
 
 describe('pnpm discovery:rebuild', () => {
@@ -165,6 +189,33 @@ describe('pnpm discovery:rebuild', () => {
         where action = 'discovery.projection_rebuilt'`,
     );
     expect(audit?.n).toBe(1);
+  }, 60_000);
+
+  it("logs a failed delete without the listing's id", async () => {
+    const local = await localDb();
+    const [listingId] = await insertProjectionRows(local.db, [{}]);
+    // Deleting a projection row now raises, so the rebuild's removal of this one fails.
+    await local.db.execute(sql`
+      create function app.ee_59_refuse() returns trigger language plpgsql
+      as $$ begin raise exception 'ee-59 refuses the delete'; end $$
+    `);
+    await local.db.execute(sql`
+      create trigger ee_59_refuse before delete on app.discovery_listings
+      for each row execute function app.ee_59_refuse()
+    `);
+
+    const run = await runScript('discovery:rebuild', [], local.url);
+    expect(run.code).toBe(1);
+    // The delete's one parameter is the listing id.
+    expect(listingId).toBeDefined();
+    expect(run.stderr).not.toContain('params:');
+    expect(run.stderr).not.toContain(listingId);
+    const failed = logLines(run.stderr).find((l) => l.msg === 'discovery:rebuild failed');
+    expect(failed?.err).toMatchObject({
+      message: expect.stringMatching(/^Failed query: delete from app\.discovery_listings/),
+      cause: { message: 'ee-59 refuses the delete' },
+    });
+    expect(await projectionCount(local.db)).toBe(1);
   }, 60_000);
 
   it('exits 1 and logs the failure when the database is unreachable', async () => {
