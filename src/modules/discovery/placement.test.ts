@@ -83,7 +83,9 @@ async function dispose(userId: string, listingId: string, state: 'saved' | 'skip
 describe('searchListings with a placement hook', () => {
   it('puts the boosted slot first, carries the hook state and resumes after organicConsumed', async () => {
     const organic = await seedOrganic(45);
-    const [boosted] = (await seed([{ title: 'Orchard hand', category: 'farm' }])) as [string];
+    const [boosted] = (await seed([
+      { title: 'Orchard hand', publishedAt: new Date(NOW.getTime() - 100 * DAY) },
+    ])) as [string];
     const calls: PlacementInput[] = [];
     setPlacementHookForTests({
       ...noopHook,
@@ -123,6 +125,43 @@ describe('searchListings with a placement hook', () => {
     expect(calls[1]).toMatchObject({ state: 'S1', pageIndex: 1 });
     expect(calls[1]?.organic[0]).toBe(organic[19]);
     expect(page2.items[1]?.listingId).toBe(organic[19]);
+  });
+
+  it('keeps only placed ids that match this query, viewer and surface', async () => {
+    const blocked = newId();
+    const [match, outside, skipped, hidden] = (await seed([
+      { title: 'Match', category: 'seasonal' },
+      { title: 'Outside', category: 'farm' },
+      { title: 'Skipped', category: 'seasonal' },
+      { title: 'Hidden', category: 'seasonal', orgId: blocked },
+    ])) as [string, string, string, string];
+    const user = await seeker();
+    await dispose(user, skipped, 'skipped');
+    registerSeekerOverlay({
+      appliedListingIds: async () => new Set(),
+      hiddenOrgIds: async () => [blocked],
+    });
+    setPlacementHookForTests({
+      ...noopHook,
+      async place(_db, i) {
+        return {
+          items: [
+            { listingId: outside, boostId: 'b-out' },
+            { listingId: skipped, boostId: 'b-skip' },
+            { listingId: hidden, boostId: 'b-hide' },
+            { listingId: match, boostId: 'b-ok' },
+          ],
+          organicConsumed: i.organic.length,
+          state: null,
+        };
+      },
+    });
+    const page = await search({ viewerUserId: user });
+    expect(page.items.map((c) => c.listingId)).toEqual([match]);
+    expect(page.items[0]?.boosted).toEqual({ boostId: 'b-ok' });
+
+    const deck = await search({ viewerUserId: user, surface: 'swipe' });
+    expect(deck.items.map((c) => c.listingId)).toEqual([match]);
   });
 
   it('deduplicates the items by listing', async () => {

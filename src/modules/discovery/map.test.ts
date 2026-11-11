@@ -7,7 +7,12 @@ import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { insertProjectionRows } from '../../../tests/helpers/discovery-rows';
 import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
-import { noopHook, setPlacementHookForTests } from './hooks';
+import {
+  noopHook,
+  registerSeekerOverlay,
+  resetSeekerOverlayForTests,
+  setPlacementHookForTests,
+} from './hooks';
 import { clusterCellDegrees, locationPreview, mapPins, MAX_PINS } from './map';
 import type { ProjectionRowInput } from './projection-columns';
 
@@ -31,6 +36,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   setPlacementHookForTests(null);
+  resetSeekerOverlayForTests();
 });
 
 const seed = (rows: Partial<ProjectionRowInput>[]) => insertProjectionRows(t.db, rows, NOW);
@@ -262,6 +268,54 @@ describe('locationPreview', () => {
     expect((await preview(us))?.host.remoteLine).toBe(
       'Remote · host based in Seward, AK · work from: US',
     );
+  });
+
+  it('drops a hidden or blocked host, and is null when that removes every row', async () => {
+    const loc = newId();
+    const only = newId();
+    const blocked = newId();
+    const visible = newId();
+    const seeker = newId();
+    const newer = new Date(NOW.getTime() + 60_000);
+    await seed([
+      {
+        ...seward(only),
+        orgId: blocked,
+        hostName: 'Blocked Harbor',
+        title: 'Hidden only',
+      },
+    ]);
+    registerSeekerOverlay({
+      appliedListingIds: async () => new Set(),
+      hiddenOrgIds: async () => [blocked],
+    });
+    expect(await preview(only, { viewerUserId: seeker })).toBeNull();
+    expect((await preview(only))?.host.name).toBe('Blocked Harbor');
+
+    await seed([
+      {
+        ...seward(loc),
+        orgId: blocked,
+        hostName: 'Blocked Harbor',
+        hostSlug: 'blocked-harbor',
+        title: 'Hidden job',
+        indexedAt: newer,
+      },
+      {
+        ...seward(loc),
+        orgId: visible,
+        hostName: 'Open Harbor',
+        hostSlug: 'open-harbor',
+        title: 'Open job',
+        indexedAt: NOW,
+      },
+    ]);
+    const hidden = await preview(loc, { viewerUserId: seeker });
+    expect(hidden?.host).toMatchObject({ name: 'Open Harbor', slug: 'open-harbor', orgId: visible });
+    expect(hidden).toMatchObject({ activeCount: 1, matchingCount: 1 });
+    expect(hidden?.items.map((c) => c.listingId)).toHaveLength(1);
+    expect(hidden?.items[0]?.title).toBe('Open job');
+    expect((await preview(loc))?.activeCount).toBe(2);
   });
 
   it('is null for a location with no active listing', async () => {

@@ -38,10 +38,9 @@ export const eventSubscribers: Record<keyof EventPayloads, string[]> = {
   'listing.changed': ['discovery.sync_listing'],
   'listing.closed': ['discovery.sync_listing'],
   'listing.removed': ['discovery.sync_listing'],
-  // SP3 also wants discovery.sync_host here. It lands with the update to
-  // src/modules/orgs/status.test.ts, which counts this fan-out. Until then a suspension reaches
-  // search through the listing.closed events that listings.close_for_org emits.
-  'org.status_changed': ['listings.close_for_org'],
+  // A suspension, ban or reinstatement re-syncs the host's search rows directly. A suspension or
+  // ban also reaches search through the listing.closed events that listings.close_for_org emits.
+  'org.status_changed': ['listings.close_for_org', 'discovery.sync_host'],
   // SP5 moves the member's threads and interviews.
   'org.member_removed': [],
   'location.updated': ['locations.resolve_nws_grid', 'discovery.sync_host'],

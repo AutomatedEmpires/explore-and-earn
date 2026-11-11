@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { insertProjectionRows } from '../../../tests/helpers/discovery-rows';
 import { queryRows } from '@/lib/db';
-import { addDays, todayIn, type DiscoveryQuery } from '@/lib/discovery';
+import { addDays, canonicalQuery, todayIn, type DiscoveryQuery } from '@/lib/discovery';
 import { isAppError } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import type { ProjectionRowInput } from './projection-columns';
@@ -419,6 +419,77 @@ describe('paging', () => {
       cursor = page.nextCursor ?? undefined;
     } while (cursor);
     expect(seen).toEqual(all);
+  });
+
+  it('binds the cursor to bbox and locationId, and leaves them out of canonicalQuery', () => {
+    const q = { categories: ['farm' as const] };
+    const bboxA: [number, number, number, number] = [-109, 36, -102, 42];
+    const bboxB: [number, number, number, number] = [-180, -60, 180, 72];
+    const loc = newId();
+    expect(cursorHash({ ...q, bbox: bboxA }, 'relevant')).not.toBe(
+      cursorHash({ ...q, bbox: bboxB }, 'relevant'),
+    );
+    expect(cursorHash({ ...q, locationId: loc }, 'relevant')).not.toBe(
+      cursorHash({ ...q, locationId: newId() }, 'relevant'),
+    );
+    expect(canonicalQuery({ ...q, bbox: bboxA, locationId: loc })).toBe(canonicalQuery(q));
+  });
+
+  it('rejects a cursor minted for another bbox, location or distance origin', async () => {
+    const loc = newId();
+    await seed([
+      { locationId: loc, lat: 39.1, lng: -105.1, publishedAt: new Date(NOW.getTime() - DAY) },
+      { locationId: loc, lat: 39.2, lng: -105.2, publishedAt: new Date(NOW.getTime() - 2 * DAY) },
+    ]);
+    const bbox: [number, number, number, number] = [-109, 36, -102, 42];
+    const otherBbox: [number, number, number, number] = [-125, 24, -66, 50];
+    const origin = { lat: 39, lng: -105 };
+    const first = await search({
+      query: { bbox, locationId: loc },
+      sort: 'distance',
+      origin,
+      limit: 1,
+    });
+    expect(first.nextCursor).not.toBeNull();
+    const cursor = first.nextCursor ?? '';
+    const code = async (p: Promise<unknown>) =>
+      p.then(
+        () => 'ok',
+        (e: unknown) => (isAppError(e) ? e.code : 'other'),
+      );
+    expect(
+      await code(search({ query: { bbox, locationId: loc }, sort: 'distance', origin, cursor })),
+    ).toBe('ok');
+    expect(
+      await code(
+        search({
+          query: { bbox: otherBbox, locationId: loc },
+          sort: 'distance',
+          origin,
+          cursor,
+        }),
+      ),
+    ).toBe('bad_request');
+    expect(
+      await code(
+        search({
+          query: { bbox, locationId: newId() },
+          sort: 'distance',
+          origin,
+          cursor,
+        }),
+      ),
+    ).toBe('bad_request');
+    expect(
+      await code(
+        search({
+          query: { bbox, locationId: loc },
+          sort: 'distance',
+          origin: { lat: 47, lng: -122 },
+          cursor,
+        }),
+      ),
+    ).toBe('bad_request');
   });
 
   it('a cursor from another query, a garbled one or one with the wrong sort values is a 400', async () => {
