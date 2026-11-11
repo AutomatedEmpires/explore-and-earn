@@ -146,6 +146,48 @@ describe('getListingDetail', () => {
     }
   });
 
+  it('returns seeker content without staff ids or an unchecked additional-step url', async () => {
+    const member = newId();
+    const unsafe = 'http://apply.kettleridge.com/form';
+    const leaked = await active(
+      fakeSp2.putListing({
+        content: {
+          applying: {
+            notifyMemberIds: [member],
+            additionalStep: { url: unsafe, note: 'Use the form' },
+          },
+        },
+      }).listingId,
+    );
+    expect(leaked.content.applying).not.toHaveProperty('notifyMemberIds');
+    expect(JSON.stringify(leaked.content)).not.toContain(member);
+    expect(JSON.stringify(leaked.content)).not.toContain('http://apply.kettleridge.com');
+    expect(leaked.content.applying.additionalStep).toBeNull();
+    expect(leaked.additionalStep).toBeNull();
+
+    const safe = 'https://apply.kettleridge.com/form';
+    const checked = await active(
+      fakeSp2.putListing({
+        content: {
+          applying: {
+            notifyMemberIds: [member],
+            additionalStep: { url: safe, note: 'Fill in the form' },
+          },
+        },
+      }).listingId,
+    );
+    expect(checked.content.applying).not.toHaveProperty('notifyMemberIds');
+    expect(checked.content.applying.additionalStep).toEqual({
+      note: 'Fill in the form',
+      url: safe,
+    });
+    expect(checked.additionalStep).toEqual({
+      note: 'Fill in the form',
+      url: safe,
+      domain: 'apply.kettleridge.com',
+    });
+  });
+
   it('keeps only https additional steps, with their domain', async () => {
     const step = async (url: string) =>
       (
