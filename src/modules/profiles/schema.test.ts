@@ -93,7 +93,10 @@ describe('work authorization', () => {
   });
 
   it('needs one type and an end date for has_visa', async () => {
-    await rejected({ work_auth_status: sql`'has_visa'`, work_auth_visa_types: sql`'{j1}'::text[]` });
+    await rejected({
+      work_auth_status: sql`'has_visa'`,
+      work_auth_visa_types: sql`'{j1}'::text[]`,
+    });
     await accepted({
       work_auth_status: sql`'has_visa'`,
       work_auth_visa_types: sql`'{j1}'::text[]`,
@@ -102,7 +105,10 @@ describe('work authorization', () => {
   });
 
   it('takes no visa type when authorized', async () => {
-    await rejected({ work_auth_status: sql`'authorized'`, work_auth_visa_types: sql`'{j1}'::text[]` });
+    await rejected({
+      work_auth_status: sql`'authorized'`,
+      work_auth_visa_types: sql`'{j1}'::text[]`,
+    });
     await accepted({ work_auth_status: sql`'authorized'` });
   });
 
@@ -273,6 +279,12 @@ describe('cascades', () => {
             (select count(*)::int from app.seeker_skills where user_id = ${user}) as skills,
             (select count(*)::int from app.seeker_certifications where user_id = ${user}) as certifications`,
     );
-    expect(counts).toEqual({ profiles: 0, experiences: 0, education: 0, skills: 0, certifications: 0 });
+    expect(counts).toEqual({
+      profiles: 0,
+      experiences: 0,
+      education: 0,
+      skills: 0,
+      certifications: 0,
+    });
   });
 });

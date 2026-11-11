@@ -142,7 +142,5 @@ export const seekerReveals = app.table(
     createdAt: ts('created_at').notNull().defaultNow(),
     updatedAt: ts('updated_at').notNull().defaultNow(),
   },
-  (t) => [
-    unique('seeker_reveals_grant_key').on(t.seekerUserId, t.orgId, t.reason, t.sourceId),
-  ],
+  (t) => [unique('seeker_reveals_grant_key').on(t.seekerUserId, t.orgId, t.reason, t.sourceId)],
 );
