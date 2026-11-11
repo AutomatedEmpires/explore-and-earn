@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import * as applications from '@/modules/applications';
 import * as profiles from '@/modules/profiles';
 import * as safety from '@/modules/safety';
+import { mayaApplicationSnapshot } from '@tests/fixtures/sp4/snapshot';
 
 const PROFILES_FUNCTIONS = [
   // Spec 3.2
@@ -40,7 +41,6 @@ const PROFILES_FUNCTIONS = [
   'revokeAiConsent',
   'expireImports',
   'writingHelp',
-  'registerResumeMediaReferences',
   // The lib's other pure rules (plan File Structure)
   'confirmedDaysAgo',
   'formatAvailableFrom',
@@ -103,8 +103,9 @@ describe('module indexes', () => {
     expect(typeof exported(safety, name)).toBe('function');
   });
 
-  it('keeps markImportSourceInUse internal', () => {
+  it('has no upload-as-resume hooks (FD-2: the uploaded file is an import source only)', () => {
     expect(exported(profiles, 'markImportSourceInUse')).toBeUndefined();
+    expect(exported(profiles, 'registerResumeMediaReferences')).toBeUndefined();
   });
 
   it('defines the transition table for every status', () => {
@@ -259,6 +260,32 @@ describe('schemas', () => {
     expect(link('https://maya.example')).toBe(true);
     expect(link('http://maya.example')).toBe(false);
     expect(link('javascript:alert(1)')).toBe(false);
+  });
+
+  it('never carry an uploaded file as the resume (FD-2)', () => {
+    const snapshot = mayaApplicationSnapshot();
+    expect(applications.applicationSnapshotV1Schema.safeParse(snapshot).success).toBe(true);
+    const upload = { ...snapshot, resume: { mode: 'upload', template: null } };
+    expect(applications.applicationSnapshotV1Schema.safeParse(upload).success).toBe(false);
+    const attached = {
+      ...snapshot,
+      resume: { ...snapshot.resume, uploadedMediaId: '019a4a3c-0000-7000-8000-0000000d0009' },
+    };
+    expect(applications.applicationSnapshotV1Schema.safeParse(attached).success).toBe(false);
+    const patch = (resume: object) => profiles.profilePatchSchema.safeParse({ resume }).success;
+    expect(patch({ mode: 'compact' })).toBe(true);
+    expect(patch({ mode: 'upload' })).toBe(false);
+    expect(
+      patch({ mode: 'classic', uploadedMediaId: '019a4a3c-0000-7000-8000-0000000d0009' }),
+    ).toBe(false);
+    expect(
+      'useAsResume' in
+        profiles.mergeImportSchema.parse({
+          id: '019a4a3c-0000-7000-8000-0000000d0009',
+          decisions: { identity: {}, items: {} },
+          useAsResume: true,
+        }),
+    ).toBe(false);
   });
 
   it('cap highlighted skills at 15 and need a date for Beyond', () => {

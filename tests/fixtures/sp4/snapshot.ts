@@ -112,7 +112,7 @@ export function mayaApplicationSnapshot(
         value: 'Mid May',
       },
     ],
-    resume: { mode: 'classic', template: 'classic@1', uploadedMediaId: null },
+    resume: { mode: 'classic', template: 'classic@1' },
     sponsorshipMismatchAcknowledged: false,
     ...o,
   };

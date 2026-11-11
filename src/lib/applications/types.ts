@@ -2,7 +2,7 @@
 // and client code. Client-safe: type-only imports.
 import type { DiscoverySource } from '@/modules/discovery';
 import type { ScreeningQuestion } from '@/modules/listings';
-import type { ProfileSnapshotV1, ResumeMode } from '@/lib/profiles/types';
+import type { ProfileSnapshotV1, ResumeMode, ResumeTemplate } from '@/lib/profiles/types';
 
 // --- Spec 3.1 ----------------------------------------------------------------------------------
 
@@ -47,11 +47,11 @@ export type ApplicationSnapshotV1 = {
     required: boolean;
     value: string | boolean | string[] | null;
   }[];
-  resume: {
-    mode: 'classic' | 'compact' | 'upload';
-    template: 'classic@1' | 'compact@1' | null;
-    uploadedMediaId: string | null;
-  };
+  /**
+   * The generated representation current at submit (FD-2): the employer gets this PDF, rendered
+   * from the frozen profile with the frozen template version, never an uploaded file.
+   */
+  resume: { mode: ResumeMode; template: ResumeTemplate };
   sponsorshipMismatchAcknowledged: boolean;
 };
 export type HostApplicationCard = {
@@ -116,7 +116,7 @@ export type ApplyContextDto = {
   existingApplicationId: string | null;
   missingFields: MissingField[];
   preview: ProfileSnapshotV1;
-  resume: { mode: ResumeMode; uploadReady: boolean };
+  resume: { mode: ResumeMode };
 };
 export type HostApplicationRef = {
   applicationId: string;

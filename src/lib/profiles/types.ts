@@ -143,7 +143,12 @@ export type AvailabilityDto = {
   confirmedAt: string;
   confirmedDaysAgo: number;
 } | null;
-export type ResumeMode = 'classic' | 'compact' | 'upload';
+/**
+ * Which generated PDF is the seeker's resume. FD-2 (docs/decisions/2026-11-04-founder-decisions.md)
+ * makes an uploaded file an import source only, never sent to employers, so there is no upload
+ * mode: spec 3.1's `upload` is superseded.
+ */
+export type ResumeMode = 'classic' | 'compact';
 export type ResumeTemplate = 'classic@1' | 'compact@1';
 export type OwnProfileDto = {
   identity: {
@@ -162,11 +167,8 @@ export type OwnProfileDto = {
   preferences: Preferences;
   workAuthorization: WorkAuthorization | null;
   visibility: { visibleToHosts: boolean; showPhotoToHosts: boolean };
-  resume: {
-    mode: ResumeMode;
-    uploadedMediaId: string | null;
-    uploadStatus: 'none' | 'pending' | 'ready' | 'rejected';
-  };
+  /** FD-2: the generated template only; an uploaded file is never the resume. */
+  resume: { mode: ResumeMode };
   languages: ProfileSnapshotV1['languages'];
   portfolioLinks: ProfileSnapshotV1['portfolioLinks'];
   aiImportConsent: { version: string; at: string } | null;

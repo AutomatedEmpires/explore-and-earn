@@ -5,6 +5,10 @@
 --
 -- Months are `date` on the first of the month. Listing ids are never stored here; foreign keys
 -- point only to app.users, app.organizations, app.media and these tables.
+--
+-- FD-2 (docs/decisions/2026-11-04-founder-decisions.md) amends spec 4.1: an uploaded resume is
+-- an import source only, never the seeker's resume or an employer attachment. So there is no
+-- `upload` resume mode and no `uploaded_resume_media_id`; the import's own row holds its source.
 
 create table app.seeker_profiles (
   user_id uuid primary key references app.users (id) on delete cascade,
@@ -18,7 +22,6 @@ create table app.seeker_profiles (
   phone text check (phone ~ '^\+[1-9][0-9]{7,14}$'),
   avatar_media_id uuid references app.media (id) on delete set null,
   cover_media_id uuid references app.media (id) on delete set null,
-  uploaded_resume_media_id uuid references app.media (id) on delete set null,
   visible_to_hosts boolean not null default true,
   show_photo_to_hosts boolean not null default false,
   pref_categories text[] not null default '{}',
@@ -37,8 +40,7 @@ create table app.seeker_profiles (
   avail_date date,
   avail_confirmed_at timestamptz,
   avail_reminders_sent smallint not null default 0 check (avail_reminders_sent between 0 and 3),
-  resume_mode text not null default 'classic'
-    check (resume_mode in ('classic', 'compact', 'upload')),
+  resume_mode text not null default 'classic' check (resume_mode in ('classic', 'compact')),
   languages jsonb not null default '[]',
   portfolio_links jsonb not null default '[]',
   ai_import_consent_version text,

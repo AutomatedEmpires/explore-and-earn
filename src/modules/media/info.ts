@@ -120,21 +120,35 @@ export async function readMedia(db: DbOrTx, storage: Storage, id: string): Promi
 }
 
 /**
- * Deletes a file outright: its row, then every stored copy (the original and each variant, in
- * its bucket and in quarantine), with an audit `media.removed`. An unknown id does nothing.
- * Unlike `removeMedia` (an operator takedown that keeps a private copy), nothing is kept: SP4
- * uses it for resume-import sources nobody references once the import expires.
+ * Deletes a file outright: every stored copy (the original and each variant, in its bucket and
+ * in quarantine), then its row, with an audit `media.removed`. An unknown id does nothing.
+ * The row goes last, so a storage failure leaves it (and its object paths) for a retry instead of
+ * orphaning the bytes; removing a missing object is not an error, so a retry is safe. Unlike
+ * `removeMedia` (an operator takedown that keeps a private copy), nothing is kept: SP4 uses it
+ * for resume-import sources once the import expires.
  */
 export async function deleteMedia(db: DbOrTx, storage: Storage, id: string): Promise<void> {
   if (!isUuid(id)) return;
-  const [row] = await db.delete(media).where(eq(media.id, id)).returning({
-    kind: media.kind,
-    bucket: media.bucket,
-    path: media.path,
-    variants: media.variants,
-    ownerOrgId: media.ownerOrgId,
-  });
+  const [row] = await db
+    .select({
+      kind: media.kind,
+      bucket: media.bucket,
+      path: media.path,
+      variants: media.variants,
+      ownerOrgId: media.ownerOrgId,
+    })
+    .from(media)
+    .where(eq(media.id, id))
+    .limit(1);
   if (!row) return;
+  const paths = new Set([row.path, ...Object.values(row.variants ?? {})]);
+  for (const p of paths) {
+    await storage.remove(row.bucket, p);
+    if (row.bucket !== 'quarantine') await storage.remove('quarantine', p);
+  }
+  // Only the call that actually deletes the row audits it (a concurrent call finds it gone).
+  const deleted = await db.delete(media).where(eq(media.id, id)).returning({ id: media.id });
+  if (deleted.length === 0) return;
   await record(db, {
     actorType: 'system',
     actorId: null,
@@ -144,9 +158,4 @@ export async function deleteMedia(db: DbOrTx, storage: Storage, id: string): Pro
     subjectId: id,
     data: { kind: row.kind },
   });
-  const paths = new Set([row.path, ...Object.values(row.variants ?? {})]);
-  for (const p of paths) {
-    await storage.remove(row.bucket, p);
-    if (row.bucket !== 'quarantine') await storage.remove('quarantine', p);
-  }
 }

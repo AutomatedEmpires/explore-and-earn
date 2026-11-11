@@ -81,10 +81,10 @@ export const applicationSnapshotV1Schema = z.strictObject({
       }),
     )
     .max(APPLICATION_LIMITS.maxQuestions),
+  // FD-2: a generated template only; no uploaded file reaches an employer.
   resume: z.strictObject({
-    mode: z.enum(['classic', 'compact', 'upload']),
-    template: z.enum(['classic@1', 'compact@1']).nullable(),
-    uploadedMediaId: z.uuid().nullable(),
+    mode: z.enum(['classic', 'compact']),
+    template: z.enum(['classic@1', 'compact@1']),
   }),
   sponsorshipMismatchAcknowledged: z.boolean(),
 }) satisfies z.ZodType<ApplicationSnapshotV1>;

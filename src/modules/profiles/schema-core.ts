@@ -35,10 +35,9 @@ export const seekerProfiles = app.table('seeker_profiles', {
   region: text('region'),
   countryCode: char('country_code', { length: 2 }).notNull().default('US'),
   phone: text('phone'),
-  /** References app.media(id), on delete set null (the three media columns). */
+  /** References app.media(id), on delete set null (both media columns). */
   avatarMediaId: uuid('avatar_media_id'),
   coverMediaId: uuid('cover_media_id'),
-  uploadedResumeMediaId: uuid('uploaded_resume_media_id'),
   visibleToHosts: boolean('visible_to_hosts').notNull().default(true),
   showPhotoToHosts: boolean('show_photo_to_hosts').notNull().default(false),
   prefCategories: text('pref_categories').array().notNull().default([]),
@@ -58,7 +57,8 @@ export const seekerProfiles = app.table('seeker_profiles', {
   availDate: day('avail_date'),
   availConfirmedAt: ts('avail_confirmed_at'),
   availRemindersSent: smallint('avail_reminders_sent').notNull().default(0),
-  resumeMode: text('resume_mode', { enum: ['classic', 'compact', 'upload'] })
+  /** FD-2: a generated template; there is no upload mode. */
+  resumeMode: text('resume_mode', { enum: ['classic', 'compact'] })
     .notNull()
     .default('classic'),
   languages: jsonb('languages').$type<ProfileSnapshotV1['languages']>().notNull().default([]),

@@ -28,7 +28,6 @@ export { resumePdfResponse } from './resume/response';
 export { cancelImport, createImport, getImport, revokeAiConsent } from './imports/service';
 export { mergeImport } from './imports/merge';
 export { expireImports } from './imports/expire';
-export { registerResumeMediaReferences } from './imports/hooks';
 export { writingHelp } from './writing-help';
 export { privacyHandler, retentionRules } from './privacy';
 

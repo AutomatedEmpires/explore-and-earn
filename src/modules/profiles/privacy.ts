@@ -16,7 +16,6 @@ export const privacyHandler: PrivacyHandler = {
   mediaColumns: [
     { table: 'seeker_profiles', column: 'avatar_media_id', array: false },
     { table: 'seeker_profiles', column: 'cover_media_id', array: false },
-    { table: 'seeker_profiles', column: 'uploaded_resume_media_id', array: false },
     { table: 'resume_imports', column: 'source_media_id', array: false },
   ],
   async exportData() {

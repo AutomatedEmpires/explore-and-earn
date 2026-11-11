@@ -188,6 +188,33 @@ describe('deleteMedia', () => {
     expect(await auditCount('media.removed', id)).toBe(1);
   });
 
+  it('keeps the row when storage fails, so a retry still finds the object paths', async () => {
+    const user = await newUser();
+    const storage = memoryStorage();
+    const id = await seedResume(user, 'approved');
+    await storage.write(
+      'media-private',
+      `${id}/resume.pdf`,
+      new Uint8Array([1]),
+      'application/pdf',
+    );
+    const failing = {
+      ...storage,
+      remove: async () => {
+        throw new Error('storage outage');
+      },
+    };
+
+    await expect(deleteMedia(t.db, failing, id)).rejects.toThrow('storage outage');
+    expect(await getMedia(t.db, id)).not.toBeNull();
+    expect(await auditCount('media.removed', id)).toBe(0);
+
+    await deleteMedia(t.db, storage, id);
+    expect(await getMedia(t.db, id)).toBeNull();
+    expect(storage.has('media-private', `${id}/resume.pdf`)).toBe(false);
+    expect(await auditCount('media.removed', id)).toBe(1);
+  });
+
   it('removes every image variant', async () => {
     const user = await newUser();
     const storage = memoryStorage();

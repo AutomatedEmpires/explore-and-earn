@@ -126,9 +126,8 @@ export const profilePatchSchema = z
       .object({ visibleToHosts: z.boolean(), showPhotoToHosts: z.boolean() })
       .partial()
       .optional(),
-    resume: z
-      .object({ mode: z.enum(RESUME_MODES), uploadedMediaId: z.uuid().nullable().optional() })
-      .optional(),
+    // FD-2: the seeker picks a generated template; an uploaded file can't be the resume.
+    resume: z.strictObject({ mode: z.enum(RESUME_MODES) }).optional(),
     languages: languagesSchema.optional(),
     portfolioLinks: portfolioLinksSchema.optional(),
   })
@@ -324,12 +323,11 @@ export const mergeDecisionsSchema = z.object({
   ),
 });
 
-/** POST /me/resume-imports/[id]/merge. */
-export const mergeImportSchema = z.object({
-  id: z.uuid(),
-  decisions: mergeDecisionsSchema,
-  useAsResume: z.boolean().default(false),
-});
+/**
+ * POST /me/resume-imports/[id]/merge. Spec 8.6's `useAsResume` is gone: under FD-2 the source
+ * file is an import source only and is never kept as the seeker's resume.
+ */
+export const mergeImportSchema = z.object({ id: z.uuid(), decisions: mergeDecisionsSchema });
 
 /** POST /me/writing-help. An experience description names its entry. */
 export const writingHelpSchema = z

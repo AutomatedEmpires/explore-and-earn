@@ -8,7 +8,7 @@ export async function mergeImport(
   _db: Db,
   _userId: string,
   _importId: string,
-  _i: { decisions: MergeDecisions; useAsResume: boolean },
+  _i: { decisions: MergeDecisions },
 ): Promise<OwnProfileDto> {
   throw new Error('not implemented: mergeImport');
 }

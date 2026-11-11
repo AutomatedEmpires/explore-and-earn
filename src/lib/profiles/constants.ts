@@ -29,11 +29,8 @@ export const ENTRY_SECTIONS = [
   'certifications',
 ] as const satisfies readonly EntrySection[];
 
-export const RESUME_MODES = [
-  'classic',
-  'compact',
-  'upload',
-] as const satisfies readonly ResumeMode[];
+/** FD-2: generated templates only (no upload mode). */
+export const RESUME_MODES = ['classic', 'compact'] as const satisfies readonly ResumeMode[];
 
 export const RESUME_TEMPLATES = [
   'classic@1',
