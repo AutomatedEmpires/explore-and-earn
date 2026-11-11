@@ -88,7 +88,7 @@ describe('setDisposition', () => {
       setDisposition(t.db, {
         userId,
         listingId: listing,
-        state: 'skipped',
+        state: 'saved',
         source: 'seek',
         expectedState: 'saved',
       }),
@@ -96,6 +96,34 @@ describe('setDisposition', () => {
     expect(err.code).toBe('conflict');
     expect(err.message).toBe('This job changed in another tab.');
     expect(err.details).toEqual({ current: 'skipped' });
+  });
+
+  it('does not 409 or rewrite a save that is already saved', async () => {
+    await save(listing);
+    const [before] = await queryRows<{ source: string; at: string }>(
+      t.db,
+      sql`select source, to_char(acted_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as at
+        from app.listing_dispositions where user_id = ${userId}::uuid`,
+    );
+    await expect(
+      setDisposition(t.db, {
+        userId,
+        listingId: listing,
+        state: 'saved',
+        source: 'swipe',
+        expectedState: null,
+      }),
+    ).resolves.toEqual({ state: 'saved', previous: 'saved' });
+    await expect(
+      setDisposition(t.db, { userId, listingId: listing, state: 'saved', source: 'map' }),
+    ).resolves.toEqual({ state: 'saved', previous: 'saved' });
+    const [after] = await queryRows<{ source: string; at: string }>(
+      t.db,
+      sql`select source, to_char(acted_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as at
+        from app.listing_dispositions where user_id = ${userId}::uuid`,
+    );
+    expect(after).toEqual(before);
+    expect(await saveEvents()).toHaveLength(1);
   });
 
   it('treats expectedState null as "no disposition yet"', async () => {
@@ -227,6 +255,18 @@ describe('clearDisposition', () => {
     expect(
       await clearDisposition(t.db, { userId, listingId: listing, expectedState: 'saved' }),
     ).toEqual({ previous: 'saved' });
+  });
+
+  it('returns without a 409 when the row is already gone', async () => {
+    await save(listing);
+    await clearDisposition(t.db, { userId, listingId: listing, expectedState: 'saved' });
+    await expect(
+      clearDisposition(t.db, { userId, listingId: listing, expectedState: 'saved' }),
+    ).resolves.toEqual({ previous: null });
+    await expect(
+      clearDisposition(t.db, { userId, listingId: 'not-a-uuid', expectedState: 'saved' }),
+    ).resolves.toEqual({ previous: null });
+    await expect(unsaveJob(t.db, userId, listing)).resolves.toBeUndefined();
   });
 });
 
