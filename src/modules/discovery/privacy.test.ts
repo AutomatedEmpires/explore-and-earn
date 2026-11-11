@@ -35,22 +35,24 @@ async function seedUserData(userId: string, o: { weeklyDigest: boolean }): Promi
   await t.db.execute(sql`
     insert into app.listing_dispositions (user_id, listing_id, state, source, first_saved_at, acted_at)
     values
-      (${userId}::uuid, ${b}::uuid, 'saved', 'seek', now(), '2026-11-02T09:00:00.000Z'),
-      (${userId}::uuid, ${a}::uuid, 'saved', 'map', now(), '2026-11-01T08:30:00.000Z'),
+      (${userId}::uuid, ${b}::uuid, 'saved', 'seek', '2026-11-02T09:00:00.000Z', '2026-11-02T09:00:00.000Z'),
+      (${userId}::uuid, ${a}::uuid, 'saved', 'map', '2026-11-01T08:30:00.000Z', '2026-11-01T08:30:00.000Z'),
       (${userId}::uuid, ${c}::uuid, 'skipped', 'swipe', null, '2026-11-03T10:15:00.000Z')
   `);
   const id = newId();
   await t.db.execute(sql`
-    insert into app.saved_searches (id, user_id, name, query, query_hash, created_at)
+    insert into app.saved_searches
+      (id, user_id, name, query, query_hash, push_enabled, email_daily, created_at)
     values (${id}::uuid, ${userId}::uuid, 'Farm jobs in California', ${JSON.stringify(QUERY)}::jsonb,
-      ${`hash-${id}`}, '2026-11-04T12:00:00.000Z')
+      ${`hash-${id}`}, false, false, '2026-11-04T12:00:00.000Z')
   `);
   await t.db.execute(sql`
-    insert into app.saved_search_matches (saved_search_id, listing_id, matched_at)
-    values (${id}::uuid, ${a}::uuid, now())
+    insert into app.saved_search_matches (saved_search_id, listing_id, matched_at, pushed_at)
+    values (${id}::uuid, ${a}::uuid, '2026-11-05T13:00:00.000Z', '2026-11-05T14:00:00.000Z')
   `);
   await t.db.execute(sql`
-    insert into app.alert_settings (user_id, weekly_digest) values (${userId}::uuid, ${o.weeklyDigest})
+    insert into app.alert_settings (user_id, weekly_digest, push_day, push_count)
+    values (${userId}::uuid, ${o.weeklyDigest}, '2026-11-04', 2)
   `);
   return id;
 }
@@ -102,14 +104,47 @@ describe('exportUserData', () => {
     const [a, b, c] = listings as [string, string, string];
     expect(await exportUserData(t.db, maya)).toEqual({
       saved: [
-        { listingId: a, at: '2026-11-01T08:30:00.000Z' },
-        { listingId: b, at: '2026-11-02T09:00:00.000Z' },
+        {
+          listingId: a,
+          at: '2026-11-01T08:30:00.000Z',
+          source: 'map',
+          firstSavedAt: '2026-11-01T08:30:00.000Z',
+        },
+        {
+          listingId: b,
+          at: '2026-11-02T09:00:00.000Z',
+          source: 'seek',
+          firstSavedAt: '2026-11-02T09:00:00.000Z',
+        },
       ],
-      skipped: [{ listingId: c, at: '2026-11-03T10:15:00.000Z' }],
+      skipped: [
+        {
+          listingId: c,
+          at: '2026-11-03T10:15:00.000Z',
+          source: 'swipe',
+          firstSavedAt: null,
+        },
+      ],
       savedSearches: [
-        { name: 'Farm jobs in California', query: QUERY, createdAt: '2026-11-04T12:00:00.000Z' },
+        {
+          name: 'Farm jobs in California',
+          query: QUERY,
+          createdAt: '2026-11-04T12:00:00.000Z',
+          pushEnabled: false,
+          emailDaily: false,
+        },
       ],
-      alertSettings: { weeklyDigest: true },
+      savedSearchMatches: [
+        {
+          savedSearchId: searchId,
+          listingId: a,
+          matchedAt: '2026-11-05T13:00:00.000Z',
+          pushedAt: '2026-11-05T14:00:00.000Z',
+          dailyEmailedAt: null,
+          weeklyEmailedAt: null,
+        },
+      ],
+      alertSettings: { weeklyDigest: true, pushDay: '2026-11-04', pushCount: 2 },
     });
   });
 
@@ -119,7 +154,8 @@ describe('exportUserData', () => {
       saved: [],
       skipped: [],
       savedSearches: [],
-      alertSettings: { weeklyDigest: false },
+      savedSearchMatches: [],
+      alertSettings: { weeklyDigest: false, pushDay: null, pushCount: 0 },
     });
   });
 });
@@ -156,6 +192,7 @@ describe('privacyHandler', () => {
         saved_jobs: data.saved,
         skipped_jobs: data.skipped,
         saved_searches: data.savedSearches,
+        saved_search_matches: data.savedSearchMatches,
         alert_settings: [data.alertSettings],
       },
       files: [],
