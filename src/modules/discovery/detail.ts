@@ -4,7 +4,8 @@
 //   built from that fresh data through buildProjectionRow and rowToCard, so a takedown applies
 //   at once and a stale projection row is never shown for an active listing.
 // - A closed listing renders from its inactive projection row; anything else is null (a 404).
-// - The activity line counts days in the viewer's zone; only https additional steps render.
+// - The activity line counts days in the viewer's zone. The public content omits the host's
+//   notify list, and an additional step is returned only when its URL is https.
 import { sql } from 'drizzle-orm';
 import { queryRows, type DbOrTx } from '@/lib/db';
 import {
@@ -179,6 +180,22 @@ function categoryFields(
   return fields.flatMap(([label, value]) => (value?.trim() ? [{ label, value }] : []));
 }
 
+/**
+ * Listing content a seeker or guest may see. `notifyMemberIds` is the host's staff list, and
+ * `additionalStep` is the https-checked step (or null), never the stored URL.
+ */
+function publicContent(c: ListingContent): ListingContent {
+  const step = additionalStep(c);
+  const { notifyMemberIds: _notifyMemberIds, ...applying } = c.applying;
+  return {
+    ...c,
+    applying: {
+      ...applying,
+      additionalStep: step ? { note: step.note, url: step.url } : null,
+    },
+  } as ListingContent;
+}
+
 /** The employer's extra step, only for https URLs. */
 function additionalStep(c: ListingContent): ListingDetail['additionalStep'] {
   const step = c.applying.additionalStep;
@@ -241,7 +258,7 @@ export async function getListingDetail(
   }
   return {
     ...card,
-    content: c,
+    content: publicContent(c),
     revisionId: published.revisionId,
     publishedAt: published.firstPublishedAt.toISOString(),
     photoUrls,
