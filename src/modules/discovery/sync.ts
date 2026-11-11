@@ -4,13 +4,15 @@
 // syncListing always re-reads SP2 under a per-listing advisory lock, whatever event woke it,
 // so concurrent syncs of one listing end in the state SP2 holds last:
 // - active: the listing, its host and its location are read and the row is upserted. A missing
-//   read throws, so the outbox retries (and the drift check repairs what still fails).
+//   read throws from syncListing, so that single job retries. A batch logs the listing,
+//   raises one alert and continues, so one failure cannot stall the fan-out.
 // - closed: the row stays, inactive, with closed_at set.
 // - anything else, or no listing at all: the row goes, and in the same transaction the
 //   listing's dispositions and alert matches (spec failure mode 1).
 import { sql, type SQL } from 'drizzle-orm';
 import { queryRows, withTx, type Db, type DbOrTx, type Tx } from '@/lib/db';
 import { newId } from '@/lib/ids';
+import { logger } from '@/lib/logger';
 import { record } from '@/modules/audit';
 import { enqueue, type HandlerMap } from '@/modules/jobs';
 import {
@@ -162,6 +164,35 @@ export async function syncListing(db: Db, listingId: string, now: Date): Promise
   return syncWith(db, listingId, now, await loadLookups(db));
 }
 
+/** One item of a batch. A failure is logged and skipped so the rest of the batch still runs. */
+async function syncItem(
+  db: Db,
+  listingId: string,
+  now: Date,
+  lookups: Lookups,
+): Promise<SyncResult | null> {
+  try {
+    return await syncWith(db, listingId, now, lookups);
+  } catch (err) {
+    logger.error('discovery.sync_item_failed', { listingId, err });
+    return null;
+  }
+}
+
+/** One alert for a batch, not one per listing. */
+async function alertSyncFailures(db: Db, failed: number): Promise<void> {
+  if (failed === 0) return;
+  await raiseAlert(db, {
+    severity: 'warning',
+    kind: 'discovery.sync_failed',
+    message:
+      failed === 1
+        ? 'A listing failed to sync and was skipped'
+        : 'Some listings failed to sync and were skipped',
+    data: { failed },
+  });
+}
+
 /**
  * Re-syncs up to 100 projection rows of the org (or of one of its locations), in listing_id
  * order after `after`. `next` is the last id synced when more rows follow.
@@ -185,9 +216,15 @@ export async function syncHost(
   const page = rows.slice(0, HOST_PAGE_SIZE);
   if (page.length === 0) return { synced: 0, next: null };
   const lookups = await loadLookups(db);
-  for (const r of page) await syncWith(db, r.id, now, lookups);
+  let synced = 0;
+  let failed = 0;
+  for (const r of page) {
+    if ((await syncItem(db, r.id, now, lookups)) === null) failed += 1;
+    else synced += 1;
+  }
+  await alertSyncFailures(db, failed);
   return {
-    synced: page.length,
+    synced,
     next: rows.length > HOST_PAGE_SIZE ? (page[page.length - 1]?.id ?? null) : null,
   };
 }
@@ -199,10 +236,15 @@ type Counts = { upserted: number; removed: number };
  * revision; then every row, active or closed, that SP2 no longer reports in its state (an
  * active row whose listing closed, or any row whose listing was removed or is gone).
  */
-async function reconcile(db: Db, now: Date): Promise<Counts> {
+async function reconcile(db: Db, now: Date): Promise<{ counts: Counts; failed: number }> {
   const lookups = await loadLookups(db);
   const counts: Counts = { upserted: 0, removed: 0 };
-  const tally = (r: SyncResult) => {
+  let failed = 0;
+  const tally = (r: SyncResult | null) => {
+    if (r === null) {
+      failed += 1;
+      return;
+    }
     if (r === 'upserted') counts.upserted++;
     else counts.removed++;
   };
@@ -223,7 +265,7 @@ async function reconcile(db: Db, now: Date): Promise<Counts> {
     for (const l of page.items) {
       const row = byId.get(l.listingId);
       if (row && row.active && row.revision === l.revisionId) continue;
-      tally(await syncWith(db, l.listingId, now, lookups));
+      tally(await syncItem(db, l.listingId, now, lookups));
     }
     if (!page.next) break;
     after = page.next;
@@ -249,12 +291,12 @@ async function reconcile(db: Db, now: Date): Promise<Counts> {
       const state = summaries.get(r.id)?.state;
       // Active listings were checked in the first pass; a closed row of a closed listing is right.
       if (state === 'active' || (state === 'closed' && !r.active)) continue;
-      tally(await syncWith(db, r.id, now, lookups));
+      tally(await syncItem(db, r.id, now, lookups));
     }
     if (rows.length < DRIFT_PAGE_SIZE) break;
     cursor = rows[rows.length - 1]?.id ?? null;
   }
-  return counts;
+  return { counts, failed };
 }
 
 /** The nightly repair (spec section 6). Any repair is audited and raises a warning alert. */
@@ -262,7 +304,7 @@ export async function driftCheck(
   db: Db,
   now: Date,
 ): Promise<{ upserted: number; removed: number; repaired: number }> {
-  const counts = await reconcile(db, now);
+  const { counts, failed } = await reconcile(db, now);
   const result = { ...counts, repaired: counts.upserted + counts.removed };
   if (result.repaired > 0) {
     await record(db, {
@@ -280,6 +322,7 @@ export async function driftCheck(
       data: result,
     });
   }
+  await alertSyncFailures(db, failed);
   return result;
 }
 
@@ -287,7 +330,7 @@ export async function driftCheck(
 export async function rebuildSearchProjection(
   db: Db,
 ): Promise<{ upserted: number; removed: number }> {
-  const counts = await reconcile(db, new Date());
+  const { counts, failed } = await reconcile(db, new Date());
   await record(db, {
     actorType: 'system',
     actorId: null,
@@ -296,6 +339,7 @@ export async function rebuildSearchProjection(
     subjectId: null,
     data: counts,
   });
+  await alertSyncFailures(db, failed);
   return counts;
 }
 

@@ -550,6 +550,21 @@ describe('syncHost', () => {
     });
     expect(await syncHost(t.db, { orgId: newId() }, NOW)).toEqual({ synced: 0, next: null });
   });
+
+  it('skips a listing that fails, syncs the rest of the page, and raises one alert', async () => {
+    await seedRows(3);
+    fakeSp2.failNext('getPublishedListing');
+    expect(await syncHost(t.db, { orgId: DEFAULT_ORG_ID }, NOW)).toEqual({ synced: 2, next: null });
+    expect(hoisted.raiseAlert).toHaveBeenCalledTimes(1);
+    expect(hoisted.raiseAlert).toHaveBeenCalledWith(t.db, {
+      severity: 'warning',
+      kind: 'discovery.sync_failed',
+      message: 'A listing failed to sync and was skipped',
+      data: { failed: 1 },
+    });
+    expect(await renamed('Old name')).toBe(1);
+    expect(await renamed('Kettle Ridge Lodge')).toBe(2);
+  });
 });
 
 describe('driftCheck and rebuildSearchProjection', () => {
@@ -633,5 +648,22 @@ describe('driftCheck and rebuildSearchProjection', () => {
     expect(await rebuildSearchProjection(t.db)).toEqual({ upserted: 2, removed: 1 });
     expect(await audits('discovery.projection_rebuilt')).toBe(before + 1);
     expect(hoisted.raiseAlert).not.toHaveBeenCalled();
+  });
+
+  it('continues the drift check when one listing fails, and raises one alert', async () => {
+    const a = fakeSp2.putListing();
+    const b = fakeSp2.putListing();
+    fakeSp2.failNext('getPublishedListing');
+    expect(await driftCheck(t.db, NOW)).toEqual({ upserted: 1, removed: 0, repaired: 1 });
+    expect(hoisted.raiseAlert).toHaveBeenCalledWith(
+      t.db,
+      expect.objectContaining({
+        kind: 'discovery.sync_failed',
+        message: 'A listing failed to sync and was skipped',
+        data: { failed: 1 },
+      }),
+    );
+    const present = [await rowOf(a.listingId), await rowOf(b.listingId)].filter(Boolean);
+    expect(present).toHaveLength(1);
   });
 });

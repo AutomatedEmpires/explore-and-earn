@@ -6,9 +6,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { createTestDb, type TestDb } from '../../../../../../../tests/helpers/db';
 import { insertProjectionRows } from '../../../../../../../tests/helpers/discovery-rows';
 import { queryRows, type Db } from '@/lib/db';
-import { dedupeKeyFor } from '@/modules/discovery';
+import { dedupeKeyFor, noopHook, setPlacementHookForTests } from '@/modules/discovery';
 import { hmacKey, viewerKeyFor } from '@/server/viewer';
-import { POST } from './route';
+import { LISTING_EVENT_RATE, POST } from './route';
 
 const state = vi.hoisted(() => ({ db: undefined as Db | undefined }));
 
@@ -44,9 +44,15 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  setPlacementHookForTests(noopHook);
+  await t.db.execute(sql`delete from app.rate_limits`);
   await t.db.execute(sql`delete from app.listing_events`);
   await t.db.execute(sql`delete from app.discovery_listings`);
   [listing] = (await insertProjectionRows(t.db, [{}])) as [string];
+});
+
+afterAll(() => {
+  setPlacementHookForTests(null);
 });
 
 function post(
@@ -79,7 +85,7 @@ const rows = () =>
   );
 
 describe('POST /api/v1/listings/:id/events', () => {
-  it("records a guest's view once per 30 minutes, keyed by a hash of address and browser", async () => {
+  it("records a guest's view once per 30 minutes, keyed by a hash of the address", async () => {
     const before = new Date();
     const res = await post({ type: 'view', source: 'seek' });
     expect(res.status).toBe(204);
@@ -105,6 +111,54 @@ describe('POST /api/v1/listings/:id/events', () => {
     await post({ type: 'view', source: 'seek' }, { ip: '198.51.100.4' });
     await post({ type: 'share', source: 'seek' });
     expect((await rows()).map((r) => r.type)).toEqual(['view', 'view', 'share']);
+  });
+
+  it('counts one view for one address when the browser changes', async () => {
+    await post({ type: 'view', source: 'seek' }, { userAgent: CHROME });
+    await post({ type: 'view', source: 'seek' }, { userAgent: 'Safari/605.1.15' });
+    expect(await rows()).toHaveLength(1);
+  });
+
+  it('does not let the client claim a boost', async () => {
+    await post({ type: 'view', source: 'boost' });
+    expect((await rows())[0]?.source).toBe('other');
+  });
+
+  it('records boost when the server says the listing is boosted', async () => {
+    setPlacementHookForTests({
+      ...noopHook,
+      boostedAmong: async () => new Map([[listing, 'b1']]),
+    });
+    await post({ type: 'view', source: 'boost' });
+    await post({ type: 'view', source: 'seek' }, { ip: '198.51.100.9' });
+    const written = await rows();
+    expect(written).toHaveLength(2);
+    expect(written.map((r) => r.source).sort()).toEqual(['boost', 'seek']);
+  });
+
+  it('returns 429 once an address is over the event limit, and does not store the address', async () => {
+    const ip = '203.0.113.50';
+    for (let i = 0; i < LISTING_EVENT_RATE.limit; i++) {
+      expect((await post({ type: 'view', source: 'seek' }, { ip })).status).toBe(204);
+    }
+    // Repeats of one listing collapse to a single row, so the over-limit call uses another
+    // listing: that view would be stored if the limiter did not stop the handler.
+    const [other] = (await insertProjectionRows(t.db, [{}])) as [string];
+    const blocked = await post({ type: 'view', source: 'seek' }, { ip, id: other });
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get('retry-after')).toBeTruthy();
+    const written = await queryRows<{ listingId: string }>(
+      t.db,
+      sql`select listing_id::text as "listingId" from app.listing_events`,
+    );
+    expect(written.map((r) => r.listingId)).toEqual([listing]);
+    const keys = await queryRows<{ key: string }>(
+      t.db,
+      sql`select key from app.rate_limits`,
+    );
+    expect(keys.some((k) => k.key.includes(ip))).toBe(false);
+    expect(keys.every((k) => k.key.startsWith('listing-events:'))).toBe(true);
+    expect(keys.length).toBeGreaterThan(0);
   });
 
   it('attributes an unknown or missing source to other', async () => {
