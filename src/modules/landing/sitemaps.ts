@@ -1,8 +1,8 @@
 // Sitemaps rendered per request from the projection, and robots.txt per environment (SP3 spec
 // 5 and 8.11, plan Task 42). Job URLs are chunked at 10,000. Closed listings are absent.
 import type { MetadataRoute } from 'next';
-import { sql } from 'drizzle-orm';
-import { queryRows, type DbOrTx } from '@/lib/db';
+import type { DbOrTx } from '@/lib/db';
+import { listActiveListings } from '@/modules/discovery';
 import { listPublicHostSlugs } from '@/modules/hostpages';
 import { listLandingPaths } from './resolve';
 
@@ -21,41 +21,43 @@ const PRIVATE_PREFIXES = [
   '/design-system',
 ] as const;
 
-/** ['jobs-1', …, 'jobs-N', 'landing', 'hosts']. */
-export async function sitemapNames(db: DbOrTx): Promise<string[]> {
-  const [row] = await queryRows<{ n: number | string }>(
-    db,
-    sql`select count(*)::int as n from app.discovery_listings where is_active`,
-  );
-  const pages = Math.max(1, Math.ceil(Number(row?.n ?? 0) / CHUNK));
-  return [...Array(pages).keys()].map((index) => `jobs-${index + 1}`).concat(['landing', 'hosts']);
+/** How many 10,000-row job sitemap files the active feed fills. Empty still publishes jobs-1. */
+async function jobPageCount(db: DbOrTx): Promise<number> {
+  let after: string | undefined;
+  let pages = 0;
+  for (;;) {
+    const page = await listActiveListings(db, { after, limit: CHUNK });
+    if (page.items.length === 0) return Math.max(1, pages);
+    pages += 1;
+    if (!page.next) return pages;
+    after = page.next;
+  }
 }
 
-function asDate(value: Date | number | string): Date {
-  if (value instanceof Date) return value;
-  if (typeof value === 'number' || /^-?\d+(\.\d+)?$/.test(value)) return new Date(Number(value));
-  return new Date(value);
+/** ['jobs-1', …, 'jobs-N', 'landing', 'hosts']. */
+export async function sitemapNames(db: DbOrTx): Promise<string[]> {
+  const pages = await jobPageCount(db);
+  return [...Array(pages).keys()].map((index) => `jobs-${index + 1}`).concat(['landing', 'hosts']);
 }
 
 async function jobEntries(
   db: DbOrTx,
   page: number,
 ): Promise<{ loc: string; lastmod: Date }[]> {
-  const offset = (page - 1) * CHUNK;
-  const rows = await queryRows<{ id: string; slug: string; indexed_at: number | string }>(
-    db,
-    sql`select listing_id::text as id, slug,
-        (extract(epoch from indexed_at) * 1000)::float8 as indexed_at
-      from app.discovery_listings
-      where is_active
-      order by listing_id
-      offset ${offset}::int
-      limit ${CHUNK}::int`,
-  );
-  return rows.map((row) => ({
-    loc: `/jobs/view/${row.id}/${row.slug}`,
-    lastmod: asDate(row.indexed_at),
-  }));
+  if (!Number.isInteger(page) || page < 1) return [];
+  let after: string | undefined;
+  for (let index = 1; index <= page; index += 1) {
+    const result = await listActiveListings(db, { after, limit: CHUNK });
+    if (index === page) {
+      return result.items.map((item) => ({
+        loc: `/jobs/view/${item.listingId}/${item.slug}`,
+        lastmod: item.indexedAt,
+      }));
+    }
+    if (!result.next) return [];
+    after = result.next;
+  }
+  return [];
 }
 
 async function hostEntries(db: DbOrTx): Promise<{ loc: string; lastmod: Date }[]> {
