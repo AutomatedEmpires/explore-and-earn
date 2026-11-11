@@ -14,3 +14,6 @@ minimumReleaseAgeExclude:
 allowBuilds:
   esbuild: true
   core-js: false
+  # msw's postinstall copies its service worker into a public folder we don't configure; the
+  # node server the tests use needs no build step.
+  msw: false
