@@ -226,7 +226,7 @@ async function overlayFor(
 
 export async function searchListings(db: DbOrTx, i: SearchInput): Promise<SearchResult> {
   const limit = Math.min(Math.max(Math.trunc(i.limit ?? DEFAULT_LIMIT), 1), MAX_LIMIT);
-  const hash = cursorHash(i.query, i.sort);
+  const hash = cursorHash(i.query, i.sort, { origin: i.origin ?? null });
   const cursor = i.cursor ? decodeCursor(i.cursor, hash) : null;
   const asOf = cursor?.asOf ?? todayIn(i.tz);
 
@@ -287,7 +287,19 @@ export async function searchListings(db: DbOrTx, i: SearchInput): Promise<Search
       : null;
 
   const seen = new Set<string>();
-  const slots = placed.items.filter((x) => !seen.has(x.listingId) && seen.add(x.listingId));
+  const proposed = placed.items.filter((x) => !seen.has(x.listingId) && seen.add(x.listingId));
+  // The hook can name an id it never ran through matchIds. Keep only what this query,
+  // viewer and surface still match, then hydrate those.
+  const allowed = new Set(
+    await filterListingIds(db, {
+      listingIds: proposed.map((x) => x.listingId),
+      query: i.query,
+      viewerUserId: i.viewerUserId,
+      surface: i.surface,
+      today: asOf,
+    }),
+  );
+  const slots = proposed.filter((x) => allowed.has(x.listingId));
   const boostIds = new Map(
     slots.flatMap((x) => (x.boostId ? [[x.listingId, x.boostId] as const] : [])),
   );

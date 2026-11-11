@@ -1,7 +1,7 @@
 // Keyset cursors (SP3 spec 8.4, plan Task 18 and Plan decision 4): base64url JSON of the last
 // item's sort values and id, the query hash, the day the first page was read (`asOf`), the
 // placement hook's opaque state (`ps`) and the page index (`pi`). A cursor minted for another
-// query or sort, or one that doesn't decode, is a 400.
+// query, sort, bbox, location or distance origin, or one that doesn't decode, is a 400.
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { canonicalQuery, type DiscoveryQuery, type DiscoverySort } from '@/lib/discovery';
@@ -31,10 +31,24 @@ const CursorSchema = z
   })
   .strict();
 
-/** sha256(canonicalQuery + '|' + sort), hex. */
-export function cursorHash(q: DiscoveryQuery, sort: DiscoverySort): string {
+export type CursorScope = {
+  /** The distance origin passed to search. A state centroid is not part of the cursor. */
+  origin?: { lat: number; lng: number } | null;
+};
+
+/** bbox, locationId and the distance origin. Kept out of canonicalQuery (saved searches). */
+function cursorScope(q: DiscoveryQuery, origin?: { lat: number; lng: number } | null): string {
+  return JSON.stringify({
+    bbox: q.bbox ?? null,
+    locationId: q.locationId ?? null,
+    origin: origin ? [origin.lat, origin.lng] : null,
+  });
+}
+
+/** sha256(canonicalQuery + '|' + sort + '|' + bbox, locationId and distance origin), hex. */
+export function cursorHash(q: DiscoveryQuery, sort: DiscoverySort, scope?: CursorScope): string {
   return createHash('sha256')
-    .update(`${canonicalQuery(q)}|${sort}`)
+    .update(`${canonicalQuery(q)}|${sort}|${cursorScope(q, scope?.origin)}`)
     .digest('hex');
 }
 

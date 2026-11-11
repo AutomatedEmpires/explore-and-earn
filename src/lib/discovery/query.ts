@@ -3,7 +3,9 @@
 //   whatever fails, so old links keep working. bbox, locationId and cursor are never read from
 //   the filter params (the routes validate paging and geometry on their own).
 // - serializeQuery writes them back in one fixed key order, which is the canonical URL form.
-// - canonicalQuery is the identity of a query (cursor hashes, saved-search hashes).
+// - canonicalQuery is the saved-search identity of a query. Page cursors hash it with the sort,
+//   then bbox, locationId and the distance origin (cursor.ts). Those three stay out of this
+//   string, so a saved search does not change when the map or the distance origin moves.
 // - describeFilters, removeFilter and summarizeQuery back the filter chips and alert names.
 import { z } from 'zod';
 import { CATEGORIES, type Category } from '@/lib/taxonomy';
