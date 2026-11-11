@@ -3,6 +3,7 @@
 //   C-1: it sends the guest's `returnTo` and finishes where the API says, never off-site.
 //   C-3: the step is in the URL, so the browser's Back button moves between steps, and a
 //        refresh or a link opens the same step.
+//   C-2: each step's paragraph is 16 px body text.
 //
 // Next.js syncs the native History API into useSearchParams; the mock below does the same from
 // jsdom's location, so the form is driven through real pushState, replaceState and popstate.
@@ -180,6 +181,21 @@ describe('OnboardingForm: the step is in the URL (C-3)', () => {
     render(<OnboardingForm hostOnly />);
     expect(hostHeading()).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+  });
+});
+
+describe('OnboardingForm: body text is at least 16 px (C-2)', () => {
+  it.each([
+    ['/onboarding', 'Welcome to Explore&Earn'],
+    ['/onboarding?step=seeker', 'Work worth going somewhere for.'],
+    ['/onboarding?step=host', 'Name your organization'],
+  ])('sets the paragraph under the heading at %s in text-16', (href, title) => {
+    visit(href);
+    render(<OnboardingForm />);
+    const lead = screen.getByRole('heading', { name: title }).nextElementSibling;
+    expect(lead?.tagName).toBe('P');
+    expect(lead).toHaveClass('text-16');
+    expect(lead).not.toHaveClass('text-15');
   });
 });
 

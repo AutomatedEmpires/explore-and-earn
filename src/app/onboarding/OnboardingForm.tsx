@@ -218,7 +218,7 @@ export function OnboardingForm({ hostOnly = false, returnTo = '/' }: OnboardingF
           <h1 ref={headingRef} tabIndex={-1} className={heading}>
             Work worth going somewhere for.
           </h1>
-          <p className="text-15 text-ink-2">
+          <p className="text-16 text-ink-2">
             Explore&amp;Earn is for adults. Confirm your age to start exploring jobs, some with
             housing and meals.
           </p>
@@ -250,7 +250,7 @@ export function OnboardingForm({ hostOnly = false, returnTo = '/' }: OnboardingF
           <h1 ref={headingRef} tabIndex={-1} className={heading}>
             Name your organization
           </h1>
-          <p className="text-15 text-ink-2">
+          <p className="text-16 text-ink-2">
             Seekers see this name on your listings and your host page. You can invite your team once
             you are in.
           </p>
@@ -280,7 +280,7 @@ export function OnboardingForm({ hostOnly = false, returnTo = '/' }: OnboardingF
         <h1 id="onboarding-title" ref={headingRef} tabIndex={-1} className={heading}>
           Welcome to Explore&amp;Earn
         </h1>
-        <p className="text-15 text-ink-2">
+        <p className="text-16 text-ink-2">
           How will you use Explore&amp;Earn? This sets up your account, and it can&apos;t be changed
           later.
         </p>
