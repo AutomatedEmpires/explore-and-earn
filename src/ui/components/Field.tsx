@@ -67,7 +67,7 @@ export function Field({
 
 /** Shared look of text-like controls: 3:1 border, token focus ring, danger border on error. */
 export const controlClass = cn(
-  'w-full rounded-lg border border-line-strong bg-surface px-3.5 text-15 text-ink placeholder:text-muted',
+  'w-full rounded-lg border border-line-strong bg-surface px-3.5 text-16 text-ink placeholder:text-muted',
   'disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-70',
   'aria-[invalid=true]:border-danger motion-safe:transition-colors',
 );

@@ -440,3 +440,157 @@ export async function write(opts: WriteOptions): Promise<string> {
   if (getEnv().AI_PROVIDER === 'stub') return writeStub(opts);
   return writeWith(anthropic(), opts);
 }
+
+// --- Generating from documents: generate (Claude Sonnet 5.5) -------------------------------------
+//
+// SP4's resume import and writing help (SP4 spec 3.4 and 9): content blocks in (text, images and
+// PDF documents), a value matching a zod schema out. Document and image blocks go before text,
+// as the Messages API recommends. A refusal reroutes server-side (`fallbacks: "default"`); a
+// refusal that survives the chain is kind 'refusal'. Content and output are never logged and
+// never appear in an error message.
+//
+// AI_PROVIDER=stub: `__fail__` in any text or in any file's bytes (read as latin1, so a marker in
+// a PDF's Info Keywords counts) fails with kind 'provider'; `__refuse__` refuses with kind
+// 'refusal'. Otherwise the caller's `stub` answers, validated by the schema.
+
+/** A PDF sent as a base64 `document` block (the API allows 32 MB and 600 pages). */
+export type AiDocument = { type: 'document'; mime: 'application/pdf'; bytes: Uint8Array };
+
+export type AiContent = ClassifyContent | AiDocument;
+
+export type GenerateOptions<T> = {
+  model: typeof DRAFTING_MODEL;
+  system: string;
+  content: AiContent[];
+  schema: z.ZodType<T>;
+  /** Identifies the prompt, e.g. `resume_import@1`. */
+  promptVersion: string;
+  effort: 'low' | 'medium';
+  /** The whole call, retries included, must finish within this. */
+  timeoutMs: number;
+  maxTokens: number;
+  /** The stub provider's answer for this content (validated by `schema`). */
+  stub: (content: AiContent[]) => T;
+};
+
+/** Routes a refused request on to Anthropic's default fallback model for its category. */
+export const SERVER_SIDE_FALLBACK_BETA = 'server-side-fallback-2026-07-01';
+
+const REFUSE_MARKER = '__refuse__';
+
+function anyContentHas(content: AiContent[], marker: string): boolean {
+  return content.some((c) =>
+    c.type === 'text'
+      ? c.text.includes(marker)
+      : Buffer.from(c.bytes).toString('latin1').includes(marker),
+  );
+}
+
+/** The stub `generate`. See the section comment for its markers. */
+export function generateStub<T>(opts: GenerateOptions<T>): T {
+  if (anyContentHas(opts.content, FAIL_MARKER))
+    throw new AiError('provider', 'Stub generate failed');
+  if (anyContentHas(opts.content, REFUSE_MARKER)) {
+    throw new AiError('refusal', 'The stub model declined the request');
+  }
+  return validateDraft(opts.schema, opts.stub(opts.content));
+}
+
+function toBetaBlocks(content: AiContent[]): Anthropic.Beta.BetaContentBlockParam[] {
+  const base64 = (bytes: Uint8Array) => Buffer.from(bytes).toString('base64');
+  const files: Anthropic.Beta.BetaContentBlockParam[] = [];
+  const texts: Anthropic.Beta.BetaContentBlockParam[] = [];
+  for (const c of content) {
+    if (c.type === 'text') {
+      texts.push({ type: 'text', text: c.text });
+    } else if (c.type === 'document') {
+      files.push({
+        type: 'document',
+        source: { type: 'base64', media_type: 'application/pdf', data: base64(c.bytes) },
+      });
+    } else {
+      if (!isApiImageType(c.mime)) {
+        throw new AiError('provider', `Image type ${c.mime} cannot be sent to the model`);
+      }
+      files.push({
+        type: 'image',
+        source: { type: 'base64', media_type: c.mime, data: base64(c.bytes) },
+      });
+    }
+  }
+  return [...files, ...texts];
+}
+
+/**
+ * Generates a value matching `schema` with a given Anthropic client: one beta Messages API call
+ * (server-side fallbacks) with structured output, under one deadline that covers the SDK's
+ * retries, validated again with zod. Throws AiError.
+ */
+export async function generateWith<T>(client: Anthropic, opts: GenerateOptions<T>): Promise<T> {
+  const content = toBetaBlocks(opts.content);
+  if (content.length === 0) throw new AiError('provider', 'Nothing to send to the model');
+
+  const controller = new AbortController();
+  let timedOut = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+      reject(new AiError('timeout', `AI request timed out after ${opts.timeoutMs} ms`));
+    }, opts.timeoutMs);
+  });
+
+  let message: Anthropic.Beta.BetaMessage;
+  try {
+    message = await Promise.race([
+      client.beta.messages.create(
+        {
+          model: opts.model,
+          max_tokens: opts.maxTokens,
+          system: opts.system,
+          messages: [{ role: 'user', content }],
+          output_config: {
+            effort: opts.effort,
+            format: { type: 'json_schema', schema: zodOutputFormat(opts.schema).schema },
+          },
+          betas: [SERVER_SIDE_FALLBACK_BETA],
+          fallbacks: 'default',
+        },
+        { signal: controller.signal, timeout: opts.timeoutMs },
+      ),
+      deadline,
+    ]);
+  } catch (err) {
+    throw toAiError(err, timedOut);
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (message.stop_reason === 'refusal') {
+    throw new AiError('refusal', 'The model declined the request');
+  }
+  if (message.stop_reason === 'max_tokens') {
+    throw new AiError('provider', 'The answer was cut off');
+  }
+  // The answer is the first text block; a server-side fallback adds a `fallback` block before it.
+  const first = message.content.find(
+    (block): block is Anthropic.Beta.BetaTextBlock => block.type === 'text',
+  );
+  let json: unknown;
+  try {
+    json = JSON.parse(first?.text ?? '');
+  } catch (err) {
+    throw new AiError('schema', 'AI answer is not JSON', { cause: err });
+  }
+  return validateDraft(opts.schema, json);
+}
+
+/**
+ * Generates a value matching `schema` from text, images and PDFs with Claude Sonnet 5.5, or
+ * throws AiError. Uses the provider in AI_PROVIDER. Server only.
+ */
+export async function generate<T>(opts: GenerateOptions<T>): Promise<T> {
+  if (getEnv().AI_PROVIDER === 'stub') return generateStub(opts);
+  return generateWith(anthropic(), opts);
+}
