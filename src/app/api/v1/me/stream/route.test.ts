@@ -40,8 +40,8 @@ afterEach(() => {
 describe('GET /api/v1/me/stream', () => {
   it('sends the counts at once, then every 15 seconds, until the client goes away', async () => {
     vi.mocked(getCounts)
-      .mockResolvedValueOnce({ inbox: 2, notifications: 5 })
-      .mockResolvedValueOnce({ inbox: 3, notifications: 5 });
+      .mockResolvedValueOnce({ inbox: 2, notifications: 5, profileDot: false })
+      .mockResolvedValueOnce({ inbox: 3, notifications: 5, profileDot: true });
     const abort = new AbortController();
 
     const res = await GET(
@@ -54,11 +54,15 @@ describe('GET /api/v1/me/stream', () => {
     if (!res.body) throw new Error('no body');
     const reader = res.body.getReader();
 
-    expect(await nextChunk(reader)).toBe('event: counts\ndata: {"inbox":2,"notifications":5}\n\n');
+    expect(await nextChunk(reader)).toBe(
+      'event: counts\ndata: {"inbox":2,"notifications":5,"profileDot":false}\n\n',
+    );
     expect(getCounts).toHaveBeenCalledWith(expect.anything(), user.id);
 
     await vi.advanceTimersByTimeAsync(15_000);
-    expect(await nextChunk(reader)).toBe('event: counts\ndata: {"inbox":3,"notifications":5}\n\n');
+    expect(await nextChunk(reader)).toBe(
+      'event: counts\ndata: {"inbox":3,"notifications":5,"profileDot":true}\n\n',
+    );
 
     abort.abort();
     expect(await nextChunk(reader)).toBeNull();
