@@ -71,19 +71,19 @@ const req = (url: string, headers: Record<string, string> = {}) =>
 describe('viewerKeyFor', () => {
   const ua = 'Mozilla/5.0 (iPhone) Safari/604.1';
 
-  it('gives guests with the same address and browser the same 43-character key', () => {
+  it('gives guests with the same address the same key, whatever the browser', () => {
     const a = viewerKeyFor({ userId: null, ip: '203.0.113.7', userAgent: ua });
-    const b = viewerKeyFor({ userId: null, ip: '203.0.113.7', userAgent: ua });
+    const b = viewerKeyFor({ userId: null, ip: '203.0.113.7', userAgent: `${ua} x` });
     expect(a).toBe(b);
+    expect(a).toBe(hmacKey('203.0.113.7'));
     expect(a).toHaveLength(43);
     expect(a).toMatch(/^[A-Za-z0-9_-]+$/);
-    expect(viewerKeyFor({ userId: null, ip: '203.0.113.7', userAgent: `${ua} x` })).not.toBe(a);
+    expect(viewerKeyFor({ userId: null, ip: '198.51.100.8', userAgent: ua })).not.toBe(a);
   });
 
-  it('uses "unknown" for a missing part', () => {
-    expect(viewerKeyFor({ userId: null, ip: null, userAgent: null })).toBe(
-      hmacKey('unknown|unknown'),
-    );
+  it('uses "unknown" when the address is missing', () => {
+    expect(viewerKeyFor({ userId: null, ip: null, userAgent: null })).toBe(hmacKey('unknown'));
+    expect(viewerKeyFor({ userId: null, ip: null, userAgent: ua })).toBe(hmacKey('unknown'));
   });
 
   it('is the user id for a signed-in user', () => {
