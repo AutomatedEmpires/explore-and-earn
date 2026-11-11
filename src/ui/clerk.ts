@@ -35,7 +35,8 @@ export const clerkAppearance = {
     colorModalBackdrop: 'var(--ee-scrim)',
     fontFamily: sans,
     fontFamilyButtons: sans,
-    fontSize: '0.9375rem',
+    // 1rem is 16px. Inputs smaller than that make iOS Safari zoom the page on focus.
+    fontSize: '1rem',
     borderRadius: '0.75rem',
   },
   options: {
@@ -50,13 +51,14 @@ export const clerkAppearance = {
       borderRadius: '1.25rem',
     },
     headerTitle: { fontSize: '1.3125rem', fontWeight: 800, letterSpacing: '-0.01em' },
-    headerSubtitle: { color: 'var(--ee-muted)', fontSize: '0.9375rem' },
-    formButtonPrimary: { ...pill, ...target, fontWeight: 700, fontSize: '0.9375rem' },
+    headerSubtitle: { color: 'var(--ee-muted)', fontSize: '1rem' },
+    formButtonPrimary: { ...pill, ...target, fontWeight: 700, fontSize: '1rem' },
     socialButtonsBlockButton: { ...pill, ...target },
     // Clerk outlines inputs with a faint shadow from a more specific rule, and hides the outline;
     // ours are a 3:1 line (Field's controlClass) with the focus-token ring from tokens.css.
     formFieldInput: {
       ...target,
+      fontSize: '1rem',
       boxShadow: '0 0 0 1px var(--ee-line-strong) !important',
       '&:focus-visible': {
         outline: '2px solid var(--ee-focus) !important',
