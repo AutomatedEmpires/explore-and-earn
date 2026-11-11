@@ -268,10 +268,12 @@ test.describe('Sign-in, onboarding and shells', () => {
 
     await page.getByRole('button', { name: /I'm looking for work/ }).click();
     await expect(page.getByText('Work worth going somewhere for.')).toBeVisible();
+    // The step is in the URL, so Back returns to the choice (tests/e2e/onboarding-return.spec.ts).
+    await expect(page).toHaveURL(`${appURL}/onboarding?step=seeker`);
     const continueButton = page.getByRole('button', { name: 'Continue' });
     await continueButton.click();
     // The 18+ confirmation is required.
-    await expect(page).toHaveURL(`${appURL}/onboarding`);
+    await expect(page).toHaveURL(`${appURL}/onboarding?step=seeker`);
     await page.getByRole('checkbox', { name: "I'm 18 or older" }).check();
     await continueButton.click();
 
