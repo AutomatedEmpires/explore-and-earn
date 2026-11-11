@@ -2,6 +2,8 @@
 
 Issue [#61](https://github.com/AutomatedEmpires/explore-and-earn/issues/61) (EE-F0). The Figma page mirrors the code on `integrate/sp2-20261104` at `ae72a80`. The code stays the source of truth: `src/ui/tokens.css` (and `src/ui/tokens.ts`) for tokens, `src/ui/components` for components and `src/ui/icons.ts` for icons. Figma variables and components mirror them; the page adds no new styles.
 
+Category colors are the exception, recorded in [Category palette](#category-palette-issue-85). Figma holds the proposed values. `src/ui/tokens.css` keeps the old ones until issue #86.
+
 - **File:** https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A (jackson.cole's team)
 - **Page "00 System":** https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=0-1
 - **Status:** waiting for the founder. Two decisions are needed: pick top bar A, B or C, and approve the as-built first run (after the fact). Nothing here is approved until the founder comments `approved` on the design issue (policy/designops.md in AE-Control).
@@ -16,6 +18,7 @@ Issue [#61](https://github.com/AutomatedEmpires/explore-and-earn/issues/61) (EE-
 | 3 Components | [11:301](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=11-301) | One component set per file in `src/ui/components`, with specimens |
 | 4 Top bar options | [20:2791](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=20-2791) | Options A, B and C for the founder |
 | 5 First run (as built) | [21:2446](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=21-2446) | Sign-in, sign-up and onboarding at phone and desktop widths |
+| 6 Category palette | [43:2627](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=43-2627) | Issue #85. Recolored category variables, compared with every status color, at 390, 768 and 1440, light and dark |
 
 ## Designing screens on this system
 
@@ -122,6 +125,101 @@ The screens are already coded. They are captured here, not redesigned. Screens g
 
 The screens are built from these parts: Clerk SignIn card [21:2213](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=21-2213), Clerk SignUp card [21:2244](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=21-2244), Onboarding choice [21:2275](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=21-2275), Onboarding · choose [21:2284](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=21-2284), Onboarding · seeker [21:2372](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=21-2372) and Onboarding · host [21:2438](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=21-2438). Each has a Default and an Error state. They sit inside the AuthFrame layout (`src/ui/patterns/AuthFrame.tsx`).
 
+## Category palette (issue 85)
+
+Issue [#85](https://github.com/AutomatedEmpires/explore-and-earn/issues/85) (EE-F0b). Section [6 Category palette](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=43-2627) on page 00 System.
+
+Only the 12 category variables changed: `color/maritime`, `color/seasonal`, `color/farm` and `color/remote`, each with `fg`, `bg` and `solid`, in Light and Dark. Status, brand and neutral variables are unchanged. Light success is still `#1F6B43`. Dark success is still `#7FD3A0`. Warning, danger and focus are unchanged too.
+
+The frames bind those variables. The hex below is the value of each variable, not a hardcoded paint. `src/ui/tokens.css` still has the old values. Issue #86 copies this palette into the code after the lead asks the founder to approve it.
+
+Each color names a kind of work, and none of them is a status color. Maritime is harbor water, a teal, not the focus blue. Seasonal is fall gold, yellower than warning. Farm is orchard olive, lighter than success. Remote was red, the same hue as danger, so it is now violet. The laptop icon and the word Remote stay with it.
+
+| Frame | Link |
+|---|---|
+| Palette · 1440 · Light | [43:2628](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=43-2628) |
+| Palette · 1440 · Dark | [43:3041](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=43-3041) |
+| Palette · 768 · Light | [43:3454](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=43-3454) |
+| Palette · 768 · Dark | [43:3867](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=43-3867) |
+| Palette · 390 · Light | [43:4280](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=43-4280) |
+| Palette · 390 · Dark | [43:4693](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=43-4693) |
+
+### Old values, still in `src/ui/tokens.css`
+
+| Token | Light | Dark |
+|---|---|---|
+| maritime fg / bg / solid | `#1A4F9C` / `#E6EEFA` / `#1D5FBF` | `#A9C8F5` / `#16294A` / `#5B95E8` |
+| seasonal fg / bg / solid | `#8F4E06` / `#FBEEDD` / `#B45F06` | `#F5BF7E` / `#3A2710` / `#E08A2E` |
+| farm fg / bg / solid | `#24622E` / `#E5F2E6` / `#2F7D3B` | `#9AD6A4` / `#183520` / `#55AC62` |
+| remote fg / bg / solid | `#A12C23` / `#FBE7E5` / `#C8382E` | `#F6A8A1` / `#451B17` / `#E5604F` |
+
+### New values, in the Figma Color collection
+
+| Token | Light | Dark |
+|---|---|---|
+| maritime fg / bg / solid | `#003949` / `#DBF3FC` / `#0E7490` | `#C9EBF8` / `#011E28` / `#3D859D` |
+| seasonal fg / bg / solid | `#4B4300` / `#F4EEB8` / `#A08318` | `#F3EFB0` / `#241F0C` / `#F3EFB0` |
+| farm fg / bg / solid | `#354316` / `#EAF8D4` / `#74915E` | `#CCF3AE` / `#131E0A` / `#5F8938` |
+| remote fg / bg / solid | `#41094C` / `#FBECFE` / `#652A72` | `#F1DCF5` / `#251229` / `#C282D0` |
+
+Dark seasonal uses the same pale gold for `fg` and `solid`. A darker gold sat on top of farm for red-blind viewers.
+
+### Contrast
+
+Text is `fg` on `bg` and must be at least 4.5:1. Marks are `solid` on the card (`color/surface`), the page (`color/bg`) and the tint (`bg`), and must be at least 3:1. Light page `#FBFAF7`, light card `#FFFFFF`. Dark page `#141311`, dark card `#1D1B18`.
+
+| Category | Theme | Text on tint | Mark on card | Mark on page | Mark on tint |
+|---|---|---|---|---|---|
+| Maritime | Light | 10.85:1 | 5.36:1 | 5.13:1 | 4.65:1 |
+| Seasonal | Light | 8.45:1 | 3.65:1 | 3.50:1 | 3.09:1 |
+| Farm | Light | 9.60:1 | 3.53:1 | 3.38:1 | 3.17:1 |
+| Remote | Light | 13.54:1 | 9.87:1 | 9.46:1 | 8.71:1 |
+| Maritime | Dark | 13.73:1 | 4.12:1 | 4.46:1 | 4.14:1 |
+| Seasonal | Dark | 13.93:1 | 14.55:1 | 15.72:1 | 13.93:1 |
+| Farm | Dark | 13.96:1 | 4.19:1 | 4.53:1 | 4.21:1 |
+| Remote | Dark | 13.61:1 | 6.05:1 | 6.54:1 | 6.18:1 |
+
+### Distance from each status color
+
+The number is CIEDE2000 between the category solid and that status solid. The hue gap is from the nearest status hue. Under 10 can look like one color to a sighted person. Every pair below is past that.
+
+| Category | Theme | Success | Warning | Danger | Focus | Hue gap |
+|---|---|---|---|---|---|---|
+| Maritime | Light | 28.6 | 42.9 | 54.3 | 18.2 | 40° from focus |
+| Seasonal | Light | 32.3 | 19.4 | 38.4 | 60.8 | 25° from warning |
+| Farm | Light | 18.9 | 32.9 | 51.1 | 51.4 | 24° from success |
+| Remote | Light | 42.9 | 47.2 | 34.8 | 23.3 | 57° from focus |
+| Maritime | Dark | 35.1 | 46.5 | 49.0 | 21.9 | 37° from focus |
+| Seasonal | Dark | 20.9 | 18.6 | 36.1 | 48.7 | 29° from warning |
+| Farm | Dark | 23.8 | 34.5 | 50.1 | 52.1 | 24° from success |
+| Remote | Dark | 44.5 | 51.0 | 26.9 | 26.3 | 60° from focus |
+
+### Color-vision check
+
+Simulated with the Machado 2009 matrices at full severity (protanopia, deuteranopia, tritanopia). The number is the nearest status color after the simulation. The same frames state this in words. The icon and the word still name the job, which is how the badge already works in `CategoryBadge`.
+
+Light:
+
+- Red-blind: Maritime 13.4 from focus, Seasonal 16.4 from warning, Farm 16.1 from success, Remote 15.5 from focus. Closest pair: Seasonal and Farm, 11.4.
+- Green-blind: Maritime 10.5 from focus, Seasonal 13.2 from danger, Farm 15.8 from danger, Remote 12.1 from focus.
+- Blue-blind: Maritime 8.0 from success, Seasonal 16.3 from warning, Farm 19.2 from focus, Remote 15.3 from warning.
+
+Dark:
+
+- Red-blind: Maritime 19.2 from focus, Seasonal 9.2 from success, Farm 18.5 from warning, Remote 10.5 from focus. Closest pair: Maritime and Remote, 10.8.
+- Green-blind: Maritime 19.6 from focus, Seasonal 11.6 from warning, Farm 20.1 from danger, Remote 7.1 from focus.
+- Blue-blind: Maritime 17.8 from focus, Seasonal 18.6 from warning, Farm 21.7 from focus, Remote 13.0 from danger.
+
+Three simulated gaps are under 10. They are listed in [Gaps and notes](#gaps-and-notes). Changing the color to close them pushed another pair under 10, or made the mark look dull next to the status colors.
+
+### Job cards
+
+Each frame has four `JobCard` instances, one per category, with the Apply button in its active state. Covers use the sample media: harbor for the deckhand, the lake for the housekeeper, the farm for the orchard. Remote has no cover. Hollow Oak shows initials HO. Trailhead Booking shows initials TB. Kettle Ridge keeps its logo.
+
+The orchard pay is `$18–$22/hr`. The gallery string `$18.50 to $22/hr` clips inside the pay chip, so the specimen uses the shorter line. The job pays $18.50 to $22 an hour.
+
+On the 390 frames the card is 384px wide, so the row sits 3px from each edge. The heading "A job in each color" sits 16px in.
+
 ## Gaps and notes
 
 1. **The Clerk forms were not captured from a live render.** No screenshot of `/sign-in` or `/sign-up` exists in the repository. A local run would mean either using the `prd` key set or letting Clerk create a keyless development instance; neither fits a design-only task. The cards follow Clerk's prebuilt layout with our appearance and copy from `src/ui/clerk.ts`. The methods drawn follow product spec section 2: Google, then an email address, with no password. The Clerk dashboard decides which methods actually appear (a passkey option, name fields, a "Development mode" note with test keys). Clerk's internal type sizes are drawn with the nearest text styles. **Next step:** take Playwright screenshots of `/sign-in` and `/sign-up` the next time a claimed task runs the dev server, and correct the two Clerk cards if they differ.
@@ -135,3 +233,4 @@ The screens are built from these parts: Clerk SignIn card [21:2213](https://www.
 9. **Small differences from the code.** The Sheet footer button in the reference has a trailing ChevronRight (an `asChild` link); Button has only a leading icon, so it is drawn without the chevron. A md Badge with an icon uses 8px left padding in code, while the Figma Badge keeps 10px.
 10. **Top bar on desktop.** The code's options exist only at phone width. On desktop the seeker bar is the TopBar component with Links on (Seek, Swipe, Map, Community) and the account menu; option B adds the badge there too. The host uses the Sidebar on desktop.
 11. **Icon swaps.** Swapping a nested icon to the icon it already shows resets the glyph's color override. If an icon turns ink after a swap, bind its `glyph` stroke to the right color variable again.
+12. **Category palette, still open.** The proposed colors are in Figma only. Three color-vision gaps stay under 10 and are carried by the icon plus the word: dark Remote vs focus for green-blind viewers (7.1), light Maritime vs success for blue-blind viewers (8.0), and dark Seasonal vs success for red-blind viewers (9.2). Light Seasonal mark on tint is 3.09:1 and light Farm mark on tint is 3.17:1, both just over 3. The nearest sighted gaps are light Maritime vs focus (18.2), light Farm vs success (18.9) and light Seasonal vs warning (19.4). JobCard's own 12px chip labels are unchanged; the type scale is issue #86. A 384px card in a 390px frame leaves 3px a side, and the frame clips the card shadow at that edge.
