@@ -5,7 +5,7 @@
 // - `seekerId` is set only for seeker accounts: hosts, operators and guests get no overlay,
 //   skips or saved state (spec 8.1).
 // - `viewerKey` dedupes views and feeds the placement hook: the user id, or for guests an HMAC
-//   of address and browser (no cookie). Neither leaves the server.
+//   of the IP alone (no cookie, and not the user agent). Neither leaves the server.
 // - `tz` is the viewer's IANA zone from `?tz=` or the `ee_tz` cookie, else America/Chicago.
 import 'server-only';
 import { createHmac } from 'node:crypto';
@@ -33,14 +33,17 @@ export function hmacKey(v: string): string {
   return createHmac('sha256', getEnv().ANALYTICS_HASH_SECRET).update(v).digest('base64url');
 }
 
-/** The user id, or for a guest a keyed hash of address and browser. */
+/**
+ * The user id, or for a guest an HMAC of the IP. The user agent is ignored: rotating it must
+ * not mint a new viewer. `userAgent` stays on the argument so callers do not change.
+ */
 export function viewerKeyFor(i: {
   userId: string | null;
   ip: string | null;
   userAgent: string | null;
 }): string {
   if (i.userId) return i.userId;
-  return hmacKey(`${i.ip || 'unknown'}|${i.userAgent || 'unknown'}`);
+  return hmacKey(i.ip || 'unknown');
 }
 
 /** The first `x-forwarded-for` address, else `x-real-ip`. */

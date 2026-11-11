@@ -91,6 +91,8 @@ export async function setDisposition(
 
     const current = await currentRow(tx, i.userId, i.listingId);
     const previous = current?.state ?? null;
+    // Already in the requested state: a retry must not 409, and must not move acted_at or source.
+    if (previous === i.state) return { state: i.state, previous };
     checkExpected(i.expectedState, previous);
 
     if (i.state === 'saved' && previous !== 'saved') {
@@ -140,13 +142,12 @@ export async function clearDisposition(
   db: DbOrTx,
   i: { userId: string; listingId: string; expectedState?: DispositionState },
 ): Promise<{ previous: DispositionState | null }> {
-  if (!UUID.test(i.listingId)) {
-    checkExpected(i.expectedState, null);
-    return { previous: null };
-  }
+  if (!UUID.test(i.listingId)) return { previous: null };
   return transact(db, async (tx) => {
     await lockPair(tx, i.userId, i.listingId);
     const previous = (await currentRow(tx, i.userId, i.listingId))?.state ?? null;
+    // Already cleared: a retried delete is not a 409.
+    if (previous === null) return { previous: null };
     checkExpected(i.expectedState, previous);
     if (previous !== null) {
       await tx.execute(sql`delete from app.listing_dispositions
