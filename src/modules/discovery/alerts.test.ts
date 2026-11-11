@@ -11,7 +11,12 @@ import { seedSeeker } from '../../../tests/helpers/sp2';
 import { queryRows } from '@/lib/db';
 import type { DiscoveryQuery } from '@/lib/discovery';
 import { newId } from '@/lib/ids';
-import { setPreference } from '@/modules/notifications';
+import {
+  sendEmailJob,
+  setPreference,
+  stubEmailProvider,
+  stubOutbox,
+} from '@/modules/notifications';
 import type { ProjectionRowInput } from './projection-columns';
 import { alertHandlers, runAlertEmails } from './alerts';
 import { registerSeekerOverlay, resetSeekerOverlayForTests } from './hooks';
@@ -643,5 +648,69 @@ describe('discovery.alerts_weekly', () => {
     await matched(await search(userId, {}), [{}]);
     await weekly();
     expect(await outboxCount('notifications.email')).toBe(0);
+  });
+});
+
+// --- The emails as sent --------------------------------------------------------------------
+
+/** Sends the one email job the handler enqueued, through the real notifications.email path. */
+async function sendEnqueuedEmail() {
+  const [job] = await queryRows<{ payload: string }>(
+    t.db,
+    sql`select payload::text as payload from app.outbox where topic = 'notifications.email'`,
+  );
+  expect(job).toBeDefined();
+  stubOutbox.length = 0;
+  const sent = await sendEmailJob(t.db, JSON.parse(job?.payload ?? '{}') as unknown, {
+    provider: stubEmailProvider(),
+  });
+  expect(sent).toBe('sent');
+  expect(stubOutbox).toHaveLength(1);
+  const [mail] = stubOutbox;
+  return { subject: mail?.subject ?? '', html: mail?.html ?? '', text: mail?.text ?? '' };
+}
+
+describe('the alert emails as sent', () => {
+  it('carry each daily search and its jobs in the email itself', async () => {
+    const ski = await search(userId, { genres: ['ski-resorts'], states: ['CO'] });
+    const farm = await search(userId, { categories: ['farm'] });
+    const [lift] = await matched(ski, [{ title: 'Lift operator' }, { title: 'Ski instructor' }]);
+    await matched(farm, [{ title: 'Orchard picker', category: 'farm', genre: 'harvest' }]);
+    await daily();
+    const mail = await sendEnqueuedEmail();
+    expect(mail.subject).toBe('New jobs for your alerts');
+    for (const line of [
+      'Ski resorts · CO',
+      'Farm',
+      'Lift operator',
+      'Ski instructor',
+      'Orchard picker',
+      'Kettle Ridge Lodge',
+      'Housing provided · $150/week · deducted from pay',
+      'No meals',
+    ]) {
+      expect(mail.text, line).toContain(line);
+    }
+    expect(mail.html.match(/See all/g)).toHaveLength(2);
+    expect(mail.html).toContain(`href="${APP_URL}/jobs/view/${lift}/lift-operator?source=other"`);
+    expect(mail.html).toContain(
+      `href="${APP_URL}/?genre=ski-resorts&amp;state=CO&amp;sort=newest"`,
+    );
+    // Filters, never the seeker (seedSeeker's display name is Maya).
+    expect(mail.text).not.toContain('Maya');
+  });
+
+  it("carry the week's jobs in the weekly digest", async () => {
+    await t.db.execute(sql`insert into app.alert_settings (user_id, weekly_digest)
+      values (${userId}::uuid, true)`);
+    await matched(await search(userId, {}), [{ title: 'Deckhand' }, { title: 'Lift operator' }]);
+    await weekly();
+    const mail = await sendEnqueuedEmail();
+    expect(mail.subject).toBe('Your weekly job digest');
+    expect(mail.text).toContain('Your saved searches');
+    expect(mail.text).toContain('Deckhand');
+    expect(mail.text).toContain('Lift operator');
+    expect(mail.html).toContain(`href="${APP_URL}/profile/alerts"`);
+    expect(mail.html.match(/See all/g)).toHaveLength(1);
   });
 });
