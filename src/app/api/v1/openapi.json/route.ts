@@ -23,6 +23,7 @@ import '@/app/api/v1/host/team/route';
 import '@/app/api/v1/host/team/transfer-ownership/route';
 import '@/app/api/v1/host/verification/info/route';
 import '@/app/api/v1/host/verification/route';
+import '@/app/api/v1/landing/route';
 import '@/app/api/v1/listings/[id]/events/route';
 import '@/app/api/v1/listings/[id]/route';
 import '@/app/api/v1/me/dispositions/[listingId]/route';
