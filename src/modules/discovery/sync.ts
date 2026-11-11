@@ -5,7 +5,10 @@
 // so concurrent syncs of one listing end in the state SP2 holds last:
 // - active: the listing, its host and its location are read and the row is upserted. A missing
 //   read throws from syncListing, so that single job retries. A batch logs the listing,
-//   raises one alert and continues, so one failure cannot stall the fan-out.
+//   raises one alert and continues, so one failure cannot stall the fan-out. A host fan-out
+//   also queues each failed row as its own sync_listing job: the nightly check ignores a
+//   row whose listing revision still matches, so a host or location change would otherwise
+//   stay stale.
 // - closed: the row stays, inactive, with closed_at set.
 // - anything else, or no listing at all: the row goes, and in the same transaction the
 //   listing's dispositions and alert matches (spec failure mode 1).
@@ -195,11 +198,13 @@ async function alertSyncFailures(db: Db, failed: number): Promise<void> {
 
 /**
  * Re-syncs up to 100 projection rows of the org (or of one of its locations), in listing_id
- * order after `after`. `next` is the last id synced when more rows follow.
+ * order after `after`. `next` is the last id of the page when more rows follow. A failed row
+ * is queued as `discovery.sync_listing` (keyed by `run`) so the outbox retries it; the page
+ * still advances.
  */
 export async function syncHost(
   db: Db,
-  i: { orgId: string; locationId?: string; after?: string },
+  i: { orgId: string; locationId?: string; after?: string; run?: string },
   now: Date,
 ): Promise<{ synced: number; next: string | null }> {
   const rows = await queryRows<{ id: string }>(
@@ -216,11 +221,20 @@ export async function syncHost(
   const page = rows.slice(0, HOST_PAGE_SIZE);
   if (page.length === 0) return { synced: 0, next: null };
   const lookups = await loadLookups(db);
+  const run = i.run ?? newId();
   let synced = 0;
   let failed = 0;
   for (const r of page) {
-    if ((await syncItem(db, r.id, now, lookups)) === null) failed += 1;
-    else synced += 1;
+    if ((await syncItem(db, r.id, now, lookups)) === null) {
+      failed += 1;
+      // Host, location and subscription changes do not move the listing revision, so the
+      // nightly check will not come back for this row. The single-listing job still throws.
+      await enqueue(db, {
+        topic: 'discovery.sync_listing',
+        payload: { listingId: r.id },
+        dedupeKey: `sync_listing_retry:${r.id}:${run}`,
+      });
+    } else synced += 1;
   }
   await alertSyncFailures(db, failed);
   return {
@@ -381,7 +395,7 @@ export const syncHandlers: HandlerMap = {
     const location = isUuid(locationId) ? locationId : undefined;
     const res = await syncHost(
       db,
-      { orgId, locationId: location, after: isUuid(after) ? after : undefined },
+      { orgId, locationId: location, after: isUuid(after) ? after : undefined, run },
       now,
     );
     if (res.next) {

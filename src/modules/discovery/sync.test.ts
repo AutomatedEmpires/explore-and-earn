@@ -551,7 +551,7 @@ describe('syncHost', () => {
     expect(await syncHost(t.db, { orgId: newId() }, NOW)).toEqual({ synced: 0, next: null });
   });
 
-  it('skips a listing that fails, syncs the rest of the page, and raises one alert', async () => {
+  it('skips a listing that fails, syncs the rest of the page, and queues that listing for retry', async () => {
     await seedRows(3);
     fakeSp2.failNext('getPublishedListing');
     expect(await syncHost(t.db, { orgId: DEFAULT_ORG_ID }, NOW)).toEqual({ synced: 2, next: null });
@@ -564,6 +564,18 @@ describe('syncHost', () => {
     });
     expect(await renamed('Old name')).toBe(1);
     expect(await renamed('Kettle Ridge Lodge')).toBe(2);
+    const [stale] = await queryRows<{ id: string }>(
+      t.db,
+      sql`select listing_id::text as id from app.discovery_listings where host_name = 'Old name'`,
+    );
+    const retries = await queryRows<{ payload: { listingId: string } }>(
+      t.db,
+      sql`select payload from app.outbox where topic = 'discovery.sync_listing'`,
+    );
+    expect(retries.map((r) => r.payload.listingId)).toEqual([stale?.id]);
+    await runWorker(t.db, { handlers: syncHandlers });
+    expect(await renamed('Old name')).toBe(0);
+    expect(await renamed('Kettle Ridge Lodge')).toBe(3);
   });
 });
 
