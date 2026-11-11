@@ -38,6 +38,16 @@ export {
   type NotificationTypeDef,
 } from './types';
 
+export {
+  listPreferenceRows,
+  notificationPreferenceSchema,
+  updatePreference,
+  USER_PREFERENCE_CATEGORIES,
+  type PreferenceInput,
+  type PreferenceRow,
+  type UserPreferenceCategory,
+} from './preferences';
+
 export { FLUSH_TOPIC, flushBatches } from './batches';
 
 export {
