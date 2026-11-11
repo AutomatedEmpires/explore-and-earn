@@ -3,7 +3,7 @@
 //   vi.mock('@/lib/db', async (orig) => (await import('@tests/helpers/sp4')).mockDbModule(orig));
 //   vi.mock('@/server/guards', async () => (await import('@tests/helpers/sp4')).guardMocks());
 //
-// then `const t = useRouteDb()` at the top level, and asSeeker(user) / asHost(ctx) / asUser(user)
+// then `const t = setupRouteDb()` at the top level, and asSeeker(user) / asHost(ctx) / asUser(user)
 // before each request. Route handlers then read the PGlite test database (through the mocked
 // getDb) and the signed-in user the test chose (through the mocked guards).
 //
@@ -27,7 +27,7 @@ export async function mockDbModule<M extends object>(orig: () => Promise<M>): Pr
   return {
     ...actual,
     getDb: () => {
-      if (!state.db) throw new Error('route test db not ready: call useRouteDb() at the top level');
+      if (!state.db) throw new Error('test db not ready: call setupRouteDb() at the top level');
       return state.db;
     },
   };
@@ -82,7 +82,7 @@ export function asHost(ctx: HostContext): void {
 }
 
 /** A PGlite test database for the file, served to route handlers by the mocked getDb(). */
-export function useRouteDb(): { readonly db: Db } {
+export function setupRouteDb(): { readonly db: Db } {
   let t: TestDb | undefined;
   beforeAll(async () => {
     t = await createTestDb();

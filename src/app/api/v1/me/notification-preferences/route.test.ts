@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { asUser, call, request, seedUser, useRouteDb } from '@tests/helpers/sp4';
+import { asUser, call, request, seedUser, setupRouteDb } from '@tests/helpers/sp4';
 import { GET, PUT } from './route';
 
 vi.mock('@/lib/db', async (orig) => (await import('@tests/helpers/sp4')).mockDbModule(orig));
 vi.mock('@/server/guards', async () => (await import('@tests/helpers/sp4')).guardMocks());
 
-const t = useRouteDb();
+const t = setupRouteDb();
 const PATH = '/api/v1/me/notification-preferences';
 
 type Items = { items: { category: string; channel: string; enabled: boolean; locked: boolean }[] };

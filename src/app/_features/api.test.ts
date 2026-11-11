@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
-import { apiUrl, server, useMswServer } from '@tests/msw/server';
+import { apiUrl, server, setupMswServer } from '@tests/msw/server';
 import { ApiError, apiFetch } from './api';
 
-useMswServer();
+setupMswServer();
 
 describe('apiFetch', () => {
   it('returns the JSON body and sends `json` as a JSON body', async () => {
