@@ -22,7 +22,7 @@ import {
 } from '@/lib/discovery';
 import type { Category } from '@/lib/taxonomy';
 import { boostedLabels } from './cards';
-import { buildFilterSql, type FilterContext } from './filters';
+import { buildFilterSql, uuidArray, type FilterContext } from './filters';
 import { overlayHidden } from './hooks';
 import { searchListings } from './search';
 
@@ -195,7 +195,7 @@ type HostRow = {
   remoteStates: string[] | null;
 };
 
-/** Null when the location has no active listing. */
+/** Null when the location has no active listing a guest or this viewer can see. */
 export async function locationPreview(
   db: DbOrTx,
   i: {
@@ -213,12 +213,17 @@ export async function locationPreview(
   nextCursor: string | null;
 } | null> {
   if (!UUID.test(i.locationId)) return null;
-  // The host and its location come from the most recently indexed active row there.
+  // Same hidden-org exclusion as mapWhere. A blocked host is not a preview, and when that
+  // exclusion removes every active row the location is null.
+  const hidden = i.viewerUserId ? await overlayHidden(db, i.viewerUserId) : [];
+  const hiddenOrg =
+    hidden.length > 0 ? sql`and dl.org_id <> all(${uuidArray(hidden)})` : sql``;
+  // The host and its location come from the most recently indexed visible row there.
   const [h] = await queryRows<HostRow>(
     db,
     sql`with here as (
         select * from app.discovery_listings dl
-        where dl.location_id = ${i.locationId}::uuid and dl.is_active
+        where dl.location_id = ${i.locationId}::uuid and dl.is_active ${hiddenOrg}
       )
       select h.org_id::text as "orgId", h.host_name as name, h.host_slug as slug,
         h.host_logo_url as "logoUrl", h.city, h.state::text as state, h.approximate,
