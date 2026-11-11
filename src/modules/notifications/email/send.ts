@@ -30,7 +30,7 @@ import {
 import BillingNotice from './templates/BillingNotice';
 import Digest, { digestSubject, type DigestItem } from './templates/Digest';
 import HostNotice from './templates/HostNotice';
-import JobAlertDaily from './templates/JobAlertDaily';
+import JobAlertDaily, { jobAlertProps } from './templates/JobAlertDaily';
 import JobAlertWeekly from './templates/JobAlertWeekly';
 import type { FooterProps } from './templates/Layout';
 import ApplicationReceipt from './templates/ApplicationReceipt';
@@ -188,11 +188,21 @@ function templateElement(name: EmailTemplateName, c: Content, footer: FooterProp
         expiresAt: String(c.data.expiresAt ?? ''),
         footer,
       });
-    // SP3 W4 feeds these the saved searches' jobs from `data` (Task 30).
+    // SP3: the saved searches' jobs come from `data` (discovery's JobAlertEmailData).
     case 'JobAlertDaily':
-      return createElement(JobAlertDaily, { title: c.title, body: c.body, footer });
+      return createElement(JobAlertDaily, {
+        ...jobAlertProps(c.data),
+        title: c.title,
+        body: c.body,
+        footer,
+      });
     case 'JobAlertWeekly':
-      return createElement(JobAlertWeekly, { title: c.title, body: c.body, footer });
+      return createElement(JobAlertWeekly, {
+        ...jobAlertProps(c.data),
+        title: c.title,
+        body: c.body,
+        footer,
+      });
     // SP4. Notification data holds ids, `listingTitle`, `orgName` and `firstName` only.
     case 'ApplicationReceipt':
       return createElement(ApplicationReceipt, {
