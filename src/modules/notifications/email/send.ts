@@ -30,9 +30,12 @@ import {
 import BillingNotice from './templates/BillingNotice';
 import Digest, { digestSubject, type DigestItem } from './templates/Digest';
 import HostNotice from './templates/HostNotice';
-import JobAlertDaily from './templates/JobAlertDaily';
+import JobAlertDaily, { jobAlertProps } from './templates/JobAlertDaily';
 import JobAlertWeekly from './templates/JobAlertWeekly';
 import type { FooterProps } from './templates/Layout';
+import ApplicationReceipt from './templates/ApplicationReceipt';
+import AvailabilityReconfirm from './templates/AvailabilityReconfirm';
+import SeekerNotice from './templates/SeekerNotice';
 import OperatorAlert from './templates/OperatorAlert';
 import OperatorMention from './templates/OperatorMention';
 import SystemTest from './templates/SystemTest';
@@ -185,11 +188,45 @@ function templateElement(name: EmailTemplateName, c: Content, footer: FooterProp
         expiresAt: String(c.data.expiresAt ?? ''),
         footer,
       });
-    // SP3 W4 feeds these the saved searches' jobs from `data` (Task 30).
+    // SP3: the saved searches' jobs come from `data` (discovery's JobAlertEmailData).
     case 'JobAlertDaily':
-      return createElement(JobAlertDaily, { title: c.title, body: c.body, footer });
+      return createElement(JobAlertDaily, {
+        ...jobAlertProps(c.data),
+        title: c.title,
+        body: c.body,
+        footer,
+      });
     case 'JobAlertWeekly':
-      return createElement(JobAlertWeekly, { title: c.title, body: c.body, footer });
+      return createElement(JobAlertWeekly, {
+        ...jobAlertProps(c.data),
+        title: c.title,
+        body: c.body,
+        footer,
+      });
+    // SP4. Notification data holds ids, `listingTitle`, `orgName` and `firstName` only.
+    case 'ApplicationReceipt':
+      return createElement(ApplicationReceipt, {
+        firstName: typeof c.data.firstName === 'string' ? c.data.firstName : '',
+        listingTitle: typeof c.data.listingTitle === 'string' ? c.data.listingTitle : '',
+        orgName: typeof c.data.orgName === 'string' ? c.data.orgName : '',
+        submittedAt: typeof c.data.submittedAt === 'string' ? c.data.submittedAt : null,
+        receiptUrl: c.url,
+        footer,
+      });
+    case 'AvailabilityReconfirm':
+      return createElement(AvailabilityReconfirm, {
+        title: c.title,
+        body: c.body,
+        url: c.url,
+        footer,
+      });
+    case 'SeekerNotice':
+      return createElement(SeekerNotice, {
+        heading: c.title,
+        lines: c.body.split('\n').filter((line) => line.trim() !== ''),
+        button: noticeButton(c),
+        footer,
+      });
   }
 }
 

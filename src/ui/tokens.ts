@@ -1,8 +1,8 @@
 // Design tokens (spec section 10). The values here and in tokens.css must stay identical;
 // tokens.test.ts checks both, and checks every text/background pair for WCAG contrast.
 //
-// Light values come from the Direction B design board. Dark values are derived from them so
-// that every pair in `tokenPairs` passes.
+// Light values come from the Direction B design board. Category fg, bg and solid are the
+// approved palette (issue 86). Dark values are derived so every pair in `tokenPairs` passes.
 
 export const themes = ['light', 'dark'] as const;
 export type Theme = (typeof themes)[number];
@@ -72,18 +72,18 @@ export const colors: Record<Theme, Record<ColorToken, string>> = {
     danger: '#B42318',
     'danger-bg': '#FCE9E7',
     focus: '#2457C5',
-    'maritime-fg': '#1A4F9C',
-    'maritime-bg': '#E6EEFA',
-    'maritime-solid': '#1D5FBF',
-    'seasonal-fg': '#8F4E06',
-    'seasonal-bg': '#FBEEDD',
-    'seasonal-solid': '#B45F06',
-    'farm-fg': '#24622E',
-    'farm-bg': '#E5F2E6',
-    'farm-solid': '#2F7D3B',
-    'remote-fg': '#A12C23',
-    'remote-bg': '#FBE7E5',
-    'remote-solid': '#C8382E',
+    'maritime-fg': '#003949',
+    'maritime-bg': '#DBF3FC',
+    'maritime-solid': '#0E7490',
+    'seasonal-fg': '#4B4300',
+    'seasonal-bg': '#F4EEB8',
+    'seasonal-solid': '#A08318',
+    'farm-fg': '#354316',
+    'farm-bg': '#EAF8D4',
+    'farm-solid': '#74915E',
+    'remote-fg': '#41094C',
+    'remote-bg': '#FBECFE',
+    'remote-solid': '#652A72',
   },
   dark: {
     bg: '#141311',
@@ -103,18 +103,18 @@ export const colors: Record<Theme, Record<ColorToken, string>> = {
     danger: '#F59990',
     'danger-bg': '#45201C',
     focus: '#8AB4F8',
-    'maritime-fg': '#A9C8F5',
-    'maritime-bg': '#16294A',
-    'maritime-solid': '#5B95E8',
-    'seasonal-fg': '#F5BF7E',
-    'seasonal-bg': '#3A2710',
-    'seasonal-solid': '#E08A2E',
-    'farm-fg': '#9AD6A4',
-    'farm-bg': '#183520',
-    'farm-solid': '#55AC62',
-    'remote-fg': '#F6A8A1',
-    'remote-bg': '#451B17',
-    'remote-solid': '#E5604F',
+    'maritime-fg': '#C9EBF8',
+    'maritime-bg': '#011E28',
+    'maritime-solid': '#3D859D',
+    'seasonal-fg': '#F3EFB0',
+    'seasonal-bg': '#241F0C',
+    'seasonal-solid': '#F3EFB0',
+    'farm-fg': '#CCF3AE',
+    'farm-bg': '#131E0A',
+    'farm-solid': '#5F8938',
+    'remote-fg': '#F1DCF5',
+    'remote-bg': '#251229',
+    'remote-solid': '#C282D0',
   },
 };
 
