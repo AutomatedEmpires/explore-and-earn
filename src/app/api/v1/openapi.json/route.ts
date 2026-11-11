@@ -27,6 +27,7 @@ import '@/app/api/v1/listings/[id]/events/route';
 import '@/app/api/v1/listings/[id]/route';
 import '@/app/api/v1/me/dispositions/[listingId]/route';
 import '@/app/api/v1/me/dispositions/route';
+import '@/app/api/v1/me/notification-preferences/route';
 import '@/app/api/v1/me/stream/route';
 import '@/app/api/v1/media/[id]/url/route';
 import '@/app/api/v1/media/uploads/[id]/complete/route';
