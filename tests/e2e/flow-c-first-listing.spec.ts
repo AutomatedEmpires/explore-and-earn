@@ -20,13 +20,18 @@
 import { crc32, deflateSync } from 'node:zlib';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
+import type { BuilderSection } from '@/modules/listings';
+// The listings module's index loads the whole module (jobs, then next/server), which Node can't
+// import in the Playwright runner. These two files are the listing contract alone (zod and the
+// plain lists in src/lib), so the fake API checks against the real schemas.
+// eslint-disable-next-line no-restricted-imports -- see above
+import { checklist } from '@/modules/listings/checklist';
+// eslint-disable-next-line no-restricted-imports -- see above
 import {
   ListingContentSchema,
   ListingDraftSchema,
   SECTION_CONTENT_KEYS,
-  checklist,
-  type BuilderSection,
-} from '@/modules/listings';
+} from '@/modules/listings/content';
 import {
   SAMPLE_IDS,
   SAMPLE_LOCATIONS,
