@@ -1,6 +1,6 @@
 // The status transition table and the seeker's view of each status (SP4 spec 8.5). Client-safe
-// and pure. The table is spec data, landed by W0 so the contract test can see it; W4 owns this
-// file from Phase B and implements the two functions (Task 19).
+// and pure. The database does not enforce the table: every status write goes through
+// @/modules/applications (setStatus and withdraw), which checks canTransition first.
 import type { Actor, ApplicationStatus, SeekerStatus, TransitionTable } from './types';
 
 export const TRANSITIONS: TransitionTable = {
@@ -26,16 +26,29 @@ export const TRANSITIONS: TransitionTable = {
   withdrawn: { host: [], seeker: [] },
 };
 
+const SEEKER_VIEW: Record<ApplicationStatus, SeekerStatus> = {
+  new: 'applied',
+  shortlisted: 'applied',
+  interviewing: 'interviewing',
+  offered: 'offer',
+  hired: 'hired',
+  not_selected: 'not_selected',
+  withdrawn: 'withdrawn',
+  offer_declined: 'offer_declined',
+};
+
 /** How a status reads to the seeker: `new` and `shortlisted` are both Applied. */
-export function seekerStatus(_s: ApplicationStatus): SeekerStatus {
-  throw new Error('not implemented: seekerStatus');
+export function seekerStatus(s: ApplicationStatus): SeekerStatus {
+  return SEEKER_VIEW[s];
 }
 
 /** Whether `actor` may move an application from `from` to `to`. 'system' = host ∪ seeker. */
 export function canTransition(
-  _from: ApplicationStatus,
-  _to: ApplicationStatus,
-  _actor: Actor['type'],
+  from: ApplicationStatus,
+  to: ApplicationStatus,
+  actor: Actor['type'],
 ): boolean {
-  throw new Error('not implemented: canTransition');
+  const allowed = TRANSITIONS[from];
+  if (actor === 'system') return allowed.host.includes(to) || allowed.seeker.includes(to);
+  return allowed[actor].includes(to);
 }
