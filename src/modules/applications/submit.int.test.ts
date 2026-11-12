@@ -2,7 +2,7 @@
 // the unique (listing, seeker) key create one application, one set of notifications and one
 // outbox row per subscriber, and the nine losers get the winner's receipt.
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { closeClient, createDb, queryRows } from '@/lib/db';
 import { resetSp2 } from '@tests/fakes/sp4/sp2';
 // Registers the three notification types the real notify() needs.
@@ -36,6 +36,12 @@ const db = createDb(url);
 
 let w: World;
 const worlds: World[] = [];
+let startedAt = '';
+
+beforeAll(async () => {
+  const [row] = await queryRows<{ now: string }>(db, sql`select now()::text as now`);
+  startedAt = row?.now ?? '';
+});
 
 const ids = (values: string[]) =>
   sql.join(
@@ -45,8 +51,10 @@ const ids = (values: string[]) =>
 
 // Applications are never deleted in the app (the guard refuses), so the cleanup switches the
 // triggers off for its own transaction. Later integration files then find the tables as they
-// expect them.
+// expect them: the outbox rows this file enqueued go too, or the jobs worker test (which shares
+// the database and runs every pending event) would pick them up.
 afterAll(async () => {
+  await db.execute(sql`delete from app.outbox where created_at >= ${startedAt}::timestamptz`);
   const users = worlds.flatMap((x) =>
     [x.seeker, x.owner.user, x.admin.user, x.recruiter.user, x.billing.user].map((u) => u.id),
   );

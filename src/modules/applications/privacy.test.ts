@@ -9,7 +9,7 @@ import { resetSp2, setListingState } from '@tests/fakes/sp4/sp2';
 import { createTestDb, type TestDb } from '@tests/helpers/db';
 import { seedUser } from '@tests/helpers/sp4';
 import { getHostApplication } from './host';
-import { privacyHandler, retentionRules } from './privacy';
+import { privacyHandler, redactDue, retentionRules } from './privacy';
 import { getReceipt } from './reads';
 import { withdraw } from './status';
 import { submitApplication } from './submit';
@@ -331,6 +331,28 @@ describe('retention rule applications.terminal_12m', () => {
     await rule?.run(t.db, new Date(), 100);
     expect(await storedSnapshot(onLive)).toContain('maya@example.test');
     expect(await storedSnapshot(onClosed)).not.toContain('maya@example.test');
+  });
+
+  it('reaches a due application behind more live ones than one scan holds', async () => {
+    await rule?.run(t.db, new Date(), 1000);
+    const live = deckhand(w);
+    const closed = deckhand(w);
+    // Three old applications to a listing that is still active, created first (lower ids)...
+    const blockers: string[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      const seeker = await seedUser(t.db, { accountType: 'seeker' });
+      blockers.push(await apply(seeker.id, live));
+    }
+    // ...and one behind them whose listing has closed.
+    const behind = await apply(w.seeker.id, closed);
+    for (const id of [...blockers, behind]) await ageStatus(id, 13);
+    setListingState(closed.listingId, 'closed');
+
+    // A scan of 2 sees only live ones at first; it must page on, on every run.
+    expect(await redactDue(t.db, new Date(), 10, 2)).toBe(1);
+    expect(await storedSnapshot(behind)).not.toContain('maya@example.test');
+    for (const id of blockers) expect(await storedSnapshot(id)).toContain('maya@example.test');
+    expect(await redactDue(t.db, new Date(), 10, 2)).toBe(0);
   });
 
   it('redacts at most `limit` applications in one run', async () => {

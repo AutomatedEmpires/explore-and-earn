@@ -117,7 +117,7 @@ describe('the SP2 listing stats provider', () => {
 });
 
 describe('applications.listing_event', () => {
-  const envelope = (applicationId: string, listingId: string) => ({
+  const envelope = (applicationId: string, listingId: string, submittedAt: string) => ({
     event: 'application.submitted',
     eventId: '019a4a3c-0000-7000-8000-0000000f0010',
     data: {
@@ -125,19 +125,27 @@ describe('applications.listing_event', () => {
       listingId,
       orgId: w.orgId,
       seekerUserId: w.seeker.id,
-      submittedAt: new Date().toISOString(),
+      submittedAt,
       source: 'swipe',
       inviteId: null,
     },
   });
 
-  it('records one apply event per application, however often the job runs', async () => {
+  it('records one apply event per application, dated when the seeker applied', async () => {
     const handler = eventHandlers[LISTING_EVENT_TOPIC];
-    const ctx = { db: t.db, now: new Date() };
-    await handler?.(envelope('app-1', 'listing-1'), ctx);
-    await handler?.(envelope('app-1', 'listing-1'), ctx);
+    // The job runs a day late (a backlog or a retry); the event keeps the submission time.
+    const submittedAt = '2026-11-10T23:59:30.000Z';
+    const ctx = { db: t.db, now: new Date('2026-11-12T00:05:00.000Z') };
+    await handler?.(envelope('app-1', 'listing-1', submittedAt), ctx);
+    await handler?.(envelope('app-1', 'listing-1', submittedAt), ctx);
     expect(calls.listingEvents).toEqual([
-      { listingId: 'listing-1', type: 'apply', source: 'swipe', dedupeKey: 'apply:app-1' },
+      {
+        listingId: 'listing-1',
+        type: 'apply',
+        source: 'swipe',
+        at: new Date(submittedAt),
+        dedupeKey: 'apply:app-1',
+      },
     ]);
   });
 

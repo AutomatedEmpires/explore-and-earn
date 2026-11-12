@@ -6,7 +6,7 @@
 // no answers, no work authorization), under the `app.privacy_erase` setting that the table's
 // guard checks. The setting is switched off again before the function returns, so nothing
 // later in the caller's transaction can touch a snapshot.
-import { and, asc, eq, inArray, lt, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, lt, notInArray, sql } from 'drizzle-orm';
 import { withTx, type Db, type DbOrTx, type Tx } from '@/lib/db';
 import { seekerStatus, TERMINAL_STATUSES, type ApplicationSnapshotV1 } from '@/lib/applications';
 import { getListingSummaries } from '@/modules/listings';
@@ -22,7 +22,7 @@ import { withdrawAllAsSystem } from './status';
 
 const DELETED_NAME = 'Deleted user';
 const RETAIN_MONTHS = 12;
-/** How many old, still-open applications one retention run checks against SP2. */
+/** How many old, still-open applications a retention run checks against SP2 at a time. */
 const RETENTION_SCAN = 500;
 
 /** A snapshot that erase or retention has not redacted yet. */
@@ -187,44 +187,64 @@ export const privacyHandler: PrivacyHandler = {
   },
 };
 
+/**
+ * Redacts up to `limit` applications whose last status change is over 12 months old: finished
+ * ones first, then still-open ones whose listing SP2 reports closed or removed (or no longer
+ * knows). The open ones are paged through by id, `scan` at a time, until `limit` is reached or
+ * none are left, so old applications to listings that are still active never hide the ones
+ * behind them.
+ */
+export async function redactDue(
+  db: Db,
+  now: Date,
+  limit: number,
+  scan: number = RETENTION_SCAN,
+): Promise<number> {
+  const cutoff = addMonths(now, -RETAIN_MONTHS);
+  const old = and(lt(applications.statusChangedAt, cutoff), NOT_REDACTED);
+
+  const finished = await db
+    .select({ id: applications.id })
+    .from(applications)
+    .where(and(old, inArray(applications.status, [...TERMINAL_STATUSES])))
+    .orderBy(asc(applications.statusChangedAt), asc(applications.id))
+    .limit(limit);
+  const due = finished.map((r) => r.id);
+
+  let after: string | null = null;
+  while (due.length < limit) {
+    const open: { id: string; listingId: string }[] = await db
+      .select({ id: applications.id, listingId: applications.listingId })
+      .from(applications)
+      .where(
+        and(
+          old,
+          notInArray(applications.status, [...TERMINAL_STATUSES]),
+          after ? gt(applications.id, after) : undefined,
+        ),
+      )
+      .orderBy(asc(applications.id))
+      .limit(scan);
+    if (open.length === 0) break;
+    const listings = await getListingSummaries(db, [...new Set(open.map((r) => r.listingId))]);
+    for (const r of open) {
+      if (due.length >= limit) break;
+      const state = listings.get(r.listingId)?.state;
+      if (state === undefined || state === 'closed' || state === 'removed') due.push(r.id);
+    }
+    if (open.length < scan) break;
+    after = open.at(-1)?.id ?? null;
+  }
+  return withTx(db, (tx) => redact(tx, due));
+}
+
 export const retentionRules: RetentionRule[] = [
   {
     key: 'applications.terminal_12m',
     description:
       'Applications are redacted 12 months after they reach a final status or their listing closes.',
     async run(db: Db, now: Date, limit: number) {
-      const cutoff = addMonths(now, -RETAIN_MONTHS);
-      const oldest = (terminal: boolean, max: number) =>
-        db
-          .select({ id: applications.id, listingId: applications.listingId })
-          .from(applications)
-          .where(
-            and(
-              lt(applications.statusChangedAt, cutoff),
-              NOT_REDACTED,
-              terminal
-                ? inArray(applications.status, [...TERMINAL_STATUSES])
-                : notInArray(applications.status, [...TERMINAL_STATUSES]),
-            ),
-          )
-          .orderBy(asc(applications.statusChangedAt), asc(applications.id))
-          .limit(max);
-
-      // Finished applications first: they are due whatever became of the listing.
-      const due = (await oldest(true, limit)).map((r) => r.id);
-      if (due.length < limit) {
-        // Still-open ones are due only once SP2 says the listing closed or was removed. A
-        // listing SP2 no longer knows is gone, the same as a removed one.
-        const open = await oldest(false, RETENTION_SCAN);
-        const listings = await getListingSummaries(db, [...new Set(open.map((r) => r.listingId))]);
-        for (const r of open) {
-          if (due.length >= limit) break;
-          const state = listings.get(r.listingId)?.state;
-          if (state === undefined || state === 'closed' || state === 'removed') due.push(r.id);
-        }
-      }
-      const deleted = await withTx(db, (tx) => redact(tx, due));
-      return { deleted };
+      return { deleted: await redactDue(db, now, limit) };
     },
   },
 ];
