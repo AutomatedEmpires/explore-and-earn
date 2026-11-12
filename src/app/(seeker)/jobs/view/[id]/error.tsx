@@ -43,9 +43,12 @@ export default function ListingError({ retry }: { error: unknown; retry: () => v
     </Button>
   );
 
+  // The page's metadata failed with it, so the boundary names the document itself (React hoists
+  // <title> into <head>).
   if (!online) {
     return (
       <div role="alert">
+        <title>You’re offline · Explore&amp;Earn</title>
         <EmptyState
           icon={WifiOff}
           titleAs="h1"
@@ -57,11 +60,14 @@ export default function ListingError({ retry }: { error: unknown; retry: () => v
     );
   }
   return (
-    <ErrorState
-      titleAs="h1"
-      title="Couldn’t load this job"
-      description="Check your connection, then try again."
-      action={tryAgain}
-    />
+    <>
+      <title>Couldn’t load this job · Explore&amp;Earn</title>
+      <ErrorState
+        titleAs="h1"
+        title="Couldn’t load this job"
+        description="Check your connection, then try again."
+        action={tryAgain}
+      />
+    </>
   );
 }

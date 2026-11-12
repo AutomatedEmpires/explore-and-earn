@@ -358,9 +358,18 @@ test('Apply goes to sign-in and on to the apply step; Save asks a guest to sign 
 
 test('768: one column with the action row under the deal', async ({ page }) => {
   await open(page, 768, 1024);
-  const bars = page.getByRole('group', { name: 'Actions for Lodge housekeeper' });
-  await expect(bars.first()).toBeVisible();
-  await expect(bars.last()).toBeHidden();
+  // Both rows are in the document (inline, then pinned); at 768 only the inline one shows,
+  // and it sits under the deal (frame 45:7566).
+  const name = 'Actions for Lodge housekeeper';
+  const all = page.getByRole('group', { name, includeHidden: true });
+  await expect(all).toHaveCount(2);
+  await expect(all.first()).toBeVisible();
+  await expect(all.last()).toBeHidden();
+  const shown = page.getByRole('group', { name });
+  await expect(shown).toHaveCount(1);
+  const deal = await page.getByRole('list', { name: 'The deal' }).boundingBox();
+  const row = await shown.boundingBox();
+  expect(row?.y ?? 0).toBeGreaterThanOrEqual((deal?.y ?? 9999) + (deal?.height ?? 0));
   await shot(page, 'detail-guest-768', true);
   await axe(page);
 });
@@ -498,6 +507,13 @@ test('signed in: the seeker bar and the same deal', async ({ page }) => {
   } catch (err) {
     test.skip(true, `no Clerk development instance: ${String(err)}`);
   }
+  // The fixture sets the account type through the API, so the session token from sign-in
+  // still has none and the proxy would send every page to /onboarding (and onboarding back to
+  // Seek). Fetch a fresh token first, as the onboarding form does after its last step.
+  await page.evaluate(async () => {
+    type Clerk = { session?: { getToken(o: { skipCache: boolean }): Promise<unknown> } | null };
+    await (window as unknown as { Clerk?: Clerk }).Clerk?.session?.getToken({ skipCache: true });
+  });
   await open(page, 390, 844);
   await expect(page.getByRole('link', { name: 'Apply' }).last()).toHaveAttribute(
     'href',

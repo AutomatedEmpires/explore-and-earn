@@ -113,6 +113,8 @@ describe('the listing error boundary', () => {
     const retry = vi.fn();
     render(<ListingError error={new Error('x')} retry={retry} />);
     expect(screen.getByRole('heading', { name: 'Couldn’t load this job' })).toBeInTheDocument();
+    // The page's metadata failed with it, so the boundary names the document (axe document-title).
+    expect(document.title).toBe('Couldn’t load this job · Explore&Earn');
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(retry).toHaveBeenCalledTimes(1);
   });
@@ -122,6 +124,7 @@ describe('the listing error boundary', () => {
     render(<ListingError error={new Error('x')} retry={retry} />);
     act(() => setOnline(false));
     expect(screen.getByRole('heading', { name: 'You’re offline' })).toBeInTheDocument();
+    expect(document.title).toBe('You’re offline · Explore&Earn');
     expect(retry).not.toHaveBeenCalled();
     act(() => setOnline(true));
     expect(retry).toHaveBeenCalledTimes(1);
