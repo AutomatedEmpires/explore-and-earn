@@ -25,6 +25,11 @@ const dev = {
   VAPID_SUBJECT: 'mailto:dev@example.test',
   JOBS_SECRET: 'j'.repeat(32),
   UNSUBSCRIBE_SECRET: 'u'.repeat(32),
+  ANALYTICS_HASH_SECRET: 'a'.repeat(32),
+  BILLING_PROVIDER: 'stub',
+  GEOCODER_PROVIDER: 'stub',
+  WEATHER_PROVIDER: 'stub',
+  LINK_SAFETY_PROVIDER: 'stub',
 } satisfies Record<string, string>;
 
 const prod = {
@@ -46,6 +51,17 @@ const prod = {
   CLOUDMERSIVE_API_KEY: 'test-cloudmersive',
   EMAIL_PROVIDER: 'resend',
   RESEND_API_KEY: 'test-resend',
+  BILLING_PROVIDER: 'stripe',
+  STRIPE_SECRET_KEY: 'sk_test_prod',
+  STRIPE_WEBHOOK_SECRET: 'whsec_test',
+  STRIPE_PORTAL_CONFIG_FULL: 'bpc_full',
+  STRIPE_PORTAL_CONFIG_BILLING: 'bpc_billing',
+  GEOCODER_PROVIDER: 'census',
+  WEATHER_PROVIDER: 'nws',
+  NWS_USER_AGENT: 'Explore&Earn (support@exploreandearn.com)',
+  LINK_SAFETY_PROVIDER: 'webrisk',
+  WEB_RISK_API_KEY: 'test-web-risk',
+  NEXT_PUBLIC_MAPBOX_TOKEN: 'pk.test',
 } satisfies Record<string, string>;
 
 function without<T extends Record<string, string>>(source: T, ...keys: (keyof T & string)[]) {
@@ -202,6 +218,118 @@ describe('STORAGE_PROVIDER=stub (in-memory storage)', () => {
       'stub',
     );
     expect(() => parseEnv({ ...dev, STORAGE_PROVIDER: 'stub', NODE_ENV: 'test' })).not.toThrow();
+  });
+});
+
+describe('parseEnv: SP2 providers', () => {
+  it.each(['BILLING_PROVIDER', 'GEOCODER_PROVIDER', 'WEATHER_PROVIDER', 'LINK_SAFETY_PROVIDER'])(
+    'refuses %s=stub in prod',
+    (name) => {
+      expect(() => parseEnv({ ...prod, [name]: 'stub' })).toThrow(
+        `Stub provider not allowed in prod: ${name}`,
+      );
+    },
+  );
+
+  it.each([
+    'STRIPE_SECRET_KEY',
+    'STRIPE_WEBHOOK_SECRET',
+    'STRIPE_PORTAL_CONFIG_FULL',
+    'STRIPE_PORTAL_CONFIG_BILLING',
+  ] as const)('requires %s when BILLING_PROVIDER=stripe', (key) => {
+    expect(() => parseEnv(without(prod, key))).toThrow(new RegExp(key));
+  });
+
+  it('checks the shape of the Stripe keys', () => {
+    expect(() => parseEnv({ ...prod, STRIPE_SECRET_KEY: 'pk_test_x' })).toThrow(
+      /STRIPE_SECRET_KEY/,
+    );
+    expect(() => parseEnv({ ...prod, STRIPE_WEBHOOK_SECRET: 'secret' })).toThrow(
+      /STRIPE_WEBHOOK_SECRET/,
+    );
+    expect(() => parseEnv({ ...prod, STRIPE_PORTAL_CONFIG_FULL: 'cfg_x' })).toThrow(
+      /STRIPE_PORTAL_CONFIG_FULL/,
+    );
+    expect(() => parseEnv({ ...prod, NEXT_PUBLIC_MAPBOX_TOKEN: 'sk.secret' })).toThrow(
+      /NEXT_PUBLIC_MAPBOX_TOKEN/,
+    );
+  });
+
+  it.each(['dev', 'preview'])('refuses a live Stripe key when APP_ENV=%s', (appEnv) => {
+    expect(() => parseEnv({ ...prod, APP_ENV: appEnv, STRIPE_SECRET_KEY: 'sk_live_x' })).toThrow(
+      'STRIPE_SECRET_KEY must be a test key outside prod',
+    );
+  });
+
+  it('accepts a test Stripe key in dev and either key in prod', () => {
+    expect(
+      parseEnv({ ...prod, APP_ENV: 'dev', STRIPE_SECRET_KEY: 'sk_test_x' }).BILLING_PROVIDER,
+    ).toBe('stripe');
+    expect(parseEnv(prod).STRIPE_SECRET_KEY).toBe('sk_test_prod');
+    expect(parseEnv({ ...prod, STRIPE_SECRET_KEY: 'sk_live_x' }).STRIPE_SECRET_KEY).toBe(
+      'sk_live_x',
+    );
+  });
+
+  it('requires NWS_USER_AGENT when WEATHER_PROVIDER=nws', () => {
+    expect(() => parseEnv(without(prod, 'NWS_USER_AGENT'))).toThrow(/NWS_USER_AGENT/);
+    expect(() => parseEnv({ ...dev, WEATHER_PROVIDER: 'nws' })).toThrow(/NWS_USER_AGENT/);
+  });
+
+  it('requires WEB_RISK_API_KEY when LINK_SAFETY_PROVIDER=webrisk', () => {
+    expect(() => parseEnv(without(prod, 'WEB_RISK_API_KEY'))).toThrow(/WEB_RISK_API_KEY/);
+    expect(() => parseEnv({ ...dev, LINK_SAFETY_PROVIDER: 'webrisk' })).toThrow(/WEB_RISK_API_KEY/);
+  });
+
+  it('requires NEXT_PUBLIC_MAPBOX_TOKEN in preview and prod, not in dev', () => {
+    expect(() =>
+      parseEnv(without({ ...prod, APP_ENV: 'preview' }, 'NEXT_PUBLIC_MAPBOX_TOKEN')),
+    ).toThrow(/NEXT_PUBLIC_MAPBOX_TOKEN/);
+    expect(() => parseEnv(without(prod, 'NEXT_PUBLIC_MAPBOX_TOKEN'))).toThrow(
+      /NEXT_PUBLIC_MAPBOX_TOKEN/,
+    );
+    expect(parseEnv(dev).NEXT_PUBLIC_MAPBOX_TOKEN).toBeUndefined();
+  });
+
+  it('requires each SP2 provider choice', () => {
+    for (const key of [
+      'BILLING_PROVIDER',
+      'GEOCODER_PROVIDER',
+      'WEATHER_PROVIDER',
+      'LINK_SAFETY_PROVIDER',
+    ] as const) {
+      expect(() => parseEnv(without(dev, key))).toThrow(new RegExp(key));
+    }
+  });
+});
+
+describe('parseEnv: SP3', () => {
+  it('requires ANALYTICS_HASH_SECRET of at least 32 characters, in every environment', () => {
+    expect(() => parseEnv(without(dev, 'ANALYTICS_HASH_SECRET'))).toThrow(/ANALYTICS_HASH_SECRET/);
+    expect(() => parseEnv(without(prod, 'ANALYTICS_HASH_SECRET'))).toThrow(/ANALYTICS_HASH_SECRET/);
+    expect(() => parseEnv({ ...dev, ANALYTICS_HASH_SECRET: 'a'.repeat(31) })).toThrow(
+      /ANALYTICS_HASH_SECRET/,
+    );
+    expect(parseEnv(dev).ANALYTICS_HASH_SECRET).toBe('a'.repeat(32));
+  });
+});
+
+describe('.env.local.example', () => {
+  it('has a dev ANALYTICS_HASH_SECRET', () => {
+    const file = readFileSync(path.resolve('.env.local.example'), 'utf8');
+    expect(parseEnv(parseDotenv(file)).ANALYTICS_HASH_SECRET).toBe(
+      'dev-only-analytics-hash-secret-0000000',
+    );
+  });
+
+  it('parses, with the SP2 providers set to stub', () => {
+    const file = readFileSync(path.resolve('.env.local.example'), 'utf8');
+    const env = parseEnv(parseDotenv(file));
+    expect(env.BILLING_PROVIDER).toBe('stub');
+    expect(env.GEOCODER_PROVIDER).toBe('stub');
+    expect(env.WEATHER_PROVIDER).toBe('stub');
+    expect(env.LINK_SAFETY_PROVIDER).toBe('stub');
+    expect(env.NWS_USER_AGENT).toBe('Explore&Earn (support@exploreandearn.com)');
   });
 });
 

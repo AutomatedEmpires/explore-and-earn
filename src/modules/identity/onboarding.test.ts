@@ -284,8 +284,9 @@ describe('POST /api/v1/onboarding', () => {
   type Route = typeof import('@/app/api/v1/onboarding/route');
   let POST: Route['POST'];
 
-  // Loading the route compiles its whole module graph; under the full suite's parallel load
-  // that can outlast a test's 30 s, so it happens here, within the 60 s hook timeout.
+  // Loading the route compiles its whole module graph, including SP2 wiring. Under the full
+  // suite's parallel load that can outlast a test's 30 s, so it happens here, within the hook
+  // timeout.
   beforeAll(async () => {
     ({ POST } = await import('@/app/api/v1/onboarding/route'));
   });

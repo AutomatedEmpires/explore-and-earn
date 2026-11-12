@@ -15,12 +15,11 @@ import type { DbOrTx } from '@/lib/db';
 import { badRequest } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
-import type { OrgRole } from '@/modules/identity';
-import { organizations, orgMemberships } from './schema';
+import { CREATED_VIA_APP, CREATED_VIA_KEY, type OrgRole } from '@/modules/identity';
 
-/** The Clerk public-metadata key and value our server sets on every organization it creates. */
-export const CREATED_VIA_KEY = 'created_via';
-export const CREATED_VIA_APP = 'app';
+export { CREATED_VIA_APP, CREATED_VIA_KEY };
+import { reserveFoundingNumber } from './founding';
+import { organizations, orgMemberships, orgSlugs } from './schema';
 
 const CLERK_ROLES: Record<string, OrgRole> = {
   'org:recruiter': 'recruiter',
@@ -57,13 +56,20 @@ function fallbackSlug(clerkOrgId: string): string {
   return slugify(clerkOrgId);
 }
 
-/** `base` if free, otherwise the first free `base-N` (N >= 2). */
+/**
+ * `base` if free, otherwise the first free `base-N` (N >= 2). Every slug in app.org_slugs counts
+ * as taken, so a retired slug (which redirects to its organization) is never reissued.
+ */
 async function freeSlug(db: DbOrTx, base: string): Promise<string> {
-  const rows = await db
+  const current = await db
     .select({ slug: organizations.slug })
     .from(organizations)
     .where(sql`${organizations.slug} = ${base} or ${organizations.slug} like ${`${base}-%`}`);
-  const taken = new Set(rows.map((r) => r.slug));
+  const used = await db
+    .select({ slug: orgSlugs.slug })
+    .from(orgSlugs)
+    .where(sql`${orgSlugs.slug} = ${base} or ${orgSlugs.slug} like ${`${base}-%`}`);
+  const taken = new Set([...current, ...used].map((r) => r.slug));
   if (!taken.has(base)) return base;
   for (let n = 2; ; n++) {
     const candidate = `${base}-${n}`;
@@ -143,6 +149,8 @@ export type OrgSnapshot = {
  * - The creator becomes the owner if no owner is recorded yet, but only for an organization
  *   our server created; one created anywhere else (Clerk's Frontend API, the dashboard) stays
  *   ownerless, which gives nobody access to it.
+ * - Recording that first owner is the organization's signup: it takes the next founding number
+ *   while any of the 100 are left (FD-7, ./founding.ts).
  * - A deleted organization stays deleted.
  */
 export async function applyClerkOrganization(
@@ -180,7 +188,11 @@ export async function applyClerkOrganization(
     .where(eq(organizations.id, org.id))
     .returning();
   if (!updated) throw new Error(`Organization ${org.id} vanished during update`);
-  if (patch.ownerUserId) await syncOwnerRole(db, updated);
+  if (patch.ownerUserId) {
+    await syncOwnerRole(db, updated);
+    // Recording the first Owner is the app creating this host organization: its signup (FD-7).
+    await reserveFoundingNumber(db, updated.id);
+  }
   return updated;
 }
 

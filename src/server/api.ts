@@ -35,9 +35,13 @@ import {
   runWithRequestContext,
   type RequestContext,
 } from './request-context';
+// SP2 module-load registrations (usage counters, subject handlers, providers) for every route.
+import '@/server/sp2-wiring';
+// SP4 module-load registrations (notification types, report subjects, providers) for every route.
+import '@/server/module-registrations';
 
 export type AuthMode = 'none' | 'user' | 'seeker' | 'host' | 'operator';
-export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export type ApiContext<I> = {
   input: I;

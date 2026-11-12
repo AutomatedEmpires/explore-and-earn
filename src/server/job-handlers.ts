@@ -3,20 +3,30 @@
 // Also the alert the worker raises when an event goes dead (onDeadEvent).
 import type { Db } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { jobHandlers as applications } from '@/modules/applications';
 import { jobHandlers as audit } from '@/modules/audit';
+import { jobHandlers as billing } from '@/modules/billing';
+import { jobHandlers as discovery } from '@/modules/discovery';
+import { jobHandlers as entitlements } from '@/modules/entitlements';
+import { jobHandlers as hostpages } from '@/modules/hostpages';
 import { jobHandlers as identity } from '@/modules/identity';
 import { jobHandlers as jobs, type DeadEvent, type HandlerMap } from '@/modules/jobs';
+import { jobHandlers as landing } from '@/modules/landing';
+import { jobHandlers as listings } from '@/modules/listings';
+import { jobHandlers as locations } from '@/modules/locations';
 import { jobHandlers as media } from '@/modules/media';
-import {
-  EMAIL_TOPIC,
-  PUSH_TOPIC,
-  jobHandlers as notifications,
-} from '@/modules/notifications';
+import { EMAIL_TOPIC, PUSH_TOPIC, jobHandlers as notifications } from '@/modules/notifications';
 import { jobHandlers as operator } from '@/modules/operator';
 import { jobHandlers as orgs } from '@/modules/orgs';
+import { jobHandlers as profiles } from '@/modules/profiles';
 import { jobHandlers as ratelimit } from '@/modules/ratelimit';
+import { jobHandlers as safety } from '@/modules/safety';
 import { jobHandlers as settings } from '@/modules/settings';
 import { raiseAlert, jobHandlers as trust } from '@/modules/trust';
+import { jobHandlers as verification } from '@/modules/verification';
+// SP4 module-load registrations, so the worker sees the same registries the API does (the
+// import expiry asks applications' resume reference checker before deleting a file).
+import '@/server/module-registrations';
 
 function merge(maps: Record<string, HandlerMap>): HandlerMap {
   const out: HandlerMap = {};
@@ -44,6 +54,20 @@ export const handlers: HandlerMap = merge({
   ratelimit,
   settings,
   trust,
+  // SP2
+  billing,
+  entitlements,
+  hostpages,
+  listings,
+  locations,
+  verification,
+  // SP3
+  discovery,
+  landing,
+  // SP4
+  profiles,
+  applications,
+  safety,
 });
 
 /**

@@ -35,14 +35,19 @@ export {
 } from './directory';
 
 export {
+  CREATED_VIA_APP,
+  CREATED_VIA_KEY,
   clerkAdmin,
   makeFakeClerkAdmin,
   userHasPasskey,
   userHasStrongAuth,
   type ClerkAdmin,
+  type ClerkOrgRole,
   type FakeClerkAdmin,
   type OperatorInviteRole,
 } from './clerk-admin';
+
+export { getUserContacts, type UserContactFacts } from './contacts';
 
 export {
   completeOnboarding,

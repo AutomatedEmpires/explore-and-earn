@@ -36,13 +36,14 @@ export function Chip({
 }: ChipProps) {
   const content = (
     <>
-      <span className="flex items-center gap-1 text-12 leading-none font-bold tracking-wider text-muted uppercase">
-        {Icon ? <Icon className="size-3.5" /> : null}
-        {label}
+      {/* 14 px caps (#155); on a narrow card the label shortens instead of leaving the chip. */}
+      <span className="flex max-w-full min-w-0 items-center gap-1 text-14 leading-none font-bold tracking-wider text-muted uppercase">
+        {Icon ? <Icon className="size-3.5 shrink-0" /> : null}
+        <span className="truncate">{label}</span>
       </span>
       <span
         className={cn(
-          'flex min-w-0 items-center gap-1 text-14 leading-tight font-bold',
+          'flex max-w-full min-w-0 items-center gap-1 text-14 leading-tight font-bold',
           valueTone[tone],
         )}
       >

@@ -4,7 +4,7 @@ import { Img } from './Img';
 export type AvatarSize = 'sm' | 'md' | 'lg' | 'xl';
 
 const sizes: Record<AvatarSize, string> = {
-  sm: 'size-8 text-12',
+  sm: 'size-8 text-14',
   md: 'size-10 text-14',
   lg: 'size-13 text-17',
   xl: 'size-15 text-19',

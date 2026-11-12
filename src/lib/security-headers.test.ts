@@ -71,6 +71,15 @@ describe('buildSecurityHeaders', () => {
     expect(csp.get('worker-src')).toEqual(["'self'", 'blob:']);
   });
 
+  it('allows Mapbox GL (tiles, telemetry and its blob workers)', () => {
+    const csp = directives(
+      buildSecurityHeaders({ nonce: 'abc', appEnv: 'prod' })['Content-Security-Policy'] ?? '',
+    );
+    expect(csp.get('connect-src')).toContain('https://api.mapbox.com');
+    expect(csp.get('connect-src')).toContain('https://events.mapbox.com');
+    expect(csp.get('worker-src')).toContain('blob:');
+  });
+
   it("allows Clerk's development hosts outside prod", () => {
     const dev = directives(
       buildSecurityHeaders({ nonce: 'abc', appEnv: 'dev' })['Content-Security-Policy'] ?? '',
@@ -80,6 +89,14 @@ describe('buildSecurityHeaders', () => {
       buildSecurityHeaders({ nonce: 'abc', appEnv: 'prod' })['Content-Security-Policy'] ?? '',
     );
     expect(prod.get('connect-src')).not.toContain('https://*.clerk.accounts.dev');
+  });
+
+  it('keeps everything outside prod out of search engines (SP3 spec 8.11)', () => {
+    expect(buildSecurityHeaders({ nonce: 'abc', appEnv: 'preview' })['X-Robots-Tag']).toBe(
+      'noindex',
+    );
+    expect(buildSecurityHeaders({ nonce: 'abc', appEnv: 'dev' })['X-Robots-Tag']).toBe('noindex');
+    expect(buildSecurityHeaders({ nonce: 'abc', appEnv: 'prod' })['X-Robots-Tag']).toBeUndefined();
   });
 
   it('sends the standard hardening headers', () => {

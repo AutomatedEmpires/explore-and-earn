@@ -1,6 +1,7 @@
 // Public API of the notifications module (in-app, email, push). Owned by W6 (Tasks 17-19).
 import type { HandlerMap } from '@/modules/jobs';
 import { FLUSH_TOPIC, flushBatches } from './batches';
+import { EMAIL_DIRECT_TOPIC, sendEmailDirectJob } from './email/direct';
 import { sendEmailJob } from './email/send';
 import { EMAIL_TOPIC, PUSH_TOPIC } from './notify';
 import { sendPushJob } from './push';
@@ -37,17 +38,36 @@ export {
   type NotificationTypeDef,
 } from './types';
 
+export {
+  listPreferenceRows,
+  notificationPreferenceSchema,
+  updatePreference,
+  USER_PREFERENCE_CATEGORIES,
+  type PreferenceInput,
+  type PreferenceRow,
+  type UserPreferenceCategory,
+} from './preferences';
+
 export { FLUSH_TOPIC, flushBatches } from './batches';
 
 export {
   getEmailProvider,
   resendEmailProvider,
   sendEmailJob,
+  STUB_EMAIL_DIR,
   stubEmailProvider,
   stubOutbox,
   type EmailProvider,
   type Message,
 } from './email/send';
+
+export {
+  EMAIL_DIRECT_TOPIC,
+  sendEmailDirectJob,
+  sendEmailNow,
+  sendEmailTo,
+  type DirectEmailInput,
+} from './email/direct';
 
 export {
   buildUnsubscribeToken,
@@ -71,6 +91,9 @@ export {
 export const jobHandlers: HandlerMap = {
   [EMAIL_TOPIC]: async (payload, { db }) => {
     await sendEmailJob(db, payload);
+  },
+  [EMAIL_DIRECT_TOPIC]: async (payload, { db }) => {
+    await sendEmailDirectJob(db, payload);
   },
   [FLUSH_TOPIC]: async (_payload, { db, now }) => {
     await flushBatches(db, now);

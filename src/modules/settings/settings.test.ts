@@ -54,17 +54,169 @@ describe('registry', () => {
   });
 
   it('lists the Foundation defaults', () => {
-    expect(SETTING_DEFAULTS).toEqual({
+    expect(SETTING_DEFAULTS).toMatchObject({
       'limits.invites_per_seeker_per_week': 10,
       'trust.thresholds': {
         image_safety: { approveBelow: 0.2, rejectAtOrAbove: 0.9 },
         text_safety: { approveBelow: 0.2, rejectAtOrAbove: 0.9 },
+        listing_moderation: { approveBelow: 0.2, rejectAtOrAbove: 0.9 },
+        listing_fraud: { approveBelow: 0.2, rejectAtOrAbove: 0.95 },
+        business_verification: { approveBelow: 0.3, rejectAtOrAbove: 1.01 },
+        photo_slot: { approveBelow: 0.5, rejectAtOrAbove: 0.5 },
       },
       'trust.audit_sample_rate': 0.01,
       'business.mailing_address': '',
       'business.support_email': '',
       'ops.second_signoff_refund_cents': 50000,
     });
+  });
+});
+
+describe('SP2 settings', () => {
+  it('lists the SP2 keys with their defaults', async () => {
+    expect(await getSetting(t.db, 'launch.public_at')).toBeNull();
+    expect(await getSetting(t.db, 'founding.max_hosts')).toBe(100);
+    expect(await getSetting(t.db, 'founding.free_days')).toBe(90);
+    expect(await getSetting(t.db, 'founding.return_window_months')).toBe(6);
+    expect(await getSetting(t.db, 'team.invitation_ttl_days')).toBe(7);
+    expect(await getSetting(t.db, 'listings.prohibited_phrases')).toEqual([
+      'US citizens only',
+      'U.S. citizens only',
+      'citizens only',
+      'American citizens only',
+      'no foreigners',
+      'native English speaker',
+    ]);
+    expect(await getSetting(t.db, 'listings.vague_pay_range_ratio')).toBe(2.5);
+    const wages = await getSetting(t.db, 'listings.min_wage_cents_by_state');
+    expect(wages.WA).toBe(1713);
+    expect(wages.TX).toBe(725);
+    const genres = await getSetting(t.db, 'listings.genres');
+    expect(genres).toHaveLength(25);
+    expect(genres[0]).toEqual({
+      code: 'commercial_fishing',
+      label: 'Commercial fishing',
+      category: 'maritime',
+      active: true,
+    });
+    expect(await getSetting(t.db, 'links.blocked_domains')).toEqual([]);
+    expect(await getSetting(t.db, 'verification.blocked_domains')).toEqual([]);
+    expect(await getSetting(t.db, 'links.shortener_domains')).toEqual([
+      'bit.ly',
+      'tinyurl.com',
+      't.co',
+      'goo.gl',
+      'ow.ly',
+      'is.gd',
+      'buff.ly',
+      'rebrand.ly',
+      'cutt.ly',
+      'shorturl.at',
+      'tiny.cc',
+      'rb.gy',
+      'lnkd.in',
+      's.id',
+      't.ly',
+    ]);
+  });
+
+  it('extends trust.thresholds with the SP2 kinds', async () => {
+    const thresholds = await getSetting(t.db, 'trust.thresholds');
+    expect(thresholds.business_verification).toEqual({ approveBelow: 0.3, rejectAtOrAbove: 1.01 });
+    expect(thresholds.listing_moderation).toEqual({ approveBelow: 0.2, rejectAtOrAbove: 0.9 });
+    expect(thresholds.listing_fraud).toEqual({ approveBelow: 0.2, rejectAtOrAbove: 0.95 });
+    expect(thresholds.photo_slot).toEqual({ approveBelow: 0.5, rejectAtOrAbove: 0.5 });
+    await expectBadRequest(
+      setSetting(
+        t.db,
+        'trust.thresholds',
+        { ...thresholds, business_verification: { approveBelow: 0.3, rejectAtOrAbove: 1.02 } },
+        { operatorId },
+      ),
+    );
+  });
+
+  it('accepts an ISO launch instant or null, and nothing else', async () => {
+    await setSetting(t.db, 'launch.public_at', '2027-01-15T00:00:00.000Z', { operatorId });
+    expect(await getSetting(t.db, 'launch.public_at')).toBe('2027-01-15T00:00:00.000Z');
+    await expectBadRequest(setSetting(t.db, 'launch.public_at', 'soon', { operatorId }));
+    await setSetting(t.db, 'launch.public_at', null, { operatorId });
+    expect(await getSetting(t.db, 'launch.public_at')).toBeNull();
+  });
+
+  it('validates the SP2 values', async () => {
+    await expectBadRequest(setSetting(t.db, 'founding.max_hosts', 1001, { operatorId }));
+    await expectBadRequest(setSetting(t.db, 'founding.free_days', 0, { operatorId }));
+    await expectBadRequest(setSetting(t.db, 'founding.return_window_months', 25, { operatorId }));
+    await expectBadRequest(setSetting(t.db, 'team.invitation_ttl_days', 31, { operatorId }));
+    await expectBadRequest(setSetting(t.db, 'listings.prohibited_phrases', [], { operatorId }));
+    await expectBadRequest(setSetting(t.db, 'listings.prohibited_phrases', ['x'], { operatorId }));
+    await expectBadRequest(setSetting(t.db, 'listings.vague_pay_range_ratio', 11, { operatorId }));
+    await expectBadRequest(
+      setSetting(t.db, 'links.blocked_domains', ['Bad.Example'], { operatorId }),
+    );
+    await expectBadRequest(
+      setSetting(t.db, 'links.shortener_domains', ['https://bit.ly'], { operatorId }),
+    );
+    const wages = await getSetting(t.db, 'listings.min_wage_cents_by_state');
+    const { WA: _wa, ...missingWa } = wages;
+    await expectBadRequest(
+      setSetting(t.db, 'listings.min_wage_cents_by_state', missingWa as typeof wages, {
+        operatorId,
+      }),
+    );
+    await expectBadRequest(
+      setSetting(t.db, 'listings.min_wage_cents_by_state', { ...wages, WA: -1 }, { operatorId }),
+    );
+    const genres = await getSetting(t.db, 'listings.genres');
+    const [firstGenre] = genres;
+    if (!firstGenre) throw new Error('no genres');
+    await expectBadRequest(
+      setSetting(t.db, 'listings.genres', [...genres, firstGenre], { operatorId }),
+    );
+    await expectBadRequest(
+      setSetting(
+        t.db,
+        'listings.genres',
+        [{ code: 'Bad Code', label: 'Bad', category: 'farm', active: true }],
+        { operatorId },
+      ),
+    );
+    await setSetting(t.db, 'links.blocked_domains', ['bad.example', 'xn--bcher-kva.example'], {
+      operatorId,
+    });
+    expect(await getSetting(t.db, 'links.blocked_domains')).toEqual([
+      'bad.example',
+      'xn--bcher-kva.example',
+    ]);
+  });
+});
+
+describe('SP3 settings', () => {
+  it('lists the SP3 discovery limits with their defaults (spec 8.8)', async () => {
+    expect(await getSetting(t.db, 'discovery.saved_jobs_per_user')).toBe(1000);
+    expect(await getSetting(t.db, 'discovery.saved_searches_per_user')).toBe(20);
+    expect(await getSetting(t.db, 'discovery.alert_push_daily_cap')).toBe(5);
+  });
+
+  it('validates the SP3 values', async () => {
+    await expectBadRequest(setSetting(t.db, 'discovery.saved_jobs_per_user', 0, { operatorId }));
+    await expectBadRequest(
+      setSetting(t.db, 'discovery.saved_jobs_per_user', 100_001, { operatorId }),
+    );
+    await expectBadRequest(
+      setSetting(t.db, 'discovery.saved_searches_per_user', 0, { operatorId }),
+    );
+    await expectBadRequest(
+      setSetting(t.db, 'discovery.saved_searches_per_user', 1001, { operatorId }),
+    );
+    await expectBadRequest(setSetting(t.db, 'discovery.alert_push_daily_cap', -1, { operatorId }));
+    await expectBadRequest(setSetting(t.db, 'discovery.alert_push_daily_cap', 51, { operatorId }));
+    await expectBadRequest(setSetting(t.db, 'discovery.alert_push_daily_cap', 2.5, { operatorId }));
+    await setSetting(t.db, 'discovery.alert_push_daily_cap', 0, { operatorId });
+    expect(await getSetting(t.db, 'discovery.alert_push_daily_cap')).toBe(0);
+    await setSetting(t.db, 'discovery.saved_jobs_per_user', 3, { operatorId });
+    expect(await getSetting(t.db, 'discovery.saved_jobs_per_user')).toBe(3);
   });
 });
 
@@ -117,6 +269,7 @@ describe('setSetting', () => {
 
   it('stores nested objects', async () => {
     const value = {
+      ...SETTING_DEFAULTS['trust.thresholds'],
       image_safety: { approveBelow: 0.1, rejectAtOrAbove: 0.8 },
       text_safety: { approveBelow: 0.6, rejectAtOrAbove: 0.9 },
     };
@@ -131,7 +284,7 @@ describe('setSetting', () => {
         '{"text_safety": {"approveBelow": 0.6, "rejectAtOrAbove": 0.95}}'::jsonb)
     `);
     expect(await getSetting(t.db, 'trust.thresholds')).toEqual({
-      image_safety: { approveBelow: 0.2, rejectAtOrAbove: 0.9 },
+      ...SETTING_DEFAULTS['trust.thresholds'],
       text_safety: { approveBelow: 0.6, rejectAtOrAbove: 0.95 },
     });
 
@@ -155,6 +308,20 @@ describe('setSetting', () => {
     );
   });
 
+  it('reads thresholds stored before SP2 with defaults for the new kinds', async () => {
+    const stored = {
+      image_safety: { approveBelow: 0.1, rejectAtOrAbove: 0.8 },
+      text_safety: { approveBelow: 0.6, rejectAtOrAbove: 0.9 },
+    };
+    await t.db.execute(
+      sql`insert into app.settings (key, value) values ('trust.thresholds', ${JSON.stringify(stored)}::jsonb)`,
+    );
+    expect(await getSetting(t.db, 'trust.thresholds')).toEqual({
+      ...SETTING_DEFAULTS['trust.thresholds'],
+      ...stored,
+    });
+  });
+
   it('rejects -1 invites per week with bad_request and stores nothing', async () => {
     const err = await expectBadRequest(
       setSetting(t.db, 'limits.invites_per_seeker_per_week', -1, { operatorId }),
@@ -173,6 +340,7 @@ describe('setSetting', () => {
         t.db,
         'trust.thresholds',
         {
+          ...SETTING_DEFAULTS['trust.thresholds'],
           image_safety: { approveBelow: 0.9, rejectAtOrAbove: 0.2 },
           text_safety: { approveBelow: 0.2, rejectAtOrAbove: 0.9 },
         },
@@ -182,9 +350,7 @@ describe('setSetting', () => {
     await expectBadRequest(
       setSetting(t.db, 'business.support_email', 'not an email', { operatorId }),
     );
-    await expectBadRequest(
-      setSetting(t.db, 'ops.second_signoff_refund_cents', -5, { operatorId }),
-    );
+    await expectBadRequest(setSetting(t.db, 'ops.second_signoff_refund_cents', -5, { operatorId }));
   });
 
   it('accepts an empty or valid support email', async () => {

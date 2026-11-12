@@ -38,6 +38,18 @@ export const EMAIL_TEMPLATE_NAMES = [
   'OperatorAlert',
   'OperatorMention',
   'Digest',
+  // SP2: host notices, team invitations (direct emails) and billing messages.
+  'HostNotice',
+  'TeamInvite',
+  'BillingNotice',
+  // SP3: the daily job alert email and the weekly digest.
+  'JobAlertDaily',
+  'JobAlertWeekly',
+  // SP4: the application receipt, the availability reminder and a generic seeker notice (used
+  // by profiles.content_removed).
+  'ApplicationReceipt',
+  'AvailabilityReconfirm',
+  'SeekerNotice',
 ] as const;
 export type EmailTemplateName = (typeof EMAIL_TEMPLATE_NAMES)[number];
 

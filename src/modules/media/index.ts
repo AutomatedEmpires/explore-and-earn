@@ -82,6 +82,16 @@ export {
 
 export { getMediaUrl, SIGNED_URL_TTL_SEC, type MediaViewer } from './urls';
 
+export {
+  deleteMedia,
+  getMedia,
+  getMediaInfo,
+  readMedia,
+  readMediaVariant,
+  type MediaInfo,
+  type MediaRecord,
+} from './info';
+
 /** `media.scan` (queued by completeUpload) and `media.cleanup` (deletes superseded copies). */
 export const jobHandlers: HandlerMap = mediaJobHandlers;
 
