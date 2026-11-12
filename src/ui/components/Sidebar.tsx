@@ -51,7 +51,7 @@ export function Sidebar({ items, label, header, footer, className }: SidebarProp
                   <Icon className="size-5" />
                   <span className="flex-1">{item.label}</span>
                   {item.count ? (
-                    <span className="min-w-6 rounded-full bg-primary px-1.5 text-center text-12 leading-5 font-bold text-on-primary tabular-nums">
+                    <span className="min-w-6 rounded-full bg-primary px-1.5 text-center text-14 leading-5 font-bold text-on-primary tabular-nums">
                       {item.count}
                     </span>
                   ) : null}
