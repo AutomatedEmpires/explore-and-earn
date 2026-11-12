@@ -4,7 +4,10 @@
 // (see seedScript) and serves the seeded photos from public/design-system/samples.
 //
 // Run against `pnpm dev` on `pnpm db:local`, with the Clerk development keys in the environment
-// (the dev server cannot start Clerk without them):
+// (the dev server cannot start Clerk without them). On PGlite, give the app one connection with
+// no pipelining, `DATABASE_URL=...:5433/postgres?max=1&max_pipeline=1`: PGlite's wire server
+// shares one unnamed prepared statement across connections, so a signed-in render (the shell's
+// counts beside the listing read) otherwise fails with "bind message supplies N parameters".
 //   pnpm e2e tests/e2e/flow-a-guest-listing.spec.ts --project=chromium
 // Screenshots are written to tests/e2e/__screenshots__/flow-a-guest-listing.spec.ts/.
 //
@@ -515,6 +518,8 @@ test('signed in: the seeker bar and the same deal', async ({ page }) => {
     await (window as unknown as { Clerk?: Clerk }).Clerk?.session?.getToken({ skipCache: true });
   });
   await open(page, 390, 844);
+  // The listing itself, not its couldn't-load ending, so a failed read says so here.
+  await expect(page.getByRole('heading', { level: 1, name: 'Lodge housekeeper' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Apply' }).last()).toHaveAttribute(
     'href',
     `/apply/${seeded.active.id}?source=other`,
