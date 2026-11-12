@@ -574,6 +574,8 @@ test.describe('Flow C: a host publishes a first listing', () => {
       .getByLabel('Short note for the card')
       .fill('2 per room, 5 minutes from the lodge');
     await takePhoto(page, /^Bedroom Take photo/, photo('bedroom', [196, 170, 140]), 'camera-390');
+    // Only once the bedroom upload has finished, so the failure lands on the bathroom photo.
+    await expect(here(page).getByRole('button', { name: /Bedroom photo added/ })).toBeVisible();
     fake.failNextPut = true;
     await takePhoto(page, /^Bathroom Take photo/, photo('bathroom', [150, 186, 196]));
     await expect(page.getByText('1 photo didn’t upload')).toBeVisible();
@@ -596,7 +598,11 @@ test.describe('Flow C: a host publishes a first listing', () => {
     await (await library).setFiles(photo('kitchen', [120, 150, 120]));
     await tap(page, page.getByRole('button', { name: 'Use this photo' }));
     await takePhoto(page, /^Exterior Take photo/, photo('exterior', [110, 140, 170]));
-    await expect(page.getByRole('button', { name: /Exterior photo added/ })).toBeVisible();
+    for (const slot of ['Bedroom', 'Bathroom', 'Kitchen', 'Exterior']) {
+      await expect(
+        here(page).getByRole('button', { name: new RegExp(`^${slot} photo added`) }),
+      ).toBeVisible();
+    }
     await check(page, 'step-4-housing-390');
     await next(page, 'Meals');
 
@@ -616,7 +622,11 @@ test.describe('Flow C: a host publishes a first listing', () => {
     await takePhoto(page, /^Meal example Take photo/, photo('meal', [220, 190, 120]));
     await takePhoto(page, /^Dining area Take photo/, photo('dining', [200, 180, 150]));
     await takePhoto(page, /^Other Take photo/, photo('other', [170, 170, 190]));
-    await expect(page.getByRole('button', { name: /Other photo added/ })).toBeVisible();
+    for (const slot of ['Kitchen', 'Meal example', 'Dining area', 'Other']) {
+      await expect(
+        here(page).getByRole('button', { name: new RegExp(`^${slot} photo added`) }),
+      ).toBeVisible();
+    }
     await check(page, 'step-5-meals-390');
     await next(page, 'Seasonal details');
 
