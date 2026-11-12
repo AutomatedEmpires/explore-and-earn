@@ -12,6 +12,7 @@ import {
   MESSAGES,
   SECTION_CONTENT,
   STEP_KEYS,
+  fieldKeyFor,
   normalizedDraft,
   sectionOfPath,
   sectionPayload,
@@ -75,6 +76,21 @@ describe('the builder model', () => {
     expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
     expect(finished.applying).toMatchObject({ notifyMemberIds: [SAMPLE_IDS.viewer] });
     expect(checklist(finished).every((s) => s.complete)).toBe(true);
+  });
+
+  it('maps a server issue to the field that edits it', () => {
+    for (const path of [
+      'pay.kind',
+      'pay.minCents',
+      'pay.maxCents',
+      'pay.crewShareEstimate.minCents',
+    ]) {
+      expect(fieldKeyFor(path)).toBe('pay.amount');
+    }
+    expect(fieldKeyFor('pay.crewShareEstimate')).toBe('pay.crewPer');
+    expect(fieldKeyFor('housing.cost.cents')).toBe('housing.cost.amount');
+    expect(fieldKeyFor('meals.cost.cents')).toBe('meals.cost.amount');
+    expect(fieldKeyFor('basics.title')).toBe('basics.title');
   });
 
   it('sends a chosen location with its onsite mode, which the strict schema requires', () => {

@@ -16,6 +16,7 @@ import { clearLocal, mergeLocal, readLocal } from '../_lib/local';
 import {
   SECTION_CONTENT,
   STEP_KEYS,
+  fieldKeyFor,
   normalizedDraft,
   sectionOfPath,
   stepTitle,
@@ -327,8 +328,9 @@ function Workspace({
     !byStep[s] && (s !== 'review' || (attest[0] && attest[1] && Object.keys(byStep).length === 0));
   const doneCount = STEP_KEYS.filter(done).length;
 
-  const focusField = (field?: string) => {
-    if (!field) return;
+  const focusField = (path?: string) => {
+    if (!path) return;
+    const field = fieldKeyFor(path);
     window.setTimeout(() => {
       const el =
         document.getElementById(fieldId(field)) ??
@@ -350,7 +352,7 @@ function Workspace({
       setVisible(s);
     }
     if (field) {
-      touch(field);
+      touch(fieldKeyFor(field));
       focusField(field);
     }
   };
@@ -591,7 +593,7 @@ function Workspace({
                           clearLocal(listingId);
                           router.push(`${base}/${listingId}/in-review`);
                         }}
-                        card={card(`guest-card-review-${phone ? 'phone' : 'tablet'}`)}
+                        card={card}
                         active={phone ? step === 'review' : true}
                         savedAt={d.savedAt}
                       />

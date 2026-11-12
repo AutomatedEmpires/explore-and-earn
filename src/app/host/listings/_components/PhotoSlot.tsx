@@ -66,7 +66,7 @@ export function PhotoSlot({
         className={cn(tile, 'border-2 border-danger bg-danger-bg px-3')}
       >
         <TriangleAlert className="size-6 text-danger" />
-        <span className="text-14 font-bold text-ink">{label} didn’t upload</span>
+        <span className="text-14 font-bold text-ink">{label} didn’t upload</span>{' '}
         <span className="text-14 text-danger">Tap to try again</span>
       </button>
     );
@@ -90,26 +90,25 @@ export function PhotoSlot({
     );
   }
 
+  // Each button is named by its visible text (WCAG 2.5.3, label in name). Words only a screen
+  // reader needs come after it.
   if (state.kind === 'filled') {
     const src = state.preview ?? remote;
     return (
-      <button
-        type="button"
-        onClick={onPick}
-        aria-label={`${label} photo added. Replace it`}
-        className={cn(tile, 'bg-surface-2')}
-      >
+      <button type="button" onClick={onPick} className={cn(tile, 'bg-surface-2')}>
         {src ? (
           <Img src={src} alt="" className="absolute inset-0 size-full object-cover" />
         ) : (
+          // Uploaded, and still being scanned before anyone can see it.
           <span className="flex flex-col items-center gap-1 text-14 text-muted">
             <Icon className="size-6 text-ink-2" />
-            Photo added
+            Being checked
           </span>
-        )}
+        )}{' '}
         <Badge tone="surface" icon={Icon} className="absolute bottom-3 left-3">
           {label}
         </Badge>
+        <span className="sr-only"> photo added. Tap to replace it.</span>
       </button>
     );
   }
@@ -118,11 +117,10 @@ export function PhotoSlot({
     <button
       type="button"
       onClick={onPick}
-      aria-label={`${label}: ${action}`}
       className={cn(tile, 'border-2 border-dashed border-line-strong bg-surface px-3')}
     >
       <Icon className="size-6 text-ink-2" />
-      <span className="text-16 font-semibold text-ink">{label}</span>
+      <span className="text-16 font-semibold text-ink">{label}</span>{' '}
       <span className="text-14 text-muted">{action}</span>
     </button>
   );

@@ -221,7 +221,7 @@ export function PhotosSection({ form }: { form: Form }) {
             <PhotoSlot
               label="Add photo"
               icon={Image}
-              action={action}
+              action={form.phone ? 'Take photo' : 'Choose a file'}
               state={form.photos.slot('photos.galleryMediaIds')}
               onPick={() =>
                 form.photos.pick({

@@ -434,10 +434,17 @@ async function check(page: Page, name: string, opts: { fullPage?: boolean; show?
   // A viewport screenshot of something below the top: bring it into view first.
   if (opts.show) await opts.show.scrollIntoViewIfNeeded();
   expect(await seriousA11yIssues(page), `axe on ${name}`).toEqual([]);
-  await expect(page).toHaveScreenshot(`flow-c-${name}.png`, {
-    ...screenshot,
-    fullPage: opts.fullPage ?? true,
-  });
+  if (!(opts.fullPage ?? true)) {
+    await expect(page).toHaveScreenshot(`flow-c-${name}.png`, screenshot);
+    return;
+  }
+  // The whole page, taken by making the viewport as tall as the page: a full-page capture would
+  // draw the fixed top bar and bottom tabs where the viewport happened to be, over the content.
+  const size = page.viewportSize();
+  const height = await page.evaluate(() => document.documentElement.scrollHeight);
+  if (size && height > size.height) await page.setViewportSize({ width: size.width, height });
+  await expect(page).toHaveScreenshot(`flow-c-${name}.png`, screenshot);
+  if (size) await page.setViewportSize(size);
 }
 
 /** The builder step on screen (on a phone the other steps are in the page but hidden). */
@@ -534,7 +541,11 @@ test.describe('Flow C: a host publishes a first listing', () => {
     const amount = here(page).getByLabel(/^Amount/);
     await amount.fill('Good wages');
     await amount.blur();
-    await expect(page.getByText('Add a number, like 18, or a range like 18 to 22.')).toBeVisible();
+    // The field's own error. The Review step lists it too, as a link back here (checked in the
+    // workspace test).
+    await expect(page.locator('#f-pay-amount-error')).toHaveText(
+      'Add a number, like 18, or a range like 18 to 22.',
+    );
     await expect(amount).toHaveValue('Good wages');
     await check(page, 'pay-error-390', { fullPage: false });
     await amount.fill('$18–$20');
@@ -562,9 +573,9 @@ test.describe('Flow C: a host publishes a first listing', () => {
     await here(page)
       .getByLabel('Short note for the card')
       .fill('2 per room, 5 minutes from the lodge');
-    await takePhoto(page, /^Bedroom: Take photo/, photo('bedroom', [196, 170, 140]), 'camera-390');
+    await takePhoto(page, /^Bedroom Take photo/, photo('bedroom', [196, 170, 140]), 'camera-390');
     fake.failNextPut = true;
-    await takePhoto(page, /^Bathroom: Take photo/, photo('bathroom', [150, 186, 196]));
+    await takePhoto(page, /^Bathroom Take photo/, photo('bathroom', [150, 186, 196]));
     await expect(page.getByText('1 photo didn’t upload')).toBeVisible();
     await check(page, 'photo-failed-390', {
       fullPage: false,
@@ -575,7 +586,7 @@ test.describe('Flow C: a host publishes a first listing', () => {
     // The camera closes without a photo: offer the host's own photos. The test takes the file
     // chooser so none is left open, then closes it the way the browser does, with `cancel`.
     const camera = page.waitForEvent('filechooser');
-    await tap(page, here(page).getByRole('button', { name: /^Kitchen: Take photo/ }));
+    await tap(page, here(page).getByRole('button', { name: /^Kitchen Take photo/ }));
     await camera;
     await page.getByTestId('photo-camera-input').dispatchEvent('cancel');
     await expect(page.getByRole('heading', { name: 'We can’t use your camera' })).toBeVisible();
@@ -584,7 +595,7 @@ test.describe('Flow C: a host publishes a first listing', () => {
     await tap(page, page.getByRole('button', { name: 'Choose from your photos' }));
     await (await library).setFiles(photo('kitchen', [120, 150, 120]));
     await tap(page, page.getByRole('button', { name: 'Use this photo' }));
-    await takePhoto(page, /^Exterior: Take photo/, photo('exterior', [110, 140, 170]));
+    await takePhoto(page, /^Exterior Take photo/, photo('exterior', [110, 140, 170]));
     await expect(page.getByRole('button', { name: /Exterior photo added/ })).toBeVisible();
     await check(page, 'step-4-housing-390');
     await next(page, 'Meals');
@@ -601,10 +612,10 @@ test.describe('Flow C: a host publishes a first listing', () => {
       .fill('$50');
     await choose(page, /^Per/, 'A week');
     await tap(page, here(page).getByText('Taken from pay', { exact: true }));
-    await takePhoto(page, /^Kitchen: Take photo/, photo('meal-kitchen', [130, 160, 130]));
-    await takePhoto(page, /^Meal example: Take photo/, photo('meal', [220, 190, 120]));
-    await takePhoto(page, /^Dining area: Take photo/, photo('dining', [200, 180, 150]));
-    await takePhoto(page, /^Other: Take photo/, photo('other', [170, 170, 190]));
+    await takePhoto(page, /^Kitchen Take photo/, photo('meal-kitchen', [130, 160, 130]));
+    await takePhoto(page, /^Meal example Take photo/, photo('meal', [220, 190, 120]));
+    await takePhoto(page, /^Dining area Take photo/, photo('dining', [200, 180, 150]));
+    await takePhoto(page, /^Other Take photo/, photo('other', [170, 170, 190]));
     await expect(page.getByRole('button', { name: /Other photo added/ })).toBeVisible();
     await check(page, 'step-5-meals-390');
     await next(page, 'Seasonal details');
@@ -632,7 +643,7 @@ test.describe('Flow C: a host publishes a first listing', () => {
     await next(page, 'Photos');
 
     // 8 Photos
-    await takePhoto(page, /^Cover: Take photo/, photo('cover', [90, 130, 160]));
+    await takePhoto(page, /^Cover Take photo/, photo('cover', [90, 130, 160]));
     await expect(page.getByRole('button', { name: /Cover photo added/ })).toBeVisible();
     await check(page, 'step-8-photos-390');
     await next(page, 'Applying');
@@ -757,6 +768,21 @@ test.describe('Flow C: a host publishes a first listing', () => {
       await expect
         .poll(() => (fake.listings.get(id)?.draft.basics as { title?: string }).title)
         .toBe('Housekeeper');
+
+      // A problem in a section shows once in Review's list, and "Fix it" goes to its field.
+      const amount = page.locator('#f-pay-amount');
+      await amount.fill('Good wages');
+      await amount.blur();
+      await expect(page.locator('#f-pay-amount-error')).toBeVisible();
+      const review = page.locator('#section-review');
+      await expect(review.getByText('Fix these before you publish')).toBeVisible();
+      await tap(page, review.getByRole('button', { name: 'Fix it' }));
+      await expect(amount).toBeFocused();
+      await amount.fill('$18–$20');
+      await expect(review.getByText('Fix these before you publish')).toHaveCount(0, NAVIGATION);
+      await expect
+        .poll(() => (fake.listings.get(id)?.draft.pay as { minCents?: number }).minCents)
+        .toBe(1800);
 
       // Review and publish.
       await tap(page, page.getByRole('button', { name: /^10 · Review/ }));

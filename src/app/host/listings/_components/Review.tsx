@@ -10,7 +10,14 @@ import { Button, Checkbox, ErrorState, Notice, Skeleton } from '@/ui/components'
 import { CircleAlert, CircleCheck } from '@/ui/icons';
 import { ApiError, api, type ChecksJson, type IssueJson, type PublishJson } from '../_lib/api';
 import { money } from '../_lib/format';
-import { MEAL_SLOTS, HOUSING_SLOTS, sectionOfPath, stepTitle, type StepKey } from '../_lib/model';
+import {
+  MEAL_SLOTS,
+  HOUSING_SLOTS,
+  fieldKeyFor,
+  sectionOfPath,
+  stepTitle,
+  type StepKey,
+} from '../_lib/model';
 import { arr, getPath, num, obj, str, strings, type Json } from '../_lib/paths';
 import type { Form } from './fields';
 
@@ -97,7 +104,7 @@ export function ReviewSection({
   onGoTo: (step: StepKey, field?: string) => void;
   onPublished: (state: PublishJson) => void;
   /** The card, where this layout shows it inside Review. */
-  card: ReactNode;
+  card: (headingId: string) => ReactNode;
   /** Review is on screen: run the checks, and again after each save. */
   active: boolean;
   /** When the draft was last saved. */
@@ -209,7 +216,7 @@ export function ReviewSection({
 
   return (
     <>
-      <div className="md:hidden">{card}</div>
+      <div className="md:hidden">{card('guest-card-review-phone')}</div>
 
       <div className="flex flex-col gap-1">
         <h3 className="text-16 font-bold text-ink">Hours and deductions</h3>
@@ -272,9 +279,11 @@ export function ReviewSection({
         {errors.length > 0 || localErrors.length > 0 ? (
           <Notice tone="danger" title="Fix these before you publish">
             <ul className="mt-1 flex flex-col gap-2">
+              {/* One entry per field: this host's own check first (it names what to type), then
+                  the server's. */}
               {[
-                ...errors.map((i) => ({ field: i.field, message: i.message })),
-                ...localErrors.map(([field, message]) => ({ field, message })),
+                ...localErrors.map(([field, message]) => ({ field: fieldKeyFor(field), message })),
+                ...errors.map((i) => ({ field: fieldKeyFor(i.field), message: i.message })),
               ]
                 .filter((v, i, all) => all.findIndex((o) => o.field === v.field) === i)
                 .map((i) => {
@@ -375,7 +384,7 @@ export function ReviewSection({
         )
       ) : null}
 
-      <div className="hidden md:block xl:hidden">{card}</div>
+      <div className="hidden md:block xl:hidden">{card('guest-card-review-tablet')}</div>
 
       {failure?.kind === 'blocked' ? (
         <Notice

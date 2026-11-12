@@ -58,6 +58,20 @@ export function sectionOfPath(path: string): BuilderSection {
   return SECTION_OF_KEY.get(path.split('.')[0] ?? '') ?? 'basics';
 }
 
+/**
+ * The builder field that edits a content path, for focusing it and listing it once. Pay is one
+ * "Amount" field for kind, minCents and maxCents; a cost is one field for its cents.
+ */
+export function fieldKeyFor(path: string): string {
+  if (/^pay\.(kind|minCents|maxCents)$/.test(path)) return 'pay.amount';
+  if (/^pay\.crewShareEstimate\.(minCents|maxCents)$/.test(path)) return 'pay.amount';
+  if (path === 'pay.crewShareEstimate' || path === 'pay.crewShareEstimate.per')
+    return 'pay.crewPer';
+  const cost = /^(housing|meals)\.cost\.cents$/.exec(path);
+  if (cost) return `${cost[1]}.cost.amount`;
+  return path;
+}
+
 export const CATEGORY_LABEL = {
   maritime: 'Maritime',
   seasonal: 'Seasonal',
