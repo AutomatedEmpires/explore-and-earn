@@ -1,32 +1,30 @@
-// Listing page metadata and JobPosting JSON-LD only (SP3 spec 8.11, plan Task 41).
-// The page body stays with the listing screen; this file adds the head and the script.
+// /jobs/view/[id]/[slug]: the listing page (issue #109, flow A; SP3 spec 8.9 and 8.11, plan
+// Tasks 34 and 41). Guests see the whole deal with no login wall; Apply goes through sign-in
+// (the account bridge) and returns to the apply step. The facts render on the server.
+// - A wrong slug answers 308 to the canonical address, keeping `source`.
+// - Unknown and removed listings are 404; a closed listing shows its closed view and noindex.
+// - Active listings carry the JobPosting JSON-LD.
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
-import { cache } from 'react';
-import { getDb } from '@/lib/db';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { getEnv } from '@/lib/env';
-import type { JobCardData, ListingDetail } from '@/lib/discovery';
-import { getListingDetail } from '@/modules/discovery';
 import { buildJobPostingJsonLd } from '@/modules/landing';
-import { seekerPage } from '@/server/shell';
+import { seekerPage, signInUrl } from '@/server/shell';
 import { getPageViewer } from '@/server/viewer';
+import { ClosedListing } from '../../_components/closed-listing';
+import { ListingDetail } from '../../_components/listing-detail';
+import { buildListingView } from '../../_lib/listing-view';
+import {
+  applyHref,
+  canonicalPath,
+  isClosed,
+  loadListing,
+  photoAlts,
+  slugOf,
+  sourceOf,
+} from '../../_lib/load';
 
 type JobParams = { id: string; slug: string };
-
-const loadListing = cache(async (id: string, viewerUserId: string | null, tz: string) =>
-  getListingDetail(getDb(), { listingId: id, viewerUserId, tz }),
-);
-
-function isClosed(
-  detail: ListingDetail | { status: 'closed'; card: JobCardData },
-): detail is { status: 'closed'; card: JobCardData } {
-  return !('content' in detail);
-}
-
-function canonicalPath(detail: ListingDetail): string {
-  const slug = (detail.href.split('?')[0] ?? '').split('/').pop() || detail.listingId;
-  return `/jobs/view/${detail.listingId}/${slug}`;
-}
+type Search = Record<string, string | string[] | undefined>;
 
 export async function generateMetadata({
   params,
@@ -56,19 +54,50 @@ export async function generateMetadata({
   };
 }
 
-export default async function JobViewPage({ params }: { params: Promise<JobParams> }) {
+export default async function JobViewPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<JobParams>;
+  searchParams: Promise<Search>;
+}) {
   const { id, slug } = await params;
-  await seekerPage(`/jobs/view/${encodeURIComponent(id)}/${encodeURIComponent(slug)}`, {
-    guests: true,
-  });
+  const path = `/jobs/view/${encodeURIComponent(id)}/${encodeURIComponent(slug)}`;
+  const seeker = (await seekerPage(path, { guests: true })) !== null;
   const viewer = await getPageViewer();
   const detail = await loadListing(id, viewer.seekerId, viewer.tz);
   if (!detail) notFound();
-  if (isClosed(detail)) return null;
+
+  const source = sourceOf((await searchParams).source);
+  const canonical = canonicalPath(detail);
+  const here = source === 'other' ? canonical : `${canonical}?source=${source}`;
+
+  if (isClosed(detail)) {
+    return <ClosedListing card={detail.card} seeker={seeker} signInHref={signInUrl(here)} />;
+  }
+  if (slug !== slugOf(detail.href, detail.listingId)) permanentRedirect(here);
+
+  const view = buildListingView(detail, await photoAlts(detail));
   return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: buildJobPostingJsonLd(detail, getEnv().APP_URL) }}
-    />
+    <>
+      <ListingDetail
+        view={view}
+        path={canonical}
+        actions={{
+          listingId: detail.listingId,
+          title: detail.title,
+          source,
+          seeker,
+          disposition: detail.viewer?.disposition ?? null,
+          applied: detail.viewer?.applied ?? false,
+          applyHref: applyHref(detail.listingId, source, seeker),
+          signInHref: signInUrl(here),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: buildJobPostingJsonLd(detail, getEnv().APP_URL) }}
+      />
+    </>
   );
 }

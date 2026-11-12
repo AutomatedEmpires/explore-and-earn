@@ -1,7 +1,11 @@
-// GET /api/v1/me/applications (SP4 spec 5). W0 contract stub: W4 implements the handler
-// (Task 22). The apiRoute options below are the contract; keep them.
-import { myApplicationsQuerySchema } from '@/modules/applications';
+// GET /api/v1/me/applications (SP4 spec 5): the signed-in seeker's applications for one My jobs
+// view, newest first, with the size of all three views. `before` is the previous page's
+// `nextBefore`; one from another view, or a malformed one, is a 400.
+// @/server/api first: it loads identity before orgs (see discovery/_shared/params.ts).
 import { apiRoute } from '@/server/api';
+import { unauthorized } from '@/lib/errors';
+import { listMyApplications, myApplicationsQuerySchema } from '@/modules/applications';
+import { privateJson } from '@/server/viewer';
 
 export const GET = apiRoute({
   auth: 'seeker',
@@ -11,7 +15,8 @@ export const GET = apiRoute({
     path: '/api/v1/me/applications',
     summary: 'List your applications',
   },
-  handler: async () => {
-    throw new Error('not implemented');
+  handler: async ({ db, user, input }) => {
+    if (!user) throw unauthorized();
+    return privateJson(await listMyApplications(db, user.id, input));
   },
 });

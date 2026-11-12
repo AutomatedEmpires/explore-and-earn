@@ -1,14 +1,30 @@
 # Seeker screens
 
-Issues [#63](https://github.com/AutomatedEmpires/explore-and-earn/issues/63) and [#152](https://github.com/AutomatedEmpires/explore-and-earn/issues/152) (revision for design audit 2). Figma only. No UI code.
+Issues [#63](https://github.com/AutomatedEmpires/explore-and-earn/issues/63), [#152](https://github.com/AutomatedEmpires/explore-and-earn/issues/152) (revision for design audit 2) and [#155](https://github.com/AutomatedEmpires/explore-and-earn/issues/155) (fixes for design audit 3). Figma only. No UI code.
 
 - **File:** https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A
 - **Page 02 Seeker:** https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=39-2627
 - **Frames:** 168. That is 151 screens, 17 prototype copies, and the 18 #128 legal-field frames (kept as that task's record). Each link below opens the frame.
-- **Built from:** page 00 System components and variables. Colors are bound to the Color collection. Text uses the 8-step scale (12, 14, 16, 18, 20, 24, 28, 32). Body copy is `text-16/regular`; fact lines and labels keep `text-16/semibold` (SE-13).
-- **Status:** not approved. The lead re-audits (audit 3), then asks the founder.
+- **Built from:** page 00 System components and variables. Colors are bound to the Color collection. Text uses the scale from 14 to 32 (14, 16, 18, 20, 24, 28, 32); since #155 no text on this page is under 14 px. Body copy is `text-16/regular`; fact lines and labels keep `text-16/semibold` (SE-13).
+- **Status:** design audit 3 found 0 blockers. The lead approved flows B (first application), C and D for build under the founder's delegation ([#45](https://github.com/AutomatedEmpires/explore-and-earn/issues/45#issuecomment-6810708880)). Flow A (guest listing) waited on SE3-1, which #155 fixes below. The lead checks the fix before approving flow A.
 
 Prefix every node with `https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=`.
+
+## What #155 changed, by audit 3 finding
+
+Issue [#155](https://github.com/AutomatedEmpires/explore-and-earn/issues/155). Most fixes are made in page 00 components and reach this page through instances (see D3-1 to D3-8 in the system README). The audit 3 report is not posted, so each row names the check and the known example.
+
+| Id | Check | Fix | Where |
+|---|---|---|---|
+| SE3-1 | Cover media versus cover size (blocks flow A) | The JobCard cover photo now fills the cover at every card width (D3-3). It was 384x288 inside 520x188, 736x188, 720x188 and 420x188 covers, which left grey bands. Now it is 520x390, 736x552, 720x540 and 420x315, centred and cropped. No screen needed an edit | Seek · results · 1440 [42-3412](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=42-3412), Swipe · card 768 [45-6205](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=45-6205) and 1440 [45-6310](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=45-6310), Swipe · undo 768 [45-6551](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=45-6551) and 1440 [45-6665](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=45-6665), Detail · guest · 1440 · side panel [45-7615](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=45-7615) and the other 1440 frames that show Seek behind a panel |
+| Badge without an icon | The "Sent" status badge (Tone=neutral) | "Apply · sent" and "Application · status" each had two Sent badges: the #152 status badge with its Send icon, and an older one without an icon. The older one is removed, so each frame starts with one Sent badge that has its icon. Badge's `Show icon` now defaults to on (D3-1) | Apply · sent [45-8200](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=45-8200), [45-8256](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=45-8256), [45-8291](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=45-8291); Application · status [45-8587](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=45-8587), [45-8644](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=45-8644), [45-8680](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=45-8680); Prototype · Apply · sent [46-20708](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=46-20708) |
+| Text under 14 px | 437 layers: the Chip "Pay" label, BottomNav labels, IconLink counts and the state tile counts | The first three are fixed in their components (D3-4). The six state tile counts ("1", "2") on the tile map use `text-14/bold` | Browse · states · 768 [46-8697](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=46-8697) and 1440 [46-8769](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=46-8769) |
+| Target under 44 px | "How we work this out" on every JobCard was 139x36. The Clerk footer links "Sign up" and "Use another email" were 20 px high | Both are now 44 px high (D3-5) | All JobCards; Account · sign in, sign-in error, cancelled and check your email |
+| Text clipped | At 320 the search placeholder wrapped to three lines in a 137 px input beside "Filters · 1", and the input cut it off | At 320 the search row stacks: the input is full width (288) and "Filters · 1" sits under it. 390 and wider are unchanged | Seek · results · 320 [185-18816](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=185-18816) |
+| Text overflowing its box | The Filters checkbox description ("Jobs paid by the day or year are converted with their weekly hours.") ran out of its 20 px box | Checkbox, Radio and field hints now wrap (D3-6) | Seek · filters · 390 [175-14419](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=175-14419), the 1440 filter rail |
+| Text outside its frame | In the #128 record frame, the detail page's BottomNav sat below the 844 px viewport, behind the sheet | Hidden, because the sheet covers that part of the page | Legal fields · How we work this out · 390 [113-11452](https://www.figma.com/design/PbAWCgi2JXiyl5PmbGvr9A?node-id=113-11452) |
+
+**Re-run of the checks, 2026-11-12, visible layers only:** 4,247 text layers, 4,456 instances, 37 Badges and 255 media layers. The result is 0 for each check: text under 14 px, targets under 44 px, text clipped, overflowing or truncated, disabled controls, placeholder, "preview" or builder copy, icon-less badges and media that doesn't cover its frame. The board notes ("Flow note", "Flow A", "Legal fields note") sit outside the screens and are not screen copy.
 
 ## What #152 changed, by audit 2 finding
 

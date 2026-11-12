@@ -186,7 +186,7 @@ describe('read stubs', () => {
     expect(await profiles.needsAttention(db, 'u1')).toBe(false);
     expect(await profiles.getCommunityIdentities(db, ['u1'])).toEqual(new Map());
     expect(await profiles.getPreferenceTargets(db, 'u1')).toEqual({ categories: [], states: [] });
-    expect(await applications.countApplicationsSince(db, new Date())).toBe(0);
+    // applications.countApplicationsSince is a real query from W4 on (reads.test.ts covers it).
   });
 
   it('throw a named error from everything else', async () => {
