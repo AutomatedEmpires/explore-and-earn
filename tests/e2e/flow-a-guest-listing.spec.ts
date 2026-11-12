@@ -238,7 +238,8 @@ async function routePhotos(page: Page): Promise<void> {
   await page.route(/\.webp(\?|$)/, async (route) => {
     const url = route.request().url();
     const id = [...seeded.media.keys()].find((k) => url.includes(k));
-    const file = path.join(SAMPLES, (id && seeded.media.get(id)) || 'lake.svg');
+    // Listing photos by id; anything else on the page is the host's logo.
+    const file = path.join(SAMPLES, (id && seeded.media.get(id)) || 'kettle-ridge-logo.svg');
     await route.fulfill({ contentType: 'image/svg+xml', body: readFileSync(file) });
   });
 }
@@ -280,8 +281,9 @@ const FACTS = [
   'Couples housed',
 ];
 
-// Serial: one seed, then the pages in order. `next dev` compiles each route on its first hit.
-test.describe.configure({ mode: 'serial', timeout: 120_000 });
+// Independent tests on one seed (beforeAll, re-run when a failure restarts the worker), so one
+// failure doesn't hide the rest. `next dev` compiles each route on its first hit.
+test.describe.configure({ timeout: 120_000 });
 
 test.beforeAll(async () => {
   test.setTimeout(300_000);
@@ -328,6 +330,13 @@ test('390: the deal fits above the pinned Skip · Apply · Save bar, which sits 
   await page.getByRole('heading', { name: 'Perks' }).scrollIntoViewIfNeeded();
   const pinned = await bar.boundingBox();
   expect(Math.abs((pinned?.y ?? 0) - barBox.y)).toBeLessThanOrEqual(1);
+
+  // At the very end it is still on the tabs, and the last row (Report, Share) clears it.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const atEnd = await bar.boundingBox();
+  expect(Math.abs((atEnd?.y ?? 0) - barBox.y)).toBeLessThanOrEqual(1);
+  const report = await page.getByRole('link', { name: 'Report' }).boundingBox();
+  expect((report?.y ?? 9999) + (report?.height ?? 0)).toBeLessThanOrEqual(barBox.y);
 });
 
 test('Apply goes to sign-in and on to the apply step; Save asks a guest to sign in', async ({

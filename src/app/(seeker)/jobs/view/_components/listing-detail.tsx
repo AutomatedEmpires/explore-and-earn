@@ -26,7 +26,11 @@ import {
 import type { ListingView, PhotoRef } from '../_lib/listing-view';
 import { ActionBar, ListingActionsProvider, ShareButton, type ListingActionsInit } from './listing-actions';
 
-/** The pinned bar sits on top of the bottom tabs: their border, padding and 56 px row. */
+/**
+ * At 390 the bar is fixed on top of the bottom tabs (their border, padding and 56 px row). It is
+ * not sticky: a sticky bar comes to rest at its own place once the listing's end scrolls into
+ * view, which is the shell's bottom padding above the tabs, not on them.
+ */
 const ABOVE_BOTTOM_TABS = {
   bottom: 'calc(1px + 3.875rem + max(1rem, env(safe-area-inset-bottom)))',
 } as const;
@@ -180,7 +184,8 @@ export function ListingDetail({ view, actions, path }: ListingDetailProps) {
         </div>
         <div className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
           {view.cover ? <Cover cover={view.cover} photoCount={view.photoCount} /> : null}
-          <div className="flex flex-col gap-4 px-4 pt-4 pb-6 md:px-0 xl:px-4">
+          {/* pb-16 at 390: with the shell's own padding, the last row ends 24 px above the bar. */}
+          <div className="flex flex-col gap-4 px-4 pt-4 pb-16 md:px-0 md:pb-6 xl:px-4">
             <div className="flex flex-col items-start gap-1.5">
               <CategoryBadge category={view.category} />
               <h1 id="listing-title" className="text-28 font-extrabold text-ink">
@@ -276,7 +281,7 @@ export function ListingDetail({ view, actions, path }: ListingDetailProps) {
           </div>
         </div>
         <ActionBar
-          className="sticky z-20 border-t border-line bg-surface px-4 py-3 md:hidden xl:static xl:flex"
+          className="fixed inset-x-0 z-30 border-t border-line bg-surface px-4 py-3 md:hidden xl:static xl:flex"
           style={ABOVE_BOTTOM_TABS}
         />
       </article>
