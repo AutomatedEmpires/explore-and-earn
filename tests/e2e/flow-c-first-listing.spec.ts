@@ -405,6 +405,14 @@ async function settle(page: Page) {
       'nextjs-portal, [data-clerk-keyless-prompt], .cl-keylessPrompt, [class*="keyless"] { display: none !important; }',
   });
   await page.evaluate(async () => {
+    // Scroll through the page so every lazy image (loading="lazy") is requested, as the
+    // design-system spec does, then back to the top for the screenshot.
+    const pause = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    for (let y = 0; y < document.documentElement.scrollHeight; y += window.innerHeight) {
+      window.scrollTo(0, y);
+      await pause();
+    }
+    window.scrollTo(0, 0);
     const shown = Array.from(document.images).filter((img) => img.getClientRects().length > 0);
     await Promise.all(
       shown.map((img) =>
@@ -421,8 +429,10 @@ async function settle(page: Page) {
 }
 
 /** axe-clean, then the screenshot. */
-async function check(page: Page, name: string, opts: { fullPage?: boolean } = {}) {
+async function check(page: Page, name: string, opts: { fullPage?: boolean; show?: Locator } = {}) {
   await settle(page);
+  // A viewport screenshot of something below the top: bring it into view first.
+  if (opts.show) await opts.show.scrollIntoViewIfNeeded();
   expect(await seriousA11yIssues(page), `axe on ${name}`).toEqual([]);
   await expect(page).toHaveScreenshot(`flow-c-${name}.png`, {
     ...screenshot,
@@ -556,11 +566,17 @@ test.describe('Flow C: a host publishes a first listing', () => {
     fake.failNextPut = true;
     await takePhoto(page, /^Bathroom: Take photo/, photo('bathroom', [150, 186, 196]));
     await expect(page.getByText('1 photo didn’t upload')).toBeVisible();
-    await check(page, 'photo-failed-390', { fullPage: false });
+    await check(page, 'photo-failed-390', {
+      fullPage: false,
+      show: here(page).getByText('1 photo didn’t upload'),
+    });
     await tap(page, here(page).getByRole('button', { name: /Bathroom didn’t upload/ }));
     await expect(page.getByRole('button', { name: /Bathroom photo added/ })).toBeVisible();
-    // The camera closes without a photo: offer the host's own photos.
+    // The camera closes without a photo: offer the host's own photos. The test takes the file
+    // chooser so none is left open, then closes it the way the browser does, with `cancel`.
+    const camera = page.waitForEvent('filechooser');
     await tap(page, here(page).getByRole('button', { name: /^Kitchen: Take photo/ }));
+    await camera;
     await page.getByTestId('photo-camera-input').dispatchEvent('cancel');
     await expect(page.getByRole('heading', { name: 'We can’t use your camera' })).toBeVisible();
     await check(page, 'camera-blocked-390');
@@ -650,12 +666,11 @@ test.describe('Flow C: a host publishes a first listing', () => {
     await check(page, 'publish-failed-390');
     await tap(page, page.getByRole('button', { name: 'Try again' }));
 
-    await expect(page.getByRole('heading', { name: 'Housekeeper is in review' })).toBeVisible(
-      NAVIGATION,
-    );
-    await expect(
-      page.getByText(/\blive\b/i).filter({ hasNotText: 'when the job is live' }),
-    ).toHaveCount(0);
+    // The ending says "in review", never that the listing is live (the body's "You will get an
+    // email when the job is live" is the approved copy).
+    const ending = page.getByRole('heading', { name: 'Housekeeper is in review' });
+    await expect(ending).toBeVisible(NAVIGATION);
+    await expect(ending).not.toContainText('live');
     await check(page, 'in-review-390');
     const publishTaps = taps;
 

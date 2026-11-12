@@ -77,6 +77,25 @@ describe('the builder model', () => {
     expect(checklist(finished).every((s) => s.complete)).toBe(true);
   });
 
+  it('sends a chosen location with its onsite mode, which the strict schema requires', () => {
+    let draft = setPath(sampleDraft(), 'where', undefined);
+    draft = setPath(draft, 'where.locationId', SAMPLE_IDS.location);
+    const data = sectionPayload('where_when', draft, ctx);
+    expect(data.where).toEqual({ mode: 'onsite', locationId: SAMPLE_IDS.location });
+    expect(serverSectionSchema('where_when').safeParse(data).success).toBe(true);
+  });
+
+  it('keeps a remote job remote before its scope is chosen', () => {
+    let draft = setPath(sampleDraft(), 'basics.primaryCategory', 'remote');
+    draft = setPath(draft, 'where', { hostLocationId: SAMPLE_IDS.location });
+    expect(sectionPayload('where_when', draft, ctx).where).toEqual({
+      mode: 'remote',
+      hostLocationId: SAMPLE_IDS.location,
+      scope: 'all_us',
+      states: [],
+    });
+  });
+
   it('reads an empty optional text as null', () => {
     const draft = setPath(sampleDraft(), 'job.typicalDay', '');
     expect(sectionPayload('job', draft, ctx).job).toMatchObject({ typicalDay: null });

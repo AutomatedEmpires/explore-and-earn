@@ -341,7 +341,9 @@ function Workspace({
   const goTo = (s: StepKey, field?: string) => {
     if (phone) {
       void d.flush();
-      router.push(`?step=${s}`, { scroll: true });
+      // A history entry, not a router navigation: the App Router keeps useSearchParams in step
+      // with pushState, so changing step needs no server round trip and works offline.
+      window.history.pushState(null, '', `?step=${s}`);
       if (!field) window.scrollTo(0, 0);
     } else {
       document.getElementById(`section-${s}`)?.scrollIntoView({ block: 'start' });

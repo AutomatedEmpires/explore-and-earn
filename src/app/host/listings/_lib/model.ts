@@ -123,9 +123,11 @@ function normalizeKey(key: string, draft: Json, ctx: BuilderContext): unknown {
     case 'basics':
       return { ...v, secondaryCategory: or(v.secondaryCategory, null) };
     case 'where':
-      return v.mode === 'remote'
-        ? { ...v, scope: or(v.scope, 'all_us'), states: arr(v.states) }
-        : v;
+      // `mode` is the union's discriminator: the server's draft schema refuses a where without it.
+      if (v.mode === 'remote' || (v.mode === undefined && categoryOf(draft) === 'remote')) {
+        return { ...v, mode: 'remote', scope: or(v.scope, 'all_us'), states: arr(v.states) };
+      }
+      return { ...v, mode: 'onsite' };
     case 'when':
       return { ...v, minCommitment: nullable(v.minCommitment) };
     case 'pay':
