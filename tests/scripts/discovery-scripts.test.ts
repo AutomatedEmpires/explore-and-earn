@@ -191,9 +191,9 @@ describe('pnpm discovery:rebuild', () => {
     expect(audit?.n).toBe(1);
   }, 60_000);
 
-  it("logs a failed delete without the listing's id", async () => {
+  it('exits 1 and logs the failed delete with its cause but no query parameters', async () => {
     const local = await localDb();
-    const [listingId] = await insertProjectionRows(local.db, [{}]);
+    await insertProjectionRows(local.db, [{}]);
     // Deleting a projection row now raises, so the rebuild's removal of this one fails.
     await local.db.execute(sql`
       create function app.ee_59_refuse() returns trigger language plpgsql
@@ -206,15 +206,23 @@ describe('pnpm discovery:rebuild', () => {
 
     const run = await runScript('discovery:rebuild', [], local.url);
     expect(run.code).toBe(1);
-    // The delete's one parameter is the listing id.
-    expect(listingId).toBeDefined();
+    // The logger drops a failed query's parameter values.
     expect(run.stderr).not.toContain('params:');
-    expect(run.stderr).not.toContain(listingId);
-    const failed = logLines(run.stderr).find((l) => l.msg === 'discovery:rebuild failed');
-    expect(failed?.err).toMatchObject({
+    // The sync logs the row it skipped, with the cause.
+    const item = logLines(run.stderr).find((l) => l.msg === 'discovery.sync_item_failed');
+    expect(item?.err).toMatchObject({
       message: expect.stringMatching(/^Failed query: delete from app\.discovery_listings/),
       cause: { message: 'ee-59 refuses the delete' },
     });
+    expect(logLines(run.stderr)).toContainEqual(
+      expect.objectContaining({
+        level: 'error',
+        msg: 'discovery:rebuild failed',
+        upserted: 0,
+        removed: 0,
+        failed: 1,
+      }),
+    );
     expect(await projectionCount(local.db)).toBe(1);
   }, 60_000);
 

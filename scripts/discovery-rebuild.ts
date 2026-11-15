@@ -1,7 +1,8 @@
 // `pnpm discovery:rebuild`: brings the whole search projection back in line with SP2's listings,
 // with the drift check's two passes, and records `discovery.projection_rebuilt` (SP3 plan Task 9).
 // Run it after a database restore. It removes every row with no live listing behind it, synthetic
-// rows included.
+// rows included. A row that fails to sync is logged by the sync itself and counted; the script
+// then logs 'discovery:rebuild failed' with the counts and exits 1.
 //
 // Needs the app environment, since getDb() validates it. Reads .env.local when present;
 // variables already set in the shell take precedence.
@@ -18,8 +19,11 @@ import { rebuildSearchProjection } from '../src/modules/discovery';
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
 
 try {
-  const counts = await rebuildSearchProjection(getDb());
-  logger.info('search projection rebuilt', counts);
+  const { failed, ...counts } = await rebuildSearchProjection(getDb());
+  if (failed > 0) {
+    logger.error('discovery:rebuild failed', { ...counts, failed });
+    process.exitCode = 1;
+  } else logger.info('search projection rebuilt', counts);
 } catch (err) {
   // The error itself, not its message: the logger drops a failed query's parameter values.
   logger.error('discovery:rebuild failed', { err });
