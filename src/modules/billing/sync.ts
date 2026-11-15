@@ -1,9 +1,9 @@
 // syncSubscription (SP2 spec section 8.8): reads the subscription from Stripe, so event order
 // never matters, then under the org lock upserts the row, swaps plan grants, grants the month's
-// invite credits, redeems founding, sets host_since, applies a lapse, emits
-// `subscription.changed` and records audit. Webhooks, the success page and the daily
+// invite credits, applies the founding offer (FD-7, ./founding.ts), sets host_since, applies a
+// lapse, emits `subscription.changed` and records audit. Webhooks, the success page and the daily
 // reconcile all end here.
-import { and, eq, inArray, ne } from 'drizzle-orm';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import type { DbOrTx, Tx } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
@@ -19,7 +19,7 @@ import {
 import { emit } from '@/modules/jobs';
 import { getOrgSummaries } from '@/modules/orgs';
 import { listOpenReviewItems, openReviewItem, raiseAlert } from '@/modules/trust';
-import { redeemFoundingCode } from './founding';
+import { syncFoundingDiscount, type FoundingMismatch } from './founding';
 import { billingGateway, type BillingGateway, type SubSnapshot } from './gateway';
 import {
   CURRENT_STATUSES,
@@ -33,7 +33,6 @@ import {
 } from './internal';
 import { notifyBillingContacts } from './notifications';
 import {
-  FOUNDING_COUPON_ID,
   PLANS,
   parseLookupKey,
   planLimits,
@@ -124,12 +123,22 @@ async function openPlanGrants(tx: Tx, orgId: string, now: Date) {
   return open.filter((g) => g.kind === 'listing_slot' || g.kind === 'seat');
 }
 
+const PROBLEM_MESSAGES = {
+  unknown_price: "A Stripe subscription uses a price Explore&Earn doesn't know, so it granted nothing.",
+  duplicate_subscription:
+    'An organization has a second current Stripe subscription, which granted nothing.',
+  founding_mismatch:
+    "A Stripe subscription carries a founding discount the founding rules (FD-7) don't allow. " +
+    'Remove the discount in Stripe.',
+} as const;
+
 /** Opens one `billing` item per reason and org (a replay adds none) and alerts the Owners. */
 async function reportBillingProblem(
   tx: Tx,
   orgId: string,
-  reason: 'unknown_price' | 'duplicate_subscription',
+  reason: keyof typeof PROBLEM_MESSAGES,
   subscriptionId: string,
+  detail: { mismatch?: FoundingMismatch } = {},
 ): Promise<void> {
   const open = await listOpenReviewItems(tx, BILLING_SUBJECT, orgId);
   if (open.some((i) => i.reason === reason)) return;
@@ -143,11 +152,8 @@ async function reportBillingProblem(
   await raiseAlert(tx, {
     severity: 'critical',
     kind: `billing.${reason}`,
-    message:
-      reason === 'unknown_price'
-        ? "A Stripe subscription uses a price Explore&Earn doesn't know, so it granted nothing."
-        : 'An organization has a second current Stripe subscription, which granted nothing.',
-    data: { itemId: id, orgId, subscriptionId },
+    message: PROBLEM_MESSAGES[reason],
+    data: { itemId: id, orgId, subscriptionId, ...detail },
   });
 }
 
@@ -256,8 +262,18 @@ async function applySnapshot(tx: Tx, orgId: string, snap: SubSnapshot): Promise<
   };
   const [row] = (await tx
     .insert(subscriptions)
-    .values({ id: newId(), orgId, stripeSubscriptionId: snap.id, ...values })
-    .onConflictDoUpdate({ target: subscriptions.stripeSubscriptionId, set: values })
+    .values({
+      id: newId(),
+      orgId,
+      stripeSubscriptionId: snap.id,
+      ...values,
+      activatedAt: snap.activatedAt,
+    })
+    .onConflictDoUpdate({
+      target: subscriptions.stripeSubscriptionId,
+      // The first payment is kept once seen, whatever later snapshots say.
+      set: { ...values, activatedAt: sql`coalesce(${subscriptions.activatedAt}, excluded.activated_at)` },
+    })
     .returning()) as [SubscriptionRow];
 
   await tx.insert(billingAccounts).values({ orgId }).onConflictDoNothing();
@@ -309,31 +325,6 @@ async function applySnapshot(tx: Tx, orgId: string, snap: SubSnapshot): Promise<
 
     await grantMonthCredits(tx, orgId, parsed.plan, now);
 
-    // Founding: redeem the held code once, and a returning founder is active again.
-    const founding =
-      snap.couponId === FOUNDING_COUPON_ID || snap.metadata.foundingCodeId !== undefined;
-    if (founding) {
-      const codeId = snap.metadata.foundingCodeId;
-      if (codeId && UUID.test(codeId) && account?.foundingCodeId !== codeId) {
-        if (await redeemFoundingCode(tx, { codeId, orgId })) {
-          accountPatch.foundingCodeId = codeId;
-          await record(tx, {
-            actorType: 'system',
-            actorId: null,
-            orgId,
-            action: 'billing.founding_redeemed',
-            subjectType: 'organization',
-            subjectId: orgId,
-            data: { codeId, subscriptionId: snap.id },
-          });
-        }
-      }
-      if (account?.foundingStatus !== 'active') {
-        accountPatch.foundingStatus = 'active';
-        accountPatch.foundingLapsedAt = null;
-      }
-    }
-
     if (!account?.hostSince) accountPatch.hostSince = snap.startDate;
     // The Checkout that led here is done.
     if (account?.openCheckoutSessionId) {
@@ -363,11 +354,15 @@ async function applySnapshot(tx: Tx, orgId: string, snap: SubSnapshot): Promise<
       lapsedClosing = await slotsUsed(tx, orgId, now);
       for (const g of await openPlanGrants(tx, orgId, now)) await endGrant(tx, g.id, now, SYSTEM);
       accountPatch.hostSince = null;
-      if (account?.foundingStatus === 'active') {
-        accountPatch.foundingStatus = 'lapsed';
-        accountPatch.foundingLapsedAt = now;
-      }
     }
+  }
+
+  // FD-7: lock the founding shape at the first paid activation, end it early on an interval
+  // change or when its subscription ends, and report a founding coupon the rules don't allow.
+  // The plan itself still applies: the host is not refused service for a discount Stripe holds.
+  const mismatch = await syncFoundingDiscount(tx, { orgId, snap, interval: parsed.interval, now });
+  if (mismatch) {
+    await reportBillingProblem(tx, orgId, 'founding_mismatch', snap.id, { mismatch });
   }
 
   if (Object.keys(accountPatch).length > 0) {

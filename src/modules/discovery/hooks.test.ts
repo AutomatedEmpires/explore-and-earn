@@ -189,21 +189,33 @@ describe('@/modules/discovery', () => {
     ]);
   });
 
-  it('acks the topics whose real handlers have not landed, so nothing dead-letters', async () => {
-    // W1's sync handlers are real (sync.test.ts); the event and alert topics are still stubs.
-    const stubbed = Object.entries(discovery.jobHandlers).filter(
-      ([topic]) =>
-        !['discovery.sync_listing', 'discovery.sync_host', 'discovery.drift_check'].includes(topic),
-    );
-    expect(stubbed.map(([topic]) => topic).sort()).toEqual([
-      'discovery.alerts_daily',
+  it('rejects a malformed alert chunk, so it is retried and seen', async () => {
+    // Every topic has its real handler now: sync (sync.test.ts), maintenance (events.test.ts)
+    // and the alerts (alerts.test.ts). A bad payload throws before touching the database.
+    const now = new Date();
+    for (const topic of [
       'discovery.alerts_match',
+      'discovery.alerts_daily',
       'discovery.alerts_weekly',
-      'discovery.maintenance',
-    ]);
-    for (const [, handler] of stubbed) {
-      await expect(handler({}, { db, now: new Date() })).resolves.toBeUndefined();
+    ]) {
+      await expect(
+        discovery.jobHandlers[topic]?.({ afterUserId: 'not-a-user' }, { db, now }),
+        topic,
+      ).rejects.toThrow(`${topic}: invalid payload`);
     }
+  });
+
+  it('defines the three alert notification types in the alerts category', async () => {
+    const { getType } = await import('@/modules/notifications');
+    expect(getType('discovery.alert_match')).toMatchObject({ category: 'alerts', push: true });
+    expect(getType('discovery.alert_daily')).toMatchObject({
+      category: 'alerts',
+      email: { template: 'JobAlertDaily' },
+    });
+    expect(getType('discovery.alert_weekly')).toMatchObject({
+      category: 'alerts',
+      email: { template: 'JobAlertWeekly' },
+    });
   });
 
   it('rejects a sync event without its ids, so a malformed payload is retried and seen', async () => {
@@ -232,10 +244,13 @@ describe('discovery privacy registration (SP8)', () => {
     ]);
   });
 
-  it('owns the raw listing events retention rule, which deletes nothing yet', async () => {
+  it('owns the raw listing events retention rule, which deletes through one batch statement', async () => {
     expect(discovery.retentionRules.map((r) => r.key)).toEqual(['discovery.listing_events_raw']);
     const [rule] = discovery.retentionRules;
     expect(rule?.description).toMatch(/90 days/);
-    expect(await rule?.run(db, new Date(), 100)).toEqual({ deleted: 0 });
+    // privacy.test.ts runs it on PGlite; here, the count the delete returns is the rule's result.
+    const execute = vi.fn(async () => ({ rows: [{ n: 2 }] }));
+    expect(await rule?.run({ execute } as unknown as Db, new Date(), 100)).toEqual({ deleted: 2 });
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 });

@@ -11,6 +11,16 @@ if (process.env.APP_ENV === 'prod') parseEnv(process.env);
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // pdfkit reads its font metrics (AFM files) from its own package directory at runtime, so it
+  // stays a plain Node dependency instead of being bundled (SP4 resume PDFs).
+  serverExternalPackages: ['pdfkit'],
+  // The resume PDF routes embed the Figtree TTFs, read from disk when a PDF renders. Keys are
+  // picomatch globs over the route path, so a dynamic segment's brackets are escaped.
+  outputFileTracingIncludes: {
+    '/api/v1/me/resume.pdf': ['./src/modules/profiles/resume/fonts/**/*'],
+    '/api/v1/me/applications/\\[id\\]/resume.pdf': ['./src/modules/profiles/resume/fonts/**/*'],
+    '/api/v1/host/applications/\\[id\\]/resume.pdf': ['./src/modules/profiles/resume/fonts/**/*'],
+  },
   // Inlined into the browser bundle at build time, so client Sentry (sentry.client.config.ts)
   // follows the server's SENTRY_DSN and APP_ENV. A Sentry DSN is public by design.
   env: {

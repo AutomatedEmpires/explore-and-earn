@@ -3,6 +3,7 @@ import type { Category } from '@/ui/categories';
 import {
   Bookmark,
   CalendarDays,
+  Clock,
   EyeOff,
   FileText,
   ListChecks,
@@ -118,7 +119,9 @@ export function CandidateCard(props: CandidateCardProps) {
       coverBadge={<CategoryListBadge categories={interests} />}
       coverAction={
         props.variant === 'applicant' ? (
-          <Badge tone="inverse">{appliedAgo(props.appliedDaysAgo)}</Badge>
+          <Badge tone="inverse" icon={Clock}>
+            {appliedAgo(props.appliedDaysAgo)}
+          </Badge>
         ) : null
       }
       identity={<Avatar name={name} src={showPhoto ? avatarSrc : null} size="xl" ring />}

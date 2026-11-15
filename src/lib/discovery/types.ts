@@ -130,10 +130,29 @@ export type InstallState = {
 };
 
 export type DiscoveryExport = {
-  saved: { listingId: string; at: string }[];
-  skipped: { listingId: string; at: string }[];
-  savedSearches: { name: string; query: DiscoveryQuery; createdAt: string }[];
-  alertSettings: { weeklyDigest: boolean };
+  saved: { listingId: string; at: string; source: DiscoverySource; firstSavedAt: string | null }[];
+  skipped: {
+    listingId: string;
+    at: string;
+    source: DiscoverySource;
+    firstSavedAt: string | null;
+  }[];
+  savedSearches: {
+    name: string;
+    query: DiscoveryQuery;
+    createdAt: string;
+    pushEnabled: boolean;
+    emailDaily: boolean;
+  }[];
+  savedSearchMatches: {
+    savedSearchId: string;
+    listingId: string;
+    matchedAt: string;
+    pushedAt: string | null;
+    dailyEmailedAt: string | null;
+    weeklyEmailedAt: string | null;
+  }[];
+  alertSettings: { weeklyDigest: boolean; pushDay: string | null; pushCount: number };
 };
 
 /** What the filter panel offers. */

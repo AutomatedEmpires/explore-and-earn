@@ -6,7 +6,7 @@ import { logger } from '@/lib/logger';
 import { getBalance, getCapacity } from '@/modules/entitlements';
 import { can } from '@/modules/orgs';
 import type { HostContext } from '@/server/guards';
-import { getFoundingCount } from './founding';
+import { foundingSpotsLeft, getFoundingSummary, type FoundingSummary } from './founding';
 import { billingGateway, type BillingGateway } from './gateway';
 import {
   BILLING_INTERVALS,
@@ -84,7 +84,8 @@ export type BillingOverview = {
     seats: { used: number; limit: number };
     inviteCredits: { balance: number; resetsAt: Date | null };
   };
-  founding: { status: SubscriptionState['founding']; spotsLeft: number };
+  /** FD-7: the org's founding discount, and how many of the first 100 signups are left. */
+  founding: FoundingSummary & { spotsLeft: number };
   /** The plan change waiting for listings to settle. The keep list only for Owners and Admins. */
   pendingChange: {
     toPlan: PlanCode;
@@ -101,14 +102,15 @@ export async function getBillingOverview(
   gw: BillingGateway = billingGateway(),
 ): Promise<BillingOverview> {
   const orgId = ctx.orgId;
-  const [subscription, prices, listingSlots, seats, inviteCredits, count, [pending]] =
+  const [subscription, prices, listingSlots, seats, inviteCredits, founding, spotsLeft, [pending]] =
     await Promise.all([
       getSubscriptionState(db, orgId),
       getPublicPrices(gw),
       getCapacity(db, orgId, 'listing_slot'),
       getCapacity(db, orgId, 'seat'),
       getBalance(db, orgId, 'invite_credit'),
-      getFoundingCount(db),
+      getFoundingSummary(db, orgId),
+      foundingSpotsLeft(db),
       db
         .select()
         .from(billingChanges)
@@ -119,10 +121,7 @@ export async function getBillingOverview(
     subscription,
     prices,
     usage: { listingSlots, seats, inviteCredits },
-    founding: {
-      status: subscription.founding,
-      spotsLeft: Math.max(0, count.max - count.redeemed - count.held),
-    },
+    founding: { ...founding, spotsLeft },
     pendingChange: pending
       ? {
           toPlan: pending.toPlan,

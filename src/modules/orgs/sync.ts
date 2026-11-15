@@ -18,6 +18,7 @@ import { logger } from '@/lib/logger';
 import { CREATED_VIA_APP, CREATED_VIA_KEY, type OrgRole } from '@/modules/identity';
 
 export { CREATED_VIA_APP, CREATED_VIA_KEY };
+import { reserveFoundingNumber } from './founding';
 import { organizations, orgMemberships, orgSlugs } from './schema';
 
 const CLERK_ROLES: Record<string, OrgRole> = {
@@ -148,6 +149,8 @@ export type OrgSnapshot = {
  * - The creator becomes the owner if no owner is recorded yet, but only for an organization
  *   our server created; one created anywhere else (Clerk's Frontend API, the dashboard) stays
  *   ownerless, which gives nobody access to it.
+ * - Recording that first owner is the organization's signup: it takes the next founding number
+ *   while any of the 100 are left (FD-7, ./founding.ts).
  * - A deleted organization stays deleted.
  */
 export async function applyClerkOrganization(
@@ -185,7 +188,11 @@ export async function applyClerkOrganization(
     .where(eq(organizations.id, org.id))
     .returning();
   if (!updated) throw new Error(`Organization ${org.id} vanished during update`);
-  if (patch.ownerUserId) await syncOwnerRole(db, updated);
+  if (patch.ownerUserId) {
+    await syncOwnerRole(db, updated);
+    // Recording the first Owner is the app creating this host organization: its signup (FD-7).
+    await reserveFoundingNumber(db, updated.id);
+  }
   return updated;
 }
 

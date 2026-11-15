@@ -1,6 +1,6 @@
-// Public API of the billing module: Stripe customers, subscriptions, plan changes, founding
-// codes, webhooks and reconciliation (SP2 spec sections 3 and 8; W2, Tasks 11-16). Imports
-// entitlements and orgs. Every Stripe call goes through the BillingGateway (./gateway).
+// Public API of the billing module: Stripe customers, subscriptions, plan changes, the founding
+// offer (FD-7), webhooks and reconciliation (SP2 spec sections 3 and 8; W2, Tasks 11-16).
+// Imports entitlements and orgs. Every Stripe call goes through the BillingGateway (./gateway).
 import { z } from 'zod';
 import type { HandlerMap } from '@/modules/jobs';
 import { CANCEL_TOPIC, cancelSubscriptionNow } from './cancel';
@@ -18,9 +18,14 @@ export type { Actor } from '@/modules/entitlements';
 export {
   BILLING_INTERVALS,
   EXTRA_SLOT_ANNUAL_MULTIPLIER,
-  FOUNDING_COUPON_ID,
+  FOUNDING_ANNUAL_COUPON_ID,
+  FOUNDING_MONTHLY_COUPON_ID,
+  FOUNDING_MONTHLY_MONTHS,
+  FOUNDING_PERCENT_OFF,
   PLANS,
   PLAN_CODES,
+  foundingCouponFor,
+  isFoundingCoupon,
   lookupKey,
   monthlyEquivalentCents,
   parseLookupKey,
@@ -51,26 +56,35 @@ export {
   seedStripeCatalog,
   stripeCatalogApi,
   type CatalogApi,
+  type CatalogCoupon,
   type CatalogPrice,
   type PortalConfigurationInput,
 } from './catalog';
-export {
-  computeFoundingTrialEnd,
-  createCheckout,
-  isReturningFounder,
-  type CheckoutInput,
-} from './checkout';
+export { createCheckout, type CheckoutInput } from './checkout';
 /** SP6 one-time purchases. */
 export { ensureStripeCustomer } from './customers';
+/** FD-7: who gets the founding discount, and its state. */
+export {
+  foundingSpotsLeft,
+  foundingStatusOf,
+  getFoundingEligibility,
+  getFoundingSummary,
+  introEndsAt,
+  type FoundingEligibility,
+  type FoundingMismatch,
+  type FoundingShape,
+  type FoundingStatus,
+  type FoundingSummary,
+} from './founding';
+/** Retired by FD-7; kept for scripts/ops-founding-codes.ts and tests/fakes/sp2/billing.ts. */
 export {
   createFoundingCodes,
   generateFoundingCode,
   getFoundingCount,
   normalizeFoundingCode,
-} from './founding';
+} from './founding-codes';
 
 export {
-  foundingStatusOf,
   getSubscriberBadges,
   getSubscriptionState,
   type SubscriptionState,
@@ -136,8 +150,9 @@ export const jobHandlers: HandlerMap = {
   'billing.grant_monthly_credits': async (_payload, { db, now }) => {
     await grantMonthlyCredits(db, now);
   },
-  'billing.apply_launch_date': async (_payload, { db, now }) => {
-    await applyLaunchDate(db, now);
+  // Retired by FD-7 (no free period to move); still scheduled, so it acknowledges the topic.
+  'billing.apply_launch_date': async () => {
+    await applyLaunchDate();
   },
   'billing.reconcile': async (_payload, { db, now }) => {
     await reconcile(db, now);

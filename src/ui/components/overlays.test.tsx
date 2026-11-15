@@ -5,7 +5,7 @@ import { BedDouble } from '@/ui/icons';
 import { Button } from './Button';
 import { Dialog } from './Dialog';
 import { Sheet } from './Sheet';
-import { ToastProvider, useToast } from './Toast';
+import { Toast, ToastProvider, useToast } from './Toast';
 
 describe('Sheet', () => {
   it('is a dialog named by its title with a labelled close button', () => {
@@ -109,5 +109,19 @@ describe('Toast', () => {
       vi.advanceTimersByTime(1_000);
     });
     expect(screen.queryByText('Job skipped')).toBeNull();
+  });
+});
+
+describe('Toast text (#155 D3-6)', () => {
+  it('wraps the title and description instead of running out of the toast', () => {
+    const long =
+      'Your message to kettleridgelodge.example could not be sent. Check your connection.';
+    render(<Toast title={long} description={long} tone="danger" onDismiss={() => {}} />);
+    const [title, description] = screen.getAllByText(long);
+    for (const element of [title, description]) {
+      expect(element).toHaveClass('wrap-anywhere');
+      expect(element).not.toHaveClass('truncate');
+    }
+    expect(title?.parentElement).toHaveClass('min-w-0');
   });
 });

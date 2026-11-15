@@ -1,16 +1,18 @@
-// Webhooks, sync and subscription state (Task 14), with the fake gateway and the W0 fakes for
-// entitlements and orgs. Trust, notifications, audit, settings and jobs are real.
+// Webhooks, sync and subscription state (Task 14, with the FD-7 founding discount), with the
+// fake gateway and the W0 fakes for entitlements and orgs (the orgs founding cohort is real).
+// Trust, notifications, audit, settings and jobs are real.
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryRows, type Db } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { POST as stripeWebhookRoute } from '@/app/api/webhooks/stripe/route';
+import { reserveFoundingNumber } from '@/modules/orgs';
 import { decide } from '@/modules/trust';
 import { entitlementsFake } from '../../../tests/fakes/sp2/entitlements';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { seedHostOrg, seedMember, type SeededOrg } from '../../../tests/helpers/sp2';
 import { finishCheckout } from './complete';
-import { createFoundingCodes, holdFoundingCode } from './founding';
+import { getFoundingSummary } from './founding';
 import type { SubSnapshot } from './gateway';
 import { makeFakeBillingGateway, type FakeBillingGateway } from './gateway-fake';
 import { startOfNextMonthUtc } from './internal';
@@ -94,7 +96,9 @@ function stripeSub(o: Partial<SubSnapshot> & { orgId?: string } = {}): SubSnapsh
     cancelAtPeriodEnd: false,
     endedAt: null,
     startDate: new Date('2026-11-01T12:00:00Z'),
+    activatedAt: new Date('2026-11-01T12:00:00Z'),
     couponId: null,
+    initialCouponId: o.couponId ?? null,
     metadata: { orgId: o.orgId ?? org.orgId },
     created: new Date('2026-11-01T12:00:00Z'),
     ...o,
@@ -139,6 +143,48 @@ async function notificationsFor(userId: string, type: string) {
     sql`select data::text from app.notifications where user_id = ${userId}::uuid and type = ${type}`,
   );
 }
+
+type DiscountRow = {
+  shape: string;
+  coupon_id: string;
+  stripe_subscription_id: string;
+  started_at: string;
+  ends_at: string;
+  ended_reason: string | null;
+};
+
+async function discountOf(orgId: string): Promise<DiscountRow | undefined> {
+  const [row] = await queryRows<DiscountRow>(
+    t.db,
+    sql`select shape, coupon_id, stripe_subscription_id, started_at::text, ends_at::text,
+          ended_reason
+        from app.founding_discounts where org_id = ${orgId}::uuid`,
+  );
+  return row;
+}
+
+async function billingItems(orgId: string) {
+  return queryRows<{ reason: string }>(
+    t.db,
+    sql`select reason from app.review_items where subject_type = 'billing_account'
+        and subject_id = ${orgId}`,
+  );
+}
+
+/** The `mismatch` of each founding alert raised for `subscriptionId`. */
+async function foundingAlerts(subscriptionId: string): Promise<string[]> {
+  const rows = await queryRows<{ data: string }>(
+    t.db,
+    sql`select data::text from app.audit_events where action = 'trust.alert'`,
+  );
+  return rows
+    .map((r) => JSON.parse(r.data) as { kind: string; data: { subscriptionId?: string; mismatch?: string } })
+    .filter((d) => d.kind === 'billing.founding_mismatch' && d.data.subscriptionId === subscriptionId)
+    .map((d) => d.data.mismatch ?? '');
+}
+
+const yearItems = (plan: string) => [{ lookupKey: `${plan}_year`, quantity: 1 }];
+const START = new Date('2026-11-01T12:00:00Z');
 
 describe('handleStripeWebhook', () => {
   it('applies an event once and enqueues one sync keyed by the event', async () => {
@@ -301,34 +347,8 @@ describe('syncSubscription', () => {
     });
   });
 
-  it('redeems the founding code and marks the org a founder', async () => {
-    const [code] = await createFoundingCodes(t.db, { count: 1, note: 'x', operatorId: null });
-    const { codeId } = await t.db.transaction((tx) =>
-      holdFoundingCode(tx, { orgId: org.orgId, code: code ?? '', until: new Date(Date.now() + 1e6) }),
-    );
-    const s = stripeSub({
-      status: 'trialing',
-      couponId: 'founding_30_forever',
-      trialEnd: new Date('2027-04-15T00:00:00Z'),
-      metadata: { orgId: org.orgId, foundingCodeId: codeId },
-    });
-    await syncSubscription(t.db, s.id, gw);
-    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('active');
-    const [row] = await queryRows<{ status: string; redeemed_org_id: string }>(
-      t.db,
-      sql`select status, redeemed_org_id from app.founding_codes where id = ${codeId}::uuid`,
-    );
-    expect(row).toEqual({ status: 'redeemed', redeemed_org_id: org.orgId });
-    const audits = await queryRows(
-      t.db,
-      sql`select 1 from app.audit_events
-          where action = 'billing.founding_redeemed' and org_id = ${org.orgId}::uuid`,
-    );
-    expect(audits).toHaveLength(1);
-  });
-
-  it('sets host_since once, and a lapse clears it, ends the founding status and the badge', async () => {
-    const s = stripeSub({ couponId: 'founding_30_forever' });
+  it('sets host_since once, and a lapse clears it and the badge', async () => {
+    const s = stripeSub();
     await syncSubscription(t.db, s.id, gw);
     const state = await getSubscriptionState(t.db, org.orgId);
     expect(state.hostSince).toEqual(s.startDate);
@@ -347,7 +367,7 @@ describe('syncSubscription', () => {
       status: 'canceled',
       entitled: false,
       hostSince: null,
-      founding: 'lapsed',
+      founding: 'none',
     });
     expect((await getSubscriberBadges(t.db, [org.orgId])).has(org.orgId)).toBe(false);
     const ended = await notificationsFor(org.owner.userId, 'billing.subscription_ended');
@@ -494,6 +514,236 @@ describe('syncSubscription', () => {
   });
 });
 
+describe('founding discount (FD-7)', () => {
+  beforeEach(async () => {
+    await reserveFoundingNumber(t.db, org.orgId);
+  });
+
+  it('is eligible before the first subscription, whatever the signup date', async () => {
+    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('eligible');
+  });
+
+  it('locks the monthly shape at the first paid activation, and starts the six months there', async () => {
+    const s = stripeSub({ couponId: 'founding_50_six_months', startDate: START, activatedAt: START });
+    await syncSubscription(t.db, s.id, gw);
+    expect(await discountOf(org.orgId)).toEqual({
+      shape: 'monthly',
+      coupon_id: 'founding_50_six_months',
+      stripe_subscription_id: s.id,
+      started_at: '2026-11-01 12:00:00+00',
+      ends_at: '2027-05-01 12:00:00+00',
+      ended_reason: null,
+    });
+    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('active');
+    expect(await billingItems(org.orgId)).toEqual([]);
+
+    await syncSubscription(t.db, s.id, gw);
+    const audits = await queryRows(
+      t.db,
+      sql`select 1 from app.audit_events
+          where action = 'billing.founding_started' and org_id = ${org.orgId}::uuid`,
+    );
+    expect(audits).toHaveLength(1);
+  });
+
+  it('locks the annual shape for the first annual term', async () => {
+    const s = stripeSub({
+      couponId: 'founding_50_first_year',
+      items: yearItems('starter'),
+      startDate: START,
+    });
+    await syncSubscription(t.db, s.id, gw);
+    expect(await discountOf(org.orgId)).toMatchObject({
+      shape: 'annual',
+      coupon_id: 'founding_50_first_year',
+      started_at: '2026-11-01 12:00:00+00',
+      ends_at: '2027-11-01 12:00:00+00',
+      ended_reason: null,
+    });
+  });
+
+  it('locks the annual shape from the first invoice once Stripe drops the once coupon', async () => {
+    // As Stripe returns a paid annual founding subscription: the `once` coupon is gone from the
+    // subscription, and only the invoice that created it still has it.
+    const s = stripeSub({
+      couponId: null,
+      initialCouponId: 'founding_50_first_year',
+      items: yearItems('professional'),
+      startDate: START,
+    });
+    await syncSubscription(t.db, s.id, gw);
+    expect(await discountOf(org.orgId)).toMatchObject({
+      shape: 'annual',
+      coupon_id: 'founding_50_first_year',
+      ends_at: '2027-11-01 12:00:00+00',
+      ended_reason: null,
+    });
+    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('active');
+    expect(await billingItems(org.orgId)).toEqual([]);
+
+    // A switch to monthly (no new invoice yet) ends it, with no false wrong-interval report.
+    update(s, { items: items('professional') });
+    await syncSubscription(t.db, s.id, gw);
+    expect((await discountOf(org.orgId))?.ended_reason).toBe('interval_change');
+    expect(await billingItems(org.orgId)).toEqual([]);
+  });
+
+  it('waits for the first paid activation, and starts the clock there, not at creation', async () => {
+    // Created on 1 November, but its first payment failed.
+    const s = stripeSub({
+      status: 'incomplete',
+      couponId: 'founding_50_six_months',
+      startDate: START,
+      activatedAt: null,
+    });
+    await syncSubscription(t.db, s.id, gw);
+    expect(await discountOf(org.orgId)).toBeUndefined();
+    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('eligible');
+
+    // Paid on 15 December. Stripe's start_date stays at creation.
+    update(s, { status: 'active', activatedAt: new Date('2026-12-15T00:00:00Z') });
+    await syncSubscription(t.db, s.id, gw);
+    expect(await discountOf(org.orgId)).toMatchObject({
+      started_at: '2026-12-15 00:00:00+00',
+      ends_at: '2027-06-15 00:00:00+00',
+    });
+  });
+
+  it("doesn't use up the discount on a subscription canceled before its first payment", async () => {
+    const failed = stripeSub({
+      status: 'incomplete',
+      couponId: 'founding_50_six_months',
+      activatedAt: null,
+    });
+    await syncSubscription(t.db, failed.id, gw);
+    update(failed, { status: 'canceled', endedAt: new Date() });
+    await syncSubscription(t.db, failed.id, gw);
+    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('eligible');
+
+    // The next subscription, paid, gets the one discount.
+    const paid = stripeSub({ couponId: 'founding_50_six_months', startDate: START });
+    await syncSubscription(t.db, paid.id, gw);
+    expect((await discountOf(org.orgId))?.stripe_subscription_id).toBe(paid.id);
+    expect(await billingItems(org.orgId)).toEqual([]);
+  });
+
+  it('remembers the first payment after the subscription ends', async () => {
+    const s = stripeSub();
+    await syncSubscription(t.db, s.id, gw);
+    // Even a later snapshot without the payment time leaves the stored one.
+    update(s, { status: 'canceled', endedAt: new Date(), activatedAt: null });
+    await syncSubscription(t.db, s.id, gw);
+    const [row] = await queryRows<{ activated_at: string | null }>(
+      t.db,
+      sql`select activated_at::text from app.subscriptions where stripe_subscription_id = ${s.id}`,
+    );
+    expect(row?.activated_at).toBe('2026-11-01 12:00:00+00');
+    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('none');
+  });
+
+  it('keeps the discount, and its end date, through monthly tier changes', async () => {
+    let s = stripeSub({ couponId: 'founding_50_six_months', startDate: START });
+    await syncSubscription(t.db, s.id, gw);
+    for (const plan of ['enterprise', 'starter']) {
+      s = update(s, { items: items(plan) });
+      await syncSubscription(t.db, s.id, gw);
+    }
+    expect(await discountOf(org.orgId)).toMatchObject({
+      shape: 'monthly',
+      ends_at: '2027-05-01 12:00:00+00',
+      ended_reason: null,
+    });
+    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('active');
+    expect(await billingItems(org.orgId)).toEqual([]);
+  });
+
+  it('ends on a switch to annual, and never grants a second introductory period', async () => {
+    let s = stripeSub({ couponId: 'founding_50_six_months', startDate: START });
+    await syncSubscription(t.db, s.id, gw);
+    // The plan change removes the coupon with the interval change (change.ts).
+    s = update(s, { items: yearItems('professional'), couponId: null });
+    await syncSubscription(t.db, s.id, gw);
+    expect((await discountOf(org.orgId))?.ended_reason).toBe('interval_change');
+    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('ended');
+    expect(await billingItems(org.orgId)).toEqual([]);
+
+    // A later subscription that somehow carries a founding coupon is reported, not honoured.
+    update(s, { status: 'canceled', endedAt: new Date() });
+    await syncSubscription(t.db, s.id, gw);
+    const again = stripeSub({ couponId: 'founding_50_first_year', items: yearItems('starter') });
+    await syncSubscription(t.db, again.id, gw);
+    expect((await discountOf(org.orgId))?.stripe_subscription_id).toBe(s.id);
+    expect(await foundingAlerts(again.id)).toEqual(['second_intro']);
+    expect(await billingItems(org.orgId)).toEqual([{ reason: 'founding_mismatch' }]);
+  });
+
+  it('reports a coupon left on after a switch to the other interval', async () => {
+    let s = stripeSub({ couponId: 'founding_50_six_months', startDate: START });
+    await syncSubscription(t.db, s.id, gw);
+    s = update(s, { items: yearItems('professional') });
+    await syncSubscription(t.db, s.id, gw);
+    expect((await discountOf(org.orgId))?.ended_reason).toBe('interval_change');
+    expect(await foundingAlerts(s.id)).toEqual(['wrong_interval']);
+  });
+
+  it('ends the introductory period when its subscription ends', async () => {
+    const s = stripeSub({ couponId: 'founding_50_six_months', startDate: START });
+    await syncSubscription(t.db, s.id, gw);
+    update(s, { status: 'canceled', endedAt: new Date() });
+    await syncSubscription(t.db, s.id, gw);
+    expect((await discountOf(org.orgId))?.ended_reason).toBe('subscription_ended');
+    expect((await getFoundingSummary(t.db, org.orgId)).status).toBe('ended');
+  });
+
+  it('reports a founding host whose first activated subscription had no discount', async () => {
+    const first = stripeSub();
+    await syncSubscription(t.db, first.id, gw);
+    update(first, { status: 'canceled', endedAt: new Date() });
+    await syncSubscription(t.db, first.id, gw);
+    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('none');
+
+    const later = stripeSub({ couponId: 'founding_50_six_months' });
+    await syncSubscription(t.db, later.id, gw);
+    expect(await discountOf(org.orgId)).toBeUndefined();
+    expect(await foundingAlerts(later.id)).toEqual(['second_intro']);
+  });
+});
+
+describe('founding mismatches (FD-7)', () => {
+  it('reports organization 101 (not in the cohort), and still grants the plan it pays for', async () => {
+    const s = stripeSub({ couponId: 'founding_50_six_months' });
+    await syncSubscription(t.db, s.id, gw);
+    expect(await discountOf(org.orgId)).toBeUndefined();
+    expect(planGrantKeys()).toEqual([`plan:${s.id}:listing_slot:10:1`, `plan:${s.id}:seat:5:1`]);
+    expect(await billingItems(org.orgId)).toEqual([{ reason: 'founding_mismatch' }]);
+    expect(await foundingAlerts(s.id)).toEqual(['not_in_cohort']);
+    const alerts = await notificationsFor(operatorOwnerId, 'operator.alert');
+    expect(alerts.map((a) => JSON.parse(a.data) as { severity: string; kind: string })).toContainEqual(
+      expect.objectContaining({ severity: 'critical', kind: 'billing.founding_mismatch' }),
+    );
+
+    // A replay opens no second item.
+    await syncSubscription(t.db, s.id, gw);
+    expect(await billingItems(org.orgId)).toHaveLength(1);
+  });
+
+  it('reports a founding coupon on the other interval', async () => {
+    await reserveFoundingNumber(t.db, org.orgId);
+    const s = stripeSub({ couponId: 'founding_50_six_months', items: yearItems('enterprise') });
+    await syncSubscription(t.db, s.id, gw);
+    expect(await discountOf(org.orgId)).toBeUndefined();
+    expect(await foundingAlerts(s.id)).toEqual(['wrong_interval']);
+  });
+
+  it('reports the retired founding_30_forever coupon, even for a founding host', async () => {
+    await reserveFoundingNumber(t.db, org.orgId);
+    const s = stripeSub({ couponId: 'founding_30_forever' });
+    await syncSubscription(t.db, s.id, gw);
+    expect(await discountOf(org.orgId)).toBeUndefined();
+    expect(await foundingAlerts(s.id)).toEqual(['retired_coupon']);
+  });
+});
+
 describe('finishCheckout (GET /host/billing/complete)', () => {
   it('entitles the org from Stripe data alone, with no webhook', async () => {
     const { id: customerId } = await gw.createCustomer(
@@ -564,8 +814,34 @@ describe('getBillingOverview', () => {
       slotMonth: 2900,
       slotYear: 29000,
     });
-    expect(overview.founding).toMatchObject({ status: 'none' });
+    expect(overview.founding).toMatchObject({
+      status: 'none',
+      number: null,
+      shape: null,
+      percentOff: 50,
+      endsAt: null,
+    });
     expect(overview.founding.spotsLeft).toBeGreaterThanOrEqual(0);
+    expect(overview.founding.spotsLeft).toBeLessThanOrEqual(100);
+  });
+
+  it("reports a founding host's discount and the spots left", async () => {
+    resetPublicPricesCache();
+    const number = await reserveFoundingNumber(t.db, org.orgId);
+    const before = await getBillingOverview(t.db, org.owner.ctx, gw);
+    expect(before.founding).toMatchObject({ status: 'eligible', number, shape: null });
+    const s = stripeSub({ couponId: 'founding_50_six_months', startDate: START });
+    await syncSubscription(t.db, s.id, gw);
+    const after = await getBillingOverview(t.db, org.owner.ctx, gw);
+    expect(after.founding).toMatchObject({
+      status: 'active',
+      number,
+      shape: 'monthly',
+      percentOff: 50,
+      startedAt: START,
+      endsAt: new Date('2027-05-01T12:00:00Z'),
+    });
+    expect(after.founding.spotsLeft).toBe(before.founding.spotsLeft);
   });
 
   it('falls back to PLANS when Stripe prices fail, and caches Stripe prices for an hour', async () => {

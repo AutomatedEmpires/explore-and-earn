@@ -2,14 +2,12 @@
 // state, and which orgs carry the subscriber badge.
 import { and, inArray, sql } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
-import { getSetting } from '@/modules/settings';
+import { getFoundingSummary, type FoundingStatus } from './founding';
 import {
   CAN_PUBLISH_STATUSES,
   ENTITLED_STATUSES,
-  addMonths,
   getAccount,
   getLatestSubscription,
-  type AccountRow,
 } from './internal';
 import type { BillingInterval, PlanCode } from './plans';
 import { billingAccounts, subscriptions } from './schema';
@@ -34,34 +32,18 @@ export type SubscriptionState = {
   currentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
   hostSince: Date | null;
-  founding: 'none' | 'active' | 'lapsed' | 'forfeited';
+  /** FD-7 founding discount: none, eligible (not used yet), active or ended (./founding.ts). */
+  founding: FoundingStatus;
 };
-
-/** The founding status as hosts see it: `lapsed` reads `forfeited` once the window has passed. */
-export function foundingStatusOf(
-  account: AccountRow | null,
-  windowMonths: number,
-  now: Date = new Date(),
-): SubscriptionState['founding'] {
-  const status = account?.foundingStatus ?? 'none';
-  if (
-    status === 'lapsed' &&
-    account?.foundingLapsedAt &&
-    addMonths(account.foundingLapsedAt, windowMonths) <= now
-  ) {
-    return 'forfeited';
-  }
-  return status;
-}
 
 /** The current subscription, else the most recent, else status `none`. */
 export async function getSubscriptionState(db: DbOrTx, orgId: string): Promise<SubscriptionState> {
-  const [row, account, windowMonths] = await Promise.all([
+  const [row, account, summary] = await Promise.all([
     getLatestSubscription(db, orgId),
     getAccount(db, orgId),
-    getSetting(db, 'founding.return_window_months'),
+    getFoundingSummary(db, orgId),
   ]);
-  const founding = foundingStatusOf(account, windowMonths);
+  const founding = summary.status;
   if (!row) {
     return {
       status: 'none',

@@ -83,6 +83,21 @@ describe('emit', () => {
       'listings.enforce_slot_limit',
     ]);
   });
+
+  it('fans org.status_changed out to listings.close_for_org and discovery.sync_host', async () => {
+    const payload: EventPayloads['org.status_changed'] = { orgId: 'org-1', status: 'suspended' };
+    await emit(t.db, 'org.status_changed', payload, 'e6');
+
+    const envelope = { event: 'org.status_changed', eventId: 'e6', data: payload };
+    expect(await rows()).toEqual([
+      { topic: 'discovery.sync_host', dedupeKey: 'e6:discovery.sync_host', payload: envelope },
+      {
+        topic: 'listings.close_for_org',
+        dedupeKey: 'e6:listings.close_for_org',
+        payload: envelope,
+      },
+    ]);
+  });
 });
 
 describe('eventSubscribers', () => {
@@ -91,7 +106,10 @@ describe('eventSubscribers', () => {
       'hostpages.notify_followers',
       'discovery.sync_listing',
     ]);
-    expect(eventSubscribers['org.status_changed']).toEqual(['listings.close_for_org']);
+    expect(eventSubscribers['org.status_changed']).toEqual([
+      'listings.close_for_org',
+      'discovery.sync_host',
+    ]);
     expect(eventSubscribers['location.updated']).toEqual([
       'locations.resolve_nws_grid',
       'discovery.sync_host',

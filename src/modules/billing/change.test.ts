@@ -1,11 +1,13 @@
-// Plan changes with a stored keep list, and the Billing Portal (Task 15). The slot holders come
-// from the registered source (listings registers the real one).
+// Plan changes with a stored keep list, the FD-7 founding discount across them, and the Billing
+// Portal (Task 15). The slot holders come from the registered source (listings registers the
+// real one).
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryRows, type Db } from '@/lib/db';
 import { resetEnvCache } from '@/lib/env';
 import { newId } from '@/lib/ids';
 import { POST as portalRoute } from '@/app/api/v1/host/billing/portal/route';
+import { reserveFoundingNumber } from '@/modules/orgs';
 import { requireHost } from '@/server/guards';
 import { entitlementsFake } from '../../../tests/fakes/sp2/entitlements';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
@@ -73,13 +75,17 @@ afterAll(async () => {
   await t.close();
 });
 
-const items = (plan: string, extra = 0) => [
-  { lookupKey: `${plan}_month`, quantity: 1 },
-  ...(extra > 0 ? [{ lookupKey: `slot_${plan}_month`, quantity: extra }] : []),
+const items = (plan: string, extra = 0, interval: 'month' | 'year' = 'month') => [
+  { lookupKey: `${plan}_${interval}`, quantity: 1 },
+  ...(extra > 0 ? [{ lookupKey: `slot_${plan}_${interval}`, quantity: extra }] : []),
 ];
 
 /** The org on `plan`, synced from the fake, with a Stripe customer. */
-async function subscribe(plan: string, extra = 0) {
+async function subscribe(
+  plan: string,
+  extra = 0,
+  o: { interval?: 'month' | 'year'; couponId?: string | null; initialCouponId?: string } = {},
+) {
   const { id: customerId } = await gw.createCustomer(
     { orgId: org.orgId, name: 'Kettle', email: null },
     `customer:${org.orgId}`,
@@ -92,14 +98,16 @@ async function subscribe(plan: string, extra = 0) {
     id: `sub_change_${newId().slice(-10)}`,
     customerId,
     status: 'active',
-    items: items(plan, extra),
+    items: items(plan, extra, o.interval),
     currentPeriodStart: now,
     currentPeriodEnd: new Date(now.getTime() + 30 * 86_400_000),
     trialEnd: null,
     cancelAtPeriodEnd: false,
     endedAt: null,
     startDate: now,
-    couponId: null,
+    activatedAt: now,
+    couponId: o.couponId ?? null,
+    initialCouponId: o.initialCouponId ?? o.couponId ?? null,
     metadata: { orgId: org.orgId },
     created: now,
   };
@@ -304,6 +312,128 @@ describe('changePlan', () => {
     });
     expect((await getSubscriptionState(t.db, org.orgId)).plan).toBe('professional');
     expect(await getPendingKeepList(t.db, org.orgId)).toBeNull();
+  });
+});
+
+describe('founding discount across plan changes (FD-7)', () => {
+  /** A founding host on `plan` with the founding coupon for `interval`, locked by sync. */
+  async function founder(plan: string, interval: 'month' | 'year') {
+    org = await seedHostOrg(t.db);
+    await reserveFoundingNumber(t.db, org.orgId);
+    entitlementsFake.setUsed(org.orgId, 'listing_slot', 1);
+    entitlementsFake.setUsed(org.orgId, 'seat', 1);
+    await subscribe(plan, 0, {
+      interval,
+      couponId: interval === 'month' ? 'founding_50_six_months' : 'founding_50_first_year',
+    });
+    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('active');
+  }
+
+  const choice = (plan: 'starter' | 'professional' | 'enterprise', interval: 'month' | 'year') => ({
+    ...toStarter(),
+    plan,
+    interval,
+  });
+
+  async function endedReason() {
+    const [row] = await queryRows<{ ended_reason: string | null }>(
+      t.db,
+      sql`select ended_reason from app.founding_discounts where org_id = ${org.orgId}::uuid`,
+    );
+    return row?.ended_reason;
+  }
+
+  it('keeps 50% on the new tier after a monthly tier change, and never restarts it', async () => {
+    await founder('professional', 'month');
+    const preview = await previewChange(t.db, org.orgId, choice('enterprise', 'month'), gw);
+    expect(preview.nextInvoiceCents).toBe(29950);
+    expect(gw.callsTo('previewInvoice').at(-1)?.[0]).not.toHaveProperty('removeDiscounts');
+
+    await changePlan(t.db, choice('enterprise', 'month'), gw);
+    const [, update] = gw.callsTo('updateSubscription').at(-1) ?? [];
+    expect(update).not.toHaveProperty('removeDiscounts');
+    expect(gw.getSubscription(sub.id)?.couponId).toBe('founding_50_six_months');
+    expect(await getSubscriptionState(t.db, org.orgId)).toMatchObject({
+      plan: 'enterprise',
+      founding: 'active',
+    });
+    expect(await endedReason()).toBeNull();
+  });
+
+  it('removes it on a move from monthly to annual, which pays the regular annual price', async () => {
+    await founder('professional', 'month');
+    const preview = await previewChange(t.db, org.orgId, choice('professional', 'year'), gw);
+    expect(preview.nextInvoiceCents).toBe(299000);
+    expect(gw.callsTo('previewInvoice').at(-1)?.[0]).toMatchObject({ removeDiscounts: true });
+
+    const result = await changePlan(t.db, choice('professional', 'year'), gw);
+    expect(result.status).toBe('applied');
+    const [, update] = gw.callsTo('updateSubscription').at(-1) ?? [];
+    expect(update as SubscriptionUpdate).toEqual({
+      items: [{ lookupKey: 'professional_year', quantity: 1 }],
+      prorationBehavior: 'create_prorations',
+      removeDiscounts: true,
+    });
+    expect(gw.getSubscription(sub.id)?.couponId).toBeNull();
+    expect(result.subscription).toMatchObject({ interval: 'year', founding: 'ended' });
+    expect(await endedReason()).toBe('interval_change');
+
+    const [audit] = await queryRows<{ data: string }>(
+      t.db,
+      sql`select data::text from app.audit_events
+          where action = 'billing.plan_changed' and org_id = ${org.orgId}::uuid`,
+    );
+    expect(JSON.parse(audit?.data ?? '{}')).toMatchObject({ foundingDiscountRemoved: true });
+
+    // Back to monthly: no discount comes back.
+    await settlePendingChange(t.db, org.orgId);
+    await changePlan(t.db, choice('professional', 'month'), gw);
+    const [, back] = gw.callsTo('updateSubscription').at(-1) ?? [];
+    expect(back).not.toHaveProperty('removeDiscounts');
+    expect(gw.getSubscription(sub.id)?.couponId).toBeNull();
+    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('ended');
+  });
+
+  it('moves an annual founder whose once coupon Stripe already dropped to monthly at full price', async () => {
+    // As Stripe holds a paid annual founding subscription: no coupon left on it.
+    org = await seedHostOrg(t.db);
+    await reserveFoundingNumber(t.db, org.orgId);
+    entitlementsFake.setUsed(org.orgId, 'listing_slot', 1);
+    entitlementsFake.setUsed(org.orgId, 'seat', 1);
+    await subscribe('professional', 0, {
+      interval: 'year',
+      couponId: null,
+      initialCouponId: 'founding_50_first_year',
+    });
+    expect((await getSubscriptionState(t.db, org.orgId)).founding).toBe('active');
+
+    await changePlan(t.db, choice('professional', 'month'), gw);
+    const [, update] = gw.callsTo('updateSubscription').at(-1) ?? [];
+    // Nothing to remove, and nothing added.
+    expect(update).toEqual({
+      items: [{ lookupKey: 'professional_month', quantity: 1 }],
+      prorationBehavior: 'create_prorations',
+    });
+    expect(gw.getSubscription(sub.id)?.couponId).toBeNull();
+    expect(await endedReason()).toBe('interval_change');
+    const [item] = await queryRows(
+      t.db,
+      sql`select 1 from app.review_items where subject_type = 'billing_account'
+          and subject_id = ${org.orgId}`,
+    );
+    expect(item).toBeUndefined();
+  });
+
+  it('never starts six discounted months on a move from annual to monthly', async () => {
+    await founder('starter', 'year');
+    await changePlan(t.db, choice('starter', 'month'), gw);
+    const [, update] = gw.callsTo('updateSubscription').at(-1) ?? [];
+    expect(update).toMatchObject({
+      items: [{ lookupKey: 'starter_month', quantity: 1 }],
+      removeDiscounts: true,
+    });
+    expect(gw.getSubscription(sub.id)?.couponId).toBeNull();
+    expect(await endedReason()).toBe('interval_change');
   });
 });
 

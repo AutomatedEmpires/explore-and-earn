@@ -4,10 +4,16 @@
 //   Step 1: "I'm looking for work" or "I'm hiring".
 //   Seeker: confirms they are 18 or older, then lands on Seek.
 //   Host: names their organization, then lands on host Home.
-// Both submit to POST /api/v1/onboarding, which returns where to go next.
+// Both submit to POST /api/v1/onboarding, which returns where to go next: back to `returnTo`,
+// the action a guest started before signing up (spec 5.1), or else the account's home.
+//
+// The step lives in the URL (`?step=seeker|host`), so the browser's Back button returns to the
+// choice and a refresh keeps the step. It changes through the native History API, which Next.js
+// syncs into useSearchParams without a server round trip.
 import { useSession } from '@clerk/nextjs';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { safeReturnTo } from '@/lib/discovery/return-to';
 import { Button, Checkbox, Input } from '@/ui/components';
 import {
   ArrowRight,
@@ -17,12 +23,11 @@ import {
   Compass,
   type IconComponent,
 } from '@/ui/icons';
+import { onboardingHref, stepFromParam, type OnboardingStep } from './return-to';
 
-export type OnboardingStep = 'choose' | 'seeker' | 'host';
-
-type OnboardingBody =
-  | { accountType: 'seeker'; adultAttested: true }
-  | { accountType: 'host'; organizationName: string };
+type OnboardingBody = (
+  { accountType: 'seeker'; adultAttested: true } | { accountType: 'host'; organizationName: string }
+) & { returnTo?: string };
 
 const NAME_MIN = 2;
 const NAME_MAX = 80;
@@ -84,10 +89,22 @@ function Choice({
 const card = 'w-full rounded-2xl border border-line bg-surface p-6 shadow-card sm:p-8';
 const heading = 'text-24 font-extrabold tracking-tight text-ink outline-none';
 
-export function OnboardingForm({ initialStep = 'choose' }: { initialStep?: OnboardingStep }) {
+export type OnboardingFormProps = {
+  /**
+   * The account is already a host whose organization was not created (the request failed
+   * halfway): naming it is the only step, with no way back to the choice.
+   */
+  hostOnly?: boolean;
+  /** Where to finish: the checked same-site path the guest started from, or `/` for none. */
+  returnTo?: string;
+};
+
+export function OnboardingForm({ hostOnly = false, returnTo = '/' }: OnboardingFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { session } = useSession();
-  const [step, setStep] = useState<OnboardingStep>(initialStep);
+  const step: OnboardingStep = hostOnly ? 'host' : stepFromParam(searchParams.get('step'));
+  const [shownStep, setShownStep] = useState(step);
   const [adult, setAdult] = useState(false);
   const [orgName, setOrgName] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -95,6 +112,15 @@ export function OnboardingForm({ initialStep = 'choose' }: { initialStep?: Onboa
   const [pending, setPending] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const firstRender = useRef(true);
+  // Whether this page added a step to the history, so in-card Back can simply go back.
+  const pushedStep = useRef(false);
+
+  // A new step (in-card or with the browser's buttons) starts without the last step's errors.
+  if (step !== shownStep) {
+    setShownStep(step);
+    setFieldError(null);
+    setFormError(null);
+  }
 
   // Each step is a new screen: move focus to its heading so it is announced.
   useEffect(() => {
@@ -105,10 +131,18 @@ export function OnboardingForm({ initialStep = 'choose' }: { initialStep?: Onboa
     headingRef.current?.focus();
   }, [step]);
 
-  function go(next: OnboardingStep) {
-    setFieldError(null);
-    setFormError(null);
-    setStep(next);
+  function go(next: Exclude<OnboardingStep, 'choose'>) {
+    pushedStep.current = true;
+    window.history.pushState(null, '', onboardingHref(returnTo, next));
+  }
+
+  function back() {
+    if (pushedStep.current) {
+      router.back();
+      return;
+    }
+    // Opened at a step (a refresh or a link), so the choice is not behind it: show it in place.
+    window.history.replaceState(null, '', onboardingHref(returnTo));
   }
 
   async function submit(body: OnboardingBody) {
@@ -118,7 +152,7 @@ export function OnboardingForm({ initialStep = 'choose' }: { initialStep?: Onboa
       const res = await fetch('/api/v1/onboarding', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(returnTo === '/' ? body : { ...body, returnTo }),
       });
       const json: unknown = await res.json().catch(() => null);
       if (res.status === 409) {
@@ -131,13 +165,15 @@ export function OnboardingForm({ initialStep = 'choose' }: { initialStep?: Onboa
         setPending(false);
         return;
       }
-      const to =
+      // The API checks the path too; this keeps the browser on this site whatever it answers.
+      const to = safeReturnTo(
         typeof json === 'object' &&
-        json !== null &&
-        'redirectTo' in json &&
-        json.redirectTo === '/host'
-          ? '/host'
-          : '/';
+          json !== null &&
+          'redirectTo' in json &&
+          typeof json.redirectTo === 'string'
+          ? json.redirectTo
+          : null,
+      );
       // The session token carries the account type the proxy reads; refresh it first.
       await session?.getToken({ skipCache: true }).catch(() => null);
       router.replace(to);
@@ -168,27 +204,21 @@ export function OnboardingForm({ initialStep = 'choose' }: { initialStep?: Onboa
     void submit({ accountType: 'host', organizationName: name });
   }
 
-  const back =
-    initialStep === 'choose' ? (
-      <Button
-        variant="ghost"
-        onClick={() => go('choose')}
-        disabled={pending}
-        className="-ml-3 self-start px-3"
-      >
-        Back
-      </Button>
-    ) : null;
+  const backButton = hostOnly ? null : (
+    <Button variant="ghost" onClick={back} disabled={pending} className="-ml-3 self-start px-3">
+      Back
+    </Button>
+  );
 
   if (step === 'seeker') {
     return (
       <form onSubmit={submitSeeker} noValidate className={`${card} flex flex-col gap-5`}>
-        {back}
+        {backButton}
         <div className="flex flex-col gap-2">
           <h1 ref={headingRef} tabIndex={-1} className={heading}>
             Work worth going somewhere for.
           </h1>
-          <p className="text-15 text-ink-2">
+          <p className="text-16 text-ink-2">
             Explore&amp;Earn is for adults. Confirm your age to start exploring jobs, some with
             housing and meals.
           </p>
@@ -215,12 +245,12 @@ export function OnboardingForm({ initialStep = 'choose' }: { initialStep?: Onboa
   if (step === 'host') {
     return (
       <form onSubmit={submitHost} noValidate className={`${card} flex flex-col gap-5`}>
-        {back}
+        {backButton}
         <div className="flex flex-col gap-2">
           <h1 ref={headingRef} tabIndex={-1} className={heading}>
             Name your organization
           </h1>
-          <p className="text-15 text-ink-2">
+          <p className="text-16 text-ink-2">
             Seekers see this name on your listings and your host page. You can invite your team once
             you are in.
           </p>
@@ -250,7 +280,7 @@ export function OnboardingForm({ initialStep = 'choose' }: { initialStep?: Onboa
         <h1 id="onboarding-title" ref={headingRef} tabIndex={-1} className={heading}>
           Welcome to Explore&amp;Earn
         </h1>
-        <p className="text-15 text-ink-2">
+        <p className="text-16 text-ink-2">
           How will you use Explore&amp;Earn? This sets up your account, and it can&apos;t be changed
           later.
         </p>

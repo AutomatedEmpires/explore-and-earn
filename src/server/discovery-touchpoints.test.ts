@@ -65,11 +65,14 @@ describe('event subscribers', () => {
   });
 
   it('re-syncs a host or location when its public facts change, keeping SP2 subscribers', () => {
-    for (const event of ['hostpage.updated', 'location.updated', 'subscription.changed'] as const) {
+    for (const event of [
+      'hostpage.updated',
+      'location.updated',
+      'org.status_changed',
+      'subscription.changed',
+    ] as const) {
       expect(eventSubscribers[event], event).toContain('discovery.sync_host');
     }
-    // org.status_changed gains discovery.sync_host in a follow-up (see event-subscribers.ts).
-    expect(eventSubscribers['org.status_changed']).toEqual(['listings.close_for_org']);
     expect(eventSubscribers['location.updated']).toContain('locations.resolve_nws_grid');
     expect(eventSubscribers['org.status_changed']).toContain('listings.close_for_org');
     expect(eventSubscribers['subscription.changed']).toEqual(

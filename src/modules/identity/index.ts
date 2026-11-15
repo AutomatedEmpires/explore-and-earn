@@ -47,6 +47,8 @@ export {
   type OperatorInviteRole,
 } from './clerk-admin';
 
+export { getUserContacts, type UserContactFacts } from './contacts';
+
 export {
   completeOnboarding,
   onboardingRequestSchema,
