@@ -78,8 +78,23 @@ beforeEach(async () => {
 const screen = (revisionId: string) =>
   jobHandlers['listings.screen']?.({ revisionId, attempt: 0 }, { db, now: FIXED_NOW });
 
+// The shared fixture is the same for every org. A unique block keeps a later listing from
+// matching an earlier one under the duplicate rule.
+let marker = 0;
+function distinguish(c: ListingContent) {
+  const n = marker++;
+  c.job.description += ` ${Array.from({ length: 80 }, (_, i) => `subject${n}token${i}`).join(' ')}`;
+}
+
 async function submitted(edit?: (c: ListingContent) => void, ctx = org.owner.ctx) {
-  const id = await seedDraftListing(db, ctx, fx.content(edit));
+  const id = await seedDraftListing(
+    db,
+    ctx,
+    fx.content((c) => {
+      edit?.(c);
+      distinguish(c);
+    }),
+  );
   await requestPublish(db, ctx, id, [], FIXED_NOW);
   const [rev] = await queryRows<{ id: string }>(
     db,
