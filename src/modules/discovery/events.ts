@@ -18,7 +18,9 @@ import { queryRows, withTx, type Db, type DbOrTx } from '@/lib/db';
 import type { DiscoverySource, ListingEventType } from '@/lib/discovery';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
+import { getOperator } from '@/modules/identity';
 import type { HandlerMap } from '@/modules/jobs';
+import { getMember } from '@/modules/orgs';
 import { hmacKey } from '@/server/viewer';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -87,17 +89,9 @@ export async function recordListingEvent(db: DbOrTx, e: ListingEventInput): Prom
   const dedupeKey = eventDedupeKey(e, at);
   const viewerId = e.viewerKey && UUID.test(e.viewerKey) ? e.viewerKey : null;
   // The host's current team, and every operator, are not a viewer or an applicant. A membership
-  // that has ended is a real viewer again. The org comes from the projection row; with no row
-  // the select is empty and nothing is written.
-  const excluded = viewerId
-    ? sql`and not exists (
-        select 1 from app.org_memberships m
-        where m.org_id = dl.org_id and m.user_id = ${viewerId}::uuid and m.deleted_at is null
-      )
-      and not exists (
-        select 1 from app.operators op where op.user_id = ${viewerId}::uuid
-      )`
-    : sql``;
+  // that has ended is a real viewer again. Identity and orgs own those tables, so this asks them.
+  if (viewerId && (await excludedViewer(db, e.listingId, viewerId))) return;
+  // The org comes from the projection row; with no row the select is empty and nothing is written.
   await db.execute(sql`
     insert into app.listing_events
       (id, listing_id, org_id, type, source, viewer_hash, dedupe_key, occurred_at)
@@ -105,9 +99,20 @@ export async function recordListingEvent(db: DbOrTx, e: ListingEventInput): Prom
       ${dedupeKey}, ${at.toISOString()}::timestamptz
     from app.discovery_listings dl
     where dl.listing_id = ${e.listingId}::uuid
-      ${excluded}
     on conflict (dedupe_key) do nothing
   `);
+}
+
+/** True when this signed-in person must not count: an operator, or a live member of the host. */
+async function excludedViewer(db: DbOrTx, listingId: string, viewerId: string): Promise<boolean> {
+  if (await getOperator(db, viewerId)) return true;
+  const [row] = await queryRows<{ orgId: string }>(
+    db,
+    sql`select org_id::text as "orgId" from app.discovery_listings
+      where listing_id = ${listingId}::uuid`,
+  );
+  if (!row) return true;
+  return (await getMember(db, row.orgId, viewerId)) !== null;
 }
 
 /**
