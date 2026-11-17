@@ -1,7 +1,11 @@
 // How the shells' pages turn a guard's answer into a redirect, with the guards and Clerk mocked.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { onboardingHref } from '@/app/onboarding/return-to';
 import { forbidden, notFound as notFoundError, unauthorized } from '@/lib/errors';
 import type { CurrentUser, HostContext } from './guards';
+
+/** A guest's job, the same path #82 carries through sign-up as `returnTo`. */
+const JOB = '/jobs/view/1/lift-operator?intent=save%3A1';
 
 const state = vi.hoisted(() => ({
   userId: null as string | null,
@@ -48,6 +52,14 @@ vi.mock('@/server/guards', () => ({
   requireUser: () => state.user?.(),
 }));
 
+/** The path the proxy forwards on the request. The seeker layout has no page path of its own. */
+const forwarded = vi.hoisted(() => ({ path: null as string | null }));
+
+vi.mock('next/headers', () => ({
+  headers: async () =>
+    new Headers(forwarded.path === null ? undefined : { 'x-ee-path': forwarded.path }),
+}));
+
 const shell = await import('./shell');
 
 const seeker: CurrentUser = {
@@ -65,6 +77,7 @@ beforeEach(() => {
   state.seeker = async () => seeker;
   state.host = async () => hostCtx;
   state.user = async () => seeker;
+  forwarded.path = null;
 });
 
 describe('homeFor', () => {
@@ -108,6 +121,23 @@ describe('refusalFor', () => {
     });
   });
 
+  it('keeps a same-origin job when an older account still needs onboarding', () => {
+    const needs = forbidden('x', { reason: 'needs_onboarding', redirectTo: '/onboarding' });
+    expect(shell.refusalFor(needs, JOB)).toEqual({ kind: 'redirect', to: onboardingHref(JOB) });
+  });
+
+  it('drops an off-site return path instead of carrying it into onboarding', () => {
+    const needs = forbidden('x', { reason: 'needs_onboarding', redirectTo: '/onboarding' });
+    for (const bad of ['https://evil.test/jobs', '//evil.test/jobs', '/\\evil']) {
+      expect(shell.refusalFor(needs, bad)).toEqual({ kind: 'redirect', to: '/onboarding' });
+    }
+    // Finishing a host organization is not the "no account type" case.
+    expect(shell.refusalFor(forbidden('x', { reason: 'not_a_member' }), JOB)).toEqual({
+      kind: 'redirect',
+      to: '/onboarding',
+    });
+  });
+
   it('leaves other errors alone', () => {
     expect(shell.refusalFor(forbidden('x', { reason: 'role_not_allowed' }))).toBeNull();
     expect(shell.refusalFor(notFoundError())).toBeNull();
@@ -132,7 +162,42 @@ describe('seekerPage', () => {
     state.seeker = async () => {
       throw forbidden('x', { reason: 'needs_onboarding', redirectTo: '/onboarding' });
     };
-    await expect(shell.seekerPage('/', { guests: true })).rejects.toThrow('REDIRECT /onboarding');
+    await expect(shell.seekerPage('/', { guests: true })).rejects.toThrow(
+      /^REDIRECT \/onboarding$/,
+    );
+  });
+
+  it('sends an older account that never finished onboarding back to the job they signed in from', async () => {
+    state.seeker = async () => {
+      throw forbidden('x', { reason: 'needs_onboarding', redirectTo: '/onboarding' });
+    };
+    await expect(shell.seekerPage(JOB, { guests: true })).rejects.toThrow(
+      `REDIRECT ${onboardingHref(JOB)}`,
+    );
+  });
+
+  it('uses the job the proxy forwarded when the layout redirects before the page', async () => {
+    forwarded.path = JOB;
+    state.seeker = async () => {
+      throw forbidden('x', { reason: 'needs_onboarding', redirectTo: '/onboarding' });
+    };
+    await expect(shell.seekerAccess()).resolves.toEqual({
+      kind: 'redirect',
+      to: onboardingHref(JOB),
+      onboarding: true,
+    });
+  });
+
+  it('drops an off-site path the proxy forwarded', async () => {
+    forwarded.path = 'https://evil.test/jobs';
+    state.seeker = async () => {
+      throw forbidden('x', { reason: 'needs_onboarding', redirectTo: '/onboarding' });
+    };
+    await expect(shell.seekerAccess()).resolves.toEqual({
+      kind: 'redirect',
+      to: '/onboarding',
+      onboarding: true,
+    });
   });
 
   it('sends a host back to the host workspace', async () => {
@@ -179,6 +244,22 @@ describe('hostPage', () => {
       throw forbidden('x', { reason: 'wrong_account_type' });
     };
     await expect(shell.hostPage('/host')).rejects.toThrow(/^REDIRECT \/$/);
+  });
+
+  it('sends a host with no organization to onboarding without carrying the page', async () => {
+    state.host = async () => {
+      throw forbidden('x', { reason: 'not_a_member' });
+    };
+    await expect(shell.hostPage('/host/team')).rejects.toThrow(/^REDIRECT \/onboarding$/);
+  });
+
+  it('keeps the host page when an older account still needs onboarding', async () => {
+    state.host = async () => {
+      throw forbidden('x', { reason: 'needs_onboarding', redirectTo: '/onboarding' });
+    };
+    await expect(shell.hostPage('/host/team')).rejects.toThrow(
+      `REDIRECT ${onboardingHref('/host/team')}`,
+    );
   });
 });
 
