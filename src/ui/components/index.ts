@@ -48,6 +48,7 @@ export {
   type Pay,
   type PayPeriod,
 } from './JobCard';
+export { Notice, type NoticeProps, type NoticeTone } from './Notice';
 export { OrgLogo, type OrgLogoProps, type OrgLogoSize } from './OrgLogo';
 export { OrgSwitcher, type OrgOption, type OrgSwitcherProps } from './OrgSwitcher';
 export { Pill, type PillProps } from './Pill';

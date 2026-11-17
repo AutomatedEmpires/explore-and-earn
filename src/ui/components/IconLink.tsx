@@ -40,7 +40,7 @@ export function IconLink({
       {typeof badge === 'number' && badge > 0 ? (
         <span
           aria-hidden="true"
-          className="absolute top-1 right-0.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-bg bg-primary px-1 text-12 leading-none font-extrabold text-on-primary"
+          className="absolute top-1 right-0.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-bg bg-primary px-1 text-14 leading-none font-extrabold text-on-primary"
         >
           {badge > 99 ? '99+' : badge}
         </span>

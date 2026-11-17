@@ -114,6 +114,29 @@ export function CardsSection() {
         >
           {() => <Job job={guestSupport} />}
         </Specimen>
+        <Specimen
+          title="No cover photo, cover collapsed"
+          note="hideCover drops the cover, its badges and the logo for a job without a photo."
+        >
+          {() => <Job job={guestSupport} hideCover />}
+        </Specimen>
+        <Specimen
+          title="Freshness and pay estimate"
+          note="The freshness line sits under the dates; the estimate under the chips, with a 44 px “How we work this out”."
+        >
+          {() => (
+            <Job
+              job={housekeeper}
+              freshness="Confirmed active 2 days ago"
+              payEstimate={{
+                line: 'About $676 a week after housing and meals',
+                basis:
+                  'Before taxes. Based on 40 hours a week at $19 an hour, less $84 a week for housing and meals.',
+                onExplain: noop,
+              }}
+            />
+          )}
+        </Specimen>
         <Specimen title="In Swipe" note="An info button on the photo also opens the listing.">
           {() => <Job job={housekeeper} onInfo={noop} />}
         </Specimen>
