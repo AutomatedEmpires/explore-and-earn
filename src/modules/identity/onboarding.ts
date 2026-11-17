@@ -6,7 +6,8 @@ import { z } from 'zod';
 import { type Db, withTx } from '@/lib/db';
 import { badRequest, conflict, notFound } from '@/lib/errors';
 import { record } from '@/modules/audit';
-import { createOrganization, findHostMembership, organizationNameSchema } from '@/modules/orgs';
+import { organizationNameSchema } from '@/modules/orgs/name';
+import { createOrganization, findHostMembership } from '@/modules/orgs';
 import type { ClerkAdmin } from './clerk-admin';
 import { users } from './schema';
 

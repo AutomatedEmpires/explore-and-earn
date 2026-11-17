@@ -1,5 +1,11 @@
 // W0 stub. The owning workstream replaces the body and keeps the name.
-export async function unreadThreadCount(..._args: unknown[]): Promise<number> {
+import type { DbOrTx } from '@/lib/db';
+
+export async function unreadThreadCount(
+  _db: DbOrTx,
+  _userId: string,
+  _o?: { orgId?: string },
+): Promise<number> {
   return 0;
 }
 
