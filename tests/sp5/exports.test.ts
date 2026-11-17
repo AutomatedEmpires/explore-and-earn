@@ -1,3 +1,5 @@
+// These imports are the internals the public indexes must not re-export.
+/* eslint-disable no-restricted-imports */
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { createTestDb, type TestDb } from '../helpers/db';

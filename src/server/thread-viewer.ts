@@ -1,6 +1,6 @@
 // Who is reading a thread. A seeker is themselves; a host is their current organization.
 import { forbidden } from '@/lib/errors';
-import type { ThreadViewer } from '@/modules/messaging/access';
+import type { ThreadViewer } from '@/modules/messaging';
 import { requireHost, type CurrentUser } from '@/server/guards';
 
 export async function threadViewer(user: CurrentUser): Promise<ThreadViewer> {

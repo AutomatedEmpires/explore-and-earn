@@ -120,7 +120,8 @@ describe('SP5 routes', () => {
     expect(opts).toBeTruthy();
     const route = real.apiRoute;
     expect(route).toBeTypeOf('function');
-    const handler = route!({
+    if (!route) throw new Error('apiRoute mock missing');
+    const handler = route({
       ...(opts as Parameters<NonNullable<typeof real.apiRoute>>[0]),
       handler: async ({ input }) => input,
     });

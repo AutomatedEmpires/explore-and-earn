@@ -1,6 +1,8 @@
 // Note scan: enqueue a check, run it, and hand a held note to review.
 import type { Db, DbOrTx, Tx } from '@/lib/db';
 import { withTx } from '@/lib/db';
+// The jobs index loads the worker, which loads every handler, including this module.
+// eslint-disable-next-line no-restricted-imports
 import { enqueue } from '@/modules/jobs/outbox';
 import { getOrgSummaries } from '@/modules/orgs';
 import { scanHostText } from '@/modules/messaging';

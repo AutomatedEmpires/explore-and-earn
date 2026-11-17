@@ -7,8 +7,8 @@ import { APPLICATION_UNAVAILABLE, type PipelineEventKind } from '@/lib/hiring';
 import { newId } from '@/lib/ids';
 import { setStatus } from '@/modules/applications';
 import { record } from '@/modules/audit';
-import { openAsDescribed } from '@/modules/hiring/as-described/open';
-import { closeOpenItems } from '@/modules/hiring/interviews/close';
+import { openAsDescribed } from './as-described/open';
+import { closeOpenItems } from './interviews/close';
 import { markThreadHired, postEvent, threadIdsForApplications } from '@/modules/messaging';
 import { pipelineEntries, pipelineEvents } from './schema';
 

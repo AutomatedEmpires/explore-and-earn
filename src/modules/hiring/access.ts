@@ -6,7 +6,7 @@ import { canAccessListing } from '@/modules/orgs';
 import type { DbOrTx } from '@/lib/db';
 import { notFound } from '@/lib/errors';
 import { APPLICATION_UNAVAILABLE } from '@/lib/hiring';
-import { inScope, listingScope } from '@/modules/messaging/access';
+import { inScope, listingScope } from '@/modules/messaging';
 import type { HostContext } from '@/server/guards';
 import type { PipelineEntryRow } from './core';
 import { pipelineEntries } from './schema';

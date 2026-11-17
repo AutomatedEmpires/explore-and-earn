@@ -2,8 +2,8 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { withTx, type Db } from '@/lib/db';
 import { newId } from '@/lib/ids';
-import { auditEvents } from '@/modules/audit/schema';
-import { pipelineEntries, pipelineEvents } from '@/modules/hiring/schema';
+import { auditEvents } from '@/db/schema';
+import { pipelineEntries, pipelineEvents } from './schema';
 import { applicationsFake } from '@tests/fakes/sp5/sp4';
 import { messagingFake } from '@tests/fakes/sp5/messaging';
 import { createTestDb, type TestDb } from '@tests/helpers/db';
@@ -25,9 +25,9 @@ vi.mock('@/modules/hiring/as-described/open', () => ({
   openAsDescribed: vi.fn(async () => {}),
 }));
 
-import { openAsDescribed } from '@/modules/hiring/as-described/open';
-import { mirrorStatus, transitionStatus } from '@/modules/hiring/core';
-import { closeOpenItems } from '@/modules/hiring/interviews/close';
+import { openAsDescribed } from './as-described/open';
+import { mirrorStatus, transitionStatus } from './core';
+import { closeOpenItems } from './interviews/close';
 
 let t: TestDb;
 

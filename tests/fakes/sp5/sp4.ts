@@ -1,5 +1,5 @@
 // In-memory SP4 for SP5 tests.
-import { canTransition, type Actor, type ApplicationStatus, type SetStatusInput } from '@/lib/applications';
+import { canTransition, type ApplicationStatus, type SetStatusInput } from '@/lib/applications';
 import type { DbOrTx } from '@/lib/db';
 import { conflict, forbidden, notFound } from '@/lib/errors';
 import type { ApplicationSnapshotV1, HostApplicationCard } from '@/lib/applications';

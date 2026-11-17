@@ -35,7 +35,6 @@ import {
   cancelOffer,
   declineOffer,
   getOfferLetterUrl,
-  hostOfferViews,
   listSeekerOffers,
   sendOffer,
 } from './offers/offers';

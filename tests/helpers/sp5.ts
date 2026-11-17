@@ -2,9 +2,8 @@
 import type { ApplicationStatus } from '@/lib/applications';
 import type { DbOrTx } from '@/lib/db';
 import { newId } from '@/lib/ids';
-import { interviewSlots, interviews, invites, offers, pipelineEntries } from '@/modules/hiring/schema';
+import { interviewSlots, interviews, invites, offers, pipelineEntries, threads } from '@/db/schema';
 import type { EventEnvelope } from '@/modules/jobs';
-import { threads } from '@/modules/messaging/schema';
 import type { EventPayloads } from '@/server/event-subscribers';
 import { applicationsFake } from '@tests/fakes/sp5/sp4';
 import { FIXED_NOW, seedHostOrg, seedMedia, seedMember, seedSeeker } from './sp2';

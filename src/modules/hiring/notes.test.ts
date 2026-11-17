@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Db } from '@/lib/db';
 import { newId } from '@/lib/ids';
-import type { NoteToScan } from '@/modules/hiring/notes';
+import type { NoteToScan } from './notes';
 import { messagingFake } from '@tests/fakes/sp5/messaging';
 import { orgsFake } from '@tests/fakes/sp5/sp2';
 import { createTestDb, type TestDb } from '@tests/helpers/db';
@@ -29,7 +29,7 @@ vi.mock('@/modules/orgs', async (orig) => ({
   ...(await import('@tests/fakes/sp5/sp2')).orgsFake,
 }));
 
-import { getNoteForReview, runNoteScan } from '@/modules/hiring/notes';
+import { getNoteForReview, runNoteScan } from './notes';
 
 let t: TestDb;
 const db = () => t.db as Db;

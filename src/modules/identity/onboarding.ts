@@ -6,6 +6,9 @@ import { z } from 'zod';
 import { type Db, withTx } from '@/lib/db';
 import { badRequest, conflict, notFound } from '@/lib/errors';
 import { record } from '@/modules/audit';
+// The orgs barrel imports identity while it is still evaluating, so reading the name schema
+// from the barrel leaves it undefined. The leaf file has no dependency on either module.
+// eslint-disable-next-line no-restricted-imports
 import { organizationNameSchema } from '@/modules/orgs/name';
 import { createOrganization, findHostMembership } from '@/modules/orgs';
 import type { ClerkAdmin } from './clerk-admin';

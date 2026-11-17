@@ -5,7 +5,7 @@ import { notFound } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import type { HostIdentity, HostPageProvider } from '@/modules/hostpages';
 import type { ListingContent, ListingHiringInfo, ListingState, ListingSummary, Occupation } from '@/modules/listings';
-import type { Actor, ConsumeResult, CreditKind } from '@/modules/entitlements';
+import type { Actor, CreditKind } from '@/modules/entitlements';
 import type { ListingAccess, Member, OrgSummary } from '@/modules/orgs';
 import type { HostContext } from '@/server/guards';
 
@@ -301,7 +301,9 @@ async function consume(
     idempotencyKey: string;
     actor: Actor;
   },
-): Promise<ConsumeResult> {
+): Promise<
+  { ok: true; consumptionId: string; remaining: number } | { ok: false; reason: 'insufficient'; remaining: number }
+> {
   entitlementCalls.push({ name: 'consume', args: [i] });
   const existing = spent.get(i.idempotencyKey);
   if (existing) {

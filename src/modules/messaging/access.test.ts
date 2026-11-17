@@ -13,7 +13,7 @@ vi.mock('@/modules/orgs', async (orig) => ({
   ...(await import('@tests/fakes/sp5/sp2')).orgsFake,
 }));
 
-import { listingScope, listingTeam } from '@/modules/messaging/access';
+import { listingScope, listingTeam } from './access';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
