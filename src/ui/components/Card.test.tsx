@@ -48,6 +48,47 @@ describe('Card', () => {
     expect(within(card).getByRole('button', { name: 'Apply' })).toBeInTheDocument();
   });
 
+  it('renders the note under the info row and the extra block between chips and actions', () => {
+    render(
+      <Card
+        title={<CardTitleLink href="/jobs/1">Lodge Housekeeper</CardTitleLink>}
+        info="Starts in 12 days"
+        note="Confirmed active 2 days ago"
+        chips={three}
+        belowChips={<button type="button">How we work this out</button>}
+        actions={<button type="button">Apply</button>}
+      />,
+    );
+    const info = screen.getByText('Starts in 12 days');
+    const note = screen.getByText('Confirmed active 2 days ago');
+    expect(info.compareDocumentPosition(note)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    const how = screen.getByRole('button', { name: 'How we work this out' });
+    expect(how.closest('.z-10')).not.toBeNull();
+    expect(screen.getByRole('button', { name: /^Pay/ }).compareDocumentPosition(how)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(how.compareDocumentPosition(screen.getByRole('button', { name: 'Apply' }))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  it('drops the cover area, its badges and the identity when hideCover is set', () => {
+    const { container } = render(
+      <Card
+        hideCover
+        cover={<div data-testid="cover" />}
+        coverBadge={<span>Seasonal</span>}
+        identity={<span>KR</span>}
+        title={<CardTitleLink href="/jobs/1">Lodge Housekeeper</CardTitleLink>}
+        chips={three}
+      />,
+    );
+    expect(screen.queryByTestId('cover')).toBeNull();
+    expect(screen.queryByText('Seasonal')).toBeNull();
+    expect(screen.queryByText('KR')).toBeNull();
+    expect(container.querySelector('[data-slot="body"]')).toHaveClass('pt-4');
+  });
+
   it('keeps chips and actions above the stretched title link', () => {
     render(
       <Card

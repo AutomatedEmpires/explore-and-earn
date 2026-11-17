@@ -16,14 +16,19 @@ export type RadioGroupProps = {
 export function RadioGroup({ legend, hideLegend, error, children, className }: RadioGroupProps) {
   return (
     <fieldset className={cn('flex flex-col', className)}>
-      <legend className={cn('mb-1 text-14 font-semibold text-ink', hideLegend && 'sr-only')}>
+      <legend
+        className={cn('mb-1 text-14 font-semibold wrap-anywhere text-ink', hideLegend && 'sr-only')}
+      >
         {legend}
       </legend>
       {children}
       {error ? (
-        <p role="alert" className="flex items-start gap-1.5 text-13 font-semibold text-danger">
+        <p
+          role="alert"
+          className="flex items-start gap-1.5 text-13 font-semibold wrap-anywhere text-danger"
+        >
           <CircleAlert className="mt-0.5 size-4 shrink-0" />
-          {error}
+          <span className="min-w-0">{error}</span>
         </p>
       ) : null}
     </fieldset>
@@ -57,10 +62,10 @@ export function Radio({ id, label, description, className, ...props }: RadioProp
         />
         <span className="pointer-events-none absolute inset-0 m-auto size-2.5 rounded-full bg-primary opacity-0 peer-checked:opacity-100" />
       </span>
-      <span className="flex flex-col gap-0.5">
-        <span className="text-15 font-semibold text-ink">{label}</span>
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-15 font-semibold wrap-anywhere text-ink">{label}</span>
         {description ? (
-          <span id={`${radioId}-description`} className="text-13 text-muted">
+          <span id={`${radioId}-description`} className="text-13 wrap-anywhere text-muted">
             {description}
           </span>
         ) : null}
