@@ -23,7 +23,7 @@ export {
 export { addEntry, deleteEntry, reorderEntries, setSkills, updateEntry } from './entries';
 export { availabilitySweep, confirmAvailability, setAvailability } from './availability-store';
 export { getCandidateCards, getFitInputs, grantReveal, queryPoolCandidates } from './pools';
-export { renderResumePdf } from './resume/render';
+export { renderResumePdf, TEMPLATES } from './resume/render';
 export { resumePdfResponse } from './resume/response';
 export { cancelImport, createImport, getImport, revokeAiConsent } from './imports/service';
 export { mergeImport } from './imports/merge';

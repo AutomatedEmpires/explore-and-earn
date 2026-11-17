@@ -185,9 +185,7 @@ describe('read stubs', () => {
   it('throw a named error from the profile reads this wave has not replaced', async () => {
     // needsAttention, getCommunityIdentities, getPreferenceTargets, and getOwnProfile are real
     // queries from W1 on (profile.test.ts). countApplicationsSince is real from W4 (reads.test.ts).
-    await expect(profiles.renderResumePdf({} as never, 'classic' as never)).rejects.toThrow(
-      'not implemented: renderResumePdf',
-    );
+    // renderResumePdf is real from W2 (resume/render.test.ts).
     await expect(profiles.writingHelp(db, 'u1', {} as never)).rejects.toThrow(
       'not implemented: writingHelp',
     );
