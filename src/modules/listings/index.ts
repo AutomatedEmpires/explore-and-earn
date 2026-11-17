@@ -22,6 +22,7 @@ export {
   type MealSlot,
   type ScreeningQuestion,
 } from './content';
+export { getHiringInfoMany, listForOrg, type ListingHiringInfo } from './hiring-info';
 export { normalizeSkill } from './skills';
 export { listOccupations, type Occupation } from './occupations';
 export { toRevisionColumns, type RevisionColumns, type RevisionContext } from './revision-columns';

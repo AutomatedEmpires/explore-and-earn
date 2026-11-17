@@ -12,5 +12,6 @@ import '@/modules/locations';
 import '@/modules/listings';
 import '@/modules/hostpages';
 import '@/modules/verification';
+import '@/server/module-registrations';
 
 registerOrgNotificationTypes();
