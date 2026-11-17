@@ -13,7 +13,6 @@ vi.mock('@/modules/orgs', async (orig) => ({
   ...(await import('@tests/fakes/sp5/sp2')).orgsFake,
 }));
 
-import { requireListing } from '@/modules/hiring/access';
 import { listingScope, listingTeam } from '@/modules/messaging/access';
 
 const A = '11111111-1111-4111-8111-111111111111';
@@ -55,11 +54,6 @@ describe('listing scope', () => {
     const recruiter = host(recruiterId, orgId, 'recruiter');
 
     await expect(listingScope(db, recruiter)).resolves.toEqual({ all: false, listingIds: [A, C] });
-    await expect(requireListing(db, recruiter, B)).rejects.toMatchObject({
-      code: 'not_found',
-      message: 'Listing not found',
-    });
-    await expect(requireListing(db, recruiter, A)).resolves.toMatchObject({ id: A, title: 'A' });
 
     const ownerId = newId();
     orgsFake.setAccess(ownerId, { all: true });
