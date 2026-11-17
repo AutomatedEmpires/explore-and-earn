@@ -329,6 +329,24 @@ async function scanImage(
   }
   if (match.match) return block(db, deps, row, original, facts, match);
 
+  // Attachment images are scanned for malware on the original bytes, before re-encoding.
+  if (row.kind === 'attachment') {
+    const ext =
+      facts.detectedMime === 'image/jpeg'
+        ? 'jpg'
+        : facts.detectedMime === 'image/png'
+          ? 'png'
+          : facts.detectedMime === 'image/webp'
+            ? 'webp'
+            : facts.detectedMime === 'image/heic'
+              ? 'heic'
+              : 'bin';
+    const verdict = await deps.malware.scanFile(original, `${row.id}.${ext}`);
+    if (!verdict.clean) {
+      return reject(db, deps, row, 'malware', facts, { threat: verdict.threat ?? 'unknown' });
+    }
+  }
+
   let processed: Processed;
   try {
     processed = await processImage(original);

@@ -17,6 +17,7 @@ import { transact } from './internal';
 import * as businessVerificationPrompt from './prompts/business_verification';
 import * as imageSafetyPrompt from './prompts/image_safety';
 import * as listingFraudPrompt from './prompts/listing_fraud';
+import * as messageScamPrompt from './prompts/message_scam';
 import * as listingModerationPrompt from './prompts/listing_moderation';
 import * as photoSlotPrompt from './prompts/photo_slot';
 import * as textSafetyPrompt from './prompts/text_safety';
@@ -40,6 +41,8 @@ export type CheckKindDef = {
   schema: z.ZodType<CheckOutput>;
   /** Used until an operator tunes this kind in the `trust.thresholds` setting. */
   defaultThresholds: Thresholds;
+  /** When set, stored labels are the intersection with this list. */
+  allowedLabels?: readonly string[];
 };
 
 const KIND_NAME = /^[a-z][a-z0-9_]{0,63}$/;
@@ -109,6 +112,15 @@ registerCheckKind({
   prompt: businessVerificationPrompt,
   schema: safety,
   defaultThresholds: { approveBelow: 0.3, rejectAtOrAbove: 1.01 },
+});
+// Host notes and messages. Labels outside the six scam signs are dropped.
+registerCheckKind({
+  kind: 'message_scam',
+  input: 'text',
+  prompt: messageScamPrompt,
+  schema: safety,
+  defaultThresholds: { approveBelow: 0.3, rejectAtOrAbove: 0.95 },
+  allowedLabels: messageScamPrompt.LABELS,
 });
 // The 640 px photo and its slot label; the score is the probability of a mismatch.
 registerCheckKind({
@@ -239,7 +251,11 @@ export async function runCheck(db: DbOrTx, i: RunCheckInput): Promise<CheckResul
 
   const checkId = newId();
   const decision = output ? decideScore(output.score, thresholds) : 'needs_review';
-  const labels = output ? normalizeLabels(output.labels) : [];
+  const labels = output
+    ? normalizeLabels(output.labels).filter(
+        (label) => !kind.allowedLabels || kind.allowedLabels.includes(label),
+      )
+    : [];
   const reason = output
     ? output.reason.trim().slice(0, MAX_REASON_LENGTH) || 'No reason given'
     : CLASSIFIER_ERROR;
