@@ -1,9 +1,11 @@
 // Runs before every page and API request (Next.js 16 "proxy", formerly middleware):
 // 1. Clerk reads the session.
 // 2. routeForHost serves the operator console on the admin host and hides /admin elsewhere.
-// 3. Signed-in users without an account type go to /onboarding. This needs the Clerk session
-//    token customized with `"metadata": "{{user.public_metadata}}"` (Clerk Dashboard >
-//    Sessions); until then the claim is missing and nobody is redirected.
+// 3. Signed-in users without an account type go to /onboarding, keeping the page they asked
+//    for as returnTo when it stays on this site. This needs the Clerk session token customized
+//    with `"metadata": "{{user.public_metadata}}"` (Clerk Dashboard > Sessions); until then the
+//    claim is missing and nobody is redirected. The path is still forwarded (x-ee-path) so the
+//    shell can keep it when it is the one that sends them to onboarding.
 // 4. Every response gets a request id and the security headers, with a fresh CSP nonce that
 //    is also passed to the app (x-nonce, and the CSP request header Next.js reads it from).
 //
@@ -11,6 +13,7 @@
 // the design-system gallery, still work. Preview and prod require the keys (src/lib/env.ts).
 import { clerkMiddleware, type ClerkMiddlewareAuth } from '@clerk/nextjs/server';
 import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server';
+import { onboardingHref } from '@/app/onboarding/return-to';
 import { getEnv } from '@/lib/env';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
@@ -27,6 +30,13 @@ import {
   shouldRedirectToOnboarding,
 } from '@/server/host-routing';
 import { REQUEST_ID_HEADER } from '@/server/request-context';
+
+/** The shell reads this from the forwarded request when it, not the proxy, sends them on. */
+const RETURN_PATH_HEADER = 'x-ee-path';
+
+function requestReturnPath(pathname: string, search: string): string {
+  return `${pathname}${search}`;
+}
 
 async function handle(req: NextRequest, auth: ClerkMiddlewareAuth | null): Promise<NextResponse> {
   const env = getEnv();
@@ -69,12 +79,16 @@ async function handle(req: NextRequest, auth: ClerkMiddlewareAuth | null): Promi
       pathname,
       isAdminHost: onAdminHost,
     });
-    if (redirect) return decorate(NextResponse.redirect(new URL('/onboarding', req.url)));
+    if (redirect) {
+      const to = onboardingHref(requestReturnPath(pathname, search));
+      return decorate(NextResponse.redirect(new URL(to, req.url)));
+    }
   }
 
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set(REQUEST_ID_HEADER, requestId);
   requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set(RETURN_PATH_HEADER, requestReturnPath(pathname, search));
   const csp = security['Content-Security-Policy'];
   if (csp) requestHeaders.set('Content-Security-Policy', csp);
 
