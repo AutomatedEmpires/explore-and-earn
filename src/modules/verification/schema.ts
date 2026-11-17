@@ -1,5 +1,6 @@
-// Drizzle tables for the verification module (created in drizzle/1400_verification.sql). Only
-// this module reads or writes them; other code goes through `@/modules/verification`.
+// Drizzle tables for the verification module (created in drizzle/1400_verification.sql and
+// drizzle/1410_verification_signals.sql). Only this module reads or writes them; other code
+// goes through `@/modules/verification`.
 // Only tables are exported here: src/db/schema.ts re-exports every module's schema file.
 import { jsonb, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import type { VerificationSignals } from './signals';
@@ -33,4 +34,21 @@ export const businessVerifications = app.table('business_verifications', {
   decidedAt: ts('decided_at'),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
+});
+
+export const FINGERPRINT_KINDS = ['card', 'device', 'phone'] as const;
+
+/** Card, device and phone values a fake-host procedure has banned. */
+export const verificationBannedFingerprints = app.table('verification_banned_fingerprints', {
+  id: uuid('id').primaryKey(),
+  kind: text('kind', { enum: FINGERPRINT_KINDS }).notNull(),
+  value: text('value').notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+});
+
+/** A well-known brand and the email domain of its own careers contact. */
+export const verificationBrandContacts = app.table('verification_brand_contacts', {
+  brandName: text('brand_name').primaryKey(),
+  contactDomain: text('contact_domain').notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
 });
