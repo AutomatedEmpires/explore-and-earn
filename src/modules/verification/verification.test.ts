@@ -73,10 +73,12 @@ afterAll(async () => {
   await t.close();
 });
 
-beforeEach(() => {
+beforeEach(async () => {
   ai.override = null;
   billingFake.reset();
   locationsFake.reset();
+  await t.db.execute(sql`delete from app.verification_banned_fingerprints`);
+  await t.db.execute(sql`delete from app.verification_brand_contacts`);
 });
 
 type Row = {
@@ -165,8 +167,13 @@ function must<T>(value: T | null | undefined): T {
   return value;
 }
 
-async function seedOrg(o: { email?: string; website?: string } = {}): Promise<SeededOrg> {
-  const org = await seedHostOrg(t.db, { ownerEmail: o.email ?? `sam@kettle-${short()}.com` });
+async function seedOrg(
+  o: { email?: string; website?: string; name?: string } = {},
+): Promise<SeededOrg> {
+  const org = await seedHostOrg(t.db, {
+    name: o.name,
+    ownerEmail: o.email ?? `sam@kettle-${short()}.com`,
+  });
   if (o.website) {
     await t.db.execute(
       sql`update app.organizations set website_url = ${o.website} where id = ${org.orgId}`,
@@ -292,6 +299,72 @@ describe('the verification.run job', () => {
     ]);
     expect(row).toMatchObject({ status: 'needs_review', review_item_id: must(found[0]).id });
     expect(await getVerificationStatus(t.db, orgId)).toBe('needs_review');
+  });
+
+  it('sends a free email to manual review', async () => {
+    const { orgId } = await seedOrg({
+      email: 'sam@gmail.com',
+      website: 'https://www.kettle-lodge.com',
+    });
+    const row = await verify(orgId);
+    expect(row.status).toBe('needs_review');
+    expect(await items(orgId)).toEqual([
+      expect.objectContaining({ queue: 'fraud', reason: 'manual_review:free_email' }),
+    ]);
+  });
+
+  it('sends a domain registered after the account to manual review', async () => {
+    const { orgId } = await seedOrg({ website: 'https://www.kettle-lodge.com' });
+    const row = await verify(orgId, {
+      ...signalDeps(),
+      rdapRegisteredAt: async () => new Date(Date.now() + 86_400_000),
+    });
+    expect(row.status).toBe('needs_review');
+    expect(await items(orgId)).toEqual([
+      expect.objectContaining({ reason: 'manual_review:domain_after_account' }),
+    ]);
+  });
+
+  it('sends a banned device to manual review', async () => {
+    const { orgId } = await seedOrg({ website: 'https://www.kettle-lodge.com' });
+    await t.db.execute(sql`
+      insert into app.verification_banned_fingerprints (id, kind, value)
+      values (${newId()}, 'device', 'phone-home')
+    `);
+    const row = await verify(orgId, { ...signalDeps(), fingerprints: { device: 'Phone-Home' } });
+    expect(row.status).toBe('needs_review');
+    expect(await items(orgId)).toEqual([
+      expect.objectContaining({ reason: 'manual_review:banned_fingerprint' }),
+    ]);
+  });
+
+  it('sends a well-known brand on the wrong email to manual review', async () => {
+    const { orgId } = await seedOrg({
+      name: 'Hilton Seattle',
+      email: `sam@not-hilton.com`,
+      website: 'https://www.hilton-seattle.com',
+    });
+    await t.db.execute(sql`
+      insert into app.verification_brand_contacts (brand_name, contact_domain)
+      values ('Hilton', 'hilton.com')
+    `);
+    const row = await verify(orgId);
+    expect(row.status).toBe('needs_review');
+    expect(await items(orgId)).toEqual([
+      expect.objectContaining({ reason: 'manual_review:brand_careers_mismatch' }),
+    ]);
+  });
+
+  it('sends a card country and name that do not fit to manual review', async () => {
+    const { orgId } = await seedOrg({ website: 'https://www.kettle-lodge.com' });
+    const row = await verify(orgId, {
+      ...signalDeps(),
+      cardProfile: { country: 'CA', name: 'Other Lodge' },
+    });
+    expect(row.status).toBe('needs_review');
+    expect(await items(orgId)).toEqual([
+      expect.objectContaining({ reason: 'manual_review:card_country,card_name' }),
+    ]);
   });
 
   it('(failure mode 4) sends a classifier failure to review, never to failed', async () => {

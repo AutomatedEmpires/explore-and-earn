@@ -3,6 +3,7 @@
 // shares the email domain, the domain's age from RDAP, the card checks Stripe ran, whether a
 // location is in the US, and the operator blocklist. Collecting never fails on a lookup: a
 // failed website fetch is "not reachable" and a failed RDAP lookup is "age unknown".
+import { and, eq, or } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbOrTx } from '@/lib/db';
 import { notFound } from '@/lib/errors';
@@ -12,6 +13,7 @@ import { listOrgLocations } from '@/modules/locations';
 import { getOrgSummaries, listMembers } from '@/modules/orgs';
 import { getSetting } from '@/modules/settings';
 import { safeFetchText } from './safe-fetch';
+import { verificationBannedFingerprints, verificationBrandContacts } from './schema';
 
 export type VerificationSignals = {
   emailDomain: string | null;
@@ -29,14 +31,36 @@ export type VerificationSignals = {
   blockedDomain: boolean;
   /** The website's visible text (at most 5,000 characters), when it answered with a 2xx. */
   websiteText: string | null;
+  /** True when the domain was registered before the account. Null when the date is unknown. */
+  domainPredatesAccount: boolean | null;
+  /** Null when the card country or the business country is unknown. */
+  cardCountryFits: boolean | null;
+  /** Null when the card has no name. */
+  cardNameFits: boolean | null;
+  /** True when the card, device or phone is on the banned-fingerprint list. */
+  bannedFingerprint: boolean;
+  /** True when the org name matches a known brand and the email is not that brand's careers contact. */
+  brandCareersMismatch: boolean;
 };
 
 export type HardFlag = 'blocked_domain' | 'disposable_email' | 'cvc_failed';
+
+export type HostFingerprints = {
+  card?: string | null;
+  device?: string | null;
+  phone?: string | null;
+};
+
+export type CardProfile = { country: string | null; name: string | null };
 
 export type SignalDeps = {
   fetchText: typeof safeFetchText;
   rdapRegisteredAt: (domain: string) => Promise<Date | null>;
   now: Date;
+  /** Values to check against the banned-fingerprint list. Absent checks nothing. */
+  fingerprints?: HostFingerprints;
+  /** Card country and name. Absent leaves both fit-checks unknown. */
+  cardProfile?: CardProfile | null;
 };
 
 /** Free email providers: an address there says nothing about the business's own domain. */
@@ -169,14 +193,107 @@ async function websiteSignals(
   }
 }
 
-async function domainAgeDays(domain: string | null, deps: SignalDeps): Promise<number | null> {
-  if (!domain || isReserved(domain)) return null;
+async function domainFacts(
+  domain: string | null,
+  deps: SignalDeps,
+): Promise<{ days: number | null; registeredAt: Date | null }> {
+  if (!domain || isReserved(domain)) return { days: null, registeredAt: null };
   try {
     const at = await deps.rdapRegisteredAt(domain);
-    return at ? Math.max(0, Math.floor((deps.now.getTime() - at.getTime()) / DAY_MS)) : null;
+    if (!at) return { days: null, registeredAt: null };
+    return {
+      registeredAt: at,
+      days: Math.max(0, Math.floor((deps.now.getTime() - at.getTime()) / DAY_MS)),
+    };
   } catch {
-    return null;
+    return { days: null, registeredAt: null };
   }
+}
+
+/** True when the domain was registered before the account existed. Null when the date is unknown. */
+export function domainPredatesAccount(
+  registeredAt: Date | null,
+  accountCreatedAt: Date,
+): boolean | null {
+  if (!registeredAt) return null;
+  return registeredAt.getTime() < accountCreatedAt.getTime();
+}
+
+/**
+ * Whether the card's country and name fit the business. A US location expects country `US`.
+ * Either check is null when that side of it is unknown, and a null check does not force review.
+ */
+export function cardFitsBusiness(
+  profile: CardProfile | null,
+  business: { name: string; inUs: boolean },
+): { countryFits: boolean | null; nameFits: boolean | null } {
+  if (!profile) return { countryFits: null, nameFits: null };
+  const countryFits =
+    profile.country === null || !business.inUs
+      ? null
+      : profile.country.trim().toUpperCase() === 'US';
+  const nameFits =
+    profile.name === null
+      ? null
+      : profile.name.trim().toLowerCase() === business.name.trim().toLowerCase();
+  return { countryFits, nameFits };
+}
+
+/** True when `orgName` matches a listed brand and the email domain is not that brand's careers contact. */
+export function brandCareersMismatch(
+  orgName: string,
+  emailDomain: string | null,
+  brands: readonly { name: string; contactDomain: string }[],
+): boolean {
+  const org = orgName.trim().toLowerCase();
+  const hit = brands.find((b) => org.includes(b.name.trim().toLowerCase()));
+  if (!hit) return false;
+  return emailDomain !== hit.contactDomain.trim().toLowerCase();
+}
+
+/** Reasons that always wait for an operator. Unknown (null) checks are not reasons. */
+export function manualReviewReasons(s: VerificationSignals): string[] {
+  const reasons: string[] = [];
+  if (s.freeEmail) reasons.push('free_email');
+  if (s.bannedFingerprint) reasons.push('banned_fingerprint');
+  if (s.brandCareersMismatch) reasons.push('brand_careers_mismatch');
+  if (s.cardCountryFits === false) reasons.push('card_country');
+  if (s.cardNameFits === false) reasons.push('card_name');
+  if (s.domainPredatesAccount === false) reasons.push('domain_after_account');
+  return reasons;
+}
+
+function fingerprintValue(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+async function bannedFingerprint(
+  db: DbOrTx,
+  prints: HostFingerprints | undefined,
+): Promise<boolean> {
+  const checks = (
+    [
+      ['card', prints?.card],
+      ['device', prints?.device],
+      ['phone', prints?.phone],
+    ] as const
+  ).flatMap(([kind, value]) => (value ? [[kind, fingerprintValue(value)] as const] : []));
+  if (checks.length === 0) return false;
+  const rows = await db
+    .select({ id: verificationBannedFingerprints.id })
+    .from(verificationBannedFingerprints)
+    .where(
+      or(
+        ...checks.map(([kind, value]) =>
+          and(
+            eq(verificationBannedFingerprints.kind, kind),
+            eq(verificationBannedFingerprints.value, value),
+          ),
+        ),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
 }
 
 /** Gathers the spec 8.4 signals for an org. Throws `not_found` for an unknown org. */
@@ -201,12 +318,19 @@ export async function collectSignals(
   // The business's own domain: its website, else a business email address.
   const ownDomain = siteHost ?? (emailDomain && !freeEmail && !disposableEmail ? emailDomain : null);
 
-  const [site, age, card, locations, blockedList] = await Promise.all([
+  const [site, domain, card, locations, blockedList, banned, brands] = await Promise.all([
     websiteSignals(org.websiteUrl, deps.fetchText),
-    domainAgeDays(ownDomain, deps),
+    domainFacts(ownDomain, deps),
     getCardChecks(db, orgId),
     listOrgLocations(db, orgId),
     getSetting(db, 'verification.blocked_domains'),
+    bannedFingerprint(db, deps.fingerprints),
+    db
+      .select({
+        name: verificationBrandContacts.brandName,
+        contactDomain: verificationBrandContacts.contactDomain,
+      })
+      .from(verificationBrandContacts),
   ]);
 
   const blocked = new Set(blockedList.map(normalizeHost));
@@ -214,6 +338,8 @@ export async function collectSignals(
     (d) => d !== null && withParents(d).some((p) => blocked.has(p)),
   );
   const states: readonly string[] = US_STATE_CODES;
+  const locationInUs = locations.some((l) => states.includes(l.state));
+  const fit = cardFitsBusiness(deps.cardProfile ?? null, { name: org.name, inUs: locationInUs });
 
   return {
     emailDomain,
@@ -221,13 +347,18 @@ export async function collectSignals(
     disposableEmail,
     websiteReachable: site.reachable,
     domainMatch: siteHost === null || emailDomain === null ? null : siteHost === emailDomain,
-    domainAgeDays: age,
+    domainAgeDays: domain.days,
     cvcCheck: card.cvcCheck,
     postalCheck: card.postalCheck,
     hasCard: card.hasCard,
-    locationInUs: locations.some((l) => states.includes(l.state)),
+    locationInUs,
     blockedDomain,
     websiteText: site.text,
+    domainPredatesAccount: domainPredatesAccount(domain.registeredAt, org.createdAt),
+    cardCountryFits: fit.countryFits,
+    cardNameFits: fit.nameFits,
+    bannedFingerprint: banned,
+    brandCareersMismatch: brandCareersMismatch(org.name, emailDomain, brands),
   };
 }
 
