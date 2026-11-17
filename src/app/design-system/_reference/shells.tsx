@@ -110,7 +110,17 @@ export function HostBottomNav({ current }: { current: HostPlace }) {
 export function HostSidebar({ current }: { current: HostPlace }) {
   const items: SidebarItem[] = [
     { href: '#home', label: 'Home', icon: host.home, current: current === 'home' },
-    { href: '#listings', label: 'Listings', icon: host.listings, current: current === 'listings' },
+    {
+      href: '#listings',
+      label: 'Listings',
+      icon: host.listings,
+      current: current === 'listings',
+      children: [
+        { href: '#listings', label: 'Active', current: current === 'listings' },
+        { href: '#listings-drafts', label: 'Drafts' },
+        { href: '#listings-library', label: 'Library' },
+      ],
+    },
     {
       href: '#applicants',
       label: 'Applicants',
@@ -127,7 +137,6 @@ export function HostSidebar({ current }: { current: HostPlace }) {
       count: 3,
       current: current === 'messages',
     },
-    { href: '#promote', label: 'Promote', icon: host.promote },
     { href: '#analytics', label: 'Analytics', icon: host.analytics },
     { href: '#host-page', label: 'Host page', icon: host.hostPage },
     { href: '#team', label: 'Team', icon: host.team },

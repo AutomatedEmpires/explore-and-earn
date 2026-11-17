@@ -10,6 +10,7 @@ const nav = vi.hoisted(() => ({ pathname: '/' }));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => nav.pathname,
+  useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ refresh: vi.fn() }),
 }));
 
@@ -92,7 +93,6 @@ const HOST = [
   'Candidates',
   'Interviews',
   'Messages',
-  'Promote',
   'Analytics',
   'Host page',
   'Team',

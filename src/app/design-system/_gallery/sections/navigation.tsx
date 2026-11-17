@@ -52,7 +52,6 @@ export const hostSidebarItems: SidebarItem[] = [
   { href: '#candidates', label: 'Candidates', icon: host.candidates },
   { href: '#interviews', label: 'Interviews', icon: host.interviews },
   { href: '#messages', label: 'Messages', icon: host.messages, count: 3 },
-  { href: '#promote', label: 'Promote', icon: host.promote },
   { href: '#analytics', label: 'Analytics', icon: host.analytics },
   { href: '#host-page', label: 'Host page', icon: host.hostPage },
   { href: '#team', label: 'Team', icon: host.team },

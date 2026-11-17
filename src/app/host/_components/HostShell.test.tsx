@@ -3,10 +3,11 @@
 import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const nav = vi.hoisted(() => ({ pathname: '/host' }));
+const nav = vi.hoisted(() => ({ pathname: '/host', tab: null as string | null }));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => nav.pathname,
+  useSearchParams: () => new URLSearchParams(nav.tab ? [['tab', nav.tab]] : []),
   useRouter: () => ({ refresh: vi.fn() }),
 }));
 
@@ -51,6 +52,7 @@ function links(landmark: HTMLElement) {
 
 beforeEach(() => {
   nav.pathname = '/host';
+  nav.tab = null;
 });
 
 describe('HostShell', () => {
@@ -69,7 +71,6 @@ describe('HostShell', () => {
       'Candidates',
       'Interviews',
       'Messages',
-      'Promote',
       'Analytics',
       'Host page',
       'Team',
@@ -79,6 +80,66 @@ describe('HostShell', () => {
     expect(within(sidebar).getByRole('link', { name: 'Home' })).toHaveAttribute(
       'aria-current',
       'page',
+    );
+    expect(screen.getByRole('main').className).not.toMatch(/max-w-5xl/);
+  });
+
+  it('opens Active, Drafts and Library under Listings and leaves Promote out', () => {
+    nav.pathname = '/host/listings';
+    render(
+      <HostShell org={ORG} initialNotifications={0}>
+        page
+      </HostShell>,
+    );
+    const [sidebar] = screen.getAllByRole('navigation', { name: 'Host' });
+    if (!sidebar) throw new Error('no sidebar');
+    expect(links(sidebar)).toEqual([
+      'Home',
+      'Listings',
+      'Active',
+      'Drafts',
+      'Library',
+      'Applicants',
+      'Candidates',
+      'Interviews',
+      'Messages',
+      'Analytics',
+      'Host page',
+      'Team',
+      'Billing',
+      'Settings',
+    ]);
+    expect(within(sidebar).queryByRole('link', { name: 'Promote' })).not.toBeInTheDocument();
+    expect(within(sidebar).getByRole('link', { name: 'Active' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(within(sidebar).getByRole('link', { name: 'Drafts' })).toHaveAttribute(
+      'href',
+      '/host/listings?tab=drafts',
+    );
+    expect(within(sidebar).getByRole('link', { name: 'Library' })).toHaveAttribute(
+      'href',
+      '/host/listings?tab=library',
+    );
+  });
+
+  it('marks Drafts current when the listings tab is drafts', () => {
+    nav.pathname = '/host/listings';
+    nav.tab = 'drafts';
+    render(
+      <HostShell org={ORG} initialNotifications={0}>
+        page
+      </HostShell>,
+    );
+    const [sidebar] = screen.getAllByRole('navigation', { name: 'Host' });
+    if (!sidebar) throw new Error('no sidebar');
+    expect(within(sidebar).getByRole('link', { name: 'Drafts' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(within(sidebar).getByRole('link', { name: 'Active' })).not.toHaveAttribute(
+      'aria-current',
     );
   });
 

@@ -21,6 +21,76 @@ const SEASON_LABEL: Record<string, string> = {
 
 const PAY_PERIODS: readonly PayPeriod[] = ['hour', 'day', 'week', 'month', 'season', 'year'];
 
+const HOUSING_TYPE: Record<string, string> = {
+  dorm: 'Dorm',
+  shared_room: 'Shared room',
+  private_room: 'Private room',
+  cabin: 'Cabin',
+  rv_site: 'RV site',
+  berth: 'Berth on the boat',
+};
+
+const COST_PERIODS = ['day', 'week', 'month', 'season'] as const;
+
+/** "Free" on its own line, or "free" / "$12 a night, taken from pay" inside a sentence. */
+function costLine(
+  cost: unknown,
+  perDay: 'a night' | 'a day',
+  standalone: boolean,
+): string | undefined {
+  const c = obj(cost);
+  if (c.free === true) return standalone ? 'Free' : 'free';
+  const cents = num(c.cents);
+  const period = str(c.period);
+  const paidBy = str(c.paidBy);
+  if (
+    cents === undefined ||
+    !period ||
+    !COST_PERIODS.includes(period as (typeof COST_PERIODS)[number]) ||
+    (paidBy !== 'deducted' && paidBy !== 'direct')
+  ) {
+    return undefined;
+  }
+  const per = period === 'day' ? perDay : `a ${period}`;
+  const paid = paidBy === 'deducted' ? 'taken from pay' : 'paid separately';
+  return `${money(cents)} ${per}, ${paid}`;
+}
+
+/** "3 meals a day, free" or "No meals". Incomplete answers stay "Meals provided" rather than a guessed count. */
+function mealsLine(meals: unknown): string {
+  const m = obj(meals);
+  if (m.provided !== true) return 'No meals';
+  const perDay = num(m.perDay);
+  const days = str(m.days);
+  if ((perDay !== 1 && perDay !== 2 && perDay !== 3) || (days !== 'every_day' && days !== 'work_days')) {
+    return 'Meals provided';
+  }
+  const count = perDay === 1 ? '1 meal' : `${perDay} meals`;
+  const when = days === 'every_day' ? 'a day' : 'on work days';
+  const cost = costLine(m.cost, 'a day', false);
+  return cost ? `${count} ${when}, ${cost}` : `${count} ${when}`;
+}
+
+function dealFrom(draft: Json) {
+  const housing = obj(draft.housing);
+  if (housing.provided !== true) {
+    return { deal: { housing: null, meals: mealsLine(draft.meals) }, roomPhotoId: null };
+  }
+  const typeKey = str(housing.type);
+  const couples = obj(housing.finePrint).couples;
+  return {
+    deal: {
+      housing: {
+        type: typeKey ? HOUSING_TYPE[typeKey] : undefined,
+        cost: costLine(housing.cost, 'a night', true),
+        couples: typeof couples === 'boolean' ? (couples ? 'Couples housed' : 'No couples') : null,
+      },
+      meals: mealsLine(draft.meals),
+    },
+    roomPhotoId: str(obj(housing.photos).bedroom) ?? null,
+  };
+}
+
 /** The card's facts from the draft, for the card and the sentence beside it. */
 export function cardFacts(draft: Json, orgName: string, locations: HostLocation[] | null) {
   const title = str(getPath(draft, 'basics.title'))?.trim() || 'Job title';
@@ -66,6 +136,7 @@ export function cardFacts(draft: Json, orgName: string, locations: HostLocation[
     pay: payValue,
     housing: getPath(draft, 'housing.provided') === true,
     meals: getPath(draft, 'meals.provided') === true,
+    ...dealFrom(draft),
     orgName,
   };
 }
@@ -89,9 +160,20 @@ export function GuestPreview({
   const facts = cardFacts(draft, orgName, locations);
   const coverId = str(getPath(draft, 'photos.coverMediaId')) ?? null;
   const remote = useMediaUrl(coverPreview ? null : coverId);
+  const roomSrc = useMediaUrl(facts.roomPhotoId);
   const coverSrc = coverPreview ?? remote;
-  const housing = facts.housing ? 'housing provided' : 'no housing';
-  const meals = facts.meals ? 'meals provided' : 'no meals';
+  const deal = {
+    ...facts.deal,
+    housing: facts.deal.housing
+      ? { ...facts.deal.housing, photo: roomSrc ? { src: roomSrc, alt: 'Bedroom' } : null }
+      : null,
+  };
+  const housingWords = facts.deal.housing
+    ? [facts.deal.housing.type, facts.deal.housing.cost, facts.deal.housing.couples]
+        .filter((part) => part)
+        .join(', ')
+    : 'No housing';
+  const meals = facts.deal.meals;
   const pay = 'label' in facts.pay ? facts.pay.label : '';
   return (
     <section aria-labelledby={headingId} className={cn('flex flex-col gap-3', className)}>
@@ -99,7 +181,7 @@ export function GuestPreview({
         What guests see
       </h2>
       <p className="sr-only">
-        {facts.title} at {orgName}, {facts.place}. {CATEGORY_LABEL[facts.category]}, {housing},{' '}
+        {facts.title} at {orgName}, {facts.place}. {CATEGORY_LABEL[facts.category]}, {housingWords},{' '}
         {meals}
         {pay ? `, ${pay}` : ''}.
       </p>
@@ -117,6 +199,7 @@ export function GuestPreview({
           housing={{ provided: facts.housing }}
           meals={{ provided: facts.meals }}
           pay={facts.pay}
+          deal={deal}
           titleAs="h3"
         />
       </div>
