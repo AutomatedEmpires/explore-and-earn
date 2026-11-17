@@ -97,11 +97,13 @@ describe('JobCard', () => {
     expect(screen.queryByText(/Ends/)).toBeNull();
   });
 
-  it('shows a disabled "Applied" button once the seeker has applied', () => {
+  it('shows Applied as a secondary button with a check', () => {
     const onApply = vi.fn();
     render(<JobCard {...base} applied onApply={onApply} />);
     const applied = screen.getByRole('button', { name: 'Applied' });
-    expect(applied).toBeDisabled();
+    expect(applied).not.toBeDisabled();
+    expect(applied).toHaveClass('border');
+    expect(applied.querySelector('svg.lucide-check')).not.toBeNull();
     expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
     fireEvent.click(applied);
     expect(onApply).not.toHaveBeenCalled();
@@ -215,6 +217,73 @@ describe('JobCard cover, freshness and pay estimate (#152, #155)', () => {
     );
     expect(screen.getByText('About $796 a week')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'How we work this out' })).toBeNull();
+  });
+
+  it('lays out a passed estimate exactly and does not invent one from pay', () => {
+    render(
+      <JobCard
+        {...base}
+        payEstimate={{
+          line: 'About $560–$640 a week after housing and meals',
+          basis:
+            'Before taxes. Based on 40 hours a week at $18–$20 an hour, less $160 a week for housing and meals.',
+        }}
+      />,
+    );
+    expect(screen.getByText('About $560–$640 a week after housing and meals')).toBeInTheDocument();
+    expect(screen.queryByText(/take-home|net pay|you'll earn|guaranteed/i)).toBeNull();
+  });
+});
+
+const room = { src: '/design-system/samples/room.svg', alt: 'A shared bedroom' };
+
+describe('JobCard whole deal', () => {
+  it('shows the room, type, cost, meals and couples under the dates, and only the pay chip', () => {
+    render(
+      <JobCard
+        {...base}
+        deal={{
+          housing: {
+            type: 'Cabin',
+            cost: '$12 a night, taken from pay',
+            photo: room,
+            couples: 'Couples housed',
+          },
+          meals: '3 meals a day, free',
+        }}
+      />,
+    );
+    const type = screen.getByText('Cabin');
+    expect(type).toHaveClass('font-semibold', 'text-16');
+    expect(screen.getByText('$12 a night, taken from pay')).toHaveClass('text-16');
+    expect(screen.getByText('3 meals a day, free')).toHaveClass('text-16');
+    expect(screen.getByText('Couples housed')).toHaveClass('text-16');
+    const photo = screen.getByRole('img', { name: 'A shared bedroom' });
+    expect(photo).toHaveClass('size-18');
+    expect(screen.queryByRole('button', { name: /^Housing/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Meals/ })).toBeNull();
+    const pay = chip(/^Pay/);
+    expect(pay.parentElement).toHaveClass('w-35');
+    const dates = screen.getByText('Starts in 12 days');
+    expect(dates.compareDocumentPosition(type)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(type.compareDocumentPosition(pay)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('says "No housing" and hides the room, the cost and couples', () => {
+    render(
+      <JobCard
+        {...base}
+        deal={{
+          housing: null,
+          meals: 'No meals',
+        }}
+      />,
+    );
+    expect(screen.getByText('No housing')).toBeInTheDocument();
+    expect(screen.getByText('No meals')).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'A shared bedroom' })).toBeNull();
+    expect(screen.queryByText('Couples housed')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Housing/ })).toBeNull();
   });
 });
 
