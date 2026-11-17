@@ -418,7 +418,7 @@ describe('SP5 hiring settings', () => {
 
   it('rejects a state code that is not a US state, and a repeated code', async () => {
     await expectBadRequest(
-      setSetting(t.db, 'hiring.fit_disabled_states', ['ZZ'], { operatorId }),
+      setSetting(t.db, 'hiring.fit_disabled_states', ['ZZ'] as never, { operatorId }),
     );
     await expectBadRequest(
       setSetting(t.db, 'hiring.fit_disabled_states', ['NY', 'NY'], { operatorId }),

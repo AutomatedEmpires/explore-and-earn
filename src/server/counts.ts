@@ -2,6 +2,8 @@
 // Shared touchpoint: `notifications` comes from the notifications module (Task 17); inbox
 // arrives with messaging; `profileDot` is SP4's "Profile, needs attention" dot (spec 3.4).
 import type { DbOrTx } from '@/lib/db';
+import { pendingInboxCount } from '@/modules/hiring';
+import { unreadThreadCount } from '@/modules/messaging';
 import { unreadCount } from '@/modules/notifications';
 import { needsAttention } from '@/modules/profiles';
 
@@ -11,5 +13,6 @@ export async function getCounts(
 ): Promise<{ inbox: number; notifications: number; profileDot: boolean }> {
   const notifications = await unreadCount(db, userId);
   const profileDot = await needsAttention(db, userId);
-  return { inbox: 0, notifications, profileDot };
+  const inbox = (await unreadThreadCount(db, userId)) + (await pendingInboxCount(db, userId));
+  return { inbox, notifications, profileDot };
 }

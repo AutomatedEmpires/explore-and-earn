@@ -2,8 +2,16 @@
 // An ambiguous fall-back time takes the earlier offset.
 export function zonedLocalToUtc(local: string, tz: string): string {
   const [date, time] = local.split('T');
-  const [y, mo, d] = date.split('-').map(Number);
-  const [h, mi] = time.split(':').map(Number);
+  const dateParts = date?.split('-').map(Number) ?? [];
+  const timeParts = time?.split(':').map(Number) ?? [];
+  const y = dateParts[0];
+  const mo = dateParts[1];
+  const d = dateParts[2];
+  const h = timeParts[0];
+  const mi = timeParts[1];
+  if (y === undefined || mo === undefined || d === undefined || h === undefined || mi === undefined) {
+    throw new Error('local time must be YYYY-MM-DDTHH:mm');
+  }
   const asUtc = Date.UTC(y, mo - 1, d, h, mi);
   const off1 = offsetMinutes(new Date(asUtc), tz);
   const utc1 = asUtc - off1 * 60_000;
@@ -39,7 +47,13 @@ export function todayInZone(tz: string, now: Date): string {
 /** `[from, to)` covering the local calendar day of `now` in `tz`. */
 export function localDayRange(tz: string, now: Date): { from: Date; to: Date } {
   const day = todayInZone(tz, now);
-  const [y, m, d] = day.split('-').map(Number);
+  const parts = day.split('-').map(Number);
+  const y = parts[0];
+  const m = parts[1];
+  const d = parts[2];
+  if (y === undefined || m === undefined || d === undefined) {
+    throw new Error('local day must be YYYY-MM-DD');
+  }
   const next = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
   return {
     from: new Date(zonedLocalToUtc(`${day}T00:00`, tz)),
