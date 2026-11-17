@@ -1,25 +1,20 @@
 // Creating a host organization: in Clerk first (for its ID), then here, with the owner's
 // membership. Clerk's webhooks for the same organization may land before or after our insert;
 // both paths upsert by Clerk ID, so either order gives one organization and one owner.
-import { z } from 'zod';
 import { type Db, withTx } from '@/lib/db';
 import { badRequest, forbidden, notFound } from '@/lib/errors';
 import { record } from '@/modules/audit';
 import type { ClerkAdmin, UserContact } from '@/modules/identity';
+import { organizationNameSchema } from './name';
 import { recordCreatedOrganization } from './sync';
 
 export { slugify } from './sync';
-
-/** An organization's display name: 2-80 characters after trimming. */
-export const organizationNameSchema = z
-  .string()
-  .trim()
-  .min(2, 'Organization name must be at least 2 characters')
-  .max(80, 'Organization name must be at most 80 characters');
+export { organizationNameSchema };
 
 // app.users belongs to the identity module, so the owner is read through its index. Identity
-// imports this module (and uses organizationNameSchema while it loads), so a static import
-// back would be an evaluation-order cycle; it is loaded when first needed instead.
+// imports this module while it loads, so a static import back would be an evaluation-order
+// cycle; it is loaded when first needed instead. The name schema lives in ./name so that
+// cycle cannot observe it before it is assigned.
 async function loadOwner(db: Db, userId: string): Promise<UserContact | null> {
   const { getUserContact } = await import('@/modules/identity');
   return getUserContact(db, userId);

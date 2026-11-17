@@ -1,6 +1,7 @@
 // The notification type registry (spec section 9). Every type names its category, how it reads
 // (title and body, rendered when it is created) and which channels it uses besides in-app.
 // Foundation's types are defined at the bottom; later sub-projects call defineType() for theirs.
+import type { DbOrTx } from '@/lib/db';
 import { getEnv } from '@/lib/env';
 
 export const CATEGORIES = [
@@ -50,8 +51,13 @@ export const EMAIL_TEMPLATE_NAMES = [
   'ApplicationReceipt',
   'AvailabilityReconfirm',
   'SeekerNotice',
+  // SP5: a hiring notice (invite, interview, offer) with one button.
+  'HiringUpdate',
 ] as const;
 export type EmailTemplateName = (typeof EMAIL_TEMPLATE_NAMES)[number];
+
+/** A file attached to one email. `content` is the file's text. */
+export type EmailAttachment = { filename: string; contentType: string; content: string };
 
 /** Security and billing messages can't be turned off (product spec section 14). */
 export const MANDATORY_CATEGORIES: ReadonlySet<Category> = new Set<Category>([
@@ -74,7 +80,14 @@ export type NotificationTypeDef = {
    */
   url?: (d: NotificationData) => string | null;
   /** Emails the notification, alone or (with `batch`) in a digest after `delayMinutes`. */
-  email?: { template: EmailTemplateName; batch?: { key: string; delayMinutes: number } };
+  email?: {
+    template: EmailTemplateName;
+    batch?: { key: string; delayMinutes: number };
+    /** Built when a single (non-batched) email is sent. A throw fails the job. */
+    attachments?: (d: NotificationData, db: DbOrTx) => Promise<EmailAttachment[]>;
+    /** The per-item button label inside a Digest. */
+    digestAction?: string;
+  };
   /** Sends a web push to each of the user's subscribed browsers. */
   push?: boolean;
 };

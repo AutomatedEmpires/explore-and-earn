@@ -24,6 +24,9 @@ import { jobHandlers as safety } from '@/modules/safety';
 import { jobHandlers as settings } from '@/modules/settings';
 import { raiseAlert, jobHandlers as trust } from '@/modules/trust';
 import { jobHandlers as verification } from '@/modules/verification';
+import { jobHandlers as analytics } from '@/modules/analytics';
+import { jobHandlers as hiring } from '@/modules/hiring';
+import { jobHandlers as messaging } from '@/modules/messaging';
 // SP4 module-load registrations, so the worker sees the same registries the API does (the
 // import expiry asks applications' resume reference checker before deleting a file).
 import '@/server/module-registrations';
@@ -68,6 +71,10 @@ export const handlers: HandlerMap = merge({
   profiles,
   applications,
   safety,
+  // SP5
+  hiring,
+  messaging,
+  analytics,
 });
 
 /**

@@ -37,6 +37,7 @@ export {
   type PinnedAnnouncement,
   type Tally,
 } from './providers';
+export { countFollowersAt } from './followers-at';
 export { usuallyHires } from './usually-hires';
 export {
   FOLLOWERS_PER_RUN,
