@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
-import { seedHostOrg, seedSeeker } from '../../../tests/helpers/sp2';
+import { seedHostOrg } from '../../../tests/helpers/sp2';
 import { newId } from '@/lib/ids';
 import { getHiringInfoMany, listForOrg } from './index';
 

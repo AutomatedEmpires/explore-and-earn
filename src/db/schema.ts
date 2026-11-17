@@ -27,5 +27,6 @@ export * from '../modules/safety/schema';
 // SP5
 export * from '../modules/hiring/schema';
 export * from '../modules/messaging/schema';
+export * from '../modules/analytics/schema';
 // SP8 (types only until SP8 W0)
 export * from '../modules/privacy/schema';
