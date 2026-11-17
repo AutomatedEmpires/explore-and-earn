@@ -53,8 +53,8 @@ export function Toast({
     >
       {Icon ? <Icon className="size-5 shrink-0" /> : null}
       <div className="min-w-0 flex-1 py-1">
-        <p className="text-15 font-semibold">{title}</p>
-        {description ? <p className="text-13 opacity-90">{description}</p> : null}
+        <p className="text-15 font-semibold wrap-anywhere">{title}</p>
+        {description ? <p className="text-13 wrap-anywhere opacity-90">{description}</p> : null}
       </div>
       {action ? (
         <button

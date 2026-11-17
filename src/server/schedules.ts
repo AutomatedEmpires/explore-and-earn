@@ -24,4 +24,8 @@ export const schedules: { topic: string; cron: string }[] = [
   { topic: 'discovery.alerts_daily', cron: '0 14 * * *' },
   { topic: 'discovery.alerts_weekly', cron: '0 14 * * 1' },
   { topic: 'discovery.maintenance', cron: '15 4 * * *' },
+  // SP4 profiles: expire unmerged resume imports (hourly) and the availability reminders and
+  // stale step (daily).
+  { topic: 'profiles.import_expire', cron: '15 * * * *' },
+  { topic: 'profiles.availability_sweep', cron: '0 15 * * *' },
 ];

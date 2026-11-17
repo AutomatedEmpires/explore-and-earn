@@ -45,7 +45,9 @@ describe('CandidateCard', () => {
       '/host/applicants/1',
     );
     expect(within(card).getByText('Seasonal, Maritime')).toBeInTheDocument();
-    expect(within(card).getByText('Applied 2 days ago')).toBeInTheDocument();
+    const applied = within(card).getByText('Applied 2 days ago');
+    // A status badge always carries its icon (#155 D3-1).
+    expect(applied.querySelector('svg.lucide-clock')).not.toBeNull();
     expect(within(card).getByText('· Applied for Lodge Housekeeper')).toBeInTheDocument();
     expect(within(card).getByText('Available May 10, 2027')).toBeInTheDocument();
     expect(within(card).getByRole('button', { name: /^Resume/ })).toHaveTextContent('3 seasons');

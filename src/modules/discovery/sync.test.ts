@@ -657,7 +657,7 @@ describe('driftCheck and rebuildSearchProjection', () => {
     await insertProjectionRows(t.db, [{}]);
     const before = await audits('discovery.projection_rebuilt');
 
-    expect(await rebuildSearchProjection(t.db)).toEqual({ upserted: 2, removed: 1 });
+    expect(await rebuildSearchProjection(t.db)).toEqual({ upserted: 2, removed: 1, failed: 0 });
     expect(await audits('discovery.projection_rebuilt')).toBe(before + 1);
     expect(hoisted.raiseAlert).not.toHaveBeenCalled();
   });

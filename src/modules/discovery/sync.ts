@@ -340,10 +340,14 @@ export async function driftCheck(
   return result;
 }
 
-/** The drift check without paging limits (SP8 restore runbook); always audited. */
+/**
+ * The drift check without paging limits (SP8 restore runbook); always audited. `failed` counts
+ * the rows that could not be synced (each is logged, and one alert is raised); it is not part
+ * of the audit record.
+ */
 export async function rebuildSearchProjection(
   db: Db,
-): Promise<{ upserted: number; removed: number }> {
+): Promise<{ upserted: number; removed: number; failed: number }> {
   const { counts, failed } = await reconcile(db, new Date());
   await record(db, {
     actorType: 'system',
@@ -354,7 +358,7 @@ export async function rebuildSearchProjection(
     data: counts,
   });
   await alertSyncFailures(db, failed);
-  return counts;
+  return { ...counts, failed };
 }
 
 /**

@@ -43,6 +43,14 @@ export { locationPreview, mapPins } from './map';
 export { suggest } from './suggest';
 // Browse by State (FD-8 addendum).
 export { countListingsByState } from './state-counts';
+// Landing sitemaps. Search stays capped; this feed does not.
+export {
+  hasActiveListing,
+  landingCoverage,
+  listActiveListings,
+  type ActiveListing,
+  type LandingCoverage,
+} from './feed';
 export { getListingDetail } from './detail';
 export { getFilterOptions, getQueryLabels, prepareQuery } from './query-context';
 export { toHourlyCents } from './projection';

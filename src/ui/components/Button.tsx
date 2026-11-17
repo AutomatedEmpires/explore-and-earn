@@ -20,7 +20,7 @@ export const buttonVariants = cva(
         danger: 'bg-danger text-surface hover:opacity-90',
       },
       size: {
-        md: 'h-11 px-5 text-15',
+        md: 'h-11 px-5 text-16',
         lg: 'h-12 px-6 text-16',
       },
       fullWidth: {

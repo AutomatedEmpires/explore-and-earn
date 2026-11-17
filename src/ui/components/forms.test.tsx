@@ -96,3 +96,53 @@ describe('Switch', () => {
     expect(onCheckedChange).toHaveBeenCalledWith(true);
   });
 });
+
+/**
+ * #152 and #155 D3-6: hints, errors and descriptions wrap onto more lines instead of running out
+ * of their box. A long word or address breaks too, and a flex column can shrink below its content.
+ */
+const LONG = 'Use the address on your passport: maya.reyes.housekeeping@kettleridgelodge.example';
+
+function expectWraps(element: Element | null) {
+  expect(element).not.toBeNull();
+  expect(element).toHaveClass('wrap-anywhere');
+  expect(element).not.toHaveClass('truncate');
+  expect(element).not.toHaveClass('whitespace-nowrap');
+}
+
+describe('hints, errors and descriptions wrap (#155 D3-6)', () => {
+  it('wraps the field hint and error of Input and Textarea', () => {
+    render(
+      <>
+        <Input label="Email" hint={LONG} />
+        <Textarea label="Note" error={LONG} />
+      </>,
+    );
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveAccessibleDescription(LONG);
+    expectWraps(document.querySelector('[id$="-hint"]'));
+    const error = document.querySelector('[id$="-error"]');
+    expectWraps(error);
+    expect(error).toHaveClass('min-w-0');
+  });
+
+  it('wraps the Radio label and description in a column that can shrink', () => {
+    render(
+      <RadioGroup legend="Housing" error={LONG}>
+        <Radio name="housing" value="cabin" label={LONG} description={LONG} />
+      </RadioGroup>,
+    );
+    const description = document.querySelector('[id$="-description"]');
+    expectWraps(description);
+    expect(description?.parentElement).toHaveClass('min-w-0');
+    expectWraps(description?.previousElementSibling ?? null);
+    expectWraps(screen.getByRole('alert'));
+  });
+
+  it('wraps the Switch label and description', () => {
+    render(<Switch label={LONG} description={LONG} />);
+    const description = document.querySelector('[id$="-description"]');
+    expectWraps(description);
+    expect(description?.parentElement).toHaveClass('min-w-0');
+    expectWraps(description?.previousElementSibling ?? null);
+  });
+});

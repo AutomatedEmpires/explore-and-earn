@@ -189,26 +189,33 @@ describe('@/modules/discovery', () => {
     ]);
   });
 
-  it('acks the topics whose real handlers have not landed, so nothing dead-letters', async () => {
-    // W1's sync handlers (sync.test.ts) and W3's maintenance (events.test.ts) are real; the
-    // alert topics are still stubs.
-    const real = [
-      'discovery.sync_listing',
-      'discovery.sync_host',
-      'discovery.drift_check',
-      'discovery.maintenance',
-    ];
-    const stubbed = Object.entries(discovery.jobHandlers).filter(
-      ([topic]) => !real.includes(topic),
-    );
-    expect(stubbed.map(([topic]) => topic).sort()).toEqual([
-      'discovery.alerts_daily',
+  it('rejects a malformed alert chunk, so it is retried and seen', async () => {
+    // Every topic has its real handler now: sync (sync.test.ts), maintenance (events.test.ts)
+    // and the alerts (alerts.test.ts). A bad payload throws before touching the database.
+    const now = new Date();
+    for (const topic of [
       'discovery.alerts_match',
+      'discovery.alerts_daily',
       'discovery.alerts_weekly',
-    ]);
-    for (const [, handler] of stubbed) {
-      await expect(handler({}, { db, now: new Date() })).resolves.toBeUndefined();
+    ]) {
+      await expect(
+        discovery.jobHandlers[topic]?.({ afterUserId: 'not-a-user' }, { db, now }),
+        topic,
+      ).rejects.toThrow(`${topic}: invalid payload`);
     }
+  });
+
+  it('defines the three alert notification types in the alerts category', async () => {
+    const { getType } = await import('@/modules/notifications');
+    expect(getType('discovery.alert_match')).toMatchObject({ category: 'alerts', push: true });
+    expect(getType('discovery.alert_daily')).toMatchObject({
+      category: 'alerts',
+      email: { template: 'JobAlertDaily' },
+    });
+    expect(getType('discovery.alert_weekly')).toMatchObject({
+      category: 'alerts',
+      email: { template: 'JobAlertWeekly' },
+    });
   });
 
   it('rejects a sync event without its ids, so a malformed payload is retried and seen', async () => {

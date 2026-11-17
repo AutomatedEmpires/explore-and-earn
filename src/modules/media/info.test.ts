@@ -1,10 +1,11 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
-import { getMediaInfo, readMediaVariant } from './index';
+import { deleteMedia, getMedia, getMediaInfo, readMedia, readMediaVariant } from './index';
 import type { MediaKind, MediaStatus } from './kinds';
-import { memoryStorage } from './storage';
+import { ObjectNotFoundError, memoryStorage } from './storage';
 
 let t: TestDb;
 
@@ -99,5 +100,129 @@ describe('readMediaVariant', () => {
 
     expect(await readMediaVariant(t.db, storage, id, 640)).toBeNull();
     expect(await readMediaVariant(t.db, storage, newId(), 640)).toBeNull();
+  });
+});
+
+/** A private PDF (a resume), as the scan leaves an approved one: in media-private, no variants. */
+async function seedResume(ownerUserId: string, status: MediaStatus): Promise<string> {
+  const id = newId();
+  const bucket = status === 'approved' ? 'media-private' : 'quarantine';
+  await t.db.execute(sql`
+    insert into app.media (id, owner_user_id, kind, status, bucket, path, declared_mime, size_bytes)
+    values (${id}, ${ownerUserId}, 'resume', ${status}, ${bucket}, ${`${id}/resume.pdf`},
+      'application/pdf', 1000)
+  `);
+  return id;
+}
+
+async function auditCount(action: string, subjectId: string): Promise<number> {
+  const [row] = await queryRows<{ n: number }>(
+    t.db,
+    sql`select count(*)::int as n from app.audit_events
+        where action = ${action} and subject_id = ${subjectId}`,
+  );
+  return row?.n ?? 0;
+}
+
+describe('getMedia', () => {
+  it('returns owner, kind and status, or null for an unknown id', async () => {
+    const user = await newUser();
+    const id = await seedResume(user, 'scanning');
+    expect(await getMedia(t.db, id)).toEqual({
+      id,
+      ownerUserId: user,
+      ownerOrgId: null,
+      kind: 'resume',
+      status: 'scanning',
+    });
+    expect(await getMedia(t.db, newId())).toBeNull();
+    expect(await getMedia(t.db, 'not-a-uuid')).toBeNull();
+  });
+});
+
+describe('readMedia', () => {
+  it('reads an approved private file and refuses one still scanning', async () => {
+    const user = await newUser();
+    const storage = memoryStorage();
+    const bytes = new TextEncoder().encode('%PDF-1.7 resume');
+    const approved = await seedResume(user, 'approved');
+    await storage.write('media-private', `${approved}/resume.pdf`, bytes, 'application/pdf');
+    expect(await readMedia(t.db, storage, approved)).toEqual(bytes);
+
+    const scanning = await seedResume(user, 'scanning');
+    await storage.write('quarantine', `${scanning}/resume.pdf`, bytes, 'application/pdf');
+    await expect(readMedia(t.db, storage, scanning)).rejects.toMatchObject({ code: 'not_found' });
+    await expect(readMedia(t.db, storage, newId())).rejects.toMatchObject({ code: 'not_found' });
+  });
+
+  it('refuses an approved file in the public bucket', async () => {
+    const user = await newUser();
+    const id = await seed({ kind: 'housing_photo', status: 'approved', ownerUserId: user });
+    await expect(readMedia(t.db, memoryStorage(), id)).rejects.toMatchObject({
+      code: 'not_found',
+    });
+  });
+});
+
+describe('deleteMedia', () => {
+  it('deletes the stored objects and the row, audits once, and is a no-op the second time', async () => {
+    const user = await newUser();
+    const storage = memoryStorage();
+    const id = await seedResume(user, 'approved');
+    await storage.write(
+      'media-private',
+      `${id}/resume.pdf`,
+      new Uint8Array([1]),
+      'application/pdf',
+    );
+
+    await deleteMedia(t.db, storage, id);
+
+    expect(await getMedia(t.db, id)).toBeNull();
+    await expect(storage.read('media-private', `${id}/resume.pdf`)).rejects.toBeInstanceOf(
+      ObjectNotFoundError,
+    );
+    expect(await auditCount('media.removed', id)).toBe(1);
+
+    await deleteMedia(t.db, storage, id);
+    expect(await auditCount('media.removed', id)).toBe(1);
+  });
+
+  it('keeps the row when storage fails, so a retry still finds the object paths', async () => {
+    const user = await newUser();
+    const storage = memoryStorage();
+    const id = await seedResume(user, 'approved');
+    await storage.write(
+      'media-private',
+      `${id}/resume.pdf`,
+      new Uint8Array([1]),
+      'application/pdf',
+    );
+    const failing = {
+      ...storage,
+      remove: async () => {
+        throw new Error('storage outage');
+      },
+    };
+
+    await expect(deleteMedia(t.db, failing, id)).rejects.toThrow('storage outage');
+    expect(await getMedia(t.db, id)).not.toBeNull();
+    expect(await auditCount('media.removed', id)).toBe(0);
+
+    await deleteMedia(t.db, storage, id);
+    expect(await getMedia(t.db, id)).toBeNull();
+    expect(storage.has('media-private', `${id}/resume.pdf`)).toBe(false);
+    expect(await auditCount('media.removed', id)).toBe(1);
+  });
+
+  it('removes every image variant', async () => {
+    const user = await newUser();
+    const storage = memoryStorage();
+    const id = await seed({ kind: 'avatar', status: 'approved', ownerUserId: user });
+    for (const w of ['320', '640', '1280']) {
+      await storage.write('media-public', `${id}/${w}.webp`, new Uint8Array([1]), 'image/webp');
+    }
+    await deleteMedia(t.db, storage, id);
+    expect(storage.list('media-public').filter((p) => p.startsWith(id))).toEqual([]);
   });
 });
