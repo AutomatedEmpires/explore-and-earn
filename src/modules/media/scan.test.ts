@@ -438,6 +438,30 @@ describe('scanMedia: images', () => {
     expect(objectsOf('quarantine', mediaId)).toEqual([mediaId]);
   });
 
+  it('fails closed when PhotoDNA times out or rate-limits', async () => {
+    const { mediaId } = await uploaded('community_photo', 'image/jpeg', fixture('gps.jpg'));
+    const timedOut = {
+      async scanImage(): Promise<never> {
+        throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+      },
+    };
+    await expect(scanMedia(t.db, { ...deps(), childSafety: timedOut }, mediaId)).rejects.toThrow(
+      /timeout/i,
+    );
+    expect(await row(mediaId)).toMatchObject({ status: 'scanning', bucket: 'quarantine' });
+
+    const limited = {
+      async scanImage(): Promise<never> {
+        throw new Error('PhotoDNA responded 429');
+      },
+    };
+    await expect(scanMedia(t.db, { ...deps(), childSafety: limited }, mediaId)).rejects.toThrow(
+      /429/,
+    );
+    expect(await row(mediaId)).toMatchObject({ status: 'scanning' });
+    expect((await row(mediaId)).status).not.toBe('approved');
+  });
+
   it('opens one review item when a scan is retried after its check ran', async () => {
     const { mediaId } = await uploaded('housing_photo', 'image/jpeg', fixture('gps.jpg'));
     trust.verdicts.set(mediaId, 'needs_review');
@@ -781,6 +805,20 @@ describe('scanners', () => {
     await expect(failing.scanImage(jpg)).rejects.toThrow(/3208/);
     // A provider error is retried, not treated as an unreadable image.
     await expect(failing.scanImage(jpg)).rejects.not.toBeInstanceOf(UnscannableImageError);
+
+    const limited = photoDnaScanner({
+      key: 'pdna',
+      fetch: async () => new Response('busy', { status: 429 }),
+    });
+    await expect(limited.scanImage(jpg)).rejects.toThrow(/429/);
+
+    const timedOut = photoDnaScanner({
+      key: 'pdna',
+      fetch: async () => {
+        throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+      },
+    });
+    await expect(timedOut.scanImage(jpg)).rejects.toThrow(/timeout/i);
   });
 
   it('PhotoDNA: an image it recognises but cannot convert is unscannable; nothing is sent', async () => {
