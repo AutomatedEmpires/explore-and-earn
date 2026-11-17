@@ -24,9 +24,11 @@ import {
   isMandatory,
   notificationUrl,
   type Category,
+  type EmailAttachment,
   type EmailTemplateName,
   type NotificationData,
 } from '../types';
+import HiringUpdate from './templates/HiringUpdate';
 import BillingNotice from './templates/BillingNotice';
 import Digest, { digestSubject, type DigestItem } from './templates/Digest';
 import HostNotice from './templates/HostNotice';
@@ -52,6 +54,8 @@ export type Message = {
   headers: Record<string, string>;
   /** Makes a retried send a no-op at the provider (Resend keeps keys for 24 hours). */
   idempotencyKey?: string;
+  /** Files built for a single send. A digest does not carry them. */
+  attachments?: EmailAttachment[];
 };
 
 export interface EmailProvider {
@@ -86,7 +90,20 @@ export function stubEmailProvider(opts: { dir?: string } = {}): EmailProvider {
       stubOutbox.push(m);
       if (writesToDisk()) {
         await mkdir(dir, { recursive: true });
-        const file = { to: m.to, subject: m.subject, html: m.html, text: m.text };
+        const file = {
+          to: m.to,
+          subject: m.subject,
+          html: m.html,
+          text: m.text,
+          ...(m.attachments
+            ? {
+                attachments: m.attachments.map(({ filename, contentType }) => ({
+                  filename,
+                  contentType,
+                })),
+              }
+            : {}),
+        };
         await writeFile(
           path.join(dir, `${id}.json`),
           JSON.stringify({ ...file, sentAt: new Date().toISOString() }),
@@ -102,7 +119,23 @@ export function resendEmailProvider(apiKey: string, from: string): EmailProvider
   return {
     async send(m) {
       const { data, error } = await client.emails.send(
-        { from, to: m.to, subject: m.subject, html: m.html, text: m.text, headers: m.headers },
+        {
+          from,
+          to: m.to,
+          subject: m.subject,
+          html: m.html,
+          text: m.text,
+          headers: m.headers,
+          ...(m.attachments
+            ? {
+                attachments: m.attachments.map((file) => ({
+                  filename: file.filename,
+                  content: Buffer.from(file.content).toString('base64'),
+                  contentType: file.contentType,
+                })),
+              }
+            : {}),
+        },
         m.idempotencyKey ? { idempotencyKey: m.idempotencyKey } : undefined,
       );
       if (error) {
@@ -227,6 +260,8 @@ function templateElement(name: EmailTemplateName, c: Content, footer: FooterProp
         button: noticeButton(c),
         footer,
       });
+    case 'HiringUpdate':
+      return createElement(HiringUpdate, { title: c.title, body: c.body, url: c.url, footer });
   }
 }
 
@@ -337,6 +372,7 @@ async function sendOne(
     footer,
   );
   const { html, text } = await renderEmail(el);
+  const attachments = def.email.attachments ? await def.email.attachments(data, db) : undefined;
   await provider.send({
     to: to.email,
     subject: n.title,
@@ -344,6 +380,7 @@ async function sendOne(
     text,
     headers: unsubscribeHeaders(footer),
     idempotencyKey: jobKey(n.id, 'email'),
+    ...(attachments ? { attachments } : {}),
   });
   return 'sent';
 }
@@ -393,6 +430,7 @@ async function sendDigest(
     title: r.title,
     body: r.body,
     url: notificationUrl(r.type, JSON.parse(r.data) as NotificationData),
+    actionLabel: getType(r.type)?.email?.digestAction,
   }));
   const footer = await footerFor(db, b.user_id, first.category);
   const { html, text } = await renderEmail(

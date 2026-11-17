@@ -5,7 +5,13 @@ import { Action, Layout, Title, styles, type FooterProps } from './Layout';
 
 const c = colors.light;
 
-export type DigestItem = { title: string; body: string; url: string | null };
+export type DigestItem = {
+  title: string;
+  body: string;
+  url: string | null;
+  /** Per-item button, drawn under the item when it has a URL. */
+  actionLabel?: string;
+};
 
 export type DigestProps = {
   items: DigestItem[];
@@ -38,6 +44,7 @@ export default function Digest({ items, url, footer }: DigestProps) {
             )}
           </Text>
           <Text style={{ ...styles.paragraph, margin: 0 }}>{item.body}</Text>
+          {item.actionLabel ? <Action href={item.url}>{item.actionLabel}</Action> : null}
         </Section>
       ))}
       <Section style={{ margin: '24px 0 0' }}>
