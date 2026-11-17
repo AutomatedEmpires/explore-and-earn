@@ -23,6 +23,7 @@ import {
 import type { Category } from '@/lib/taxonomy';
 import { boostedLabels } from './cards';
 import { buildFilterSql, uuidArray, type FilterContext } from './filters';
+import { publicSeedGuardSql } from './seed';
 import { overlayHidden } from './hooks';
 import { searchListings } from './search';
 
@@ -223,7 +224,8 @@ export async function locationPreview(
     db,
     sql`with here as (
         select * from app.discovery_listings dl
-        where dl.location_id = ${i.locationId}::uuid and dl.is_active ${hiddenOrg}
+        where dl.location_id = ${i.locationId}::uuid and dl.is_active
+          and ${publicSeedGuardSql()} ${hiddenOrg}
       )
       select h.org_id::text as "orgId", h.host_name as name, h.host_slug as slug,
         h.host_logo_url as "logoUrl", h.city, h.state::text as state, h.approximate,

@@ -3,17 +3,24 @@
 //
 // - Raw events carry no user id, ever. `viewer_hash` and `dedupe_key` are nulled after 24 hours
 //   and the rows are deleted after 90 days (the nightly maintenance and SP8's retention rule).
+// - A view or share by one viewer counts once per 30-minute bucket. A save or an application
+//   counts once per signed-in person. Guests are the same, keyed by their viewer key.
+// - The listing host's current team and every operator are left out. A count is never seeded.
 // - `listing_event_daily` holds one count per listing, UTC day, type and source, recomputed from
-//   the raw events, and is kept indefinitely.
+//   the raw events, and is kept indefinitely. Host analytics read those same rows.
 // - Counts read the daily rows for past days and the raw events for today. Yesterday also comes
 //   from the raw events until the nightly rollup has written it (04:15 UTC, which is the US
 //   evening), so yesterday never reads as zero in the hours before the job runs.
+// - A count shown to a person goes through `visibleCount`: zero stays hidden, and a fraction is
+//   hidden rather than rounded up.
 import { sql, type SQL } from 'drizzle-orm';
 import { queryRows, withTx, type Db, type DbOrTx } from '@/lib/db';
 import type { DiscoverySource, ListingEventType } from '@/lib/discovery';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
+import { getOperator } from '@/modules/identity';
 import type { HandlerMap } from '@/modules/jobs';
+import { getMember } from '@/modules/orgs';
 import { hmacKey } from '@/server/viewer';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -27,6 +34,15 @@ const SCRUB_AFTER_MS = DAY_MS;
 const DELETE_BATCH = 5_000;
 /** A view or share by the same viewer counts once per 30-minute bucket. */
 const DEDUPE_BUCKET_SEC = 1_800;
+
+/**
+ * A count a person may see. Zero is too little data to show, and anything that is not a whole
+ * number is hidden so a partial count is never rounded up or estimated.
+ */
+export function visibleCount(n: number): number | null {
+  if (!Number.isInteger(n) || n < 1) return null;
+  return n;
+}
 
 /** YYYY-MM-DD of `d` in UTC. */
 const utcDay = (d: Date): string => d.toISOString().slice(0, 10);
@@ -46,32 +62,57 @@ const textList = (values: readonly string[]): SQL =>
     sql`, `,
   );
 
+type ListingEventInput = {
+  listingId: string;
+  type: ListingEventType;
+  source: DiscoverySource;
+  at?: Date;
+  viewerKey?: string | null;
+  dedupeKey?: string;
+};
+
+/** One person, one save or application. Views and shares stay on the 30-minute bucket. */
+function eventDedupeKey(e: ListingEventInput, at: Date): string | null {
+  if (e.dedupeKey) return e.dedupeKey;
+  if (!e.viewerKey) return null;
+  if (e.type === 'view' || e.type === 'share') {
+    return dedupeKeyFor(e.type, e.viewerKey, e.listingId, at);
+  }
+  return `${e.type}:${hmacKey(e.viewerKey)}:${e.listingId}`;
+}
+
 /** Records one event. Unknown listings are dropped silently, and so is a repeated dedupe key. */
-export async function recordListingEvent(
-  db: DbOrTx,
-  e: {
-    listingId: string;
-    type: ListingEventType;
-    source: DiscoverySource;
-    at?: Date;
-    viewerKey?: string | null;
-    dedupeKey?: string;
-  },
-): Promise<void> {
+export async function recordListingEvent(db: DbOrTx, e: ListingEventInput): Promise<void> {
   if (!UUID.test(e.listingId)) return;
   const at = e.at ?? new Date();
   const viewerHash = e.viewerKey ? hmacKey(e.viewerKey) : null;
-  // The org comes from the projection row; with no row the select is empty and nothing is
-  // written.
+  const dedupeKey = eventDedupeKey(e, at);
+  const viewerId = e.viewerKey && UUID.test(e.viewerKey) ? e.viewerKey : null;
+  // The host's current team, and every operator, are not a viewer or an applicant. A membership
+  // that has ended is a real viewer again. Identity and orgs own those tables, so this asks them.
+  if (viewerId && (await excludedViewer(db, e.listingId, viewerId))) return;
+  // The org comes from the projection row; with no row the select is empty and nothing is written.
   await db.execute(sql`
     insert into app.listing_events
       (id, listing_id, org_id, type, source, viewer_hash, dedupe_key, occurred_at)
     select ${newId()}::uuid, dl.listing_id, dl.org_id, ${e.type}, ${e.source}, ${viewerHash},
-      ${e.dedupeKey ?? null}, ${at.toISOString()}::timestamptz
+      ${dedupeKey}, ${at.toISOString()}::timestamptz
     from app.discovery_listings dl
     where dl.listing_id = ${e.listingId}::uuid
     on conflict (dedupe_key) do nothing
   `);
+}
+
+/** True when this signed-in person must not count: an operator, or a live member of the host. */
+async function excludedViewer(db: DbOrTx, listingId: string, viewerId: string): Promise<boolean> {
+  if (await getOperator(db, viewerId)) return true;
+  const [row] = await queryRows<{ orgId: string }>(
+    db,
+    sql`select org_id::text as "orgId" from app.discovery_listings
+      where listing_id = ${listingId}::uuid`,
+  );
+  if (!row) return true;
+  return (await getMember(db, row.orgId, viewerId)) !== null;
 }
 
 /**
