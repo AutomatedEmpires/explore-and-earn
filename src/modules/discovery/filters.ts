@@ -8,6 +8,7 @@
 // that uses it (spec failure mode 1).
 import { sql, type SQL } from 'drizzle-orm';
 import { addDays, seasonWindow, withinMonthsEnd, type DiscoveryQuery } from '@/lib/discovery';
+import { publicSeedGuardSql } from './seed';
 
 export type FilterContext = {
   /** YYYY-MM-DD in the viewer's time zone. */
@@ -149,5 +150,8 @@ function exclusionSql(ctx: FilterContext): SQL[] {
 
 /** The WHERE clause over `dl`: active rows, every filter of `q` and the viewer's exclusions. */
 export function buildFilterSql(q: DiscoveryQuery, ctx: FilterContext): SQL {
-  return sql.join([sql`dl.is_active`, ...querySql(q, ctx.today), ...exclusionSql(ctx)], sql` and `);
+  return sql.join(
+    [sql`dl.is_active`, publicSeedGuardSql(), ...querySql(q, ctx.today), ...exclusionSql(ctx)],
+    sql` and `,
+  );
 }

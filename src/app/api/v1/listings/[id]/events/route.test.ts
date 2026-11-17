@@ -5,12 +5,15 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestDb, type TestDb } from '../../../../../../../tests/helpers/db';
 import { insertProjectionRows } from '../../../../../../../tests/helpers/discovery-rows';
+import { seedHostOrg, seedSeeker } from '../../../../../../../tests/helpers/sp2';
 import { queryRows, type Db } from '@/lib/db';
+import { newId } from '@/lib/ids';
 import { dedupeKeyFor, noopHook, setPlacementHookForTests } from '@/modules/discovery';
 import { hmacKey, viewerKeyFor } from '@/server/viewer';
 import { LISTING_EVENT_RATE, POST } from './route';
 
 const state = vi.hoisted(() => ({ db: undefined as Db | undefined }));
+const authState = vi.hoisted(() => ({ clerkUserId: null as string | null }));
 
 vi.mock('@/lib/db', async (orig) => ({
   ...(await orig<typeof import('@/lib/db')>()),
@@ -20,9 +23,9 @@ vi.mock('@/lib/db', async (orig) => ({
   },
 }));
 
-// Every caller here is a guest.
+// Callers are guests unless a test sets a Clerk user id.
 vi.mock('@clerk/nextjs/server', () => ({
-  auth: async () => ({ userId: null, orgId: null }),
+  auth: async () => ({ userId: authState.clerkUserId, orgId: null }),
   currentUser: async () => null,
 }));
 
@@ -44,6 +47,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  authState.clerkUserId = null;
   setPlacementHookForTests(noopHook);
   await t.db.execute(sql`delete from app.rate_limits`);
   await t.db.execute(sql`delete from app.listing_events`);
@@ -165,6 +169,34 @@ describe('POST /api/v1/listings/:id/events', () => {
     await post({ type: 'view', source: 'newsletter' });
     await post({ type: 'share' });
     expect((await rows()).map((r) => r.source)).toEqual(['other', 'other']);
+  });
+
+  it('writes nothing for the listing host team or an operator', async () => {
+    const org = await seedHostOrg(t.db, { name: 'Honest Lodge' });
+    await t.db.execute(sql`
+      update app.discovery_listings set org_id = ${org.orgId}::uuid where listing_id = ${listing}::uuid
+    `);
+    authState.clerkUserId = org.owner.clerkUserId;
+    expect((await post({ type: 'view', source: 'seek' })).status).toBe(204);
+    expect(await rows()).toEqual([]);
+
+    const operatorId = newId();
+    const clerkId = `user_${operatorId.replace(/-/g, '').slice(0, 10)}`;
+    await t.db.execute(sql`
+      insert into app.users (id, clerk_user_id, email, display_name, account_type)
+      values (${operatorId}, ${clerkId}, 'op@ops.test', 'Op', 'operator')
+    `);
+    await t.db.execute(sql`
+      insert into app.operators (user_id, role) values (${operatorId}, 'operator')
+    `);
+    authState.clerkUserId = clerkId;
+    expect((await post({ type: 'share', source: 'seek' })).status).toBe(204);
+    expect(await rows()).toEqual([]);
+
+    const seeker = await seedSeeker(t.db);
+    authState.clerkUserId = seeker.user.clerkUserId;
+    expect((await post({ type: 'view', source: 'seek' })).status).toBe(204);
+    expect(await rows()).toHaveLength(1);
   });
 
   it('writes nothing for Googlebot', async () => {

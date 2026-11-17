@@ -17,6 +17,7 @@ import {
 } from '@/lib/discovery';
 import { GENRES } from '@/lib/taxonomy';
 import { listDestinations } from '@/modules/locations';
+import { publicSeedGuardSql } from './seed';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -35,7 +36,7 @@ async function findHost(
     db,
     sql`select dl.org_id::text as "orgId", dl.host_slug as slug, dl.host_name as name
       from app.discovery_listings dl
-      where ${where}
+      where ${where} and ${publicSeedGuardSql()}
       order by dl.is_active desc, dl.indexed_at desc
       limit 1`,
   );
