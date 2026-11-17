@@ -3,6 +3,7 @@
 - **Issue:** [#89](https://github.com/AutomatedEmpires/explore-and-earn/issues/89) (EE-LEGAL1)
 - **Written:** 2026-11-10 by the `claude-code` research agent
 - **Status:** agent analysis for the founder and for licensed counsel. **This is not legal advice.** No lawyer has reviewed it. It is a map of the risks, the product changes that reduce them, and the questions a lawyer must answer. Nothing here changes a founder decision or a launch gate.
+- **Colorado re-check (issue 116, 2026-11-17):** SB 26-189 was read at the Colorado General Assembly. See sections 2.8 and 14. The other laws in section 2.8 were not re-opened that day.
 - **Product state reviewed:** the specs and plans on `integrate/sp2-20261104` (product design of 2026-11-03, founder decisions FD-1 to FD-9, SP2 and SP8 designs) and the ten decisions the founder accepted on 2026-11-11 ([#45 comment](https://github.com/AutomatedEmpires/explore-and-earn/issues/45#issuecomment-6786615643)).
 
 ## How to read this
@@ -207,7 +208,7 @@ A plain job board is usually outside these definitions. Three features move Expl
 
 This is already a launch gate (`legal.fit_score`), so only the changes since the spec was written are noted.
 
-- **Colorado.** The SP8 gate and its counsel question cite the Colorado AI Act, SB 24-205. Law-firm summaries report that it was first delayed to 2026-06-30 and then repealed and re-enacted in narrower form by SB 26-189, signed 2026-05-14, effective 2027-01-01. **The gate text is out of date.** This was not confirmed at the Colorado General Assembly's site.
+- **Colorado.** The SP8 gate and its counsel question cited the Colorado AI Act, SB 24-205. Checked on 2026-11-17 at the Colorado General Assembly: [SB 26-189](https://leg.colorado.gov/bills/sb26-189) (Automated Decision-Making Technology) is a Signed Act dated 2026-05-14. The Governor signed it that day. The session-laws table on that page lists chapter 131 and an effective date of 2026-05-14. The Assembly's summary of the bill as enacted says Senate Bill 24-205 created consumer protections for artificial intelligence systems, and that this act repeals and reenacts those provisions with new requirements for automated decision-making technology. That same summary says a developer of covered automated decision-making technology must provide documentation starting 2027-01-01. **The gate text that cited only SB 24-205 is out of date.** The signed-act PDF was not read line by line; the bill page, the enacted summary, the version table and the session-laws table were. Source: https://leg.colorado.gov/bills/sb26-189. Illinois HB 3773, California's automated-decision regulations and NYC Local Law 144, in the bullets below, were not re-opened on 2026-11-17.
 - **Illinois.** An amendment to the Human Rights Act (HB 3773, effective 2026-01-01) requires notice when AI is used in hiring decisions and bars discriminatory effect.
 - **California.** Civil Rights Council regulations on automated-decision systems in employment took effect 2025-10-01, and the privacy agency's automated-decision rules begin to bind in 2027.
 - **New York City** Local Law 144 requires a bias audit and notice for a tool that substantially assists a hiring decision.
@@ -663,6 +664,7 @@ Checked on 2026-11-10. **Primary** means the agent read the law at an official o
 - 29 CFR 531.3 and part 531 subpart C: https://www.ecfr.gov/current/title-29/part-531
 - 29 U.S.C. §§ 1802, 1821: https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title29-section1821
 - 16 CFR part 465: https://www.ecfr.gov/current/title-16/part-465 ; final rule, 89 Fed. Reg. 68034: https://www.federalregister.gov/documents/2024/08/22/2024-18519/trade-regulation-rule-on-the-use-of-consumer-reviews-and-testimonials
+- Colorado SB 26-189, Automated Decision-Making Technology, which repeals and reenacts SB 24-205. Read 2026-11-17 at https://leg.colorado.gov/bills/sb26-189 : Signed Act dated 2026-05-14 (Governor signed the same day); session laws chapter 131, effective date 2026-05-14. The Assembly's summary of the enacted bill says developer documentation duties for covered automated decision-making technology start 2027-01-01. The signed-act PDF was not read line by line.
 
 For the search-result items above (Illinois, Virginia, Maine, New York, Colorado, Washington, 29 CFR 531, 29 U.S.C. 1802 and 1821, 16 CFR 465), the agent read the official page's title and the matching passage returned by a government-source search, not the whole section.
 
@@ -670,7 +672,7 @@ For the search-result items above (Illinois, Virginia, Maine, New York, Colorado
 
 - Virginia, Maine, Connecticut and Delaware pay-transparency details (thresholds, dates, penalties): Cooley, 2026-07-06, https://www.cooley.com/news/insight/2026/2026-07-06-show-me-the-money-or-the-wage-range-new-state-pay-transparency-laws
 - Washington 2025 cure period, California SB 642, New Jersey and Massachusetts dates: law-firm trackers returned by search; not read at the statutes.
-- Colorado SB 24-205 delayed, then repealed and replaced by SB 26-189: https://www.jdsupra.com/legalnews/colorado-repeals-and-replaces-ai-act-1665581/ and related summaries. Not confirmed at leg.colorado.gov.
+- Earlier law-firm summaries of Colorado SB 24-205 and SB 26-189, including https://www.jdsupra.com/legalnews/colorado-repeals-and-replaces-ai-act-1665581/, are secondary only. The 2026-11-17 primary check is the bill page in the Primary list.
 - State privacy laws in force in 2026, and the 2026 California regulations: law-firm summaries. The $26.6 million threshold and the 1,850-foot and 1,750-foot definitions were **not** confirmed by the search.
 - FTC enforcement of the TAKE IT DOWN Act from 2026-05-19 and the $53,088 penalty figure: https://www.ftc.gov/business-guidance/resources/complying-take-it-down-act and https://www.ftc.gov/news-events/news/press-releases/2026/05/ftc-begins-enforcing-take-it-down-act (titles and summaries read through search).
 - FTC negative-option rule vacated in July 2025 and reopened in 2026: law-firm summaries.
