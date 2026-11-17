@@ -40,6 +40,7 @@ export const CHECK_KINDS = [
   'listing_fraud',
   'business_verification',
   'photo_slot',
+  'message_scam',
 ] as const;
 
 /**

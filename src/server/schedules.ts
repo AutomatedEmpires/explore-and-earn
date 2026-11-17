@@ -28,4 +28,9 @@ export const schedules: { topic: string; cron: string }[] = [
   // stale step (daily).
   { topic: 'profiles.import_expire', cron: '15 * * * *' },
   { topic: 'profiles.availability_sweep', cron: '0 15 * * *' },
+  // SP5 hiring and messaging.
+  { topic: 'hiring.sweep', cron: '*/5 * * * *' },
+  { topic: 'hiring.fit_refresh', cron: '0 8 * * *' },
+  { topic: 'hiring.as_described_due', cron: '0 15 * * *' },
+  { topic: 'messaging.daily', cron: '30 8 * * *' },
 ];

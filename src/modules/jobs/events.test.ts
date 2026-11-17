@@ -124,9 +124,8 @@ describe('eventSubscribers', () => {
       expect(eventSubscribers[event]).toEqual(['discovery.sync_listing']);
     }
     expect(eventSubscribers['hostpage.updated']).toEqual(['discovery.sync_host']);
-    for (const event of ['org.member_removed', 'billing.stripe_event'] as const) {
-      expect(eventSubscribers[event]).toEqual([]);
-    }
+    expect(eventSubscribers['org.member_removed']).toEqual(['hiring.member_removed']);
+    expect(eventSubscribers['billing.stripe_event']).toEqual([]);
   });
 });
 

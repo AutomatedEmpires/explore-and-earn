@@ -1,6 +1,22 @@
-// The profiles module's SP8 registration (SP4 spec 10). W0 stub: W1 implements export and erase
-// (Task 12). The table and media column lists are final.
-import type { PrivacyHandler, RetentionRule } from '@/modules/privacy';
+// The profiles module's SP8 registration (SP4 spec 10). Profile data is held only by an `all` hold.
+// FD-2: an uploaded resume is not a profile column, so mediaColumns stay the import source and
+// the avatar and cover.
+import { eq } from 'drizzle-orm';
+import type { ExportPart, PrivacyHandler, RetentionRule } from '@/modules/privacy';
+import { getOwnProfile } from './profile';
+import { seekerProfiles, seekerReveals } from './schema';
+
+const emptyExport = (): ExportPart => ({
+  records: {
+    profile: [],
+    experience: [],
+    education: [],
+    skills: [],
+    certifications: [],
+    consent: [],
+  },
+  files: [],
+});
 
 export const privacyHandler: PrivacyHandler = {
   module: 'profiles',
@@ -18,11 +34,49 @@ export const privacyHandler: PrivacyHandler = {
     { table: 'seeker_profiles', column: 'cover_media_id', array: false },
     { table: 'resume_imports', column: 'source_media_id', array: false },
   ],
-  async exportData() {
-    throw new Error('not implemented: profiles privacyHandler.exportData');
+  async exportData(db, subject) {
+    if (subject.kind !== 'user') return emptyExport();
+    const view = await getOwnProfile(db, subject.userId);
+    if (view.version === 0) return emptyExport();
+    return {
+      records: {
+        profile: [
+          {
+            identity: view.identity,
+            preferences: view.preferences,
+            workAuthorization: view.workAuthorization,
+            visibility: view.visibility,
+            resume: view.resume,
+            languages: view.languages,
+            portfolioLinks: view.portfolioLinks,
+          },
+        ],
+        experience: view.experience,
+        education: view.education,
+        skills: view.skills,
+        certifications: view.certifications,
+        consent: view.aiImportConsent ? [view.aiImportConsent] : [],
+      },
+      files: [],
+    };
   },
-  async erase() {
-    throw new Error('not implemented: profiles privacyHandler.erase');
+  async erase(tx, subject, ctx) {
+    if (subject.kind !== 'user') return { erased: 0, retained: [] };
+    if (ctx.holds.includes('all')) {
+      return {
+        erased: 0,
+        retained: [{ table: 'seeker_profiles', reason: 'legal_hold', until: null }],
+      };
+    }
+    const profiles = await tx
+      .delete(seekerProfiles)
+      .where(eq(seekerProfiles.userId, subject.userId))
+      .returning({ userId: seekerProfiles.userId });
+    const reveals = await tx
+      .delete(seekerReveals)
+      .where(eq(seekerReveals.seekerUserId, subject.userId))
+      .returning({ id: seekerReveals.id });
+    return { erased: profiles.length + reveals.length, retained: [] };
   },
 };
 

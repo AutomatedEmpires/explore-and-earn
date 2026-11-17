@@ -63,6 +63,7 @@ function directEmail(
     case 'ApplicationReceipt':
     case 'AvailabilityReconfirm':
     case 'SeekerNotice':
+    case 'HiringUpdate':
       throw badRequest(`The ${template} email can't be sent as a direct email`);
     case 'HostNotice': {
       const d = parse(notice);

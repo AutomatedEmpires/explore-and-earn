@@ -8,7 +8,7 @@ import { badRequest, notFound } from '@/lib/errors';
 import { record } from '@/modules/audit';
 import type { ClerkAdmin } from '@/modules/identity';
 import type { HostContext } from '@/server/guards';
-import { organizationNameSchema } from './create';
+import { organizationNameSchema } from './name';
 import { requireCapability } from './roles';
 import { organizations } from './schema';
 import type { OrgStatus, OrgVerificationStatus } from './status';

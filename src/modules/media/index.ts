@@ -82,6 +82,9 @@ export {
 
 export { getMediaUrl, SIGNED_URL_TTL_SEC, type MediaViewer } from './urls';
 
+export { getAuthorizedMediaUrl, getPublicMediaUrls } from './authorized-url';
+export { getMediaMeta, type MediaMeta } from './meta';
+
 export {
   deleteMedia,
   getMedia,

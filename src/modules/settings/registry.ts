@@ -44,6 +44,10 @@ export interface SettingValues {
   'discovery.saved_searches_per_user': number;
   /** Alert pushes per user per UTC day; over the cap, matches still go to the daily email. */
   'discovery.alert_push_daily_cap': number;
+  // SP5: fit score switches. Off means no score is computed or stored.
+  'hiring.fit_enabled': boolean;
+  /** US state codes where fit is off for listings located in that state. */
+  'hiring.fit_disabled_states': USStateCode[];
 }
 
 export type SettingKey = keyof SettingValues;
@@ -60,6 +64,7 @@ export const SETTING_DEFAULTS: { readonly [K in SettingKey]: SettingValues[K] } 
     business_verification: { approveBelow: 0.3, rejectAtOrAbove: 1.01 },
     // No review band: a photo either matches its slot or it doesn't.
     photo_slot: { approveBelow: 0.5, rejectAtOrAbove: 0.5 },
+    message_scam: { approveBelow: 0.3, rejectAtOrAbove: 0.95 },
   },
   'trust.audit_sample_rate': 0.01,
   'business.mailing_address': '',
@@ -103,6 +108,8 @@ export const SETTING_DEFAULTS: { readonly [K in SettingKey]: SettingValues[K] } 
   'discovery.saved_jobs_per_user': 1000,
   'discovery.saved_searches_per_user': 20,
   'discovery.alert_push_daily_cap': 5,
+  'hiring.fit_enabled': true,
+  'hiring.fit_disabled_states': [],
 };
 
 export const SETTING_KEYS = Object.keys(SETTING_DEFAULTS) as readonly SettingKey[];
@@ -184,4 +191,11 @@ export const SETTING_SCHEMAS: { readonly [K in SettingKey]: z.ZodType<SettingVal
   'discovery.saved_jobs_per_user': int(1, 100_000),
   'discovery.saved_searches_per_user': int(1, 1000),
   'discovery.alert_push_daily_cap': int(0, 50),
+  'hiring.fit_enabled': z.boolean(),
+  'hiring.fit_disabled_states': z
+    .array(z.enum(US_STATE_CODES))
+    .max(US_STATE_CODES.length)
+    .refine((codes) => new Set(codes).size === codes.length, {
+      message: 'state codes must be unique',
+    }),
 };

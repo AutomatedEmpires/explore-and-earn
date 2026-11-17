@@ -8,3 +8,6 @@
 import '@/modules/profiles';
 import '@/modules/applications';
 import '@/modules/safety';
+import '@/modules/hiring';
+import '@/modules/messaging';
+import '@/modules/analytics';

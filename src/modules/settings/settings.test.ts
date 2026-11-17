@@ -405,3 +405,25 @@ describe('getAllSettings', () => {
     expect(all).toEqual({ ...SETTING_DEFAULTS, 'business.support_email': 'ops@example.com' });
   });
 });
+
+describe('SP5 hiring settings', () => {
+  it('defaults fit on, no disabled states, and the message_scam thresholds', async () => {
+    expect(await getSetting(t.db, 'hiring.fit_enabled')).toBe(true);
+    expect(await getSetting(t.db, 'hiring.fit_disabled_states')).toEqual([]);
+    expect((await getSetting(t.db, 'trust.thresholds')).message_scam).toEqual({
+      approveBelow: 0.3,
+      rejectAtOrAbove: 0.95,
+    });
+  });
+
+  it('rejects a state code that is not a US state, and a repeated code', async () => {
+    await expectBadRequest(
+      setSetting(t.db, 'hiring.fit_disabled_states', ['ZZ'] as never, { operatorId }),
+    );
+    await expectBadRequest(
+      setSetting(t.db, 'hiring.fit_disabled_states', ['NY', 'NY'], { operatorId }),
+    );
+    await setSetting(t.db, 'hiring.fit_disabled_states', ['NY', 'CO'], { operatorId });
+    expect(await getSetting(t.db, 'hiring.fit_disabled_states')).toEqual(['NY', 'CO']);
+  });
+});

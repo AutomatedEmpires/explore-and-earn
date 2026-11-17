@@ -75,7 +75,7 @@ export const eventSubscribers: Record<keyof EventPayloads, string[]> = {
   // ban also reaches search through the listing.closed events that listings.close_for_org emits.
   'org.status_changed': ['listings.close_for_org', 'discovery.sync_host'],
   // SP5 moves the member's threads and interviews.
-  'org.member_removed': [],
+  'org.member_removed': ['hiring.member_removed'],
   'location.updated': ['locations.resolve_nws_grid', 'discovery.sync_host'],
   'hostpage.updated': ['discovery.sync_host'],
   'subscription.changed': [
@@ -89,8 +89,8 @@ export const eventSubscribers: Record<keyof EventPayloads, string[]> = {
   // SP4 records an `apply` listing event in SP3. SP5 appends hiring.application_submitted and
   // hiring.application_withdrawn; never add a topic without a handler (the worker retries an
   // unknown topic until it is dead).
-  'application.submitted': ['applications.listing_event'],
-  'application.withdrawn': [],
+  'application.submitted': ['applications.listing_event', 'hiring.application_submitted'],
+  'application.withdrawn': ['hiring.application_withdrawn'],
   'application.status_changed': [],
-  'application.additional_step_changed': [],
+  'application.additional_step_changed': ['hiring.additional_step_changed'],
 };
