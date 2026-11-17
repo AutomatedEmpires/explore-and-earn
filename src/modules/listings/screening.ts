@@ -4,7 +4,7 @@
 //
 // Each run reads the revision afresh and does nothing unless it is still `screening`, so a
 // retried or duplicated job is harmless. Waits re-enqueue the job with their own dedupe keys.
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbOrTx } from '@/lib/db';
 import { newId } from '@/lib/ids';
@@ -22,6 +22,7 @@ import { getSetting } from '@/modules/settings';
 import {
   findLatestCheck,
   listOpenReviewItems,
+  matchHostFraud,
   openReviewItem,
   runCheck,
   type CheckResult,
@@ -168,6 +169,68 @@ export function listingCheckText(c: ListingContent, org: OrgSummary | undefined)
     add('Additional step note', c.applying.additionalStep.note);
   }
   return lines.join('\n');
+}
+
+/** The housing lines, so a deposit written there is not treated as a hidden one. */
+function housingFraudText(c: ListingContent): string {
+  if (!c.housing.provided) return '';
+  const lines: string[] = [];
+  const add = (label: string, value: string | null | undefined) => {
+    if (value && value.trim() !== '') lines.push(`${label}: ${value.trim()}`);
+  };
+  const cost = c.housing.cost.free
+    ? 'free'
+    : `${money(c.housing.cost.cents)} per ${c.housing.cost.period}`;
+  add('Housing', `${c.housing.type}, ${cost}`);
+  add('Housing note', c.housing.note);
+  add('Housing fine print', c.housing.finePrint.notes);
+  return lines.join('\n');
+}
+
+/** Listing text for the fraud rules, with the housing lines taken out. */
+function bodyFraudText(c: ListingContent, org: OrgSummary | undefined): string {
+  const housing = new Set(housingFraudText(c).split('\n'));
+  return listingCheckText(c, org)
+    .split('\n')
+    .filter((line) => !housing.has(line))
+    .join('\n');
+}
+
+function readableContent(value: unknown): ListingContent | null {
+  if (!value || typeof value !== 'object') return null;
+  const c = value as Partial<ListingContent>;
+  if (!c.basics || !c.job || !c.photos || !c.housing || !c.pay || !c.when || !c.applying) return null;
+  return c as ListingContent;
+}
+
+/** Other organizations' approved or queued listings, for the duplicate rule. */
+async function fraudPeers(db: DbOrTx, revisionId: string) {
+  const rows = await db
+    .select({
+      orgId: listingRevisions.orgId,
+      content: listingRevisions.content,
+    })
+    .from(listingRevisions)
+    .where(
+      and(
+        ne(listingRevisions.id, revisionId),
+        inArray(listingRevisions.status, ['approved', 'in_review']),
+      ),
+    );
+  const summaries = await getOrgSummaries(db, rows.map((row) => row.orgId));
+  const peers = [];
+  for (const row of rows) {
+    const content = readableContent(row.content);
+    if (!content) continue;
+    const org = summaries.get(row.orgId);
+    peers.push({
+      orgId: row.orgId,
+      orgCreatedAt: org?.createdAt ?? new Date(0),
+      text: bodyFraudText(content, org),
+      photoIds: referencedMediaIds(content),
+    });
+  }
+  return peers;
 }
 
 async function setStage(db: DbOrTx, listingId: string, stage: 'verification' | 'screening') {
@@ -322,6 +385,24 @@ export async function screenRevision(
   // 5. The AI checks, in parallel.
   const org = (await getOrgSummaries(db, [rev.orgId])).get(rev.orgId);
   const text = listingCheckText(content, org);
+  const fraudMatches = matchHostFraud({
+    bodyText: bodyFraudText(content, org),
+    housingText: housingFraudText(content),
+    photoIds: referencedMediaIds(content),
+    orgId: rev.orgId,
+    orgCreatedAt: org?.createdAt ?? new Date(0),
+    now,
+    peers: await fraudPeers(db, rev.id),
+  });
+  if (fraudMatches.length > 0) {
+    await toModeration(
+      db,
+      rev,
+      l,
+      fraudMatches.map((match) => ({ reason: match.rule })),
+    );
+    return;
+  }
   const subject = { subjectType: REVISION_SUBJECT, subjectId: rev.id, text };
   const [moderation, fraud] = await Promise.all([
     checkOnce(db, { kind: 'listing_moderation', reviewQueue: 'moderation', ...subject }),

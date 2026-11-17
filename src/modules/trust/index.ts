@@ -17,6 +17,15 @@ export {
 } from './actions';
 export { raiseAlert, type Alert } from './alerts';
 export {
+  FRAUD_RULES,
+  matchHostFraud,
+  NEW_ACCOUNT_DAYS,
+  type FraudMatch,
+  type FraudPeer,
+  type FraudRule,
+  type HostFraudInput,
+} from './fraud-rules';
+export {
   CLASSIFIER_ERROR,
   findLatestCheck,
   registerCheckKind,

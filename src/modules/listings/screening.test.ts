@@ -74,9 +74,25 @@ beforeEach(async () => {
 const screen = (payload: Record<string, unknown>, now = FIXED_NOW) =>
   jobHandlers['listings.screen']?.(payload, { db, now });
 
+// Each test org publishes the same fixture. Without a unique block, the duplicate rule
+// treats the next org's copy as a repost. The words are unique per listing and long enough
+// that the shared fixture stays under the near-copy threshold.
+let marker = 0;
+function distinguish(c: ListingContent) {
+  const n = marker++;
+  c.job.description += ` ${Array.from({ length: 80 }, (_, i) => `screening${n}token${i}`).join(' ')}`;
+}
+
 /** A listing with a publish requested; returns its id and the revision being screened. */
 async function submitted(edit?: (c: ListingContent) => void) {
-  const id = await seedDraftListing(db, org.owner.ctx, fx.content(edit));
+  const id = await seedDraftListing(
+    db,
+    org.owner.ctx,
+    fx.content((c) => {
+      edit?.(c);
+      distinguish(c);
+    }),
+  );
   await requestPublish(db, org.owner.ctx, id, [], FIXED_NOW);
   const [rev] = await queryRows<{ id: string }>(
     db,
@@ -88,7 +104,13 @@ async function submitted(edit?: (c: ListingContent) => void) {
 
 /** A submitted listing whose publish acknowledged `warnings`. */
 async function submittedAcking(warnings: string[]) {
-  const id = await seedDraftListing(db, org.owner.ctx, fx.content());
+  const id = await seedDraftListing(
+    db,
+    org.owner.ctx,
+    fx.content((c) => {
+      distinguish(c);
+    }),
+  );
   await requestPublish(db, org.owner.ctx, id, warnings, FIXED_NOW);
   const [rev] = await queryRows<{ id: string }>(
     db,
@@ -164,6 +186,20 @@ describe('AI checks', () => {
         subject_type: 'organization',
       },
     ]);
+  });
+
+  it('queues a pay-to-apply listing before the classifier and does not publish it', async () => {
+    vi.mocked(runCheck).mockClear();
+    const { id, revisionId } = await submitted((c) => {
+      c.job.description += ' Applicants pay a $50 application fee.';
+    });
+    await screen({ revisionId, attempt: 0 });
+    const s = await state(id, revisionId);
+    expect([s.state, s.status, s.review_stage]).toEqual(['in_review', 'in_review', 'moderation']);
+    expect(await items(revisionId)).toEqual([
+      expect.objectContaining({ queue: 'moderation', reason: 'pay_to_apply' }),
+    ]);
+    expect(runCheck).not.toHaveBeenCalled();
   });
 
   it('does nothing for a revision that is no longer screening', async () => {
