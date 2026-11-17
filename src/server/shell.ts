@@ -6,8 +6,10 @@
 // re-running (client navigation between siblings), so every page checks for itself. The
 // lookups are cached per request with React's cache(), so a layout and its page share one.
 import { auth } from '@clerk/nextjs/server';
+import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { cache } from 'react';
+import { onboardingHref } from '@/app/onboarding/return-to';
 import { getDb } from '@/lib/db';
 import { getEnv } from '@/lib/env';
 import { AppError } from '@/lib/errors';
@@ -61,17 +63,49 @@ function detailsOf(err: AppError): Record<string, unknown> {
 }
 
 /**
+ * The path the proxy saw, forwarded on the request. Layouts call `seekerAccess` / `hostAccess`
+ * with no page path of their own, so this is how a job survives the redirect to onboarding.
+ */
+const RETURN_PATH_HEADER = 'x-ee-path';
+
+async function forwardedReturnPath(): Promise<string | undefined> {
+  try {
+    const value = (await headers()).get(RETURN_PATH_HEADER);
+    return value && value.length > 0 ? value : undefined;
+  } catch {
+    // Pages called outside a request (unit tests) have no headers store.
+    return undefined;
+  }
+}
+
+/** A page path replaces a bare `/onboarding` only when the account still has no type. */
+function redirectTarget(to: string, pagePath: string, onboarding: boolean | undefined): string {
+  return onboarding && to === '/onboarding' ? onboardingHref(pagePath) : to;
+}
+
+function needsOnboarding(err: unknown): boolean {
+  return (
+    err instanceof AppError &&
+    err.code === 'forbidden' &&
+    detailsOf(err).reason === 'needs_onboarding'
+  );
+}
+
+/**
  * Maps a guard's error to what the page should do, or null for errors that are not a refusal
  * (those are rethrown). A host who is not a member of any organization finished choosing the
  * account type but not creating the organization, so they go back to onboarding to finish.
+ * A signed-in user with no account type keeps `returnPath` (the job they signed in from) when
+ * it stays on this site.
  */
-export function refusalFor(err: unknown): Refusal | null {
+export function refusalFor(err: unknown, returnPath?: string | null): Refusal | null {
   if (!(err instanceof AppError)) return null;
   if (err.code === 'unauthorized') return { kind: 'sign_in' };
   if (err.code !== 'forbidden') return null;
   const reason = detailsOf(err).reason;
   switch (reason) {
     case 'needs_onboarding':
+      return { kind: 'redirect', to: onboardingHref(returnPath ?? '/') };
     case 'not_a_member':
       return { kind: 'redirect', to: '/onboarding' };
     case 'needs_strong_auth':
@@ -103,13 +137,13 @@ type Access<T> =
   | { kind: 'ok'; value: T }
   | { kind: 'guest' }
   | { kind: 'locked' }
-  | { kind: 'redirect'; to: string };
+  | { kind: 'redirect'; to: string; onboarding?: boolean };
 
 async function resolve<T>(guard: () => Promise<T>): Promise<Access<T>> {
   try {
     return { kind: 'ok', value: await guard() };
   } catch (err) {
-    const refusal = refusalFor(err);
+    const refusal = refusalFor(err, await forwardedReturnPath());
     if (!refusal) throw err;
     switch (refusal.kind) {
       case 'sign_in':
@@ -117,7 +151,11 @@ async function resolve<T>(guard: () => Promise<T>): Promise<Access<T>> {
       case 'locked':
         return { kind: 'locked' };
       case 'redirect':
-        return { kind: 'redirect', to: refusal.to };
+        return {
+          kind: 'redirect',
+          to: refusal.to,
+          ...(needsOnboarding(err) ? { onboarding: true } : {}),
+        };
       case 'wrong_shell':
         return { kind: 'redirect', to: await ownShell() };
     }
@@ -145,7 +183,7 @@ export async function seekerPage(
     case 'ok':
       return access.value;
     case 'redirect':
-      return redirect(access.to);
+      return redirect(redirectTarget(access.to, path, access.onboarding));
     case 'locked':
     case 'guest':
       if (opts.guests) return null;
@@ -178,7 +216,7 @@ export async function hostPage(path: string): Promise<HostShellContext> {
     case 'locked':
       return redirect('/host/security');
     case 'redirect':
-      return redirect(access.to);
+      return redirect(redirectTarget(access.to, path, access.onboarding));
     case 'guest':
       return redirect(signInUrl(path));
   }
@@ -193,7 +231,7 @@ export async function hostSecurityPage(): Promise<{ locked: boolean }> {
     case 'locked':
       return { locked: true };
     case 'redirect':
-      return redirect(access.to);
+      return redirect(redirectTarget(access.to, '/host/security', access.onboarding));
     case 'guest':
       return redirect(signInUrl('/host/security'));
   }

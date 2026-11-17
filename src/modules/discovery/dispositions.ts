@@ -131,6 +131,7 @@ export async function setDisposition(
         listingId: i.listingId,
         type: 'save',
         source: i.source,
+        viewerKey: i.userId,
         dedupeKey: `save:${hmacKey(i.userId)}:${i.listingId}`,
       });
     }

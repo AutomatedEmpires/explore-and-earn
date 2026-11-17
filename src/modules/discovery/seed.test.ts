@@ -4,6 +4,8 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { queryRows, type Db } from '@/lib/db';
+import { noopHook, setPlacementHookForTests } from './hooks';
+import { searchListings } from './search';
 import { seedSynthetic } from './seed';
 
 const env = vi.hoisted(() => ({ appEnv: null as 'dev' | 'preview' | 'prod' | null }));
@@ -103,6 +105,37 @@ describe('seedSynthetic', () => {
       );
     } finally {
       env.appEnv = null;
+    }
+  });
+
+  it('shows no seeded listing in production search, and seeds no counts', async () => {
+    const [counts] = await queryRows<{ events: number; daily: number }>(
+      first.db,
+      sql`select (select count(*)::int from app.listing_events) as events,
+        (select count(*)::int from app.listing_event_daily) as daily`,
+    );
+    expect(counts).toEqual({ events: 0, daily: 0 });
+
+    setPlacementHookForTests(noopHook);
+    const input = {
+      query: {},
+      sort: 'newest' as const,
+      surface: 'seek' as const,
+      tz: 'UTC',
+      viewerUserId: null,
+      viewerKey: 'guest-key',
+      limit: 20,
+    };
+    try {
+      env.appEnv = null;
+      expect((await searchListings(first.db, input)).total).toBeGreaterThan(0);
+      env.appEnv = 'prod';
+      const hidden = await searchListings(first.db, input);
+      expect(hidden.total).toBe(0);
+      expect(hidden.items).toEqual([]);
+    } finally {
+      env.appEnv = null;
+      setPlacementHookForTests(null);
     }
   });
 });

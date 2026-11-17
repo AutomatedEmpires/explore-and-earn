@@ -1,6 +1,6 @@
-// PUT /api/v1/me/profile/{section}/order (SP4 spec 5). W0 contract stub: W1 implements the handler
-// (Task 9). The apiRoute options below are the contract; keep them.
-import { reorderSchema } from '@/modules/profiles';
+// PUT /api/v1/me/profile/{section}/order (SP4 spec 5). The apiRoute options below are the contract.
+import { unauthorized } from '@/lib/errors';
+import { reorderEntries, reorderSchema } from '@/modules/profiles';
 import { apiRoute } from '@/server/api';
 
 export const PUT = apiRoute({
@@ -11,7 +11,8 @@ export const PUT = apiRoute({
     path: '/api/v1/me/profile/{section}/order',
     summary: "Reorder a section's entries",
   },
-  handler: async () => {
-    throw new Error('not implemented');
+  handler: async ({ db, user, input }) => {
+    if (!user) throw unauthorized();
+    await reorderEntries(db, user.id, input.section, input.ids);
   },
 });

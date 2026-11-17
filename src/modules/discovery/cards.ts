@@ -14,6 +14,7 @@ import { logger } from '@/lib/logger';
 import type { ListingContent } from '@/modules/listings';
 import { getPlacementHook, overlayApplied } from './hooks';
 import { projectionSelect, type ProjectionRow } from './projection-columns';
+import { publicSeedGuardSql } from './seed';
 
 export type CardContext = {
   /** YYYY-MM-DD in the viewer's time zone. */
@@ -123,7 +124,8 @@ export async function loadCards(
   const rows = await queryRows<ProjectionRow>(
     db,
     sql`select ${projectionSelect('dl')} from app.discovery_listings dl
-      where dl.listing_id in (${list}) ${o.includeClosed ? sql`` : sql`and dl.is_active`}`,
+      where dl.listing_id in (${list}) and ${publicSeedGuardSql()}
+        ${o.includeClosed ? sql`` : sql`and dl.is_active`}`,
   );
   const byId = new Map(rows.map((r) => [r.listingId, r]));
   const found = wanted.filter((id) => byId.has(id));

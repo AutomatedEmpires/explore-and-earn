@@ -20,6 +20,7 @@ import {
 import { boostedLabels, loadCards } from './cards';
 import { cursorHash, decodeCursor, encodeCursor, staleCursor, type Cursor } from './cursor';
 import { buildFilterSql, tsQuerySql, uuidArray, type FilterContext } from './filters';
+import { publicSeedGuardSql } from './seed';
 import { overlayApplied, overlayHidden, type PlacementOutput } from './hooks';
 import { place } from './placement';
 
@@ -386,7 +387,8 @@ export async function countNewListings(
     sql`select count(*)::int as listings, count(distinct dl.org_id)::int as hosts,
         (count(*) filter (where dl.housing_provided))::int as "withHousing"
       from app.discovery_listings dl
-      where dl.is_active and dl.first_active_at >= ${i.since.toISOString()}::timestamptz`,
+      where dl.is_active and ${publicSeedGuardSql()}
+        and dl.first_active_at >= ${i.since.toISOString()}::timestamptz`,
   );
   return row ?? { listings: 0, hosts: 0, withHousing: 0 };
 }

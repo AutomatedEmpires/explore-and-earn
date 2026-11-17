@@ -40,7 +40,7 @@ export function Checkbox({ id, label, description, error, className, ...props }:
           />
         </span>
         <span className="flex flex-col gap-0.5">
-          <span className="text-15 font-semibold text-ink">{label}</span>
+          <span className="text-16 font-semibold text-ink">{label}</span>
           {description ? (
             <span id={`${boxId}-description`} className="text-13 text-muted">
               {description}

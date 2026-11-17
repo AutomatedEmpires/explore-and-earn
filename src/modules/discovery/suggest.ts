@@ -5,6 +5,7 @@ import { sql } from 'drizzle-orm';
 import { queryRows, type DbOrTx } from '@/lib/db';
 import { US_STATES } from '@/lib/discovery';
 import { listDestinations } from '@/modules/locations';
+import { publicSeedGuardSql } from './seed';
 
 export const SUGGEST_PER_GROUP = 5;
 const Q_MIN = 2;
@@ -34,12 +35,12 @@ export async function suggest(db: DbOrTx, raw: string): Promise<Suggestions> {
     sql`select label, kind from (
         select dl.occupation_label as label, 0 as kind, count(*)::int as n
         from app.discovery_listings dl
-        where dl.is_active and dl.occupation_label ~* ${word}
+        where dl.is_active and ${publicSeedGuardSql()} and dl.occupation_label ~* ${word}
         group by dl.occupation_label
         union all
         select dl.title as label, 1 as kind, count(*)::int as n
         from app.discovery_listings dl
-        where dl.is_active and dl.title ~* ${word}
+        where dl.is_active and ${publicSeedGuardSql()} and dl.title ~* ${word}
         group by dl.title
       ) j
       order by kind, n desc, lower(label), label
@@ -69,7 +70,8 @@ export async function suggest(db: DbOrTx, raw: string): Promise<Suggestions> {
     sql`select distinct on (lower(dl.host_name), dl.org_id)
         dl.host_name as label, dl.org_id::text as "orgId", dl.host_slug as slug
       from app.discovery_listings dl
-      where dl.is_active and lower(dl.host_name) like lower(${likeLiteral(q)}) || '%' escape '\\'
+      where dl.is_active and ${publicSeedGuardSql()}
+        and lower(dl.host_name) like lower(${likeLiteral(q)}) || '%' escape '\\'
       order by lower(dl.host_name), dl.org_id, dl.indexed_at desc
       limit ${SUGGEST_PER_GROUP}::int`,
   );

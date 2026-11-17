@@ -5,7 +5,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { DEFAULT_ORG_ID, insertProjectionRows } from '../../../tests/helpers/discovery-rows';
-import { seedSeeker } from '../../../tests/helpers/sp2';
+import { seedHostOrg, seedSeeker } from '../../../tests/helpers/sp2';
 import { queryRows, type DbOrTx } from '@/lib/db';
 import type { DiscoverySource, ListingEventType } from '@/lib/discovery';
 import { newId } from '@/lib/ids';
@@ -19,6 +19,7 @@ import {
   listingStats,
   recordListingEvent,
   runMaintenance,
+  visibleCount,
 } from './events';
 
 const registered = vi.hoisted(() => new Map<string, unknown>());
@@ -192,6 +193,103 @@ describe('recordListingEvent', () => {
       { type: 'apply', source: 'invite', viewerHash: null, dedupeKey: null },
       { type: 'apply', source: 'invite', viewerHash: null, dedupeKey: null },
     ]);
+  });
+
+  it('counts one apply per signed-in person when no dedupe key is given', async () => {
+    const seeker = await seedSeeker(t.db);
+    const other = await seedSeeker(t.db);
+    await recordListingEvent(t.db, {
+      listingId: a,
+      type: 'apply',
+      source: 'seek',
+      viewerKey: seeker.userId,
+    });
+    await recordListingEvent(t.db, {
+      listingId: a,
+      type: 'apply',
+      source: 'seek',
+      viewerKey: seeker.userId,
+    });
+    await recordListingEvent(t.db, {
+      listingId: a,
+      type: 'apply',
+      source: 'seek',
+      viewerKey: other.userId,
+    });
+    expect(await events()).toHaveLength(2);
+  });
+
+  it('drops views, saves, shares and applies from the host team and from operators', async () => {
+    const org = await seedHostOrg(t.db, { name: 'Honest Lodge' });
+    const [listing] = (await insertProjectionRows(t.db, [{ orgId: org.orgId }])) as [string];
+    // Counts read raw events for today and yesterday only, so the window has to move with the clock.
+    const day = utcDay(new Date());
+    const when = at(day, '12:05:00');
+    const operatorId = newId();
+    await t.db.execute(sql`
+      insert into app.users (id, clerk_user_id, email, display_name, account_type)
+      values (${operatorId}, ${`user_${operatorId.slice(0, 8)}`}, 'op@ops.test', 'Op', 'operator')
+    `);
+    await t.db.execute(sql`
+      insert into app.operators (user_id, role) values (${operatorId}, 'operator')
+    `);
+    const outsider = await seedHostOrg(t.db, { name: 'Other Lodge' });
+    const seeker = await seedSeeker(t.db);
+
+    const record = (type: ListingEventType, viewerKey: string) =>
+      recordListingEvent(t.db, {
+        listingId: listing,
+        type,
+        source: 'seek',
+        at: when,
+        viewerKey,
+        dedupeKey:
+          type === 'view' || type === 'share'
+            ? dedupeKeyFor(type, viewerKey, listing, when)
+            : `${type}:${viewerKey}:${listing}`,
+      });
+
+    for (const type of ['view', 'save', 'share', 'apply'] as const) {
+      await record(type, org.owner.userId);
+      await record(type, operatorId);
+    }
+    expect(await events()).toEqual([]);
+
+    await record('view', seeker.userId);
+    await record('view', seeker.userId);
+    await record('view', outsider.owner.userId);
+    await t.db.execute(sql`
+      update app.org_memberships set deleted_at = now() where user_id = ${org.owner.userId}
+    `);
+    await record('save', org.owner.userId);
+
+    const written = await events();
+    expect(written.map((e) => e.type).sort()).toEqual(['save', 'view', 'view']);
+    const counts = await getListingEventCounts(t.db, {
+      orgId: org.orgId,
+      from: at(day, '00:00:00'),
+      to: at(addDays(day, 1), '00:00:00'),
+      types: ['view', 'save', 'share', 'apply'],
+      bucket: 'none',
+    });
+    expect(counts).toEqual(
+      [
+        { listingId: listing, bucketStart: null, type: 'save', source: null, count: 1 },
+        { listingId: listing, bucketStart: null, type: 'view', source: null, count: 2 },
+      ].sort((x, y) => cmp(x.type, y.type)),
+    );
+    expect((await listingStats(t.db, [listing])).get(listing)).toEqual({ views: 2, saves: 1 });
+  });
+});
+
+describe('visibleCount', () => {
+  it('hides an empty count and never rounds a partial one up', () => {
+    expect(visibleCount(0)).toBeNull();
+    expect(visibleCount(1)).toBe(1);
+    expect(visibleCount(4)).toBe(4);
+    expect(visibleCount(2.2)).toBeNull();
+    expect(visibleCount(-3)).toBeNull();
+    expect(visibleCount(Number.NaN)).toBeNull();
   });
 });
 
