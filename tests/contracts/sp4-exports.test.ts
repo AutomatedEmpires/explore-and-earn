@@ -182,16 +182,14 @@ describe('read stubs', () => {
     expect(await safety.blockedUserIdsForOrg(db, 'o1')).toEqual([]);
   });
 
-  it('say nothing needs attention and nothing was applied', async () => {
-    expect(await profiles.needsAttention(db, 'u1')).toBe(false);
-    expect(await profiles.getCommunityIdentities(db, ['u1'])).toEqual(new Map());
-    expect(await profiles.getPreferenceTargets(db, 'u1')).toEqual({ categories: [], states: [] });
-    // applications.countApplicationsSince is a real query from W4 on (reads.test.ts covers it).
-  });
-
-  it('throw a named error from everything else', async () => {
-    await expect(profiles.getOwnProfile(db, 'u1')).rejects.toThrow(
-      'not implemented: getOwnProfile',
+  it('throw a named error from the profile reads this wave has not replaced', async () => {
+    // needsAttention, getCommunityIdentities, getPreferenceTargets, and getOwnProfile are real
+    // queries from W1 on (profile.test.ts). countApplicationsSince is real from W4 (reads.test.ts).
+    await expect(profiles.renderResumePdf({} as never, 'classic' as never)).rejects.toThrow(
+      'not implemented: renderResumePdf',
+    );
+    await expect(profiles.writingHelp(db, 'u1', {} as never)).rejects.toThrow(
+      'not implemented: writingHelp',
     );
   });
 });
