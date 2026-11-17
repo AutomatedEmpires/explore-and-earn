@@ -27,11 +27,13 @@ vi.mock('next/navigation', () => ({
   },
 }));
 
-// The Apply placeholder asks the seeker shell for the viewer; only the env check is real.
+// The apply page asks the seeker shell who is here. A guest stays on the account bridge.
 const seekerPage = vi.hoisted(() => vi.fn(async () => ({ id: 'user_1' })));
+const seekerAccess = vi.hoisted(() => vi.fn(async () => ({ kind: 'guest' as const })));
 vi.mock('@/server/shell', async (orig) => ({
   ...(await orig<typeof import('@/server/shell')>()),
   seekerPage,
+  seekerAccess,
 }));
 
 const applyProps = (listingId: string) => ({
@@ -115,17 +117,19 @@ describe('job handlers', () => {
   });
 });
 
-describe('/apply/[listingId] placeholder', () => {
-  it('names the sub-project that delivers it, for a signed-in seeker', async () => {
+describe('/apply/[listingId]', () => {
+  it('keeps a guest on this job and sends them to sign in', async () => {
     const html = renderToStaticMarkup(await ApplyPage(applyProps('l1')));
-    expect(html).toContain('Coming in sub-project 4: Seeker');
-    expect(seekerPage).toHaveBeenCalledWith('/apply/l1', { guests: false });
+    expect(html).toContain('Sign in to apply');
+    expect(html).toContain(encodeURIComponent('/apply/l1?source=other'));
+    expect(seekerAccess).toHaveBeenCalled();
   });
 
-  it('is hidden in prod', async () => {
+  it('stays available in prod', async () => {
     envOverride.appEnv = 'prod';
     try {
-      await expect(ApplyPage(applyProps('l1'))).rejects.toThrow('NEXT_NOT_FOUND');
+      const html = renderToStaticMarkup(await ApplyPage(applyProps('l1')));
+      expect(html).toContain('Sign in to apply');
     } finally {
       envOverride.appEnv = null;
     }
