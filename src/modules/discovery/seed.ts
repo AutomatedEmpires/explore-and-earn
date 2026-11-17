@@ -11,7 +11,7 @@
 //   listing and one in eight of the others.
 // - Mixed pay units (hour, day, week, month, season, year and maritime crew shares), fixed,
 //   season and ongoing schedules, housing on about 30%.
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import { withTx, type Db } from '@/lib/db';
 import {
   effectiveEnd,
@@ -381,6 +381,18 @@ function row(rand: Rand, places: Place[], anchorMs: number): ProjectionRowInput 
       description: `${title} with ${place.host.name}. ${genre.label} work in ${st?.name ?? place.state}.`,
     },
   };
+}
+
+/** Slug prefix of every host `seedSynthetic` invents. Reserved, so production can tell them apart. */
+export const SEEDED_HOST_SLUG_PREFIX = 'synthetic-host-';
+
+/**
+ * Every public discovery read includes this. Outside production it is `true`, so the performance
+ * dataset stays searchable. In production a seeded row is not a listing and must not appear.
+ */
+export function publicSeedGuardSql(): SQL {
+  if (getEnv().APP_ENV !== 'prod') return sql`true`;
+  return sql`dl.host_slug not like ${`${SEEDED_HOST_SLUG_PREFIX}%`}`;
 }
 
 /**

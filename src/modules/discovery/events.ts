@@ -3,11 +3,16 @@
 //
 // - Raw events carry no user id, ever. `viewer_hash` and `dedupe_key` are nulled after 24 hours
 //   and the rows are deleted after 90 days (the nightly maintenance and SP8's retention rule).
+// - A view or share by one viewer counts once per 30-minute bucket. A save or an application
+//   counts once per signed-in person. Guests are the same, keyed by their viewer key.
+// - The listing host's current team and every operator are left out. A count is never seeded.
 // - `listing_event_daily` holds one count per listing, UTC day, type and source, recomputed from
-//   the raw events, and is kept indefinitely.
+//   the raw events, and is kept indefinitely. Host analytics read those same rows.
 // - Counts read the daily rows for past days and the raw events for today. Yesterday also comes
 //   from the raw events until the nightly rollup has written it (04:15 UTC, which is the US
 //   evening), so yesterday never reads as zero in the hours before the job runs.
+// - A count shown to a person goes through `visibleCount`: zero stays hidden, and a fraction is
+//   hidden rather than rounded up.
 import { sql, type SQL } from 'drizzle-orm';
 import { queryRows, withTx, type Db, type DbOrTx } from '@/lib/db';
 import type { DiscoverySource, ListingEventType } from '@/lib/discovery';
@@ -28,6 +33,15 @@ const DELETE_BATCH = 5_000;
 /** A view or share by the same viewer counts once per 30-minute bucket. */
 const DEDUPE_BUCKET_SEC = 1_800;
 
+/**
+ * A count a person may see. Zero is too little data to show, and anything that is not a whole
+ * number is hidden so a partial count is never rounded up or estimated.
+ */
+export function visibleCount(n: number): number | null {
+  if (!Number.isInteger(n) || n < 1) return null;
+  return n;
+}
+
 /** YYYY-MM-DD of `d` in UTC. */
 const utcDay = (d: Date): string => d.toISOString().slice(0, 10);
 /** Midnight UTC of a YYYY-MM-DD day, as an ISO timestamp. */
@@ -46,30 +60,52 @@ const textList = (values: readonly string[]): SQL =>
     sql`, `,
   );
 
+type ListingEventInput = {
+  listingId: string;
+  type: ListingEventType;
+  source: DiscoverySource;
+  at?: Date;
+  viewerKey?: string | null;
+  dedupeKey?: string;
+};
+
+/** One person, one save or application. Views and shares stay on the 30-minute bucket. */
+function eventDedupeKey(e: ListingEventInput, at: Date): string | null {
+  if (e.dedupeKey) return e.dedupeKey;
+  if (!e.viewerKey) return null;
+  if (e.type === 'view' || e.type === 'share') {
+    return dedupeKeyFor(e.type, e.viewerKey, e.listingId, at);
+  }
+  return `${e.type}:${hmacKey(e.viewerKey)}:${e.listingId}`;
+}
+
 /** Records one event. Unknown listings are dropped silently, and so is a repeated dedupe key. */
-export async function recordListingEvent(
-  db: DbOrTx,
-  e: {
-    listingId: string;
-    type: ListingEventType;
-    source: DiscoverySource;
-    at?: Date;
-    viewerKey?: string | null;
-    dedupeKey?: string;
-  },
-): Promise<void> {
+export async function recordListingEvent(db: DbOrTx, e: ListingEventInput): Promise<void> {
   if (!UUID.test(e.listingId)) return;
   const at = e.at ?? new Date();
   const viewerHash = e.viewerKey ? hmacKey(e.viewerKey) : null;
-  // The org comes from the projection row; with no row the select is empty and nothing is
-  // written.
+  const dedupeKey = eventDedupeKey(e, at);
+  const viewerId = e.viewerKey && UUID.test(e.viewerKey) ? e.viewerKey : null;
+  // The host's current team, and every operator, are not a viewer or an applicant. A membership
+  // that has ended is a real viewer again. The org comes from the projection row; with no row
+  // the select is empty and nothing is written.
+  const excluded = viewerId
+    ? sql`and not exists (
+        select 1 from app.org_memberships m
+        where m.org_id = dl.org_id and m.user_id = ${viewerId}::uuid and m.deleted_at is null
+      )
+      and not exists (
+        select 1 from app.operators op where op.user_id = ${viewerId}::uuid
+      )`
+    : sql``;
   await db.execute(sql`
     insert into app.listing_events
       (id, listing_id, org_id, type, source, viewer_hash, dedupe_key, occurred_at)
     select ${newId()}::uuid, dl.listing_id, dl.org_id, ${e.type}, ${e.source}, ${viewerHash},
-      ${e.dedupeKey ?? null}, ${at.toISOString()}::timestamptz
+      ${dedupeKey}, ${at.toISOString()}::timestamptz
     from app.discovery_listings dl
     where dl.listing_id = ${e.listingId}::uuid
+      ${excluded}
     on conflict (dedupe_key) do nothing
   `);
 }
