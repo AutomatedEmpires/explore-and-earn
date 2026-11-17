@@ -24,5 +24,8 @@ export * from '../modules/landing/schema';
 export * from '../modules/profiles/schema';
 export * from '../modules/applications/schema';
 export * from '../modules/safety/schema';
+// SP5
+export * from '../modules/hiring/schema';
+export * from '../modules/messaging/schema';
 // SP8 (types only until SP8 W0)
 export * from '../modules/privacy/schema';
