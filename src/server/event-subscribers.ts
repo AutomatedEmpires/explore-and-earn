@@ -2,6 +2,7 @@
 // one outbox row per subscriber topic listed here, inside the emitter's transaction, so reverse
 // flows between modules never need an import. Shared touchpoint: later sub-projects add their
 // events to EventPayloads and append their topics to the lists below.
+import type { ApplicationSource, ApplicationStatus, WithdrawReason } from '@/lib/applications';
 
 export interface EventPayloads {
   'listing.published': { listingId: string; revisionId: string; orgId: string; first: boolean };
@@ -27,6 +28,38 @@ export interface EventPayloads {
     status: 'unverified' | 'running' | 'verified' | 'needs_review' | 'needs_info' | 'failed';
   };
   'billing.stripe_event': { eventId: string; type: string; objectId: string | null };
+  // SP4 (spec 3.3). Emitted in the change's transaction; eventId is the application_events row id.
+  'application.submitted': {
+    applicationId: string;
+    listingId: string;
+    orgId: string;
+    seekerUserId: string;
+    submittedAt: string;
+    source: ApplicationSource;
+    inviteId: string | null;
+  };
+  'application.withdrawn': {
+    applicationId: string;
+    listingId: string;
+    orgId: string;
+    seekerUserId: string;
+    withdrawnAt: string;
+    reason: WithdrawReason | null;
+  };
+  'application.status_changed': {
+    applicationId: string;
+    orgId: string;
+    from: ApplicationStatus;
+    to: ApplicationStatus;
+    actorType: 'seeker' | 'host' | 'system';
+    at: string;
+  };
+  'application.additional_step_changed': {
+    applicationId: string;
+    orgId: string;
+    completed: boolean;
+    at: string;
+  };
 }
 
 /** The outbox topics each event fans out to. Every topic needs a handler in job-handlers.ts. */
@@ -53,4 +86,11 @@ export const eventSubscribers: Record<keyof EventPayloads, string[]> = {
   'verification.decided': ['listings.resume_screening'],
   // SP6 subscribes for one-time payments.
   'billing.stripe_event': [],
+  // SP4 records an `apply` listing event in SP3. SP5 appends hiring.application_submitted and
+  // hiring.application_withdrawn; never add a topic without a handler (the worker retries an
+  // unknown topic until it is dead).
+  'application.submitted': ['applications.listing_event'],
+  'application.withdrawn': [],
+  'application.status_changed': [],
+  'application.additional_step_changed': [],
 };

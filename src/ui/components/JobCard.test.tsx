@@ -134,6 +134,90 @@ describe('JobCard', () => {
   });
 });
 
+describe('JobCard cover, freshness and pay estimate (#152, #155)', () => {
+  const cover = { src: '/design-system/samples/lake.svg', alt: 'A lake below snowy peaks' };
+
+  it('fills the cover with a 4:3 photo that is cropped, not stretched (D3-3)', () => {
+    render(<JobCard {...base} cover={cover} />);
+    const photo = screen.getByRole('img', { name: cover.alt });
+    for (const name of ['w-full', 'aspect-4/3', 'min-h-full', 'object-cover', 'object-center']) {
+      expect(photo).toHaveClass(name);
+    }
+    // Centred in the 188 px cover at every card width.
+    for (const name of ['absolute', 'top-1/2', '-translate-y-1/2']) {
+      expect(photo).toHaveClass(name);
+    }
+  });
+
+  it('keeps the cover, cover badges and logo by default, even without a photo', () => {
+    render(<JobCard {...base} cover={null} />);
+    expect(screen.getByText('Seasonal')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Kettle Ridge Lodge host page' })).toBeInTheDocument();
+  });
+
+  it('collapses the cover, cover badges and logo when hideCover is set (SE-19)', () => {
+    render(<JobCard {...base} cover={null} boosted hideCover />);
+    const card = screen.getByRole('article');
+    expect(within(card).queryByText('Seasonal')).toBeNull();
+    expect(within(card).queryByText('Boosted')).toBeNull();
+    expect(within(card).queryByRole('link', { name: 'Kettle Ridge Lodge host page' })).toBeNull();
+    expect(within(card).getByRole('heading', { name: 'Lodge Housekeeper' })).toBeInTheDocument();
+    expect(card.querySelector('[data-slot="cover"]')).toBeNull();
+    expect(card.querySelector('[data-slot="body"]')).toHaveClass('pt-4');
+  });
+
+  it('shows the freshness line under the dates with a clock icon (SE-9)', () => {
+    render(<JobCard {...base} freshness="Confirmed active 2 days ago" />);
+    const line = screen.getByText('Confirmed active 2 days ago').closest('p');
+    expect(line?.querySelector('svg.lucide-clock')).not.toBeNull();
+    expect(line).toHaveClass('text-14');
+    const dates = screen.getByText('Starts in 12 days').closest('p');
+    expect(dates?.compareDocumentPosition(line as Node)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('shows no freshness line or estimate unless given', () => {
+    const { container } = render(<JobCard {...base} />);
+    expect(container.querySelector('svg.lucide-clock')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'How we work this out' })).toBeNull();
+  });
+
+  it('shows the pay estimate line and basis under the chips, with a 44 px "How we work this out"', () => {
+    const onExplain = vi.fn();
+    render(
+      <JobCard
+        {...base}
+        payEstimate={{
+          line: 'About $796 a week after housing and meals',
+          basis: 'Before taxes. Based on 40 hours a week at $22 an hour.',
+          onExplain,
+        }}
+      />,
+    );
+    const line = screen.getByText('About $796 a week after housing and meals');
+    expect(line).toHaveClass('text-16');
+    expect(screen.getByText('Before taxes. Based on 40 hours a week at $22 an hour.')).toHaveClass(
+      'text-14',
+    );
+    const how = screen.getByRole('button', { name: 'How we work this out' });
+    expect(how).toHaveClass('min-h-11');
+    expect(how).toHaveAttribute('aria-haspopup', 'dialog');
+    // Above the title link that is stretched over the card.
+    expect(how.closest('.z-10')).not.toBeNull();
+    fireEvent.click(how);
+    expect(onExplain).toHaveBeenCalledOnce();
+    const pay = chip(/^Pay/);
+    expect(pay.compareDocumentPosition(line)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('leaves out "How we work this out" when nothing opens it', () => {
+    render(
+      <JobCard {...base} payEstimate={{ line: 'About $796 a week', basis: 'Before taxes.' }} />,
+    );
+    expect(screen.getByText('About $796 a week')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'How we work this out' })).toBeNull();
+  });
+});
+
 describe('formatPay', () => {
   it.each<[PayPeriod, string]>([
     ['hour', '$19/hr'],

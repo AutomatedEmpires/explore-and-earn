@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { cn } from '@/ui/cn';
+import { ShieldCheck, Store, User, type IconComponent } from '@/ui/icons';
 import { Badge } from './Badge';
 
 export type WordmarkProps = { href?: string; className?: string };
@@ -26,6 +27,12 @@ const roleLabel: Record<TopBarRole, string> = {
   seeker: 'Seeker',
   host: 'Host',
   operator: 'Operator',
+};
+
+const roleIcon: Record<TopBarRole, IconComponent> = {
+  seeker: User,
+  host: Store,
+  operator: ShieldCheck,
 };
 
 export type TopBarLink = { href: string; label: string; current?: boolean };
@@ -62,7 +69,7 @@ export function TopBar({
         {start}
         {brand ?? <Wordmark />}
         {role ? (
-          <Badge size="sm" tone={role === 'seeker' ? 'neutral' : 'inverse'}>
+          <Badge size="sm" tone={role === 'seeker' ? 'neutral' : 'inverse'} icon={roleIcon[role]}>
             {roleLabel[role]}
           </Badge>
         ) : null}

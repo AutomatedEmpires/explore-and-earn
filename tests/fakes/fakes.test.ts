@@ -4,6 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Db } from '@/lib/db';
 import { GENRES } from '@/lib/taxonomy';
+import * as hostpages from '@/modules/hostpages';
 import { ListingContentSchema } from '@/modules/listings';
 import * as locations from '@/modules/locations';
 import {
@@ -16,6 +17,9 @@ import { mediaFake } from './media';
 import { fakeSp2, hostpagesFake, listingsFake, locationsFake } from './sp2';
 
 vi.mock('@/modules/locations', async () => (await import('./sp2')).locationsFake);
+// The real hostpages registers its weather filter with locations as it loads, which the
+// locations fake can't take, so it is replaced too. Discovery then loads only the fake.
+vi.mock('@/modules/hostpages', async () => (await import('./sp2')).hostpagesFake);
 // The spread form: the fake's functions over the real module's other exports (the schema).
 vi.mock('@/modules/listings', async (orig) => ({
   ...(await orig<typeof import('@/modules/listings')>()),
@@ -237,6 +241,14 @@ describe('fakeSp2 hosts and locations', () => {
   it('stands in for the module with vi.mock', async () => {
     expect(locations.getLocations).toBe(locationsFake.getLocations);
     expect((await locations.getLocations(db, [DEFAULT_LOCATION_ID])).size).toBe(1);
+    expect(hostpages.getHostIdentities).toBe(hostpagesFake.getHostIdentities);
+    expect((await hostpages.getHostIdentities(db, [DEFAULT_ORG_ID])).size).toBe(1);
+  });
+
+  it('serves the fake to a dynamic import of @/modules/hostpages, as discovery makes', async () => {
+    const loaded = await import('@/modules/hostpages');
+    expect(loaded.getHostIdentities).toBe(hostpagesFake.getHostIdentities);
+    expect(loaded.listPublicHostSlugs).toBe(hostpagesFake.listPublicHostSlugs);
   });
 });
 

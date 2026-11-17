@@ -65,7 +65,16 @@ export const clerkAppearance = {
         outlineOffset: '2px !important',
       },
     },
-    footerActionLink: { color: 'var(--ee-ink)', fontWeight: 700, textDecoration: 'underline' },
+    // "Sign up" and "Use another email" are 44 px targets (#155, D3-5). min-height needs a box,
+    // so the link is an inline flex box with its text centred.
+    footerActionLink: {
+      ...target,
+      display: 'inline-flex',
+      alignItems: 'center',
+      color: 'var(--ee-ink)',
+      fontWeight: 700,
+      textDecoration: 'underline',
+    },
     formFieldAction: { color: 'var(--ee-ink)', fontWeight: 700 },
     userButtonTrigger: { ...pill, ...target, minWidth: '2.75rem' },
     userButtonAvatarBox: { width: '2rem', height: '2rem' },

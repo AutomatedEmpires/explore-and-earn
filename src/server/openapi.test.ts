@@ -58,6 +58,23 @@ describe('buildOpenApi', () => {
     ]);
   });
 
+  it('turns PUT input into a JSON request body without the path parameters', () => {
+    registerRoute({
+      method: 'PUT',
+      path: '/api/v1/test-things/{id}',
+      summary: 'Replace',
+      auth: 'user',
+      input: z.object({ id: z.string(), name: z.string() }),
+    });
+    const op = buildOpenApi().paths['/api/v1/test-things/{id}']?.put;
+    expect(op?.requestBody).toBeDefined();
+    const schema = op?.requestBody?.content['application/json']?.schema;
+    expect(Object.keys(schema?.properties ?? {})).toEqual(['name']);
+    expect(op?.parameters).toEqual([
+      { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+    ]);
+  });
+
   it('documents the error envelope once, as a component', () => {
     const error = buildOpenApi().components.schemas.Error;
     expect(error).toMatchObject({ type: 'object', required: ['error'] });
