@@ -1,7 +1,8 @@
 // POST /api/v1/listings/[id]/events { type: 'view' | 'share', source }: the client records a
-// view when the detail page or panel opens, and a share (SP3 spec 5 and 8.12). Bots, repeats
-// within 30 minutes and unknown listings are dropped silently. A source outside the known list
-// is attributed to 'other'. `boost` is taken from the placement hook, never from the client.
+// view when the detail page or panel opens, and a share (SP3 spec 5 and 8.12). Bots, the
+// listing host's current team, operators, repeats within 30 minutes and unknown listings are
+// dropped silently. A source outside the known list is attributed to 'other'. `boost` is taken
+// from the placement hook, never from the client.
 // The viewer is the user id, or for a guest an HMAC of the IP; only that HMAC is stored, and
 // only for 24 hours. An address over the limit gets 429.
 // @/server/api first: it loads identity before orgs (see discovery/_shared/params.ts).
