@@ -351,7 +351,7 @@ All screens use only `src/ui` components. Console: Sidebar on desktop; below 768
 | Privacy Policy | data collected, staged reveal, AI uses from product section 18 and that the provider does not train on user data, retention table generated from registered `RetentionRule.description`, automated export and deletion, vendors, mailing address | GDPR lawful bases and transfer mechanism; whether fit scores and host notes belong in access responses |
 | Cookie Policy | 8.4 verbatim | |
 | Community Guidelines | photos only, no captions or comments, prohibited content, child-safety scanning and NCMEC reporting | |
-| Fit-score notice | the product section 11.2 inputs; never protected traits, photo, name, age or gender; never auto-rejects; ranks pools and sorts applicants only | NYC Local Law 144 (bias audit, notice); Colorado AI Act (SB 24-205); any other state law counsel identifies |
+| Fit-score notice | the product section 11.2 inputs; never protected traits, photo, name, age or gender; never auto-rejects; ranks pools and sorts applicants only | Colorado SB 26-189; Illinois HB 3773; California's automated-decision regulations; NYC Local Law 144 (bias audit, notice); any other state law counsel identifies |
 | International | J-1 through a sponsor, H-2A, H-2B basics with links to official .gov pages; "We don't give visa advice" | wording review |
 | Subprocessors | Clerk, Supabase, Vercel, Stripe, Resend, PostHog, Sentry, Mapbox, Anthropic, Cloudmersive, Microsoft PhotoDNA, Doppler, GitHub: purpose, data, region, DPA status | SCCs per vendor |
 
@@ -390,7 +390,7 @@ All screens use only `src/ui` components. Console: Sidebar on desktop; below 768
 |---|---|---|---|
 | `legal.terms` | Terms and Host Terms | attestation | counsel approval recorded, versions published |
 | `legal.privacy` | Privacy, Cookies, Subprocessors | attestation | approved and published |
-| `legal.fit_score` | NYC and Colorado compliance | attestation | counsel memo linked, notice published, any required bias audit done |
+| `legal.fit_score` | automated hiring tools compliance | attestation | counsel memo linked, notice published, any required bias audit done; the memo covers Colorado SB 26-189 (verified at leg.colorado.gov on 2026-11-17), Illinois HB 3773, California's automated-decision regulations and NYC Local Law 144 |
 | `legal.gdpr` | GDPR | both | DPAs accepted for every subprocessor; consent e2e green |
 | `legal.wage_visa` | wage law and visa wording | attestation | approved; `international` published |
 | `ncmec.registered` | NCMEC ESP registration | attestation | CyberTipline account confirmed |
@@ -547,7 +547,7 @@ Migration ranges inside 7000–7999: W1 7000–7099, W4 7100–7199, W5 7200–7
 | The About page story (product section 21) | Founder | `/about` goes live (it 404s until saved) |
 | Manual screen-reader pass by the founder, or an external auditor | Founder | the `a11y.audit` gate run |
 | Billing retention of 7 years; redaction of shared applications on deletion; fit score in access responses | Counsel | `legal.privacy` gate |
-| Whether NYC Local Law 144 requires a bias audit before launch | Counsel | `legal.fit_score` gate |
+| Whether Colorado SB 26-189, Illinois HB 3773, California's automated-decision regulations or NYC Local Law 144 requires a bias audit or a notice before launch | Counsel | `legal.fit_score` gate |
 | PhotoDNA production approval and NCMEC ESP registration | Founder | `child_safety.live` and `ncmec.registered` gates |
 | Clerk Pro plan approval (MFA, passkeys, impersonation) | Founder | W3 view-as and W6 |
 | Supabase projects `ee-perf` and `ee-backup` approved on the Pro organization | Founder | W2 and W7 |
