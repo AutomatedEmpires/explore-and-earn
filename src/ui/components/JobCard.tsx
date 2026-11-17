@@ -6,6 +6,7 @@ import {
   BedDouble,
   Bookmark,
   CalendarDays,
+  Check,
   Clock,
   Info,
   Sparkles,
@@ -26,8 +27,29 @@ export type Pay = { amountCents: number; maxAmountCents?: number; per: PayPeriod
 export type JobCardChip = 'housing' | 'meals' | 'pay';
 
 /**
- * Pay after housing and meals (legal review section 9), under the chips. Discovery decides when
- * it may be shown and writes both lines; the card only lays them out.
+ * The whole deal under the dates: a 72 px room photo beside housing type, housing cost, meals
+ * and couples. The caller writes every line. Housing and Meals chips are left out while this
+ * is set, so the card does not also say "Provided".
+ */
+export type JobCardDeal = {
+  /** Null when there is no housing: the card says "No housing" and hides the room, type, cost and couples. */
+  housing: {
+    /** e.g. "Cabin". */
+    type?: string;
+    /** e.g. "Free" or "$12 a night, taken from pay". */
+    cost?: string;
+    photo?: { src: string; alt: string } | null;
+    /** e.g. "Couples housed" or "No couples". */
+    couples?: string | null;
+  } | null;
+  /** e.g. "3 meals a day, free" or "No meals". */
+  meals: string;
+};
+
+/**
+ * Pay after housing and meals (legal review section 9), under the chips. Shown only when a
+ * caller passes it (#127 computes it). The card lays the two lines out and does not invent a
+ * number or call it take-home pay.
  */
 export type JobCardPayEstimate = {
   /** e.g. "About $796 a week after housing and meals". */
@@ -68,6 +90,8 @@ export type JobCardProps = {
   meals: { provided: boolean };
   /** A Pay to format, or a preformatted chip label such as "$19–$22/hr" or "$52k/yr". */
   pay: Pay | { label: string };
+  /** The whole deal under the dates. Without it the Housing and Meals chips stay. */
+  deal?: JobCardDeal;
   payEstimate?: JobCardPayEstimate;
   saved?: boolean;
   /** The seeker has applied: the Apply button reads "Applied" and is disabled. */
@@ -141,6 +165,7 @@ export function JobCard({
   housing,
   meals,
   pay,
+  deal,
   payEstimate,
   saved = false,
   applied = false,
@@ -155,6 +180,16 @@ export function JobCard({
   className,
 }: JobCardProps) {
   const open = (chip: JobCardChip) => (onOpenChip ? () => onOpenChip(chip) : undefined);
+  const payChip = (
+    <Chip
+      key="pay"
+      label="Pay"
+      icon={Banknote}
+      value={payLabel(pay)}
+      onOpen={open('pay')}
+      className={deal ? 'w-full' : undefined}
+    />
+  );
   const logo = (
     <OrgLogo name={host.name} src={host.logoSrc} size="lg" ring decorative={!!host.href} />
   );
@@ -231,25 +266,30 @@ export function JobCard({
           </>
         ) : null
       }
-      chips={[
-        <Chip
-          key="housing"
-          label="Housing"
-          icon={BedDouble}
-          value={housing.provided ? 'Provided' : 'No housing'}
-          tone={housing.provided ? 'success' : 'muted'}
-          onOpen={open('housing')}
-        />,
-        <Chip
-          key="meals"
-          label="Meals"
-          icon={Utensils}
-          value={meals.provided ? 'Provided' : 'No meals'}
-          tone={meals.provided ? 'success' : 'muted'}
-          onOpen={open('meals')}
-        />,
-        <Chip key="pay" label="Pay" icon={Banknote} value={payLabel(pay)} onOpen={open('pay')} />,
-      ]}
+      deal={deal ? <DealLines deal={deal} /> : null}
+      chips={
+        deal
+          ? [null, null, payChip]
+          : [
+              <Chip
+                key="housing"
+                label="Housing"
+                icon={BedDouble}
+                value={housing.provided ? 'Provided' : 'No housing'}
+                tone={housing.provided ? 'success' : 'muted'}
+                onOpen={open('housing')}
+              />,
+              <Chip
+                key="meals"
+                label="Meals"
+                icon={Utensils}
+                value={meals.provided ? 'Provided' : 'No meals'}
+                tone={meals.provided ? 'success' : 'muted'}
+                onOpen={open('meals')}
+              />,
+              payChip,
+            ]
+      }
       belowChips={
         payEstimate ? (
           <div className="flex flex-col items-start">
@@ -272,7 +312,13 @@ export function JobCard({
         hideActions ? null : (
           <>
             <IconButton icon={X} label="Skip" variant="outline" size="lg" onClick={onSkip} />
-            <Button size="lg" className="flex-1" disabled={applied} onClick={onApply}>
+            <Button
+              size="lg"
+              className="flex-1"
+              variant={applied ? 'secondary' : 'primary'}
+              icon={applied ? Check : undefined}
+              onClick={applied ? undefined : onApply}
+            >
               {applied ? 'Applied' : 'Apply'}
             </Button>
             <IconButton
@@ -287,5 +333,31 @@ export function JobCard({
         )
       }
     />
+  );
+}
+
+/** Four lines beside a 72 px room photo. No housing drops the photo, the type, the cost and couples. */
+function DealLines({ deal }: { deal: JobCardDeal }) {
+  if (!deal.housing) {
+    return (
+      <div className="flex flex-col">
+        <p className="text-16 text-ink">No housing</p>
+        <p className="text-16 text-ink">{deal.meals}</p>
+      </div>
+    );
+  }
+  const { type, cost, photo, couples } = deal.housing;
+  return (
+    <div className="flex items-start gap-3">
+      {photo ? (
+        <Img src={photo.src} alt={photo.alt} className="size-18 shrink-0 rounded-md object-cover" />
+      ) : null}
+      <div className="flex min-w-0 flex-col">
+        {type ? <p className="text-16 font-semibold text-ink">{type}</p> : null}
+        {cost ? <p className="text-16 text-ink">{cost}</p> : null}
+        <p className="text-16 text-ink">{deal.meals}</p>
+        {couples ? <p className="text-16 text-ink">{couples}</p> : null}
+      </div>
+    </div>
   );
 }

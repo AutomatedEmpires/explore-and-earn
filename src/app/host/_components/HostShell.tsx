@@ -9,7 +9,7 @@
 // Until an Owner or Admin sets up a passkey or two-step sign-in, the shell is `locked`: only the
 // top bar and the security screen, with no way into the rest of the workspace.
 import { UserButton, useOrganizationList } from '@clerk/nextjs';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useLiveCounts } from '@/app/_components/useLiveCounts';
 import {
@@ -77,6 +77,36 @@ function withCount(label: string, count: number): string {
   return count > 0 ? `${label}, ${count} unread` : label;
 }
 
+/** Desktop sidebar. Promote stays off it (the frames hide it). Listings opens Active, Drafts and Library. */
+function sidebarItems(pathname: string, tab: string | null): SidebarItem[] {
+  return HOST_NAV.filter((item) => item.href !== '/host/promote').map((item) => {
+    const current = isHostCurrent(pathname, item.href);
+    if (item.href !== '/host/listings') return { ...item, current };
+    const onIndex = pathname === '/host/listings';
+    return {
+      ...item,
+      current,
+      children: [
+        {
+          href: '/host/listings',
+          label: 'Active',
+          current: onIndex && tab !== 'drafts' && tab !== 'library',
+        },
+        {
+          href: '/host/listings?tab=drafts',
+          label: 'Drafts',
+          current: onIndex && tab === 'drafts',
+        },
+        {
+          href: '/host/listings?tab=library',
+          label: 'Library',
+          current: onIndex && tab === 'library',
+        },
+      ],
+    };
+  });
+}
+
 function NotificationsLink({ count, current }: { count: number; current: boolean }) {
   return (
     <IconLink
@@ -99,6 +129,7 @@ export type HostShellProps = {
 
 export function HostShell({ org, initialNotifications = 0, children }: HostShellProps) {
   const pathname = usePathname();
+  const tab = useSearchParams().get('tab');
   // The unread count, kept live as in the seeker top bar (not while the workspace is locked).
   const { notifications } = useLiveCounts(org !== null, {
     inbox: 0,
@@ -129,7 +160,7 @@ export function HostShell({ org, initialNotifications = 0, children }: HostShell
 
   const current = (href: string) => isHostCurrent(pathname, href);
   const notificationsCurrent = current(HOST_NOTIFICATIONS_HREF);
-  const items: SidebarItem[] = HOST_NAV.map((item) => ({ ...item, current: current(item.href) }));
+  const items = sidebarItems(pathname, tab);
   const tabs: NavItem[] = [
     ...HOST_TAB_HREFS.flatMap((href) => {
       const item = HOST_NAV.find((i) => i.href === href);
@@ -176,7 +207,7 @@ export function HostShell({ org, initialNotifications = 0, children }: HostShell
         />
         <main
           id="main"
-          className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-28 md:px-10 md:pt-10 md:pb-16"
+          className="mx-auto w-full flex-1 px-4 pt-6 pb-28 md:px-10 md:pt-10 md:pb-16"
         >
           {children}
         </main>
