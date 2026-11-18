@@ -232,3 +232,70 @@ describe('stripeGateway retrieveSubscription', () => {
     expect((await snap({ status: 'past_due', latestInvoice: failed })).activatedAt).toBeNull();
   });
 });
+
+describe('stripeGateway getDefaultCardChecks', () => {
+  type Pm = {
+    card: {
+      checks: { cvc_check: string | null; address_postal_code_check: string | null } | null;
+      fingerprint?: string | null;
+      country?: string | null;
+    } | null;
+    billing_details?: { name: string | null } | null;
+  };
+
+  function cardGateway(o: { defaultPm?: Pm | null; listed?: Pm[] }) {
+    const stripe = {
+      customers: {
+        retrieve: async () => ({
+          deleted: false,
+          invoice_settings: { default_payment_method: o.defaultPm ?? null },
+        }),
+        listPaymentMethods: async () => ({ data: o.listed ?? [] }),
+      },
+    } as unknown as Stripe;
+    return stripeGateway(stripe);
+  }
+
+  const visa: Pm = {
+    card: {
+      checks: { cvc_check: 'pass', address_postal_code_check: 'unavailable' },
+      fingerprint: 'Xt5EWLLDS7FJjR1c',
+      country: 'US',
+    },
+    billing_details: { name: 'Kettle Ridge Lodge LLC' },
+  };
+
+  it('reads the default card print, country and cardholder name as Stripe gives them', async () => {
+    expect(await cardGateway({ defaultPm: visa }).getDefaultCardChecks('cus_1')).toEqual({
+      hasCard: true,
+      cvcCheck: 'pass',
+      postalCheck: 'unavailable',
+      fingerprint: 'Xt5EWLLDS7FJjR1c',
+      country: 'US',
+      name: 'Kettle Ridge Lodge LLC',
+    });
+  });
+
+  it('falls back to the first card on file, and gives null for what the card lacks', async () => {
+    const bare: Pm = { card: { checks: null }, billing_details: null };
+    expect(await cardGateway({ listed: [bare] }).getDefaultCardChecks('cus_1')).toEqual({
+      hasCard: true,
+      cvcCheck: null,
+      postalCheck: null,
+      fingerprint: null,
+      country: null,
+      name: null,
+    });
+  });
+
+  it('reports no card when the customer has none', async () => {
+    expect(await cardGateway({}).getDefaultCardChecks('cus_1')).toEqual({
+      hasCard: false,
+      cvcCheck: null,
+      postalCheck: null,
+      fingerprint: null,
+      country: null,
+      name: null,
+    });
+  });
+});

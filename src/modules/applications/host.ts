@@ -20,11 +20,12 @@ import type {
   HostApplicationRef,
 } from '@/lib/applications';
 import { forbidden, notFound } from '@/lib/errors';
-import { record } from '@/modules/audit';
 import { getListingSummaries } from '@/modules/listings';
 import { canAccessListing } from '@/modules/orgs';
 import { isBlockedBetween } from '@/modules/safety';
+import { requireProfileView } from '@/modules/verification';
 import type { HostContext } from '@/server/guards';
+import { recordHostOpen } from './host-activity';
 import { loadEvents } from './receipt';
 import { applications, type ApplicationRow } from './schema';
 import { hostView } from './snapshot';
@@ -79,22 +80,23 @@ export async function authorizeHostApplication(
   };
 }
 
-/** Audited (`applications.snapshot_viewed`). */
+/**
+ * Audited (`applications.snapshot_viewed`). A new host's read counts against its daily
+ * profile-view cap (429 `new_host_daily_cap` over it, before anything is read) and queues the
+ * silent-host check (host-activity.ts).
+ */
 export async function getHostApplication(
   db: Db,
   host: HostContext,
   applicationId: string,
 ): Promise<HostApplicationDto> {
   const row = await authorizedRow(db, host, applicationId);
+  await requireProfileView(db, host.orgId, row.seekerUserId);
   const events = await loadEvents(db, row.id);
-  await record(db, {
-    actorType: 'user',
-    actorId: host.user.id,
-    orgId: host.orgId,
+  await recordHostOpen(db, host, {
+    applicationId: row.id,
+    listingId: row.listingId,
     action: 'applications.snapshot_viewed',
-    subjectType: 'application',
-    subjectId: row.id,
-    data: { listingId: row.listingId },
   });
   return {
     applicationId: row.id,

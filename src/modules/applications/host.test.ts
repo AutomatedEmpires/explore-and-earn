@@ -71,9 +71,12 @@ beforeEach(async () => {
   id = (await submitApplication(t.db, w.seeker.id, input(l))).application.applicationId;
 });
 
-/** A second org with its own Owner, to probe the boundary between hosts. */
+/** A second, verified org with its own Owner, to probe the boundary between hosts. */
 async function otherOrg() {
   const { orgId } = await seedOrg(t.db, { name: 'Other Lodge' });
+  await t.db.execute(
+    sql`update app.organizations set verification_status = 'verified' where id = ${orgId}`,
+  );
   return seedMember(t.db, orgId, await seedUser(t.db, { accountType: 'host' }), 'owner');
 }
 

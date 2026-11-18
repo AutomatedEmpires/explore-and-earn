@@ -22,6 +22,7 @@ import { getPublicMediaUrls, getStorage } from '@/modules/media';
 import { inScope, listingScope } from '@/modules/messaging';
 import { getOrgSummaries } from '@/modules/orgs';
 import { getCandidateCards, getCommunityIdentities } from '@/modules/profiles';
+import { requireProfileView } from '@/modules/verification';
 import type { HostContext } from '@/server/guards';
 import { requireApplicantAccess } from '../pools/gate';
 import { invites } from '../schema';
@@ -272,6 +273,8 @@ export async function getSeekerInvite(
  * name and contacts, no work authorization (plan decision 16). 404 unless the invite is the
  * org's, on a listing in scope, answered Interested, and SP4 still returns the card (a reveal
  * exists and neither side blocked the other). The photo shows only if the seeker allows it.
+ * A new host's view counts against its daily profile-view cap (legal review 7.3): 429
+ * `new_host_daily_cap` over it, before the profile is read.
  */
 export async function getInterestedCandidate(
   db: DbOrTx,
@@ -284,6 +287,7 @@ export async function getInterestedCandidate(
   if (!inScope(await listingScope(db, ctx), row.listingId)) throw notFound(INVITE_NOT_FOUND);
   if (row.status !== 'interested' && row.status !== 'applied') throw notFound(INVITE_NOT_FOUND);
   await requireApplicantAccess(db, ctx.orgId);
+  await requireProfileView(db, ctx.orgId, row.seekerUserId, now);
   const cards = await getCandidateCards(db, {
     orgId: ctx.orgId,
     seekerUserIds: [row.seekerUserId],

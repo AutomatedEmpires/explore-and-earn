@@ -78,7 +78,19 @@ export type SubscriptionUpdate = {
   removeDiscounts?: boolean;
 };
 
-export type CardChecks = { hasCard: boolean; cvcCheck: string | null; postalCheck: string | null };
+/**
+ * The default card's Stripe checks, and what business verification compares (legal review 7):
+ * the card's fingerprint exactly as Stripe gives it (case-sensitive), its issuing country and
+ * the cardholder name. Each of those three is null, or absent, when the card does not carry it.
+ */
+export type CardChecks = {
+  hasCard: boolean;
+  cvcCheck: string | null;
+  postalCheck: string | null;
+  fingerprint?: string | null;
+  country?: string | null;
+  name?: string | null;
+};
 
 export type GatewayInvoice = {
   id: string;
@@ -518,11 +530,23 @@ export function stripeGateway(stripe: Stripe, webhookSecret?: string): BillingGa
         pm = list.data[0] ?? null;
       }
       const card = pm?.card;
-      if (!card) return { hasCard: false, cvcCheck: null, postalCheck: null };
+      if (!card) {
+        return {
+          hasCard: false,
+          cvcCheck: null,
+          postalCheck: null,
+          fingerprint: null,
+          country: null,
+          name: null,
+        };
+      }
       return {
         hasCard: true,
         cvcCheck: card.checks?.cvc_check ?? null,
         postalCheck: card.checks?.address_postal_code_check ?? null,
+        fingerprint: card.fingerprint ?? null,
+        country: card.country ?? null,
+        name: pm?.billing_details?.name ?? null,
       };
     },
 

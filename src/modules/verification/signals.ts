@@ -3,17 +3,28 @@
 // shares the email domain, the domain's age from RDAP, the card checks Stripe ran, whether a
 // location is in the US, and the operator blocklist. Collecting never fails on a lookup: a
 // failed website fetch is "not reachable" and a failed RDAP lookup is "age unknown".
+//
+// The legal review's section 7 signals come from the card on file (billing): its fingerprint
+// against the banned list, and its country and cardholder name against the business. Sign-up
+// collects no device or phone value yet, so those two are checked only when a caller passes
+// them. Fingerprints are stored and compared by `fingerprintValue`: a Stripe card print exactly
+// (it is case-sensitive), a device or phone trimmed and lowercased.
 import { and, eq, or } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbOrTx } from '@/lib/db';
 import { notFound } from '@/lib/errors';
+import { newId } from '@/lib/ids';
 import { US_STATE_CODES } from '@/lib/us-states';
 import { getCardChecks } from '@/modules/billing';
 import { listOrgLocations } from '@/modules/locations';
 import { getOrgSummaries, listMembers } from '@/modules/orgs';
 import { getSetting } from '@/modules/settings';
 import { safeFetchText } from './safe-fetch';
-import { verificationBannedFingerprints, verificationBrandContacts } from './schema';
+import {
+  FINGERPRINT_KINDS,
+  verificationBannedFingerprints,
+  verificationBrandContacts,
+} from './schema';
 
 export type VerificationSignals = {
   emailDomain: string | null;
@@ -57,10 +68,11 @@ export type SignalDeps = {
   fetchText: typeof safeFetchText;
   rdapRegisteredAt: (domain: string) => Promise<Date | null>;
   now: Date;
-  /** Values to check against the banned-fingerprint list. Absent checks nothing. */
-  fingerprints?: HostFingerprints;
-  /** Card country and name. Absent leaves both fit-checks unknown. */
-  cardProfile?: CardProfile | null;
+  /**
+   * A device or phone value to check against the banned list. Sign-up collects neither yet, so
+   * the production run passes none. The card print always comes from the card on file.
+   */
+  fingerprints?: Pick<HostFingerprints, 'device' | 'phone'>;
 };
 
 /** Free email providers: an address there says nothing about the business's own domain. */
@@ -170,7 +182,10 @@ export async function rdapRegisteredAt(
   }
 }
 
-/** The production dependencies: the SSRF-safe fetch and the RDAP client. */
+/**
+ * The production dependencies: the SSRF-safe fetch and the RDAP client. The card's print,
+ * country and name need no dependency: collectSignals reads them from billing's card on file.
+ */
 export function defaultSignalDeps(now: Date = new Date()): SignalDeps {
   return {
     fetchText: (url, deps) => safeFetchText(url, deps),
@@ -219,23 +234,107 @@ export function domainPredatesAccount(
   return registeredAt.getTime() < accountCreatedAt.getTime();
 }
 
+/** Legal-form words a card or business name may carry or leave off. */
+const LEGAL_SUFFIXES: ReadonlySet<string> = new Set([
+  'llc',
+  'pllc',
+  'lllp',
+  'llp',
+  'lp',
+  'inc',
+  'incorporated',
+  'corp',
+  'corporation',
+  'co',
+  'company',
+  'ltd',
+  'limited',
+  'pc',
+  'pa',
+  'plc',
+]);
+
+/**
+ * A name for comparing: accents, case and punctuation dropped (`L.L.C.` is `llc`, `&` is
+ * `and`), a leading `the` and trailing legal-form words removed. The last word always stays,
+ * so a name that is only `LLC` is still a name. Empty when nothing is left.
+ */
+export function normalizeName(name: string): string {
+  const words = name
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[.'’]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean);
+  if (words.length > 1 && words[0] === 'the') words.shift();
+  while (words.length > 1 && LEGAL_SUFFIXES.has(words.at(-1) ?? '')) words.pop();
+  return words.join(' ');
+}
+
+/** Levenshtein distance, giving up (returning `max + 1`) once it must exceed `max`. */
+function editDistance(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      const value = Math.min((prev[j] ?? 0) + 1, (row[j - 1] ?? 0) + 1, (prev[j - 1] ?? 0) + cost);
+      row.push(value);
+      best = Math.min(best, value);
+    }
+    if (best > max) return max + 1;
+    prev = row;
+  }
+  return prev[b.length] ?? max + 1;
+}
+
+/** Typos a name of this length may carry: none under 8 characters, 1 under 16, else 2. */
+function allowedEdits(a: string, b: string): number {
+  const length = Math.max(a.length, b.length);
+  return length < 8 ? 0 : length < 16 ? 1 : 2;
+}
+
+/** Without single-letter words: a middle initial (`Sam J. Rivera`) is left off. */
+const withoutInitials = (name: string) =>
+  name
+    .split(' ')
+    .filter((w) => w.length > 1)
+    .join(' ');
+
+/** True when two normalized names are the same, apart from initials and a typo or two. */
+function namesMatch(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const [x, y] = [withoutInitials(a) || a, withoutInitials(b) || b];
+  return editDistance(x, y, allowedEdits(x, y)) <= allowedEdits(x, y);
+}
+
 /**
  * Whether the card's country and name fit the business. A US location expects country `US`.
+ * The cardholder may be the business (`Kettle Ridge Lodge, LLC`) or one of its people (`Sam J
+ * Rivera`); names are compared normalized (see normalizeName), allowing a close spelling.
  * Either check is null when that side of it is unknown, and a null check does not force review.
  */
 export function cardFitsBusiness(
   profile: CardProfile | null,
-  business: { name: string; inUs: boolean },
+  business: { name: string; inUs: boolean; people?: readonly (string | null)[] },
 ): { countryFits: boolean | null; nameFits: boolean | null } {
   if (!profile) return { countryFits: null, nameFits: null };
   const countryFits =
     profile.country === null || !business.inUs
       ? null
       : profile.country.trim().toUpperCase() === 'US';
-  const nameFits =
-    profile.name === null
-      ? null
-      : profile.name.trim().toLowerCase() === business.name.trim().toLowerCase();
+  const holder = profile.name === null ? '' : normalizeName(profile.name);
+  const names = [business.name, ...(business.people ?? [])].flatMap((n) =>
+    n ? [normalizeName(n)] : [],
+  );
+  const nameFits = holder === '' ? null : names.some((n) => namesMatch(holder, n));
   return { countryFits, nameFits };
 }
 
@@ -263,21 +362,55 @@ export function manualReviewReasons(s: VerificationSignals): string[] {
   return reasons;
 }
 
-function fingerprintValue(value: string): string {
-  return value.trim().toLowerCase();
+type FingerprintKind = (typeof FINGERPRINT_KINDS)[number];
+
+/**
+ * The stored form of a fingerprint, for both writing and lookup. A Stripe card print is kept
+ * exactly (prints are case-sensitive, so case folding would merge distinct cards); a device or
+ * phone value is trimmed and lowercased. Empty means there is nothing to check.
+ */
+export function fingerprintValue(kind: FingerprintKind, value: string): string {
+  const trimmed = value.trim();
+  return kind === 'card' ? trimmed : trimmed.toLowerCase();
+}
+
+/** The non-empty prints in `prints`, in their stored form. */
+function fingerprintRows(prints: HostFingerprints | undefined): [FingerprintKind, string][] {
+  return FINGERPRINT_KINDS.flatMap((kind) => {
+    const value = prints?.[kind];
+    const stored = value ? fingerprintValue(kind, value) : '';
+    return stored ? [[kind, stored] as [FingerprintKind, string]] : [];
+  });
+}
+
+/**
+ * Adds prints to the banned list (the confirmed-fake-host procedure, legal review 7 item 6).
+ * Idempotent: a print already listed is left alone. Returns how many it added.
+ */
+export async function banFingerprints(db: DbOrTx, prints: HostFingerprints): Promise<number> {
+  const rows = fingerprintRows(prints);
+  if (rows.length === 0) return 0;
+  const added = await db
+    .insert(verificationBannedFingerprints)
+    .values(rows.map(([kind, value]) => ({ id: newId(), kind, value })))
+    .onConflictDoNothing({
+      target: [verificationBannedFingerprints.kind, verificationBannedFingerprints.value],
+    })
+    .returning({ id: verificationBannedFingerprints.id });
+  return added.length;
+}
+
+/** Bans the print of the org's card on file. Reads billing (Stripe): call it outside a transaction. */
+export async function banCardOnFile(db: DbOrTx, orgId: string): Promise<number> {
+  const card = await getCardChecks(db, orgId);
+  return card.hasCard ? banFingerprints(db, { card: card.fingerprint ?? null }) : 0;
 }
 
 async function bannedFingerprint(
   db: DbOrTx,
   prints: HostFingerprints | undefined,
 ): Promise<boolean> {
-  const checks = (
-    [
-      ['card', prints?.card],
-      ['device', prints?.device],
-      ['phone', prints?.phone],
-    ] as const
-  ).flatMap(([kind, value]) => (value ? [[kind, fingerprintValue(value)] as const] : []));
+  const checks = fingerprintRows(prints);
   if (checks.length === 0) return false;
   const rows = await db
     .select({ id: verificationBannedFingerprints.id })
@@ -318,13 +451,12 @@ export async function collectSignals(
   // The business's own domain: its website, else a business email address.
   const ownDomain = siteHost ?? (emailDomain && !freeEmail && !disposableEmail ? emailDomain : null);
 
-  const [site, domain, card, locations, blockedList, banned, brands] = await Promise.all([
+  const [site, domain, card, locations, blockedList, brands] = await Promise.all([
     websiteSignals(org.websiteUrl, deps.fetchText),
     domainFacts(ownDomain, deps),
     getCardChecks(db, orgId),
     listOrgLocations(db, orgId),
     getSetting(db, 'verification.blocked_domains'),
-    bannedFingerprint(db, deps.fingerprints),
     db
       .select({
         name: verificationBrandContacts.brandName,
@@ -332,6 +464,14 @@ export async function collectSignals(
       })
       .from(verificationBrandContacts),
   ]);
+  const banned = await bannedFingerprint(db, {
+    card: card.hasCard ? (card.fingerprint ?? null) : null,
+    device: deps.fingerprints?.device ?? null,
+    phone: deps.fingerprints?.phone ?? null,
+  });
+  const cardProfile: CardProfile | null = card.hasCard
+    ? { country: card.country ?? null, name: card.name ?? null }
+    : null;
 
   const blocked = new Set(blockedList.map(normalizeHost));
   const blockedDomain = [emailDomain, siteHost].some(
@@ -339,7 +479,11 @@ export async function collectSignals(
   );
   const states: readonly string[] = US_STATE_CODES;
   const locationInUs = locations.some((l) => states.includes(l.state));
-  const fit = cardFitsBusiness(deps.cardProfile ?? null, { name: org.name, inUs: locationInUs });
+  const fit = cardFitsBusiness(cardProfile, {
+    name: org.name,
+    inUs: locationInUs,
+    people: members.map((m) => m.displayName),
+  });
 
   return {
     emailDomain,
