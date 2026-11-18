@@ -63,6 +63,37 @@ describe('GET /api/v1/host/applications/{id}/resume.pdf', () => {
     expect(await downloads(t.db, orgId)).toEqual([]);
   });
 
+  it.each(['running', 'needs_review', 'needs_info', 'failed'] as const)(
+    'refuses a host whose verification is %s with 409, renders nothing and audits nothing',
+    async (status) => {
+      const { orgId } = await seedOrg(t.db);
+      const host = await seedMember(t.db, orgId, await seedUser(t.db, { accountType: 'host' }), 'owner');
+      asHost(host);
+      await t.db.execute(sql`update app.organizations set verification_status = ${status} where id = ${orgId}`);
+      const snapshot: ApplicationSnapshotV1 = mayaApplicationSnapshot();
+      mocks.authorizeHostApplication.mockResolvedValue({
+        applicationId: APP_ID,
+        listingId: snapshot.listing.id,
+        orgId,
+        seekerUserId: '019a4a3c-0000-7000-8000-0000000e0003',
+        status: 'new',
+        submittedAt: new Date('2026-01-01T00:00:00Z'),
+      });
+      mocks.getSnapshot.mockResolvedValue(snapshot);
+
+      const res = await call(GET, request('GET', `/api/v1/host/applications/${APP_ID}/resume.pdf`), {
+        id: APP_ID,
+      });
+
+      expect(res.status).toBe(409);
+      expect(res.body).toMatchObject({
+        error: { code: 'conflict', details: { reason: `verification_${status}` } },
+      });
+      expect(mocks.getSnapshot).not.toHaveBeenCalled();
+      expect(await downloads(t.db, orgId)).toEqual([]);
+    },
+  );
+
   it('writes one applications.resume_downloaded audit row with the org', async () => {
     const { orgId } = await seedOrg(t.db);
     const host = await seedMember(t.db, orgId, await seedUser(t.db, { accountType: 'host' }), 'owner');

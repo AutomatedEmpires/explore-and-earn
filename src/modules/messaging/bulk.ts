@@ -180,6 +180,10 @@ export async function decideBulk(
   }
   if (bulk.scanState === 'warn') {
     await db.update(bulkMessages).set({ scanState: 'clear' }).where(eq(bulkMessages.id, bulkId));
-    await db.update(messages).set({ scanState: 'clear' }).where(eq(messages.bulkId, bulkId));
+    // Only the warned copies lose the banner. One an operator removed after a report stays removed.
+    await db
+      .update(messages)
+      .set({ scanState: 'clear' })
+      .where(and(eq(messages.bulkId, bulkId), eq(messages.scanState, 'warn')));
   }
 }

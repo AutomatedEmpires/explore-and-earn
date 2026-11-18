@@ -1,6 +1,7 @@
 // Host interview proposals, new rounds, cancellation and outcomes.
 import { and, eq, inArray } from 'drizzle-orm';
 import type { ApplicationStatus } from '@/lib/applications';
+import { DEFAULT_TZ, resolveTimeZone } from '@/lib/discovery';
 import type { Db, DbOrTx } from '@/lib/db';
 import { withTx } from '@/lib/db';
 import { badRequest, conflict, notFound } from '@/lib/errors';
@@ -13,7 +14,9 @@ import { requireEntry, requireListing } from '../access';
 import { recordPipelineEvent, staleStatus, transitionStatus } from '../core';
 import { enqueueNoteScan } from '../notes';
 import { interviewSlots, interviews, pipelineEntries } from '../schema';
+import { blockedConflict, stampIfBlocked } from './blocks';
 import { notifyInterview, publishInterviewInvite, scheduleFields } from './deliver';
+import { interviewScanText } from './notes';
 import { hostInterviewViews } from './reads';
 import { setInterviewState } from './state';
 
@@ -24,6 +27,8 @@ const NEW_ROUND = ['invited', 'scheduled', 'reschedule_requested', 'expired'] as
 const MIN_LEAD_MS = INTERVIEWS.minLeadMinutes * 60_000;
 const MAX_AHEAD_MS = INTERVIEWS.maxAheadDays * 24 * 60 * 60_000;
 const HOUR_MS = 60 * 60_000;
+const VIDEO_URL_MAX = 1000;
+const OPEN: readonly string[] = ['new', 'shortlisted', 'interviewing'];
 
 function actor(ctx: HostContext) {
   return { type: 'host' as const, userId: ctx.user.id, orgId: ctx.orgId };
@@ -55,6 +60,26 @@ function expiresAt(starts: Date[], expiryHours: number, now: Date): Date {
   return new Date(Math.min(now.getTime() + expiryHours * HOUR_MS, latest));
 }
 
+/** The zone the host sent, in its canonical spelling. An unknown zone is refused. */
+function chosenZone(input: string | undefined): string | undefined {
+  if (input === undefined) return undefined;
+  const zone = resolveTimeZone(input);
+  // `resolveTimeZone` answers the default for a zone it does not know, so that answer is
+  // valid only when the default, or an alias of it, was sent.
+  if (zone === DEFAULT_TZ && !isDefaultZone(input)) {
+    throw badRequest('Choose a valid time zone.', { reason: 'invalid_timezone' });
+  }
+  return zone;
+}
+
+function isDefaultZone(tz: string): boolean {
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone: tz }).resolvedOptions().timeZone === DEFAULT_TZ;
+  } catch {
+    return false;
+  }
+}
+
 async function viewOf(db: Db, id: string, now: Date): Promise<HostInterviewView> {
   const views = await hostInterviewViews(db, [id], now);
   const view = views.get(id);
@@ -78,10 +103,16 @@ export async function proposeInterview(
 ): Promise<HostInterviewView> {
   const starts = input.slots.map((slot) => new Date(slot.start));
   assertSlots(starts, input.durationMinutes, now);
+  const zone = chosenZone(input.timezone);
+  const videoUrl = input.format === 'video' ? (input.videoUrl ?? null) : null;
+  if (videoUrl && videoUrl.length > VIDEO_URL_MAX) {
+    throw badRequest('Use a shorter video link.', { reason: 'video_url_too_long' });
+  }
   const id = await withTx(db, async (tx) => {
     const entry = await requireEntry(tx, ctx, applicationId, { forUpdate: true });
-    if (entry.status !== 'new' && entry.status !== 'shortlisted' && entry.status !== 'interviewing') {
-      throw staleStatus(entry.status as ApplicationStatus);
+    if (!OPEN.includes(entry.status)) throw staleStatus(entry.status as ApplicationStatus);
+    if (await stampIfBlocked(tx, { orgId: entry.orgId, seekerUserId: entry.seekerUserId, applicationId })) {
+      return null;
     }
     const [active] = await tx
       .select({ id: interviews.id })
@@ -97,6 +128,10 @@ export async function proposeInterview(
     });
     const interviewId = newId();
     const note = input.note?.trim() ? input.note.trim() : null;
+    const address = input.format === 'in_person' ? (input.address ?? null) : null;
+    const phoneNote = input.format === 'phone' ? (input.phoneNote ?? null) : null;
+    // Every host text the seeker will read is scanned before the invite is delivered.
+    const scanned = interviewScanText({ note, phoneNote, address, videoUrl }) !== null;
     const row: InterviewRow = {
       id: interviewId,
       orgId: entry.orgId,
@@ -106,11 +141,11 @@ export async function proposeInterview(
       organizerUserId: ctx.user.id,
       status: 'invited',
       format: input.format,
-      videoUrl: input.format === 'video' ? (input.videoUrl ?? null) : null,
-      address: input.format === 'in_person' ? (input.address ?? null) : null,
-      phoneNote: input.format === 'phone' ? (input.phoneNote ?? null) : null,
+      videoUrl,
+      address,
+      phoneNote,
       note,
-      timezone: input.timezone ?? listing.timezone,
+      timezone: zone ?? resolveTimeZone(listing.timezone),
       durationMinutes: input.durationMinutes,
       expiryHours: input.expiryHours,
       round: 1,
@@ -124,7 +159,7 @@ export async function proposeInterview(
       outcomeBy: null,
       outcomeAt: null,
       outcomeNudgedAt: null,
-      scanState: note ? 'pending' : 'clear',
+      scanState: scanned ? 'pending' : 'clear',
       checkId: null,
       createdAt: now,
       updatedAt: now,
@@ -150,7 +185,7 @@ export async function proposeInterview(
       if (!moved.ok) throw staleStatus(moved.current);
     }
     await setInterviewState(tx, applicationId, 'invited');
-    if (note) await enqueueNoteScan(tx, 'interview', interviewId);
+    if (scanned) await enqueueNoteScan(tx, 'interview', interviewId);
     else await publishInterviewInvite(tx, row);
     await record(tx, {
       actorType: 'user',
@@ -162,6 +197,7 @@ export async function proposeInterview(
     });
     return interviewId;
   });
+  if (id === null) throw blockedConflict();
   return viewOf(db, id, now);
 }
 
@@ -174,10 +210,24 @@ export async function proposeNewRound(
 ): Promise<HostInterviewView> {
   const starts = input.slots.map((slot) => new Date(slot.start));
   assertSlots(starts, input.durationMinutes, now);
-  await withTx(db, async (tx) => {
+  const zone = chosenZone(input.timezone);
+  const blocked = await withTx(db, async (tx) => {
     const current = await loadHostInterview(tx, ctx, interviewId);
     if (!(NEW_ROUND as readonly string[]).includes(current.status)) {
       throw conflict('This interview can no longer take a new round.', { reason: 'interview_closed' });
+    }
+    // An expired interview outlives Pass, withdrawal and hire, so the application decides.
+    // The entry is locked before the interview, as a pipeline transition locks them.
+    const entry = await requireEntry(tx, ctx, current.applicationId, { forUpdate: true });
+    if (!OPEN.includes(entry.status)) throw staleStatus(entry.status as ApplicationStatus);
+    if (
+      await stampIfBlocked(tx, {
+        orgId: entry.orgId,
+        seekerUserId: entry.seekerUserId,
+        applicationId: entry.applicationId,
+      })
+    ) {
+      return true;
     }
     const [locked] = await tx.select().from(interviews).where(eq(interviews.id, interviewId)).for('update');
     if (!locked || !(NEW_ROUND as readonly string[]).includes(locked.status)) {
@@ -195,9 +245,9 @@ export async function proposeNewRound(
         sequence: nextSequence,
         durationMinutes: input.durationMinutes,
         expiryHours: input.expiryHours,
-        timezone: input.timezone ?? locked.timezone,
+        timezone: zone ?? locked.timezone,
         expiresAt: expiresAt(starts, input.expiryHours, now),
-        scheduledSlotId: null,
+        // `scheduledSlotId` stays: it is how the calendar file still cancels the old time.
         scheduledStart: null,
         scheduledEnd: null,
         requestedWindows: null,
@@ -217,22 +267,18 @@ export async function proposeNewRound(
     );
     await setInterviewState(tx, locked.applicationId, 'invited');
     if (locked.scanState === 'clear' || locked.scanState === 'warn') {
-      const [entry] = await tx
-        .select()
-        .from(pipelineEntries)
-        .where(eq(pipelineEntries.applicationId, locked.applicationId));
-      if (entry) {
-        await notifyInterview(
-          tx,
-          updated,
-          entry.seekerUserId,
-          [{ userId: entry.seekerUserId, audience: 'seeker' }],
-          'hiring.interview_invited',
-          wasScheduled ? { icsMethod: 'CANCEL', ...previous } : {},
-        );
-      }
+      await notifyInterview(
+        tx,
+        updated,
+        entry.seekerUserId,
+        [{ userId: entry.seekerUserId, audience: 'seeker' }],
+        'hiring.interview_invited',
+        wasScheduled ? { icsMethod: 'CANCEL', ...previous } : {},
+      );
     }
+    return false;
   });
+  if (blocked) throw blockedConflict();
   return viewOf(db, interviewId, now);
 }
 
@@ -257,12 +303,14 @@ export async function cancelInterview(
       .returning();
     if (!updated) throw conflict('This interview is no longer open.', { reason: 'interview_closed' });
     await setInterviewState(tx, locked.applicationId, 'canceled');
-    await postEvent(tx, locked.threadId, { code: 'interview_canceled', visibleTo: 'all' });
+    // The seeker never saw a pending or held invite, so its cancel is for the host only.
+    const delivered = locked.scanState === 'clear' || locked.scanState === 'warn';
+    await postEvent(tx, locked.threadId, { code: 'interview_canceled', visibleTo: delivered ? 'all' : 'host' });
     const [entry] = await tx
       .select()
       .from(pipelineEntries)
       .where(eq(pipelineEntries.applicationId, locked.applicationId));
-    if (entry && (locked.scanState === 'clear' || locked.scanState === 'warn')) {
+    if (entry && delivered) {
       await notifyInterview(
         tx,
         updated,

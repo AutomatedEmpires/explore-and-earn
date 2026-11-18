@@ -1,9 +1,10 @@
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ApplicationSnapshotV1, HostApplicationCard } from '@/lib/applications';
+import type { ApplicationSnapshotV1, ApplicationStatus, HostApplicationCard } from '@/lib/applications';
 import { newId } from '@/lib/ids';
 import { pipelineEntries, pipelineEvents } from '../schema';
 import * as applications from '@/modules/applications';
+import { setSetting } from '@/modules/settings';
 import { applicationsFake } from '@tests/fakes/sp5/sp4';
 import { listingsFake } from '@tests/fakes/sp5/sp2';
 import { messagingFake } from '@tests/fakes/sp5/messaging';
@@ -25,6 +26,9 @@ vi.mock('@/modules/messaging', async (orig) => ({
   ...(await import('@tests/fakes/sp5/messaging')).messagingFake,
 }));
 
+const OPERATOR = { operatorId: '019a4a3c-0000-7000-8000-00000000f001' };
+const HOUR = 60 * 60 * 1000;
+
 let t: TestDb;
 
 beforeAll(async () => {
@@ -35,7 +39,9 @@ afterAll(async () => {
   await t.close();
 });
 
-beforeEach(() => {
+beforeEach(async () => {
+  await setSetting(t.db, 'hiring.fit_enabled', true, OPERATOR);
+  await setSetting(t.db, 'hiring.fit_disabled_states', [], OPERATOR);
   applicationsFake.reset();
   listingsFake.reset();
   messagingFake.reset();
@@ -207,6 +213,166 @@ describe('applicants', () => {
       .where(eq(pipelineEntries.applicationId, applicationId));
     const scored = await getApplicantDetail(t.db, org.owner.ctx, applicationId);
     expect(scored.fit).toMatchObject({ score: 80, weightsVersion: 'fit_weights@test' });
+  });
+
+  describe('verified-host gate (legal review 7.1)', () => {
+    async function scored() {
+      const org = await seedHostOrg(t.db);
+      const listingId = newId();
+      listingsFake.setListing({ id: listingId, orgId: org.orgId });
+      const seeker = await seedSeeker(t.db);
+      const applicationId = await seedEntry(t.db, {
+        orgId: org.orgId,
+        listingId,
+        seekerUserId: seeker.userId,
+        fitScore: 90,
+      });
+      vi.mocked(applications.getSnapshot).mockResolvedValue({ v: 1 } as ApplicationSnapshotV1);
+      return { org, listingId, applicationId };
+    }
+
+    const setStatus = (orgId: string, status: string) =>
+      t.db.execute(sql`update app.organizations set verification_status = ${status} where id = ${orgId}`);
+
+    it.each(['running', 'needs_review', 'needs_info', 'failed'] as const)(
+      'refuses the list and the detail while verification is %s, for applicants already received',
+      async (status) => {
+        const { org, applicationId } = await scored();
+        await setStatus(org.orgId, 'verified');
+        expect((await listApplicants(t.db, org.owner.ctx, { sort: 'newest', limit: 25 })).items).toHaveLength(1);
+
+        await setStatus(org.orgId, status);
+        vi.mocked(applications.getHostCards).mockClear();
+        vi.mocked(applications.getSnapshot).mockClear();
+        const refusal = { status: 409, code: 'conflict', details: { reason: `verification_${status}` } };
+        await expect(listApplicants(t.db, org.owner.ctx, { sort: 'newest', limit: 25 })).rejects.toMatchObject(
+          refusal,
+        );
+        await expect(getApplicantDetail(t.db, org.owner.ctx, applicationId)).rejects.toMatchObject(refusal);
+        expect(applications.getHostCards).not.toHaveBeenCalled();
+        expect(applications.getSnapshot).not.toHaveBeenCalled();
+      },
+    );
+
+    it('serves a verified host', async () => {
+      const { org, applicationId } = await scored();
+      await setStatus(org.orgId, 'verified');
+      const detail = await getApplicantDetail(t.db, org.owner.ctx, applicationId);
+      expect(detail.card.applicationId).toBe(applicationId);
+    });
+  });
+
+  describe('stored fit while fit is off for the listing (spec 8.3)', () => {
+    async function threeApplicants(o: { state?: string } = {}) {
+      const org = await seedHostOrg(t.db);
+      const listingId = newId();
+      listingsFake.setListing({ id: listingId, orgId: org.orgId, state: o.state ?? 'CO' });
+      const at = (hours: number) => new Date(FIXED_NOW.getTime() + hours * HOUR);
+      const seed = async (fitScore: number | null, hours: number) =>
+        seedEntry(t.db, {
+          orgId: org.orgId,
+          listingId,
+          seekerUserId: (await seedSeeker(t.db)).userId,
+          fitScore,
+          appliedAt: at(hours),
+        });
+      // Fit order is best, good, none; newest-first order is good, none, best.
+      const best = await seed(95, 1);
+      const none = await seed(null, 2);
+      const good = await seed(80, 3);
+      return { org, listingId, best, none, good };
+    }
+
+    it('shows scores and sorts by them while fit is on', async () => {
+      const s = await threeApplicants();
+      const page = await listApplicants(t.db, s.org.owner.ctx, { listingId: s.listingId, sort: 'fit', limit: 25 });
+      expect(page.items.map((item) => item.applicationId)).toEqual([s.best, s.good, s.none]);
+      expect(page.items.map((item) => item.fitScore)).toEqual([95, 80, null]);
+    });
+
+    it.each([
+      ['hiring.fit_enabled is false', async () => setSetting(t.db, 'hiring.fit_enabled', false, OPERATOR)],
+      ["the listing's state is disabled", async () => setSetting(t.db, 'hiring.fit_disabled_states', ['CO'], OPERATOR)],
+    ])('hides every score and sorts by newest when %s', async (_label, turnOff) => {
+      const s = await threeApplicants();
+      await turnOff();
+      const page = await listApplicants(t.db, s.org.owner.ctx, { listingId: s.listingId, sort: 'fit', limit: 25 });
+      expect(page.items.map((item) => item.applicationId)).toEqual([s.good, s.none, s.best]);
+      expect(page.items.map((item) => item.fitScore)).toEqual([null, null, null]);
+
+      const newest = await listApplicants(t.db, s.org.owner.ctx, { listingId: s.listingId, sort: 'newest', limit: 25 });
+      expect(newest.items.map((item) => item.fitScore)).toEqual([null, null, null]);
+
+      vi.mocked(applications.getSnapshot).mockResolvedValue({ v: 1 } as ApplicationSnapshotV1);
+      await t.db
+        .update(pipelineEntries)
+        .set({ fitLines: [], fitWeightsVersion: 'fit_weights@test' })
+        .where(eq(pipelineEntries.applicationId, s.best));
+      const detail = await getApplicantDetail(t.db, s.org.owner.ctx, s.best);
+      expect(detail.fit).toBeNull();
+      expect(detail.card.fitScore).toBeNull();
+    });
+
+    it('pages sort=fit with a cursor that carries no hidden score', async () => {
+      const s = await threeApplicants();
+      await setSetting(t.db, 'hiring.fit_disabled_states', ['CO'], OPERATOR);
+      const first = await listApplicants(t.db, s.org.owner.ctx, { listingId: s.listingId, sort: 'fit', limit: 1 });
+      expect(first.items.map((item) => item.applicationId)).toEqual([s.good]);
+      const decoded = JSON.parse(Buffer.from(first.nextCursor ?? '', 'base64url').toString('utf8')) as {
+        fitScore: unknown;
+      };
+      expect(decoded.fitScore).toBeNull();
+      const rest = await listApplicants(t.db, s.org.owner.ctx, {
+        listingId: s.listingId,
+        sort: 'fit',
+        limit: 25,
+        cursor: first.nextCursor ?? undefined,
+      });
+      expect(rest.items.map((item) => item.applicationId)).toEqual([s.none, s.best]);
+    });
+
+    it('keeps scores on listings where fit is on when one listing of the org turns off', async () => {
+      const off = await threeApplicants({ state: 'CO' });
+      const onListing = newId();
+      listingsFake.setListing({ id: onListing, orgId: off.org.orgId, state: 'UT' });
+      const onEntry = await seedEntry(t.db, {
+        orgId: off.org.orgId,
+        listingId: onListing,
+        seekerUserId: (await seedSeeker(t.db)).userId,
+        fitScore: 40,
+        appliedAt: new Date(FIXED_NOW.getTime() - HOUR),
+      });
+      await setSetting(t.db, 'hiring.fit_disabled_states', ['CO'], OPERATOR);
+      const page = await listApplicants(t.db, off.org.owner.ctx, { sort: 'fit', limit: 25 });
+      // The UT score ranks; the CO applicants follow, newest first, with no score.
+      expect(page.items.map((item) => item.applicationId)).toEqual([onEntry, off.good, off.none, off.best]);
+      expect(page.items.map((item) => item.fitScore)).toEqual([40, null, null, null]);
+    });
+
+    // The daily refresh skips listings that are not live and finished applicants, so only the
+    // read keeps these scores hidden.
+    it.each(['in_review', 'closed'] as const)(
+      'hides scores on a %s listing and on finished applicants once fit is off',
+      async (listingStatus) => {
+        const org = await seedHostOrg(t.db);
+        const listingId = newId();
+        listingsFake.setListing({ id: listingId, orgId: org.orgId, status: listingStatus });
+        const finished: ApplicationStatus[] = ['hired', 'not_selected', 'withdrawn', 'offer_declined'];
+        for (const status of finished) {
+          await seedEntry(t.db, {
+            orgId: org.orgId,
+            listingId,
+            seekerUserId: (await seedSeeker(t.db)).userId,
+            status,
+            fitScore: 70,
+          });
+        }
+        await setSetting(t.db, 'hiring.fit_enabled', false, OPERATOR);
+        const page = await listApplicants(t.db, org.owner.ctx, { listingId, sort: 'fit', limit: 25 });
+        expect(page.items).toHaveLength(finished.length);
+        expect(page.items.map((item) => item.fitScore)).toEqual(finished.map(() => null));
+      },
+    );
   });
 
   it('never returns a withdrawn application id', async () => {

@@ -1,4 +1,9 @@
 // Applicant list, detail, and the ids a bulk message can address.
+//
+// The list and detail are refused while the host is not verified (./gate.ts). A stored fit
+// score shows, and sort=fit orders by it, only on a listing whose fit is on now (spec 8.3):
+// the stored value can outlive the switch, because the daily refresh skips listings that are
+// not live and finished applicants. Where fit is off, sort=fit falls back to newest first.
 import { and, asc, desc, eq, inArray, lt, or, sql, type SQL } from 'drizzle-orm';
 import type { ApplicationSource, ApplicationStatus, HostApplicationCard } from '@/lib/applications';
 import { APPLICATION_STATUSES } from '@/lib/applications';
@@ -16,14 +21,16 @@ import type {
 import type { DbOrTx } from '@/lib/db';
 import { getHostCards, getSnapshot } from '@/modules/applications';
 import { getPublicMediaUrls, getStorage } from '@/modules/media';
-import { getHiringInfoMany } from '@/modules/listings';
+import { getHiringInfoMany, type ListingHiringInfo } from '@/modules/listings';
 import { inScope, listingScope, threadIdsForApplications, type ListingScope } from '@/modules/messaging';
 import type { HostContext } from '@/server/guards';
 import { requireEntry } from '../access';
 import type { PipelineEntryRow } from '../core';
+import { fitAvailable } from '../fit/score';
 import { hostInterviewViews } from '../interviews/reads';
 import { hostOfferViews } from '../offers/offers';
 import { pendingPasses, pipelineEntries, pipelineEvents } from '../schema';
+import { requireApplicantReads } from './gate';
 
 type Cursor =
   | { sort: 'newest'; appliedAt: string; id: string }
@@ -62,7 +69,23 @@ function sqlOf(value: SQL | undefined): SQL {
   return value;
 }
 
-function cursorSql(cursor: Cursor): SQL {
+/** The listings among `infos` whose fit is on now. */
+async function fitOnListings(db: DbOrTx, infos: ListingHiringInfo[]): Promise<Set<string>> {
+  const on = await Promise.all(infos.map(async (h) => ((await fitAvailable(db, h)) ? [h.id] : [])));
+  return new Set(on.flat());
+}
+
+/** The score sort=fit orders by: the stored one on a listing in `fitOn`, otherwise null. */
+function shownFitSql(fitOn: ReadonlySet<string>): SQL {
+  if (fitOn.size === 0) return sql`null::smallint`;
+  return sql`(case when ${inArray(pipelineEntries.listingId, [...fitOn])} then ${pipelineEntries.fitScore} end)`;
+}
+
+function shownFit(row: PipelineEntryRow, fitOn: ReadonlySet<string>): number | null {
+  return fitOn.has(row.listingId) ? row.fitScore : null;
+}
+
+function cursorSql(cursor: Cursor, fit: SQL): SQL {
   if (cursor.sort === 'newest') {
     const at = new Date(cursor.appliedAt);
     return sqlOf(
@@ -91,44 +114,35 @@ function cursorSql(cursor: Cursor): SQL {
     );
   }
   const at = new Date(cursor.appliedAt);
-  const sameScore = sql`${pipelineEntries.fitScore} is not distinct from ${cursor.fitScore}`;
+  const sameScore = sql`${fit} is not distinct from ${cursor.fitScore}`;
   const earlier = sqlOf(
     or(
       lt(pipelineEntries.appliedAt, at),
       and(eq(pipelineEntries.appliedAt, at), lt(pipelineEntries.applicationId, cursor.id)),
     ),
   );
-  if (cursor.fitScore === null) return sqlOf(and(sql`${pipelineEntries.fitScore} is null`, earlier));
-  return sqlOf(
-    or(
-      sql`${pipelineEntries.fitScore} < ${cursor.fitScore}`,
-      sql`${pipelineEntries.fitScore} is null`,
-      and(sameScore, earlier),
-    ),
-  );
+  if (cursor.fitScore === null) return sqlOf(and(sql`${fit} is null`, earlier));
+  return sqlOf(or(sql`${fit} < ${cursor.fitScore}`, sql`${fit} is null`, and(sameScore, earlier)));
 }
 
-function orderBy(sort: ApplicantsQuery['sort']): SQL[] {
+function orderBy(sort: ApplicantsQuery['sort'], fit: SQL): SQL[] {
   if (sort === 'oldest') return [asc(pipelineEntries.appliedAt), asc(pipelineEntries.applicationId)];
   if (sort === 'activity') return [desc(pipelineEntries.lastStatusAt), desc(pipelineEntries.applicationId)];
   if (sort === 'fit') {
-    return [
-      sql`${pipelineEntries.fitScore} desc nulls last`,
-      desc(pipelineEntries.appliedAt),
-      desc(pipelineEntries.applicationId),
-    ];
+    // With no score shown this is newest first.
+    return [sql`${fit} desc nulls last`, desc(pipelineEntries.appliedAt), desc(pipelineEntries.applicationId)];
   }
   return [desc(pipelineEntries.appliedAt), desc(pipelineEntries.applicationId)];
 }
 
-function nextCursor(sort: ApplicantsQuery['sort'], row: PipelineEntryRow): string {
+function nextCursor(sort: ApplicantsQuery['sort'], row: PipelineEntryRow, fitOn: ReadonlySet<string>): string {
   if (sort === 'activity') {
     return encodeCursor({ sort, lastStatusAt: row.lastStatusAt.toISOString(), id: row.applicationId });
   }
   if (sort === 'fit') {
     return encodeCursor({
       sort,
-      fitScore: row.fitScore,
+      fitScore: shownFit(row, fitOn),
       appliedAt: row.appliedAt.toISOString(),
       id: row.applicationId,
     });
@@ -145,10 +159,12 @@ function storedFit(entry: PipelineEntryRow): FitResult | null {
   return { score: entry.fitScore, weightsVersion: entry.fitWeightsVersion ?? '', lines };
 }
 
+/** Cards for `rows`. `fitOn` is the listings whose fit is on; it is read when not given. */
 async function toCards(
   db: DbOrTx,
   ctx: HostContext,
   rows: PipelineEntryRow[],
+  fitOn?: ReadonlySet<string>,
 ): Promise<ApplicantCardData[]> {
   if (rows.length === 0) return [];
   const applicationIds = rows.map((row) => row.applicationId);
@@ -159,6 +175,7 @@ async function toCards(
     threadIdsForApplications(db, applicationIds),
     db.select().from(pendingPasses).where(inArray(pendingPasses.applicationId, applicationIds)),
   ]);
+  const shown = fitOn ?? (await fitOnListings(db, listings));
   const cardById = new Map(cards.map((card) => [card.applicationId, card]));
   const titleById = new Map(listings.map((listing) => [listing.id, listing.title]));
   const undoById = new Map(passes.map((row) => [row.applicationId, row.commitAt.toISOString()]));
@@ -172,7 +189,7 @@ async function toCards(
   for (const row of rows) {
     const card = cardById.get(row.applicationId);
     if (!card) continue;
-    items.push(cardItem(row, card, titleById.get(row.listingId) ?? '', urls, undoById, threads));
+    items.push(cardItem(row, card, titleById.get(row.listingId) ?? '', urls, undoById, threads, shown));
   }
   return items;
 }
@@ -184,6 +201,7 @@ function cardItem(
   urls: Map<string, string>,
   undoById: Map<string, string>,
   threads: Map<string, string>,
+  fitOn: ReadonlySet<string>,
 ): ApplicantCardData {
   return {
     applicationId: row.applicationId,
@@ -196,7 +214,7 @@ function cardItem(
     card,
     avatarUrl: card.avatarMediaId ? (urls.get(card.avatarMediaId) ?? null) : null,
     coverUrl: card.coverMediaId ? (urls.get(card.coverMediaId) ?? null) : null,
-    fitScore: row.fitScore,
+    fitScore: shownFit(row, fitOn),
     interviewState: (row.interviewState as InterviewStatus | null) ?? null,
     offerState: (row.offerState as OfferStatus | null) ?? null,
     undoUntil: undoById.get(row.applicationId) ?? null,
@@ -209,6 +227,7 @@ export async function listApplicants(
   ctx: HostContext,
   q: ApplicantsQuery,
 ): Promise<{ items: ApplicantCardData[]; counts: Record<ApplicationStatus, number>; nextCursor: string | null }> {
+  await requireApplicantReads(db, ctx.orgId);
   const scope = await listingScope(db, ctx);
   if (q.listingId && !inScope(scope, q.listingId)) throw notFound('Listing not found');
   const counts = zeroCounts();
@@ -230,6 +249,12 @@ export async function listApplicants(
   }
 
   const cursor = q.cursor ? decodeCursor(q.cursor, q.sort) : undefined;
+  // sort=fit orders by the shown score, so it needs fit for every listing the filter covers.
+  let fitOn: Set<string> | undefined;
+  if (q.sort === 'fit') {
+    fitOn = await fitOnListings(db, await getHiringInfoMany(db, await listingIdsOf(db, base, q)));
+  }
+  const fit = shownFitSql(fitOn ?? new Set());
   const rows = await db
     .select()
     .from(pipelineEntries)
@@ -237,19 +262,25 @@ export async function listApplicants(
       and(
         base,
         q.status && q.status.length > 0 ? inArray(pipelineEntries.status, q.status) : undefined,
-        cursor ? cursorSql(cursor) : undefined,
+        cursor ? cursorSql(cursor, fit) : undefined,
       ),
     )
-    .orderBy(...orderBy(q.sort))
+    .orderBy(...orderBy(q.sort, fit))
     .limit(q.limit + 1);
   const page = rows.slice(0, q.limit);
   const more = rows.length > q.limit;
   const last = page.at(-1);
   return {
-    items: await toCards(db, ctx, page),
+    items: await toCards(db, ctx, page, fitOn),
     counts,
-    nextCursor: more && last ? nextCursor(q.sort, last) : null,
+    nextCursor: more && last ? nextCursor(q.sort, last, fitOn ?? new Set()) : null,
   };
+}
+
+async function listingIdsOf(db: DbOrTx, base: SQL | undefined, q: ApplicantsQuery): Promise<string[]> {
+  if (q.listingId) return [q.listingId];
+  const rows = await db.selectDistinct({ listingId: pipelineEntries.listingId }).from(pipelineEntries).where(base);
+  return rows.map((row) => row.listingId);
 }
 
 export async function getApplicantDetail(
@@ -257,6 +288,7 @@ export async function getApplicantDetail(
   ctx: HostContext,
   applicationId: string,
 ): Promise<ApplicantDetail> {
+  await requireApplicantReads(db, ctx.orgId);
   const entry = await requireEntry(db, ctx, applicationId);
   const snapshot = await getSnapshot(db, { orgId: ctx.orgId, applicationId });
   if (!snapshot) throw notFound(APPLICATION_UNAVAILABLE);
@@ -275,7 +307,8 @@ export async function getApplicantDetail(
   return {
     card,
     snapshot,
-    fit: storedFit(entry),
+    // The card's score is null whenever fit is off for the listing; the full result follows it.
+    fit: card.fitScore === null ? null : storedFit(entry),
     history: history.map((event) => ({
       kind: event.kind as ApplicantDetail['history'][number]['kind'],
       actorType: event.actorType as 'host' | 'seeker' | 'system',

@@ -8,7 +8,7 @@ import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { sql } from 'drizzle-orm';
 import type { HostContext } from '@/server/guards';
-import { pipelineEvents } from '../schema';
+import { invites, pipelineEvents } from '../schema';
 import { listingsFake, orgsFake } from '@tests/fakes/sp5/sp2';
 import { discoveryFake } from '@tests/fakes/sp5/sp3';
 import { profilesFake, safetyFake } from '@tests/fakes/sp5/sp4';
@@ -183,6 +183,37 @@ describe('respondToInvite', () => {
     expect(list.items.find((i) => i.inviteId === inviteId)?.status).toBe('expired');
   });
 
+  it.each(['closed', 'in_review'] as const)(
+    'refuses any answer once the listing is %s, before the sweep, and reveals nothing',
+    async (state) => {
+      const s = await setup();
+      const inviteId = await invite(s);
+      listingsFake.setListing({ id: s.listingId, orgId: s.orgId, status: state });
+      for (const response of ['interested', 'not_interested'] as const) {
+        await expect(respondToInvite(t.db, s.seekerUserId, inviteId, { response }, NOW)).rejects.toMatchObject({
+          code: 'conflict',
+          details: { reason: 'expired' },
+        });
+      }
+      expect(calls('ensureThread')).toHaveLength(0);
+      expect(calls('postCard')).toHaveLength(0);
+      expect(profilesFake.calls.filter((c) => c.name === 'grantReveal')).toHaveLength(0);
+      expect(await responses(s.senderId)).toHaveLength(0);
+      const [row] = await t.db.select().from(invites).where(eq(invites.id, inviteId));
+      expect(row?.status).toBe('sent');
+    },
+  );
+
+  it('still returns a recorded Interested after the listing closes, without a second thread', async () => {
+    const s = await setup();
+    const inviteId = await invite(s);
+    const first = await respondToInvite(t.db, s.seekerUserId, inviteId, { response: 'interested' }, NOW);
+    listingsFake.setListing({ id: s.listingId, orgId: s.orgId, status: 'closed' });
+    const again = await respondToInvite(t.db, s.seekerUserId, inviteId, { response: 'interested' }, NOW);
+    expect(again.threadId).toBe(first.threadId);
+    expect(calls('ensureThread')).toHaveLength(1);
+  });
+
   it("is 404 for another seeker's invite", async () => {
     const s = await setup();
     const inviteId = await invite(s);
@@ -218,6 +249,17 @@ describe('muteInviteHost', () => {
     expect(r.invite).toMatchObject({ status: 'not_interested' });
     const host = await listHostInvites(t.db, s.ctx, {}, NOW);
     expect(host.items.find((i) => i.inviteId === inviteId)).toMatchObject({ status: 'not_interested', declineReason: null });
+  });
+
+  it('mutes but records no answer once the listing stopped being live', async () => {
+    const s = await setup();
+    const inviteId = await invite(s);
+    listingsFake.setListing({ id: s.listingId, orgId: s.orgId, status: 'closed' });
+    await muteInviteHost(t.db, s.seekerUserId, inviteId, NOW);
+    expect(safetyFake.calls.filter((c) => c.name === 'mute')).toHaveLength(1);
+    const [row] = await t.db.select().from(invites).where(eq(invites.id, inviteId));
+    expect(row?.status).toBe('sent');
+    expect(await responses(s.senderId)).toHaveLength(0);
   });
 });
 
