@@ -141,19 +141,29 @@ export async function toSeekerItems(
   return out;
 }
 
-/** The org's invites by ID (W3's card payloads). */
+/**
+ * The org's invites by ID. Given the member's HostContext (W3's thread card payloads), only
+ * invites on listings in the member's scope are returned.
+ */
 export async function hostInviteItems(
   db: DbOrTx,
-  orgId: string,
+  org: string | HostContext,
   inviteIds: string[],
   now: Date = new Date(),
 ): Promise<Map<string, HostInviteItem>> {
   if (inviteIds.length === 0) return new Map();
+  const orgId = typeof org === 'string' ? org : org.orgId;
   const rows = await db
     .select()
     .from(invites)
     .where(and(eq(invites.orgId, orgId), inArray(invites.id, inviteIds)));
-  return toHostItems(db, rows, now);
+  if (typeof org === 'string') return toHostItems(db, rows, now);
+  const scope = await listingScope(db, org);
+  return toHostItems(
+    db,
+    rows.filter((row) => inScope(scope, row.listingId)),
+    now,
+  );
 }
 
 /** The seeker's own delivered invites by ID (W3's card payloads). */

@@ -45,7 +45,7 @@ vi.mock('@/modules/messaging', async (orig) => ({
 }));
 
 import '../notification-types';
-import { getSeekerInvite, listHostInvites, listSeekerInvites } from './reads';
+import { getSeekerInvite, hostInviteItems, listHostInvites, listSeekerInvites, seekerInviteItems } from './reads';
 import { muteInviteHost, respondToInvite } from './respond';
 
 const NOW = FIXED_NOW;
@@ -302,6 +302,17 @@ describe('invite lists', () => {
     await expect(
       listSeekerInvites(t.db, s.seekerUserId, { cursor: first.nextCursor ?? undefined }, NOW),
     ).rejects.toMatchObject({ code: 'bad_request' });
+  });
+
+  it('scopes card lookups by HostContext, and by org id alone', async () => {
+    const s = await setup();
+    const inviteId = await invite(s);
+    expect((await hostInviteItems(t.db, s.ctx, [inviteId], NOW)).get(inviteId)?.status).toBe('sent');
+    expect((await hostInviteItems(t.db, s.orgId, [inviteId], NOW)).has(inviteId)).toBe(true);
+    expect((await hostInviteItems(t.db, newId(), [inviteId], NOW)).size).toBe(0);
+    orgsFake.setAccess(s.senderId, { all: false, listingIds: [], locationIds: [] });
+    expect((await hostInviteItems(t.db, s.ctx, [inviteId], NOW)).size).toBe(0);
+    expect((await seekerInviteItems(t.db, s.seekerUserId, [inviteId], NOW)).get(inviteId)?.inviteId).toBe(inviteId);
   });
 
   it('scopes the host list to listings a Recruiter can see', async () => {
