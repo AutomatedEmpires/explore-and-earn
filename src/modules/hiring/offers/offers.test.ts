@@ -177,6 +177,9 @@ describe('offer responses', () => {
       { startDate: '2026-11-04', pay, position: 'Lead Deckhand' },
       NOW,
     );
+    // A position the host typed is scanned before the seeker sees the offer.
+    expect(view.noteState).toBe('pending');
+    await withTx(t.db as Db, (tx) => releaseOfferNote(tx, view.id, { state: 'clear', checkId: newId(), labels: [] }));
     const accepted = await acceptOffer(t.db as Db, scene.seeker.userId, view.id, NOW);
     expect(accepted.applicationStatus).toBe('hired');
     expect(accepted.offer.status).toBe('accepted');
