@@ -1,20 +1,32 @@
-// GET/PUT /api/v1/host/not-selected-message. The owner replaces the handler.
+// GET/PUT /api/v1/host/not-selected-message.
+import { unauthorized } from '@/lib/errors';
 import { notSelectedSchema } from '@/lib/messaging';
+import { getNotSelectedMessage, setNotSelectedMessage } from '@/modules/messaging';
 import { apiRoute } from '@/server/api';
 
 export const GET = apiRoute({
   auth: 'host',
-  openapi: { method: 'GET', path: '/api/v1/host/not-selected-message', summary: 'Read the not-selected message' },
-  handler: async () => {
-    throw new Error('not implemented');
+  openapi: {
+    method: 'GET',
+    path: '/api/v1/host/not-selected-message',
+    summary: 'Read the not-selected message',
+  },
+  handler: async ({ db, host }) => {
+    if (!host) throw unauthorized();
+    return getNotSelectedMessage(db, host.orgId);
   },
 });
 
 export const PUT = apiRoute({
   auth: 'host',
   input: notSelectedSchema,
-  openapi: { method: 'PUT', path: '/api/v1/host/not-selected-message', summary: 'Set the not-selected message' },
-  handler: async () => {
-    throw new Error('not implemented');
+  openapi: {
+    method: 'PUT',
+    path: '/api/v1/host/not-selected-message',
+    summary: 'Set the not-selected message',
+  },
+  handler: async ({ db, host, input }) => {
+    if (!host) throw unauthorized();
+    return setNotSelectedMessage(db, host, input.body);
   },
 });
