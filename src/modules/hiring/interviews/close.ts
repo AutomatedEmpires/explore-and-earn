@@ -61,10 +61,12 @@ export async function closeOpenItems(
       .returning();
     if (updated) {
       await setInterviewState(tx, i.applicationId, 'canceled');
-      await postEvent(tx, interview.threadId, { code: 'interview_canceled', visibleTo: 'all' });
-      if (entry) {
+      // The seeker never saw a pending or held invite: its cancel is for the host only.
+      const delivered = interview.scanState === 'clear' || interview.scanState === 'warn';
+      await postEvent(tx, interview.threadId, { code: 'interview_canceled', visibleTo: delivered ? 'all' : 'host' });
+      const audience = i.reason === 'withdrawn' ? 'host' : 'seeker';
+      if (entry && (delivered || audience === 'host')) {
         const recipient = i.reason === 'withdrawn' ? updated.organizerUserId : entry.seekerUserId;
-        const audience = i.reason === 'withdrawn' ? 'host' : 'seeker';
         await notifyInterview(
           tx,
           updated,
@@ -90,7 +92,8 @@ export async function closeOpenItems(
       .returning();
     if (updated) {
       await setOfferState(tx, i.applicationId, 'canceled');
-      await postEvent(tx, offer.threadId, { code: 'offer_canceled', visibleTo: 'all' });
+      const delivered = offer.scanState === 'clear' || offer.scanState === 'warn';
+      await postEvent(tx, offer.threadId, { code: 'offer_canceled', visibleTo: delivered ? 'all' : 'host' });
     }
   }
 }

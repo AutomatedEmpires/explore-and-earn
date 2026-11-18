@@ -7,7 +7,7 @@ import type { EmailAttachment, NotificationData } from '@/modules/notifications'
 import { getHiringInfoMany } from '@/modules/listings';
 import { inScope, listingScope, type ThreadViewer } from '@/modules/messaging';
 import { getOrgSummaries } from '@/modules/orgs';
-import { interviews, pipelineEntries } from '../schema';
+import { interviewSlots, interviews, pipelineEntries } from '../schema';
 
 export type IcsEvent = {
   method: 'REQUEST' | 'CANCEL';
@@ -155,6 +155,24 @@ export async function interviewIcsAttachments(
   ];
 }
 
+type InterviewRow = typeof interviews.$inferSelect;
+
+/**
+ * The time the interview holds, or last held. A decline or a request for new times keeps the
+ * scheduled time on the row; a new round clears it but keeps `scheduledSlotId`, the slot of
+ * the round before.
+ */
+async function lastScheduled(db: DbOrTx, row: InterviewRow): Promise<{ start: Date; end: Date } | null> {
+  if (row.scheduledStart && row.scheduledEnd) return { start: row.scheduledStart, end: row.scheduledEnd };
+  if (!row.scheduledSlotId) return null;
+  const [slot] = await db.select().from(interviewSlots).where(eq(interviewSlots.id, row.scheduledSlotId));
+  if (!slot || slot.interviewId !== row.id) return null;
+  return { start: slot.startsAt, end: slot.endsAt };
+}
+
+/** A scheduled interview is the event; any later state that had a time cancels it. */
+const ICS_CANCEL = new Set(['canceled', 'declined', 'reschedule_requested', 'expired', 'invited']);
+
 export async function getInterviewIcs(
   db: DbOrTx,
   viewer: ThreadViewer,
@@ -178,10 +196,9 @@ export async function getInterviewIcs(
     if (!inScope(scope, row.listingId)) throw notFound('Interview not found', { reason: 'not_found' });
   }
 
-  const method = row.status === 'scheduled' ? 'REQUEST' : row.status === 'canceled' ? 'CANCEL' : null;
-  if (!method || !row.scheduledStart || !row.scheduledEnd) {
-    throw notFound('Interview not found', { reason: 'not_found' });
-  }
+  const method = row.status === 'scheduled' ? 'REQUEST' : ICS_CANCEL.has(row.status) ? 'CANCEL' : null;
+  const when = method ? await lastScheduled(db, row) : null;
+  if (!method || !when) throw notFound('Interview not found', { reason: 'not_found' });
   const audience = viewer.kind === 'host' ? 'host' : 'seeker';
   const [info] = await getHiringInfoMany(db, [row.listingId]);
   const orgs = await getOrgSummaries(db, [row.orgId]);
@@ -189,8 +206,8 @@ export async function getInterviewIcs(
     method,
     uid: interviewUid(row.id),
     sequence: row.sequence,
-    start: row.scheduledStart,
-    end: row.scheduledEnd,
+    start: when.start,
+    end: when.end,
     stamp: row.updatedAt,
     summary: `Interview: ${info?.title ?? ''} at ${orgs.get(row.orgId)?.name ?? 'Org'}`,
     location: locationOf(row),
