@@ -276,7 +276,7 @@ describe('releasing a message later', () => {
       clientId: newId(),
       body: 'On my way',
     });
-    safetyFake.setBlocked(seeded.orgId, seeded.seekerId);
+    safetyFake.setBlocked(seeded.orgId, seeded.seekerId, 'user');
     await runWorker(t.db, { handlers: jobHandlers });
 
     const seeker = await getThread(t.db, seekerViewer(seeded.seekerId), seeded.threadId);
@@ -284,6 +284,8 @@ describe('releasing a message later', () => {
     expect(seeker.readOnly).toBe('blocked');
     const hostView = await getThread(t.db, host, seeded.threadId);
     expect(hostView.messages.find((row) => row.id === sent.message.id)?.state).toBe('not_delivered');
+    // The host is never told that the seeker blocked them.
+    expect(hostView.readOnly).toBe('unavailable');
     expect(await seekerNotes(seeded.seekerId)).toBe(0);
     const [thread] = await t.db.select().from(threads).where(eq(threads.id, seeded.threadId));
     expect(thread?.lastToSeekerAt).toBeNull();
@@ -296,7 +298,7 @@ describe('releasing a message later', () => {
       body: '__block__',
     });
     await runWorker(t.db, { handlers: jobHandlers });
-    safetyFake.setBlocked(seeded.orgId, seeded.seekerId);
+    safetyFake.setBlocked(seeded.orgId, seeded.seekerId, 'user');
     const [item] = await listOpenReviewItems(t.db, 'message', sent.message.id);
     await decide(t.db, item?.id ?? '', operatorId, 'approve');
 
