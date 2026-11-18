@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getDb } from '@/lib/db';
 import { getEnv } from '@/lib/env';
@@ -8,6 +9,7 @@ import { requireUser, type CurrentUser } from '@/server/guards';
 import { adminOrigin, homeFor, signInUrl } from '@/server/shell';
 import { AuthFrame } from '@/ui/patterns/AuthFrame';
 import { OnboardingForm } from './OnboardingForm';
+import { isSignupRefusedValue, SIGNUP_REFUSED_COOKIE } from './refusal';
 import { onboardingDestination, onboardingHref, onboardingReturnTo } from './return-to';
 
 export const metadata: Metadata = { title: 'Welcome · Explore&Earn' };
@@ -52,9 +54,12 @@ export default async function OnboardingPage({ searchParams }: { searchParams: S
   const state = await onboardingFor(user, returnTo);
   if ('to' in state) redirect(state.to);
 
+  // A sign-up refused earlier in this browser session opens on the refusal (legal review 2.6).
+  const refused = isSignupRefusedValue((await cookies()).get(SIGNUP_REFUSED_COOKIE)?.value);
+
   return (
     <AuthFrame footer="Explore&Earn is free for seekers, forever.">
-      <OnboardingForm hostOnly={state.hostOnly} returnTo={returnTo} />
+      <OnboardingForm hostOnly={state.hostOnly} refused={refused} returnTo={returnTo} />
     </AuthFrame>
   );
 }

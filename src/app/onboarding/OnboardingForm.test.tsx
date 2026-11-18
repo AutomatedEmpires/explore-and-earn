@@ -4,6 +4,9 @@
 //   C-3: the step is in the URL, so the browser's Back button moves between steps, and a
 //        refresh or a link opens the same step.
 //   C-2: each step's paragraph is 16 px body text.
+//   Legal review 2.6 (P0 item 17): the seeker step asks for the date of birth as a neutral
+//   question (#128's approved frames), never hints at the cut-off, and a refusal closes
+//   onboarding for the session.
 //
 // Next.js syncs the native History API into useSearchParams; the mock below does the same from
 // jsdom's location, so the form is driven through real pushState, replaceState and popstate.
@@ -38,7 +41,11 @@ vi.mock('next/navigation', async () => {
 });
 
 const getToken = vi.hoisted(() => vi.fn(async () => 'token'));
-vi.mock('@clerk/nextjs', () => ({ useSession: () => ({ session: { getToken } }) }));
+const signOut = vi.hoisted(() => vi.fn(async (_opts?: { redirectUrl?: string }) => {}));
+vi.mock('@clerk/nextjs', () => ({
+  useSession: () => ({ session: { getToken } }),
+  useClerk: () => ({ signOut }),
+}));
 
 const JOB = '/jobs/view/1/lift-operator?intent=save%3A1';
 const ONBOARDING_JOB = `/onboarding?returnTo=${encodeURIComponent(JOB)}`;
@@ -53,6 +60,7 @@ beforeEach(() => {
   nav.refresh.mockReset();
   nav.back.mockReset();
   getToken.mockClear();
+  signOut.mockClear();
   // Like Next.js: history calls and popstate update useSearchParams.
   window.history.pushState = (...args: Parameters<History['pushState']>) => {
     pushState.apply(window.history, args);
@@ -91,8 +99,25 @@ function sentBody(fetchMock: ReturnType<typeof respond>): unknown {
 }
 
 const chooseHeading = () => screen.queryByRole('heading', { name: 'Welcome to Explore&Earn' });
-const seekerHeading = () =>
-  screen.queryByRole('heading', { name: 'Work worth going somewhere for.' });
+const seekerHeading = () => screen.queryByRole('heading', { name: 'What is your date of birth?' });
+const refusedHeading = () =>
+  screen.queryByRole('heading', { name: 'We can’t make you an account' });
+
+/** Picks the month through the Select's form value, as the browser's autofill does. */
+function chooseMonth(value: string) {
+  const select = document.querySelector<HTMLSelectElement>('select[name="birthMonth"]');
+  if (!select) throw new Error('no month select');
+  fireEvent.change(select, { target: { value } });
+}
+
+/** Fills in the date of birth: month 1-12, day and year as typed. */
+function enterDateOfBirth(month: string, day: string, year: string) {
+  if (month) chooseMonth(month);
+  fireEvent.change(screen.getByRole('textbox', { name: /^Day/ }), { target: { value: day } });
+  fireEvent.change(screen.getByRole('textbox', { name: /^Year/ }), { target: { value: year } });
+}
+
+const ADULT = { month: '4', day: '3', year: '1990', iso: '1990-04-03' };
 const hostHeading = () => screen.queryByRole('heading', { name: 'Name your organization' });
 
 describe('OnboardingForm: the step is in the URL (C-3)', () => {
@@ -167,13 +192,13 @@ describe('OnboardingForm: the step is in the URL (C-3)', () => {
     render(<OnboardingForm />);
     fireEvent.click(screen.getByRole('button', { name: /I'm looking for work/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    expect(screen.getByText('Confirm you are 18 or older to continue.')).toBeInTheDocument();
+    expect(screen.getByText('Choose a month.')).toBeInTheDocument();
 
     act(() => window.history.back());
     await waitFor(() => expect(chooseHeading()).toBeInTheDocument());
     act(() => window.history.forward());
     await waitFor(() => expect(seekerHeading()).toBeInTheDocument());
-    expect(screen.queryByText('Confirm you are 18 or older to continue.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Choose a month.')).not.toBeInTheDocument();
   });
 
   it('shows only the organization step, without Back, for a host who still has to name it', () => {
@@ -187,7 +212,7 @@ describe('OnboardingForm: the step is in the URL (C-3)', () => {
 describe('OnboardingForm: body text is at least 16 px (C-2)', () => {
   it.each([
     ['/onboarding', 'Welcome to Explore&Earn'],
-    ['/onboarding?step=seeker', 'Work worth going somewhere for.'],
+    ['/onboarding?step=seeker', 'What is your date of birth?'],
     ['/onboarding?step=host', 'Name your organization'],
   ])('sets the paragraph under the heading at %s in text-16', (href, title) => {
     visit(href);
@@ -205,14 +230,14 @@ describe("OnboardingForm: the guest's action survives onboarding (C-1)", () => {
     visit(`${ONBOARDING_JOB}&step=seeker`);
     render(<OnboardingForm returnTo={JOB} />);
 
-    fireEvent.click(screen.getByRole('checkbox', { name: "I'm 18 or older" }));
+    enterDateOfBirth(ADULT.month, ADULT.day, ADULT.year);
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 
     await waitFor(() => expect(nav.replace).toHaveBeenCalledWith(JOB));
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/onboarding', expect.anything());
     expect(sentBody(fetchMock)).toEqual({
       accountType: 'seeker',
-      adultAttested: true,
+      dateOfBirth: ADULT.iso,
       returnTo: JOB,
     });
     expect(getToken).toHaveBeenCalledWith({ skipCache: true });
@@ -244,11 +269,11 @@ describe("OnboardingForm: the guest's action survives onboarding (C-1)", () => {
     visit('/onboarding?step=seeker');
     render(<OnboardingForm />);
 
-    fireEvent.click(screen.getByRole('checkbox', { name: "I'm 18 or older" }));
+    enterDateOfBirth(ADULT.month, ADULT.day, ADULT.year);
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 
     await waitFor(() => expect(nav.replace).toHaveBeenCalledWith('/'));
-    expect(sentBody(fetchMock)).toEqual({ accountType: 'seeker', adultAttested: true });
+    expect(sentBody(fetchMock)).toEqual({ accountType: 'seeker', dateOfBirth: ADULT.iso });
   });
 
   it.each([['https://evil.test/jobs'], ['//evil.test'], ['javascript:alert(1)'], [42], [null]])(
@@ -258,7 +283,7 @@ describe("OnboardingForm: the guest's action survives onboarding (C-1)", () => {
       visit('/onboarding?step=seeker');
       render(<OnboardingForm />);
 
-      fireEvent.click(screen.getByRole('checkbox', { name: "I'm 18 or older" }));
+      enterDateOfBirth(ADULT.month, ADULT.day, ADULT.year);
       fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 
       await waitFor(() => expect(nav.replace).toHaveBeenCalledWith('/'));
@@ -270,12 +295,145 @@ describe("OnboardingForm: the guest's action survives onboarding (C-1)", () => {
     visit(`${ONBOARDING_JOB}&step=seeker`);
     render(<OnboardingForm returnTo={JOB} />);
 
-    fireEvent.click(screen.getByRole('checkbox', { name: "I'm 18 or older" }));
+    enterDateOfBirth(ADULT.month, ADULT.day, ADULT.year);
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 
     await waitFor(() => expect(nav.refresh).toHaveBeenCalledTimes(1));
     expect(nav.replace).not.toHaveBeenCalled();
     // The refreshed page reads returnTo from the URL, which still has it.
     expect(new URLSearchParams(window.location.search).get('returnTo')).toBe(JOB);
+  });
+});
+
+describe('OnboardingForm: the date of birth step (legal review 2.6)', () => {
+  const REFUSED = {
+    error: {
+      code: 'forbidden',
+      message: 'We can’t make you an account',
+      details: { reason: 'signup_refused' },
+      requestId: 'req-1',
+    },
+  };
+
+  it('asks a neutral question, keeps only the year, and never shows an age', () => {
+    visit('/onboarding?step=seeker');
+    const { container } = render(<OnboardingForm />);
+
+    expect(seekerHeading()).toBeInTheDocument();
+    expect(
+      screen.getByText('We ask everyone who makes an account. We keep only the year.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Date of birth' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /^Month/ })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /^Day/ })).toHaveAttribute('inputmode', 'numeric');
+    expect(screen.getByRole('textbox', { name: /^Year/ })).toHaveAttribute('inputmode', 'numeric');
+    expect(screen.getByText('You never pay to get a job.')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    // No hint at the cut-off anywhere on the step.
+    expect(container.textContent).not.toMatch(/\b18\b|adult|or older|\bage\b/i);
+  });
+
+  it('checks the date in place and keeps what was typed', () => {
+    const fetchMock = respond(200, { redirectTo: '/' });
+    visit('/onboarding?step=seeker');
+    render(<OnboardingForm />);
+
+    enterDateOfBirth('4', '3', '01');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getByText('Enter all 4 numbers, like 1998.')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /^Year/ })).toHaveValue('01');
+    expect(screen.getByRole('textbox', { name: /^Year/ })).toHaveAttribute('aria-invalid', 'true');
+
+    enterDateOfBirth('2', '30', '2001');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getByText('Enter a real date.')).toBeInTheDocument();
+
+    enterDateOfBirth('4', '', '2001');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getByText('Enter the day, like 3.')).toBeInTheDocument();
+
+    enterDateOfBirth('4', '3', String(new Date().getFullYear() + 1));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getByText('Enter a date before today.')).toBeInTheDocument();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('pads the date it sends: 4 / 3 / 2001 is 2001-04-03', async () => {
+    const fetchMock = respond(200, { redirectTo: '/' });
+    visit('/onboarding?step=seeker');
+    render(<OnboardingForm />);
+
+    enterDateOfBirth('4', '03', '2001');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(sentBody(fetchMock)).toEqual({ accountType: 'seeker', dateOfBirth: '2001-04-03' });
+  });
+
+  it('shows the refusal with no way to try again, and Back to jobs signs out', async () => {
+    respond(403, REFUSED);
+    visit('/onboarding?step=seeker');
+    const { container } = render(<OnboardingForm />);
+
+    enterDateOfBirth('6', '1', '2015');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await waitFor(() => expect(refusedHeading()).toBeInTheDocument());
+    expect(refusedHeading()).toHaveFocus();
+    expect(screen.getByText('You can still look at jobs without an account.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Date of birth' })).not.toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/\b18\b|adult|or older|\bage\b|try again/i);
+
+    // Both ways out end the session first: a signed-in account with no type is sent back to
+    // onboarding from any page.
+    fireEvent.click(screen.getByRole('button', { name: 'Back to jobs' }));
+    expect(signOut).toHaveBeenLastCalledWith({ redirectUrl: '/' });
+    fireEvent.click(screen.getByRole('button', { name: 'Read the Terms' }));
+    expect(signOut).toHaveBeenLastCalledWith({ redirectUrl: '/legal/terms' });
+    expect(nav.replace).not.toHaveBeenCalled();
+  });
+
+  it('opens on the refusal when the session was already refused, at any step', () => {
+    visit('/onboarding?step=host');
+    render(<OnboardingForm refused />);
+    expect(refusedHeading()).toBeInTheDocument();
+    expect(hostHeading()).not.toBeInTheDocument();
+  });
+
+  it('keeps the date while offline, and sends it again from Try again', async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+        throw new TypeError('Failed to fetch');
+      },
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const onLine = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    visit('/onboarding?step=seeker');
+    render(<OnboardingForm />);
+
+    enterDateOfBirth(ADULT.month, ADULT.day, ADULT.year);
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'You are offline' })).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText('Your date of birth is saved on this phone. Try again when you are back.'),
+    ).toBeInTheDocument();
+
+    onLine.mockReturnValue(true);
+    fetchMock.mockImplementation(async () => Response.json({ redirectTo: '/' }, { status: 200 }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    await waitFor(() => expect(nav.replace).toHaveBeenCalledWith('/'));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toEqual({
+      accountType: 'seeker',
+      dateOfBirth: ADULT.iso,
+    });
+    onLine.mockRestore();
   });
 });
