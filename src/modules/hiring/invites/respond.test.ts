@@ -296,6 +296,12 @@ describe('invite lists', () => {
     expect(second.nextCursor).toBeNull();
     const none = await listHostInvites(t.db, s.ctx, { status: 'interested' }, NOW);
     expect(none.items).toEqual([]);
+    await expect(
+      listHostInvites(t.db, s.ctx, { status: 'sent', cursor: first.nextCursor ?? undefined }, NOW),
+    ).rejects.toMatchObject({ code: 'bad_request', details: { reason: 'invalid_cursor' } });
+    await expect(
+      listSeekerInvites(t.db, s.seekerUserId, { cursor: first.nextCursor ?? undefined }, NOW),
+    ).rejects.toMatchObject({ code: 'bad_request' });
   });
 
   it('scopes the host list to listings a Recruiter can see', async () => {

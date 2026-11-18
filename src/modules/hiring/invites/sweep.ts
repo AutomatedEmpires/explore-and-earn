@@ -5,30 +5,33 @@
 import { and, eq, gt, inArray, isNull, lte } from 'drizzle-orm';
 import { withTx, type Db, type Tx } from '@/lib/db';
 import { INVITES } from '@/lib/hiring';
+import { newId } from '@/lib/ids';
 import { getHiringInfoMany } from '@/modules/listings';
-import { recordPipelineEvent } from '../core';
-import { invites } from '../schema';
+import { invites, pipelineEvents } from '../schema';
 import { notifyInviteExpiring } from './notify';
 import type { InviteRow } from './reads';
 import { DELIVERED } from './status';
 
 const HOUR_MS = 3_600_000;
 
+/** One `invite_expired` event per expired invite, written in one insert. */
 async function expire(tx: Tx, rows: InviteRow[], now: Date): Promise<void> {
   if (rows.length === 0) return;
   const infos = await getHiringInfoMany(tx, [...new Set(rows.map((r) => r.listingId))]);
   const locations = new Map(infos.map((h) => [h.id, h.locationId]));
-  for (const row of rows) {
-    await recordPipelineEvent(tx, {
+  await tx.insert(pipelineEvents).values(
+    rows.map((row) => ({
+      id: newId(),
       orgId: row.orgId,
       listingId: row.listingId,
       locationId: locations.get(row.listingId) ?? null,
       inviteId: row.id,
       kind: 'invite_expired',
-      actor: { type: 'system' },
-      at: now,
-    });
-  }
+      actorType: 'system',
+      actorUserId: null,
+      occurredAt: now,
+    })),
+  );
 }
 
 export async function sweepInvites(db: Db, now: Date): Promise<void> {

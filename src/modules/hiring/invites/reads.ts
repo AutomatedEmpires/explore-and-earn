@@ -41,25 +41,28 @@ export function applyHref(listingId: string, inviteId: string): string {
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
 const unique = (values: string[]) => [...new Set(values)];
 
-type Cursor = { side: 'h' | 's'; at: string; id: string };
+/** `key` binds a cursor to its list and filters: `s` for the seeker, `h.<listing>.<status>` for the host. */
+type Cursor = { key: string; at: string; id: string };
+
+const hostKey = (q: { listingId?: string; status?: InviteStatus }) => `h.${q.listingId ?? '-'}.${q.status ?? '-'}`;
 
 function encodeCursor(c: Cursor): string {
-  return Buffer.from(`${c.side}|${c.at}|${c.id}`, 'utf8').toString('base64url');
+  return Buffer.from(`${c.key}|${c.at}|${c.id}`, 'utf8').toString('base64url');
 }
 
-function decodeCursor(raw: string, side: Cursor['side']): Cursor {
-  const [s, at, id, ...rest] = Buffer.from(raw, 'base64url').toString('utf8').split('|');
-  if (rest.length > 0 || s !== side || !at || Number.isNaN(Date.parse(at)) || !id || !UUID.test(id)) {
+function decodeCursor(raw: string, key: string): Cursor {
+  const [k, at, id, ...rest] = Buffer.from(raw, 'base64url').toString('utf8').split('|');
+  if (rest.length > 0 || k !== key || !at || Number.isNaN(Date.parse(at)) || !id || !UUID.test(id)) {
     throw badRequest('Invalid cursor', { reason: 'invalid_cursor' });
   }
-  return { side, at, id };
+  return { key, at, id };
 }
 
 function after(c: Cursor | null): SQL | undefined {
   return c ? sql`(${invites.sentAt}, ${invites.id}) < (${c.at}::timestamptz, ${c.id}::uuid)` : undefined;
 }
 
-function page<T>(rows: InviteRow[], items: Map<string, T>, side: Cursor['side']): Page<T> {
+function page<T>(rows: InviteRow[], items: Map<string, T>, key: string): Page<T> {
   const shown = rows.slice(0, PAGE_SIZE);
   const last = shown[shown.length - 1];
   return {
@@ -68,7 +71,7 @@ function page<T>(rows: InviteRow[], items: Map<string, T>, side: Cursor['side'])
       return item ? [item] : [];
     }),
     nextCursor:
-      rows.length > PAGE_SIZE && last ? encodeCursor({ side, at: last.sentAt.toISOString(), id: last.id }) : null,
+      rows.length > PAGE_SIZE && last ? encodeCursor({ key, at: last.sentAt.toISOString(), id: last.id }) : null,
   };
 }
 
@@ -196,7 +199,8 @@ export async function listHostInvites(
   now: Date = new Date(),
 ): Promise<Page<HostInviteItem>> {
   await requireApplicantAccess(db, ctx.orgId);
-  const cursor = q.cursor ? decodeCursor(q.cursor, 'h') : null;
+  const key = hostKey(q);
+  const cursor = q.cursor ? decodeCursor(q.cursor, key) : null;
   const scope = await listingScope(db, ctx);
   if (q.listingId && !inScope(scope, q.listingId)) throw notFound('Listing not found');
   if (!scope.all && scope.listingIds.length === 0) return { items: [], nextCursor: null };
@@ -214,7 +218,7 @@ export async function listHostInvites(
     )
     .orderBy(desc(invites.sentAt), desc(invites.id))
     .limit(PAGE_SIZE + 1);
-  return page(rows, await toHostItems(db, rows.slice(0, PAGE_SIZE), now), 'h');
+  return page(rows, await toHostItems(db, rows.slice(0, PAGE_SIZE), now), key);
 }
 
 /** The seeker's delivered invites, newest first, keyset-paged. */

@@ -1,6 +1,6 @@
 // Stored fit for applicants (SP5 plan Task 13). The fit engine itself never writes; this file
 // does. When fit is off for a listing the stored score is cleared, so none is kept (spec 8.3).
-import { and, eq, inArray, notInArray } from 'drizzle-orm';
+import { and, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import type { Db } from '@/lib/db';
 import type { ApplicationStatus } from '@/lib/applications';
 import { getHiringInfoMany } from '@/modules/listings';
@@ -35,20 +35,25 @@ export async function scoreApplications(
     [...new Set(entries.map((e) => e.seekerUserId))],
   );
   const now = new Date();
-  let scored = 0;
-  for (const entry of entries) {
+  const values = entries.map((entry) => {
     const fit = scores?.get(entry.seekerUserId) ?? null;
-    if (fit) scored += 1;
-    await db
-      .update(pipelineEntries)
-      .set(
-        fit
-          ? { fitScore: fit.score, fitLines: fit.lines, fitWeightsVersion: fit.weightsVersion, fitComputedAt: now }
-          : { fitScore: null, fitLines: null, fitWeightsVersion: null, fitComputedAt: null },
-      )
-      .where(eq(pipelineEntries.applicationId, entry.applicationId));
-  }
-  return scored;
+    return {
+      application_id: entry.applicationId,
+      score: fit?.score ?? null,
+      lines: fit?.lines ?? null,
+      version: fit?.weightsVersion ?? null,
+      at: fit ? now.toISOString() : null,
+    };
+  });
+  // One statement for the whole listing, not one per entry.
+  await db.execute(sql`
+    update app.pipeline_entries p
+    set fit_score = v.score, fit_lines = v.lines, fit_weights_version = v.version, fit_computed_at = v.at
+    from jsonb_to_recordset(${JSON.stringify(values)}::jsonb)
+      as v(application_id uuid, score smallint, lines jsonb, version text, at timestamptz)
+    where p.application_id = v.application_id
+  `);
+  return values.filter((v) => v.score !== null).length;
 }
 
 /** `hiring.fit_refresh` (daily): rescores non-terminal entries on every active listing. */
