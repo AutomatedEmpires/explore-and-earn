@@ -2,6 +2,14 @@
 // apiRoute's `rateLimit` option uses. Owned by W4 (Task 11).
 import type { HandlerMap } from '@/modules/jobs';
 
-export { consume, type RateLimitResult } from './limiter';
+export {
+  NEW_HOST_DAILY_CAP,
+  NEW_HOST_DAYS,
+  consume,
+  consumeNewHostDaily,
+  newHostWindowOpen,
+  type NewHostAction,
+  type RateLimitResult,
+} from './limiter';
 
 export const jobHandlers: HandlerMap = {};

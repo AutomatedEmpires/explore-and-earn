@@ -10,8 +10,12 @@ import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { FIXED_NOW, seedHostOrg } from '../../../tests/helpers/sp2';
 import {
   FREE_EMAIL_DOMAINS,
+  brandCareersMismatch,
+  cardFitsBusiness,
   collectSignals,
+  domainPredatesAccount,
   hardFlags,
+  manualReviewReasons,
   rdapRegisteredAt,
   type SignalDeps,
   type VerificationSignals,
@@ -44,6 +48,8 @@ beforeEach(async () => {
   billingFake.reset();
   locationsFake.reset();
   await t.db.execute(sql`delete from app.settings`);
+  await t.db.execute(sql`delete from app.verification_banned_fingerprints`);
+  await t.db.execute(sql`delete from app.verification_brand_contacts`);
 });
 
 const DAY_MS = 86_400_000;
@@ -204,6 +210,31 @@ describe('collectSignals', () => {
     expect(s).toMatchObject({ hasCard: true, cvcCheck: 'fail', postalCheck: null, locationInUs: true });
     expect(hardFlags(s)).toEqual(['cvc_failed']);
   });
+
+  it('reads a banned fingerprint, a brand careers mismatch and a card that does not fit', async () => {
+    const orgId = await org('sam@gmail.com', 'https://hilton.example');
+    await t.db.execute(sql`
+      insert into app.verification_banned_fingerprints (id, kind, value)
+      values (${newId()}, 'device', 'dev-1')
+    `);
+    await t.db.execute(sql`
+      insert into app.verification_brand_contacts (brand_name, contact_domain)
+      values ('Kettle Ridge', 'kettle.com')
+    `);
+    locationsFake.setLocation({ id: newId(), orgId, state: 'MT' });
+    const s = await collectSignals(t.db, orgId, {
+      ...deps().deps,
+      fingerprints: { device: 'DEV-1' },
+      cardProfile: { country: 'GB', name: 'Someone Else' },
+    });
+    expect(s).toMatchObject({
+      bannedFingerprint: true,
+      brandCareersMismatch: true,
+      cardCountryFits: false,
+      cardNameFits: false,
+      freeEmail: true,
+    });
+  });
 });
 
 describe('rdapRegisteredAt', () => {
@@ -252,10 +283,90 @@ describe('hardFlags', () => {
       locationInUs: true,
       blockedDomain: true,
       websiteText: null,
+      domainPredatesAccount: null,
+      cardCountryFits: null,
+      cardNameFits: null,
+      bannedFingerprint: false,
+      brandCareersMismatch: false,
     };
     expect(hardFlags(s)).toEqual(['blocked_domain', 'disposable_email', 'cvc_failed']);
     expect(
       hardFlags({ ...s, blockedDomain: false, disposableEmail: false, cvcCheck: 'unchecked' }),
     ).toEqual([]);
+  });
+});
+
+describe('the signals that wait for an operator', () => {
+  const account = new Date('2026-01-01T00:00:00Z');
+
+  it('says the domain predates the account only when registration is earlier', () => {
+    expect(domainPredatesAccount(new Date('2025-12-31T00:00:00Z'), account)).toBe(true);
+    expect(domainPredatesAccount(account, account)).toBe(false);
+    expect(domainPredatesAccount(null, account)).toBeNull();
+  });
+
+  it('fits a US card country and the business name, and leaves an unknown side alone', () => {
+    expect(cardFitsBusiness(null, { name: 'Lodge', inUs: true })).toEqual({
+      countryFits: null,
+      nameFits: null,
+    });
+    expect(
+      cardFitsBusiness({ country: 'us', name: 'Lodge' }, { name: 'Lodge', inUs: true }),
+    ).toEqual({ countryFits: true, nameFits: true });
+    expect(
+      cardFitsBusiness({ country: 'CA', name: 'Other' }, { name: 'Lodge', inUs: true }),
+    ).toEqual({ countryFits: false, nameFits: false });
+    expect(cardFitsBusiness({ country: 'CA', name: null }, { name: 'Lodge', inUs: false })).toEqual({
+      countryFits: null,
+      nameFits: null,
+    });
+  });
+
+  it('flags a known brand whose email is not that brand\'s careers contact', () => {
+    const brands = [{ name: 'Hilton', contactDomain: 'hilton.com' }];
+    expect(brandCareersMismatch('Hilton Seattle', 'gmail.com', brands)).toBe(true);
+    expect(brandCareersMismatch('Hilton Seattle', 'hilton.com', brands)).toBe(false);
+    expect(brandCareersMismatch('Kettle Ridge Lodge', 'gmail.com', brands)).toBe(false);
+  });
+
+  it('names each reason that waits for an operator and ignores unknowns', () => {
+    const base: VerificationSignals = {
+      emailDomain: 'kettle.com',
+      freeEmail: false,
+      disposableEmail: false,
+      websiteReachable: true,
+      domainMatch: true,
+      domainAgeDays: 100,
+      cvcCheck: 'pass',
+      postalCheck: 'pass',
+      hasCard: true,
+      locationInUs: true,
+      blockedDomain: false,
+      websiteText: null,
+      domainPredatesAccount: true,
+      cardCountryFits: null,
+      cardNameFits: null,
+      bannedFingerprint: false,
+      brandCareersMismatch: false,
+    };
+    expect(manualReviewReasons(base)).toEqual([]);
+    expect(
+      manualReviewReasons({
+        ...base,
+        freeEmail: true,
+        bannedFingerprint: true,
+        brandCareersMismatch: true,
+        cardCountryFits: false,
+        cardNameFits: false,
+        domainPredatesAccount: false,
+      }),
+    ).toEqual([
+      'free_email',
+      'banned_fingerprint',
+      'brand_careers_mismatch',
+      'card_country',
+      'card_name',
+      'domain_after_account',
+    ]);
   });
 });

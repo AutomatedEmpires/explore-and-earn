@@ -9,6 +9,7 @@ import { record, type AuditEventInput } from '@/modules/audit';
 import { emit } from '@/modules/jobs';
 import { notify } from '@/modules/notifications';
 import { getOrgSummaries } from '@/modules/orgs';
+import { hostApplicantGate, type ApplicantDataBlock } from '@/modules/verification';
 import type { HostContext } from '@/server/guards';
 import { findListing, loadListing, userActor, type ListingRecord } from './access';
 import { revisionUnderReview, teamFor } from './publish';
@@ -140,13 +141,15 @@ export async function canAcceptApplications(
   now: Date = new Date(),
 ): Promise<
   | { ok: true; revisionId: string }
-  | { ok: false; reason: 'not_active' | 'org_inactive' | 'deadline_passed' }
+  | { ok: false; reason: 'not_active' | 'org_inactive' | 'deadline_passed' | ApplicantDataBlock }
 > {
   const l = await findListing(db, listingId);
   if (!l || l.state !== 'active' || !l.publishedRevisionId)
     return { ok: false, reason: 'not_active' };
   const org = (await getOrgSummaries(db, [l.orgId])).get(l.orgId);
   if (!org || org.status !== 'active' || org.deleted) return { ok: false, reason: 'org_inactive' };
+  const gate = await hostApplicantGate(db, l.orgId);
+  if (!gate.ok) return gate;
   const [rev] = await db
     .select({ deadline: listingRevisions.deadline, timezone: listingRevisions.timezone })
     .from(listingRevisions)
