@@ -268,6 +268,36 @@ describe('runListingChecks', () => {
       ]);
     });
 
+    it('reads the group list and the age rules, with the race ground (issue 200)', async () => {
+      const r = await check((c) => {
+        c.job.description = `${DESCRIPTION} Men preferred.`;
+        c.job.requiredQualifications = ['Must be under 35', 'Whites only'];
+      });
+      expect(r.errors).toEqual([]);
+      const keep =
+        'If the job needs it, you can keep it: we will review the listing before it goes live.';
+      expect(r.warnings).toEqual([
+        {
+          code: 'wording_flagged',
+          section: 'job',
+          field: 'job.description',
+          message: `"men preferred" can read as a preference for men or for women. Describe the work and the skills it needs, not the kind of person you want. ${keep}`,
+        },
+        {
+          code: 'wording_flagged',
+          section: 'job',
+          field: 'job.requiredQualifications.0',
+          message: `"under 35" can read as an age limit or preference. Remove the age limit. The only age rule a listing can set is 18 or 21 and up. ${keep}`,
+        },
+        {
+          code: 'wording_flagged',
+          section: 'job',
+          field: 'job.requiredQualifications.1',
+          message: `"whites only" can read as a preference about race or skin color. Describe the work and the skills it needs, not the kind of person you want. ${keep}`,
+        },
+      ]);
+    });
+
     it('leaves a field with blocked wording to the block', async () => {
       const r = await check((c) => {
         c.job.description = `${DESCRIPTION} US citizens only. Young team.`;
@@ -360,6 +390,97 @@ describe('runListingChecks', () => {
       ]);
     });
 
+    // Issue 200: an age range or an upper limit, in any order, with or without "are you", and
+    // school-finish or graduation dates. Blocked, not only flagged.
+    it.each([
+      'Are you between 18 and 30?',
+      'Are you over 18 and under 30?',
+      'Are you at least 18 and under 30?',
+      'Are you 21 or older, but younger than 35?',
+      'Are you over the age of 18 and no older than 40?',
+      'Are you 18-30?',
+      'Are you 18 to 30?',
+      'Are you under 35?',
+      'Are you a student under 25?',
+      'Are you 30 or younger?',
+      'Are you 35 and under?',
+      'When did you finish high school?',
+      'When did you finish school?',
+      'When did you graduate?',
+      'When did you graduate from college?',
+      'What year did you finish high school?',
+      'What is your graduation date?',
+      'Class of 2015 or later?',
+    ])('blocks the age question %j, with no wording warning (issue 200)', async (prompt) => {
+      const r = await check(ask(prompt));
+      expect(r.errors).toEqual([
+        {
+          code: 'question_not_allowed',
+          section: 'applying',
+          field: 'applying.questions.0.prompt',
+          message:
+            'The only question about age you can ask is "Are you at least 18?" or "Are you at least 21?".',
+        },
+      ]);
+      expect(r.warnings).toEqual([]);
+    });
+
+    it.each([
+      'Do you have any kids?',
+      'Do you have any children?',
+      'Do you have kids?',
+      'Are you a parent?',
+      'Are you a single mom?',
+      'Do you have any dependents?',
+      'Who will watch your kids while you work?',
+      'How many children do you have?',
+    ])('blocks the family question %j (issue 200)', async (prompt) => {
+      expect((await check(ask(prompt))).errors).toEqual([
+        {
+          code: 'question_not_allowed',
+          section: 'applying',
+          field: 'applying.questions.0.prompt',
+          message:
+            "You can't ask about marriage, partners or children. Ask about what the job needs, like the schedule or shared housing.",
+        },
+      ]);
+    });
+
+    it.each([
+      'What is your gender?',
+      'Are you male or female?',
+      'Are you a man or a woman?',
+      'What is your sex?',
+      'Gender?',
+      'What is your sexual orientation?',
+    ])('blocks the sex or gender question %j (issue 200)', async (prompt) => {
+      expect((await check(ask(prompt))).errors).toEqual([
+        {
+          code: 'question_not_allowed',
+          section: 'applying',
+          field: 'applying.questions.0.prompt',
+          message:
+            "You can't ask about sex, gender or sexual orientation. If housing is split by sex, say so in the listing.",
+        },
+      ]);
+    });
+
+    it('blocks sex as a choice (issue 200)', async () => {
+      const r = await check(ask('Which dorm should we put you in?', ['Male', 'Female']));
+      expect(brief(r.errors)).toEqual([
+        {
+          code: 'question_not_allowed',
+          section: 'applying',
+          field: 'applying.questions.0.choices.0',
+        },
+        {
+          code: 'question_not_allowed',
+          section: 'applying',
+          field: 'applying.questions.0.choices.1',
+        },
+      ]);
+    });
+
     it('checks the choices too', async () => {
       const r = await check(ask('Which describes you?', ['Single', 'Married']));
       expect(brief(r.errors)).toEqual([
@@ -380,6 +501,21 @@ describe('runListingChecks', () => {
       "Do you have a valid driver's license?",
       'Do you have childcare experience?',
       'Have you managed a stage crew?',
+      // Issue 200: the minimum-age question in other words, and numbers that are not ages.
+      'Are you over the age of 18?',
+      'Are you at least 21 years of age?',
+      'Are you 18 years old or older?',
+      'Can you work 20 to 30 hours a week?',
+      'Can you work between 20 and 30 hours a week?',
+      'Can you lift between 40 and 50 lb?',
+      'Do you live under 20 minutes from the resort?',
+      'Can you work 9 to 5?',
+      'Are you comfortable working with campers under 16?',
+      'Do you have 2 to 5 years of experience?',
+      'When did you finish your last seasonal job?',
+      'Do you have a high school diploma or GED?',
+      'Have you worked with kids before?',
+      'Can you share a cabin with a coworker?',
     ])('allows the lawful question %j', async (prompt) => {
       const r = await check(ask(prompt));
       expect(r.errors).toEqual([]);
@@ -619,9 +755,10 @@ describe('normalizeForPhraseMatch', () => {
 describe('the wording lists', () => {
   const flagged = SETTING_DEFAULTS['listings.flagged_phrases'];
   const nationalities = SETTING_DEFAULTS['listings.flagged_nationalities'];
+  const groups = SETTING_DEFAULTS['listings.flagged_groups'];
   const topics = SETTING_DEFAULTS['listings.question_topics'];
   type Topics = SettingValue<'listings.question_topics'>;
-  const lists = { flagged, nationalities };
+  const lists = { flagged, nationalities, groups };
   /** A phrase with its wildcards filled in: `*` a word, `#` a number. */
   const sample = (phrase: string) => phrase.replace(/\*/g, 'spanish').replace(/#/g, '40');
   const inDescription = (text: string) => ({ job: { description: `We are hiring. ${text}.` } });
@@ -631,6 +768,7 @@ describe('the wording lists', () => {
       findFlaggedWording(inDescription(sample(entry.phrase)), {
         flagged: [entry],
         nationalities: [],
+        groups: [],
       }),
     ).toEqual([
       expect.objectContaining({
@@ -644,9 +782,55 @@ describe('the wording lists', () => {
   it.each(nationalities)('flags people named as %s', (n) => {
     for (const text of [`${n} workers preferred`, `${n}s only`, `Must be ${n}`]) {
       expect(
-        findFlaggedWording(inDescription(text), { flagged: [], nationalities: [n] }),
+        findFlaggedWording(inDescription(text), { flagged: [], nationalities: [n], groups: [] }),
         text,
       ).toEqual([expect.objectContaining({ field: 'job.description', ground: 'national_origin' })]);
+    }
+  });
+
+  // Issue 200: a nationality at the end of a phrase, after "no", "only" or "prefer".
+  it.each(nationalities)('flags %s after no, only and prefer', (n) => {
+    for (const text of [`No ${n}s`, `Only ${n}s`, `Prefer ${n}s`, `Only ${n} applicants`]) {
+      expect(
+        findFlaggedWording(inDescription(text), { flagged: [], nationalities: [n], groups: [] }),
+        text,
+      ).toEqual([
+        expect.objectContaining({ field: 'job.description', phrase: n, ground: 'national_origin' }),
+      ]);
+    }
+  });
+
+  // Issue 200: each group term on its own, in the forms that state a preference or a limit.
+  it.each(groups.map((g) => [g.term, g] as const))('flags the group %j', (_term, entry) => {
+    const forms =
+      entry.form === 'adjective'
+        ? [
+            `${entry.term} applicants preferred`,
+            `Must be ${entry.term}`,
+            `No ${entry.term} workers`,
+          ]
+        : [
+            `${entry.term} preferred`,
+            `${entry.term} only`,
+            `Only ${entry.term}`,
+            `Must be a ${entry.term}`,
+          ];
+    for (const text of forms) {
+      expect(
+        findFlaggedWording(inDescription(text), {
+          flagged: [],
+          nationalities: [],
+          groups: [entry],
+        }),
+        text,
+      ).toEqual([
+        expect.objectContaining({
+          field: 'job.description',
+          phrase: entry.term,
+          ground: entry.ground,
+          suggestion: entry.suggestion,
+        }),
+      ]);
     }
   });
 
@@ -680,6 +864,80 @@ describe('the wording lists', () => {
     ]);
   });
 
+  // Issue 200: every phrasing the review of PR 190 lists, and close variants of each.
+  it.each<[string, string, string]>([
+    // Age: any maximum age, and ranges in any order.
+    ['Must be under 35', 'under 35', 'age'],
+    ['Must be younger than 35', 'younger than 35', 'age'],
+    ['Applicants should be below 40', 'below 40', 'age'],
+    ['Must be 35 or younger', '35 or younger', 'age'],
+    ['Must be 35 and under', '35 and under', 'age'],
+    ['18 to 30 years old', '18 to 30 years old', 'age'],
+    ['Applicants 18-30 years of age', '18 30 years of age', 'age'],
+    ['Looking for 21 to 35 year olds', '21 to 35 year olds', 'age'],
+    ['Between 18 and 30', 'between 18 and 30', 'age'],
+    ['Staff between 21 and 35 preferred', 'between 21 and 35', 'age'],
+    ['18-30 only', '18 30', 'age'],
+    ['No one over 40', 'no one over 40', 'age'],
+    ['Nobody older than 45, please', 'nobody older than 45', 'age'],
+    ['No applicants over 50', 'no applicants over 50', 'age'],
+    ['No one 40 or older', 'no one 40 or older', 'age'],
+    ['Age 21-35', 'age 21 35', 'age'],
+    ['Age 21 to 35', 'age 21 to 35', 'age'],
+    ['Under 35 preferred', 'under 35', 'age'],
+    ['Applicants younger than 40 only', 'younger than 40', 'age'],
+    ['Prefer candidates under 35', 'under 35', 'age'],
+    ['Under 35 years old', 'under 35 years old', 'age'],
+    ['Ideal for people in their 20s', 'in their 20s', 'age'],
+    // Sex.
+    ['Men preferred', 'men preferred', 'sex'],
+    ['Males preferred', 'males preferred', 'sex'],
+    ['Females preferred', 'females preferred', 'sex'],
+    ['Female preferred', 'female preferred', 'sex'],
+    ['Women wanted for the front desk', 'women wanted', 'sex'],
+    ['Ladies only', 'ladies only', 'sex'],
+    ['Gentlemen only', 'gentlemen only', 'sex'],
+    ['Must be a woman', 'must be a woman', 'sex'],
+    ['Must be a man', 'must be a man', 'sex'],
+    ['We prefer men for the lift crew', 'prefer men', 'sex'],
+    ['Prefer female bartenders', 'prefer female', 'sex'],
+    ['Only women', 'only women', 'sex'],
+    ['No women', 'no women', 'sex'],
+    ['No pregnant women', 'no pregnant women', 'sex'],
+    ['Pregnant applicants need not apply', 'pregnant', 'sex'],
+    // Race and color.
+    ['Whites only', 'whites only', 'race'],
+    ['White only', 'white only', 'race'],
+    ['White applicants preferred', 'white applicants', 'race'],
+    ['Black workers wanted', 'black workers', 'race'],
+    ['No blacks', 'no blacks', 'race'],
+    ['Only whites', 'only whites', 'race'],
+    ['Must be white', 'must be white', 'race'],
+    ['Light-skinned staff for the front desk', 'light skinned', 'race'],
+    ['Caucasian preferred', 'caucasian preferred', 'national_origin'],
+    // National origin and citizenship.
+    ['No Mexicans', 'no mexicans', 'national_origin'],
+    ['Only Americans', 'only americans', 'national_origin'],
+    ['Prefer Americans', 'prefer americans', 'national_origin'],
+    ['Preference for Canadians', 'preference for canadians', 'national_origin'],
+    ['No Irish need apply', 'no irish need apply', 'national_origin'],
+    ['Mexican workers wanted', 'mexican workers', 'national_origin'],
+    ['US born only', 'us born', 'national_origin'],
+    ['U.S.-born applicants', 'us born', 'national_origin'],
+    ['American-born staff', 'american born', 'national_origin'],
+    ['Must be born in the US', 'born in the us', 'national_origin'],
+    ['Must be born in the USA', 'born in the usa', 'national_origin'],
+    ['Born in America preferred', 'born in america', 'national_origin'],
+    ['Citizens preferred', 'citizens preferred', 'national_origin'],
+    ['Only citizens', 'only citizens', 'national_origin'],
+    ['Prefer citizens', 'prefer citizens', 'national_origin'],
+    ['Permanent residents only', 'permanent residents only', 'national_origin'],
+  ])('flags %j as %j (%s) (issue 200)', (text, matched, ground) => {
+    expect(findFlaggedWording(inDescription(text), lists)).toEqual([
+      expect.objectContaining({ field: 'job.description', matched, ground }),
+    ]);
+  });
+
   it.each([
     'Our office is in Youngstown',
     'Rooms are single occupancy',
@@ -688,8 +946,41 @@ describe('the wording lists', () => {
     'Bilingual in Spanish and English is a plus',
     'You must pass a background check',
     'Able to lift 50 lb',
+    // Issue 200: lawful age rules, numbers that are not ages, and words that only look close.
+    'Must be 18 or older',
+    'Must be at least 21 to serve alcohol',
+    'Applicants must be over 18',
+    'Anyone under 21 cannot serve alcohol',
+    'Lift up to 50 lb',
+    'Shifts are 8 to 10 hours',
+    'Between 20 and 40 hours a week',
+    'Pay is between $18 and $30 an hour',
+    'We serve between 18 and 30 guests a night',
+    'Under 25 minutes from town',
+    'Must be under 35 minutes from the resort',
+    'Kids 12 and under ski free',
+    'Care for children 2 to 5 years old',
+    'Black pants and a white shirt',
+    'Guide white-water rafting trips',
+    'No English required',
+    'Spanish speakers welcome',
+    'Separate housing for men and women',
+    'Female staff housing is in Cabin 3',
+    'Join a three-man crew',
+    'Our foreman schedules the crews',
+    'Born and raised in Alaska, our family runs the lodge',
   ])('does not flag %j', (text) => {
     expect(findFlaggedWording(inDescription(text), lists)).toEqual([]);
+  });
+
+  // Legal review 2.2: a bona fide use still goes to an operator, as a flag and never a block.
+  it.each<[string, string]>([
+    ['Christian camp: staff lead morning devotions', 'religion'],
+    ['Housing is for married couples only', 'family_status'],
+  ])('flags the lawful use %j for review (%s)', (text, ground) => {
+    expect(findFlaggedWording(inDescription(text), lists)).toEqual([
+      expect.objectContaining({ ground }),
+    ]);
   });
 
   it('reads prose fields only, not codes', () => {
