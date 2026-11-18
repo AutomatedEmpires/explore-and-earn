@@ -18,16 +18,14 @@ afterAll(async () => {
 
 /**
  * The report without the claims whose table has not merged yet (PENDING_CLAIMED_TABLES). A
- * table or a media column with no handler is never excused.
+ * table or a media column with no handler is never excused, and neither is a declared media
+ * column that does not exist: the media retention rules refuse to run on either.
  */
 function gaps(report: CoverageReport): CoverageReport {
   const pending = (table: string) => Object.hasOwn(PENDING_CLAIMED_TABLES, table);
   return {
     ...report,
     claimedButMissing: report.claimedButMissing.filter((table) => !pending(table)),
-    declaredMediaColumnsMissing: report.declaredMediaColumnsMissing.filter(
-      (name) => !pending(name.split('.')[0] ?? ''),
-    ),
   };
 }
 

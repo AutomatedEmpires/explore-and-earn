@@ -26,16 +26,14 @@ function handler(module: string, tables: readonly string[], mediaColumns?: Priva
 
 /**
  * The report without the claims whose table has not merged yet (PENDING_CLAIMED_TABLES). A
- * table or a media column with no handler is never excused.
+ * table or a media column with no handler is never excused, and neither is a declared media
+ * column that does not exist: the media retention rules refuse to run on either.
  */
 function gaps(report: CoverageReport): CoverageReport {
   const pending = (table: string) => Object.hasOwn(PENDING_CLAIMED_TABLES, table);
   return {
     ...report,
     claimedButMissing: report.claimedButMissing.filter((table) => !pending(table)),
-    declaredMediaColumnsMissing: report.declaredMediaColumnsMissing.filter(
-      (name) => !pending(name.split('.')[0] ?? ''),
-    ),
   };
 }
 
@@ -95,6 +93,15 @@ describe('computeCoverage', () => {
       missingModules: [],
       unregisteredModuleDirs: [],
     });
+  });
+
+  // The media retention rules (media.orphans and its sibling) refuse to run, and alert every
+  // day, while either list is non-empty. Nothing is excused here, pending or not.
+  it('declares every *media_id* column, and none that does not exist', async () => {
+    t = await createTestDb();
+    const report = await computeCoverage(t.db, privacyRegistry);
+    expect(report.undeclaredMediaColumns).toEqual([]);
+    expect(report.declaredMediaColumnsMissing).toEqual([]);
   });
 
   it('registers exactly the expected modules, and every rule under a registered module', () => {

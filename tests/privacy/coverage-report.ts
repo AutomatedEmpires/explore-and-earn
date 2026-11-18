@@ -53,7 +53,8 @@ export const PRIVACY_EXEMPT_MODULE_DIRS: Readonly<Record<string, string>> = {
 /**
  * Tables a handler already claims whose migration has not merged yet, each with its owner. A
  * claim with no table is not a privacy gap (nothing is stored), so these are the only entries
- * the enforcing test tolerates in `claimedButMissing` and `declaredMediaColumnsMissing`.
+ * the enforcing test tolerates in `claimedButMissing`. A media column is declared only once its
+ * table exists.
  * Remove an entry when its table lands; never add a table that exists.
  */
 export const PENDING_CLAIMED_TABLES: Readonly<Record<string, string>> = {
