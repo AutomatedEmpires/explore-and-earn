@@ -362,7 +362,7 @@ it('sends a kept photo mismatch to moderation', async () => {
   expect((await items(revisionId)).map((i) => i.reason)).toEqual(['photo_slot_mismatch_kept']);
 });
 
-describe('flagged wording (legal review 2.2, #121)', () => {
+describe('flagged wording (legal review 2.2, issue 121)', () => {
   it('sends a listing with flagged wording to moderation, never returning it', async () => {
     const { id, revisionId } = await submittedAcking(['wording_flagged'], (c) => {
       c.job.description += ' Christian camp: staff lead morning devotions.';

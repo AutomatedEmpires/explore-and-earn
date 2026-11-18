@@ -216,7 +216,7 @@ describe('runListingChecks', () => {
     ]);
   });
 
-  describe('wording_flagged (legal review 2.2, #121)', () => {
+  describe('wording_flagged (legal review 2.2, issue 121)', () => {
     const DESCRIPTION =
       'Run the chairlift, help riders on and off safely, and keep the loading area clear.';
 
@@ -279,7 +279,7 @@ describe('runListingChecks', () => {
     });
   });
 
-  describe('question_not_allowed (legal review 2.2 item 2, #121)', () => {
+  describe('question_not_allowed (legal review 2.2 item 2, issue 121)', () => {
     const ask = (prompt: string, choices?: string[]) => (c: ListingContent) => {
       c.applying.questions = [
         choices
@@ -395,7 +395,7 @@ describe('runListingChecks', () => {
     });
   });
 
-  describe('visa sponsorship (legal review 2.3, #121)', () => {
+  describe('visa sponsorship (legal review 2.3, issue 121)', () => {
     it('blocks H-2A without free housing, linking 20 CFR 655.122(d)', async () => {
       const paid = await check((c) => {
         c.job.visaSponsorship = 'h2a';

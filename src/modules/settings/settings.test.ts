@@ -194,7 +194,7 @@ describe('SP2 settings', () => {
   });
 });
 
-describe('listing wording settings (legal review 2.2, #121)', () => {
+describe('listing wording settings (legal review 2.2, issue 121)', () => {
   const GROUNDS = [
     'age',
     'sex',

@@ -166,7 +166,7 @@ describe('ListingContentSchema', () => {
     expect(pathsOf(build((c) => void (c.job.minAge = 17)))).toEqual(['job.minAge']);
   });
 
-  describe('job.h2b (the 20 CFR 655.41(b) items the form lacks, #121)', () => {
+  describe('job.h2b (the 20 CFR 655.41(b) items the form lacks, issue 121)', () => {
     const h2b = {
       transportation: 'Bus fare from your home to Kodiak and back is paid, plus $14.68 a day.',
       tools: 'All tools, gear and boots are provided free.',
