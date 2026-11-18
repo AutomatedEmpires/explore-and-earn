@@ -22,6 +22,8 @@ export const privacyHandler: PrivacyHandler = {
         displayName: users.displayName,
         accountType: users.accountType,
         adultAttestedAt: users.adultAttestedAt,
+        birthYear: users.birthYear,
+        analyticsOptOutAt: users.analyticsOptOutAt,
         createdAt: users.createdAt,
       })
       .from(users)
@@ -67,6 +69,7 @@ export const privacyHandler: PrivacyHandler = {
       user.clerkUserId === pseudonym &&
       user.email === null &&
       user.displayName === DELETED_NAME &&
+      user.birthYear === null &&
       user.deletedAt !== null;
     if (done) return { erased: 0, retained };
 
@@ -76,6 +79,9 @@ export const privacyHandler: PrivacyHandler = {
         erasedClerkIdSha256: tombstone,
         email: null,
         displayName: DELETED_NAME,
+        // The birth year goes. The analytics opt-out stays: it only ever says "do not track
+        // this account", and keeping it means no later job can track an erased person.
+        birthYear: null,
         clerkUserId: pseudonym,
         deletedAt,
       })

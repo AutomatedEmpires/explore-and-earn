@@ -57,6 +57,8 @@ describe('identity privacy handler', () => {
     expect(Object.keys(part.records.account?.[0] as object).sort()).toEqual([
       'accountType',
       'adultAttestedAt',
+      'analyticsOptOutAt',
+      'birthYear',
       'createdAt',
       'displayName',
       'email',
@@ -121,6 +123,48 @@ describe('identity privacy handler', () => {
       email: null,
       erased_clerk_id_sha256: clerkIdHash(seeker.user.clerkUserId),
     });
+  });
+
+  it('clears the birth year and keeps the analytics opt-out', async () => {
+    const seeker = await seedSeeker(t.db);
+    const optedOut = '2026-10-01T00:00:00.000Z';
+    await t.db.execute(sql`
+      update app.users set birth_year = 1994, analytics_opt_out_at = ${optedOut}::timestamptz
+      where id = ${seeker.userId}
+    `);
+    const subject = { kind: 'user' as const, userId: seeker.userId };
+    const read = async () =>
+      (
+        await queryRows<{ birth_year: number | null; opt_out: string | null }>(
+          t.db,
+          sql`select birth_year, to_char(analytics_opt_out_at at time zone 'utc',
+                'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as opt_out
+              from app.users where id = ${seeker.userId}`,
+        )
+      )[0];
+
+    const part = await privacyHandler.exportData(t.db, subject);
+    expect(part.records.account?.[0]).toMatchObject({
+      birthYear: 1994,
+      analyticsOptOutAt: new Date(optedOut),
+    });
+
+    await erase(subject, ['all']);
+    expect(await read()).toEqual({ birth_year: 1994, opt_out: optedOut });
+    expect((await erase(subject)).erased).toBe(1);
+    expect(await read()).toEqual({ birth_year: null, opt_out: optedOut });
+    expect((await erase(subject)).erased).toBe(0);
+  });
+
+  it('finishes a row that was pseudonymized before the birth year existed', async () => {
+    const seeker = await seedSeeker(t.db);
+    const subject = { kind: 'user' as const, userId: seeker.userId };
+    await erase(subject);
+    await t.db.execute(sql`update app.users set birth_year = 1990 where id = ${seeker.userId}`);
+    expect((await erase(subject)).erased).toBe(1);
+    expect(
+      await queryRows(t.db, sql`select 1 from app.users where id = ${seeker.userId} and birth_year is null`),
+    ).toHaveLength(1);
   });
 
   it('holds a narrower scope without keeping the identity', async () => {
