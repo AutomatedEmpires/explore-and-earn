@@ -106,12 +106,15 @@ function onboardingUrl(returnTo: string, step?: 'seeker' | 'host'): string {
 }
 
 const choose = (page: Page) => page.getByRole('heading', { name: 'Welcome to Explore&Earn' });
-const ageStep = (page: Page) =>
-  page.getByRole('heading', { name: 'Work worth going somewhere for.' });
+const ageStep = (page: Page) => page.getByRole('heading', { name: 'What is your date of birth?' });
 const hostStep = (page: Page) => page.getByRole('heading', { name: 'Name your organization' });
 
+/** The age screen (legal review 2.6): an adult's date of birth, then Continue. */
 async function confirmAdult(page: Page): Promise<void> {
-  await page.getByRole('checkbox', { name: "I'm 18 or older" }).check();
+  await page.getByRole('combobox', { name: /^Month/ }).click();
+  await page.getByRole('option', { name: 'April' }).click();
+  await page.getByRole('textbox', { name: /^Day/ }).fill('3');
+  await page.getByRole('textbox', { name: /^Year/ }).fill('1990');
   await page.getByRole('button', { name: 'Continue' }).click();
 }
 

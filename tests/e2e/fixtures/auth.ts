@@ -12,7 +12,7 @@ const HOST_ORG = 'Discovery E2E Host';
 
 type ClerkKeys = { publishableKey: string; secretKey: string };
 type AccountChoice =
-  | { accountType: 'seeker'; adultAttested: true }
+  | { accountType: 'seeker'; dateOfBirth: string }
   | { accountType: 'host'; organizationName: string };
 
 let ready: Promise<void> | null = null;
@@ -155,7 +155,8 @@ export async function signInAsSeeker(page: Page, opts?: { fresh?: boolean }): Pr
     ? `discovery-seeker-${Date.now()}-${Math.random().toString(36).slice(2, 8)}+clerk_test@example.com`
     : SEEKER_EMAIL;
   await signIn(page, email);
-  await chooseAccount(page, { accountType: 'seeker', adultAttested: true });
+  // The age screen keeps only the year (legal review 2.6); any adult date works.
+  await chooseAccount(page, { accountType: 'seeker', dateOfBirth: '1990-04-03' });
 }
 
 /** Signs in the stable discovery host and names an organization that is not a seeded employer. */
