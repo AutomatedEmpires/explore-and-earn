@@ -3,7 +3,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { PrivacyHandler } from '@/modules/privacy';
 import { buildPrivacyRegistry, privacyRegistry } from '@/server/privacy-registry';
 import { createTestDb, type TestDb } from '@tests/helpers/db';
-import { computeCoverage } from './coverage-report';
+import {
+  computeCoverage,
+  EXPECTED_PRIVACY_MODULES,
+  PENDING_CLAIMED_TABLES,
+  type CoverageReport,
+} from './coverage-report';
 
 function handler(module: string, tables: readonly string[], mediaColumns?: PrivacyHandler['mediaColumns']): PrivacyHandler {
   return {
@@ -16,6 +21,21 @@ function handler(module: string, tables: readonly string[], mediaColumns?: Priva
     async erase() {
       return { erased: 0, retained: [] };
     },
+  };
+}
+
+/**
+ * The report without the claims whose table has not merged yet (PENDING_CLAIMED_TABLES). A
+ * table or a media column with no handler is never excused.
+ */
+function gaps(report: CoverageReport): CoverageReport {
+  const pending = (table: string) => Object.hasOwn(PENDING_CLAIMED_TABLES, table);
+  return {
+    ...report,
+    claimedButMissing: report.claimedButMissing.filter((table) => !pending(table)),
+    declaredMediaColumnsMissing: report.declaredMediaColumnsMissing.filter(
+      (name) => !pending(name.split('.')[0] ?? ''),
+    ),
   };
 }
 
@@ -61,10 +81,27 @@ describe('computeCoverage', () => {
     );
   });
 
-  it('prints the live report and refuses a table that is both claimed and exempt', async () => {
+  // D2, enforcing: a table, a media column or a module with no handler fails the build.
+  it('finds a handler for every table, media column and module', async () => {
     t = await createTestDb();
     const report = await computeCoverage(t.db, privacyRegistry);
-    console.info('privacy coverage', report);
-    expect(report.claimedAndExempt).toEqual([]);
+    expect(gaps(report)).toEqual({
+      unclaimed: [],
+      claimedButMissing: [],
+      exemptButMissing: [],
+      claimedAndExempt: [],
+      undeclaredMediaColumns: [],
+      declaredMediaColumnsMissing: [],
+      missingModules: [],
+      unregisteredModuleDirs: [],
+    });
+  });
+
+  it('registers exactly the expected modules, and every rule under a registered module', () => {
+    const modules = privacyRegistry.handlers.map((h) => h.module);
+    expect([...modules].sort()).toEqual([...EXPECTED_PRIVACY_MODULES].sort());
+    for (const rule of privacyRegistry.rules) {
+      expect(modules, rule.key).toContain(rule.key.split('.')[0]);
+    }
   });
 });
