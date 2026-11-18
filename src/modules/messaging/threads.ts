@@ -77,12 +77,18 @@ export async function stampBlocked(db: DbOrTx, row: ThreadRow): Promise<void> {
   row.readOnlyReason = 'blocked';
 }
 
+/**
+ * A seeker owns the thread. A host acts for one org: the thread must belong to that org, and
+ * the member's role and listing scope must cover it. A scope of `all` means every listing of
+ * the host's own org, never another org's.
+ */
 export async function canParticipate(
   db: DbOrTx,
   viewer: ThreadViewer,
   row: ThreadRow,
 ): Promise<boolean> {
   if (viewer.kind === 'seeker') return viewer.userId === row.seekerUserId;
+  if (row.orgId !== viewer.ctx.orgId) return false;
   if (!TEAM.has(viewer.ctx.role)) return false;
   const scope = await listingScope(db, viewer.ctx);
   return inScope(scope, row.listingId);
@@ -443,8 +449,14 @@ export async function listThreads(
   }
   const cursor = decodeCursor(q.cursor);
   if (cursor) {
+    // and() does not wrap a raw fragment, so the keyset is built with or()/and(), which do.
+    // A bare `a < x or (a = x and id < y)` would drop the tenant filter above it.
+    const at = sql`coalesce(${sort}, ${threads.createdAt})`;
+    const atCursor = sql`${cursor.at.toISOString()}::timestamptz`;
     filters.push(
-      sql`coalesce(${sort}, ${threads.createdAt}) < ${cursor.at.toISOString()}::timestamptz or (coalesce(${sort}, ${threads.createdAt}) = ${cursor.at.toISOString()}::timestamptz and ${threads.id} < ${cursor.id})`,
+      definedSql(
+        or(sql`${at} < ${atCursor}`, and(sql`${at} = ${atCursor}`, sql`${threads.id} < ${cursor.id}`)),
+      ),
     );
   }
   const rows = await db
