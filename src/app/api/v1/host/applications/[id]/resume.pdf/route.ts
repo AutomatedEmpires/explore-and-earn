@@ -3,11 +3,14 @@
 // host* (SP4 plan): authorizeHostApplication requires owner, admin or recruiter (403, reason
 // role_not_allowed) and canAccessListing (404). Billing members get 403. A seeker who blocked
 // the org is not_found. FD-2: the PDF is rendered from the frozen snapshot, never an upload.
+// A host whose verification is running, needs_review, needs_info or failed gets 409
+// `verification_<status>` before anything is read, rendered or audited (legal review 7.1).
 import { forbidden, notFound } from '@/lib/errors';
 import { authorizeHostApplication, getSnapshot } from '@/modules/applications';
 import { record } from '@/modules/audit';
 import { idParamSchema, renderResumePdf, resumePdfResponse } from '@/modules/profiles';
 import { apiRoute } from '@/server/api';
+import { requireVerifiedHost } from '../../_shared/verified-host';
 
 export const GET = apiRoute({
   auth: 'host',
@@ -19,6 +22,7 @@ export const GET = apiRoute({
   },
   handler: async ({ input, db, host }) => {
     if (!host) throw forbidden();
+    await requireVerifiedHost(db, host.orgId);
     const ref = await authorizeHostApplication(db, host, input.id);
     const snapshot = await getSnapshot(db, {
       orgId: ref.orgId,
