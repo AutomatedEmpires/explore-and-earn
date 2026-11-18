@@ -1,5 +1,5 @@
 // Sending a message, and delivering one the scam scan released (SP5 W4).
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, ne } from 'drizzle-orm';
 import type { Db, DbOrTx, Tx } from '@/lib/db';
 import { withTx } from '@/lib/db';
 import { conflict, notFound } from '@/lib/errors';
@@ -85,13 +85,18 @@ async function notifySide(
   }
 }
 
-/** Stamps the viewer's side and, when asked, notifies the other side. No message body leaves. */
+/**
+ * Stamps the receiving side's unread time and notifies it. No message body leaves. The unread
+ * time is the delivery time, not the send time, so a message the scan or an operator releases
+ * after the reader last opened the thread still makes it unread. The first host reply keeps
+ * the send time: that is when the host answered.
+ */
 export async function deliverMessage(
   db: DbOrTx,
   thread: ThreadRow,
   message: Pick<MessageRow, 'id' | 'senderType' | 'senderUserId' | 'createdAt'>,
 ): Promise<void> {
-  const at = message.createdAt;
+  const at = new Date();
   const toSeeker = message.senderType !== 'seeker';
   if (toSeeker) {
     const current = thread.lastToSeekerAt;
@@ -102,7 +107,7 @@ export async function deliverMessage(
     if (message.senderType === 'host') {
       const stamped = await db
         .update(threads)
-        .set({ firstHostReplyAt: at })
+        .set({ firstHostReplyAt: message.createdAt })
         .where(and(eq(threads.id, thread.id), isNull(threads.firstHostReplyAt)))
         .returning({ id: threads.id });
       await noteHostReply(db, {
@@ -153,7 +158,14 @@ export async function deliverMessage(
 
 export async function sendHostMessage(
   tx: Tx,
-  i: { threadId: string; senderUserId: string; body: string; bulkId?: string },
+  i: {
+    threadId: string;
+    senderUserId: string;
+    body: string;
+    bulkId?: string;
+    clientId?: string;
+    attachmentMediaIds?: string[];
+  },
 ): Promise<string | null> {
   const thread = await loadThread(tx, i.threadId);
   if (!thread) return null;
@@ -188,8 +200,10 @@ export async function sendHostMessage(
     senderUserId: i.senderUserId,
     kind: 'text',
     body: i.body.length > 0 ? i.body : null,
+    attachmentMediaIds: i.attachmentMediaIds ?? [],
     visibleTo: 'all',
     scanState,
+    clientId: i.clientId ?? null,
     bulkId: i.bulkId ?? null,
     createdAt: now,
   });
@@ -254,23 +268,69 @@ export async function sendMessage(
   if (await blockingReason(db, fresh)) throw conflict(READ_ONLY, { reason: 'read_only' });
 
   const senderUserId = viewerUserId(viewer);
-  const [existing] = await db
+  const existing = await findByClientId(db, threadId, senderUserId, input.clientId);
+  if (existing) return { message: await presentMessage(db, viewer, fresh, existing) };
+
+  const attachmentMediaIds = input.attachmentMediaIds ?? [];
+  await assertAttachments(db, viewer, attachmentMediaIds);
+
+  let messageId: string | null;
+  try {
+    messageId = await insertMessage(db, viewer, fresh, { ...input, attachmentMediaIds });
+  } catch (err) {
+    // A retry with the same client id committed between the lookup above and this insert
+    // (messages_client_idx). This transaction rolled back, so the stored message is the answer.
+    const raced = isUniqueViolation(err)
+      ? await findByClientId(db, threadId, senderUserId, input.clientId)
+      : undefined;
+    if (!raced) throw err;
+    return { message: await presentMessage(db, viewer, fresh, raced) };
+  }
+  if (!messageId) readOnlyConflict();
+  const row = await loadMessage(db, messageId);
+  if (!row) throw notFound();
+  return { message: await presentMessage(db, viewer, fresh, row) };
+}
+
+/** True for a Postgres unique violation anywhere in the error's cause chain. */
+function isUniqueViolation(err: unknown): boolean {
+  for (let e: unknown = err; e instanceof Error; e = e.cause) {
+    if ((e as { code?: unknown }).code === '23505') return true;
+  }
+  return false;
+}
+
+async function findByClientId(
+  db: DbOrTx,
+  threadId: string,
+  senderUserId: string,
+  clientId: string,
+): Promise<MessageRow | undefined> {
+  const [row] = await db
     .select()
     .from(messages)
     .where(
       and(
         eq(messages.threadId, threadId),
         eq(messages.senderUserId, senderUserId),
-        eq(messages.clientId, input.clientId),
+        eq(messages.clientId, clientId),
       ),
     )
     .limit(1);
-  if (existing) return { message: await presentMessage(db, viewer, fresh, existing) };
+  return row;
+}
 
-  const attachmentMediaIds = input.attachmentMediaIds ?? [];
-  await assertAttachments(db, viewer, attachmentMediaIds);
-
-  const messageId = await withTx(db, async (tx) => {
+/** Inserts and delivers (or queues for the scan) in one transaction. Null when read-only. */
+async function insertMessage(
+  db: Db,
+  viewer: ThreadViewer,
+  fresh: ThreadRow,
+  input: SendMessageInput & { attachmentMediaIds: string[] },
+): Promise<string | null> {
+  const threadId = fresh.id;
+  const senderUserId = viewerUserId(viewer);
+  const attachmentMediaIds = input.attachmentMediaIds;
+  return withTx(db, async (tx) => {
     if (viewer.kind === 'seeker') {
       const id = newId();
       const now = new Date();
@@ -302,25 +362,22 @@ export async function sendMessage(
       });
       return id;
     }
-    const id = await sendHostMessage(tx, {
+    return sendHostMessage(tx, {
       threadId,
       senderUserId,
       body: input.body ?? '',
+      clientId: input.clientId,
+      attachmentMediaIds,
     });
-    if (!id) return null;
-    await tx
-      .update(messages)
-      .set({ attachmentMediaIds, clientId: input.clientId })
-      .where(eq(messages.id, id));
-    return id;
   });
-  if (!messageId) readOnlyConflict();
-  const row = await loadMessage(db, messageId);
-  if (!row) throw notFound();
-  return { message: await presentMessage(db, viewer, fresh, row) };
 }
 
-/** Trust `approve` on a held message delivers it; `remove` hides it from the seeker. */
+/**
+ * Trust `approve` on a held message delivers it; on a warned one it drops the banner. `remove`
+ * hides it from the seeker, and a later approve never brings a removed message back. A held
+ * message whose thread became read-only meanwhile stays held: the seeker gets nothing (plan
+ * decision 11) and the host sees it as not delivered.
+ */
 export async function decideMessage(
   db: DbOrTx,
   messageId: string,
@@ -332,10 +389,24 @@ export async function decideMessage(
     await db.update(messages).set({ scanState: 'removed' }).where(eq(messages.id, messageId));
     return;
   }
-  const wasHeld = row.scanState === 'held';
-  await db.update(messages).set({ scanState: 'clear' }).where(eq(messages.id, messageId));
-  if (!wasHeld) return;
+  if (row.scanState === 'removed') return;
+  if (row.scanState !== 'held') {
+    await db
+      .update(messages)
+      .set({ scanState: 'clear' })
+      .where(and(eq(messages.id, messageId), ne(messages.scanState, 'removed')));
+    return;
+  }
   const thread = await loadThread(db, row.threadId);
   if (!thread) return;
+  const reason = await blockingReason(db, thread);
+  if (reason === 'blocked') await stampBlocked(db, thread);
+  if (reason) return;
+  const released = await db
+    .update(messages)
+    .set({ scanState: 'clear' })
+    .where(and(eq(messages.id, messageId), eq(messages.scanState, 'held')))
+    .returning({ id: messages.id });
+  if (released.length === 0) return;
   await deliverMessage(db, thread, row);
 }
