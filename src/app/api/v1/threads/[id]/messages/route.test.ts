@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { newId } from '@/lib/ids';
 // Seed helpers sit beside the messaging tests and are not part of the public API.
 // eslint-disable-next-line no-restricted-imports
-import { seedAttachment, seedThread } from '@/modules/messaging/test-fixture';
+import { seedAttachment, seedThread } from '@/modules/messaging/test-fixtures';
 import { asSeeker, call, request, setupRouteDb } from '@tests/helpers/sp4';
 import { POST } from './route';
 

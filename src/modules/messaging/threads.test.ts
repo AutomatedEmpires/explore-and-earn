@@ -7,7 +7,7 @@ import { createTestDb, type TestDb } from '@tests/helpers/db';
 import { listingsFake, orgsFake } from '@tests/fakes/sp5/sp2';
 import { safetyFake } from '@tests/fakes/sp5/sp4';
 import { messages, threads } from './schema';
-import { hostViewer, seedHostOrg, seedSeeker, seedThread, seekerViewer, type SeededThread } from './test-fixture';
+import { hostViewer, seedHostOrg, seedSeeker, seedThread, seekerViewer, type SeededThread } from './test-fixtures';
 import { ensureThread, getThread, listThreads, postEvent } from './threads';
 
 vi.mock('@/modules/listings', async (orig) => ({

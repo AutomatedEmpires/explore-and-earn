@@ -8,7 +8,7 @@ import { createTestDb, type TestDb } from '@tests/helpers/db';
 import { listingsFake } from '@tests/fakes/sp5/sp2';
 import { threads } from './schema';
 import { getReplyStats, runMessagingDaily } from './stats';
-import { seedHostOrg, seedSeeker } from './test-fixture';
+import { seedHostOrg, seedSeeker } from './test-fixtures';
 import './register';
 
 vi.mock('@/modules/listings', async (orig) => ({

@@ -3,7 +3,7 @@ import { newId } from '@/lib/ids';
 import { sendMessage } from '@/modules/messaging';
 // Seed helpers sit beside the messaging tests and are not part of the public API.
 // eslint-disable-next-line no-restricted-imports
-import { seedAttachment, seedThread, seekerViewer } from '@/modules/messaging/test-fixture';
+import { seedAttachment, seedThread, seekerViewer } from '@/modules/messaging/test-fixtures';
 import { asSeeker, call, request, setupRouteDb } from '@tests/helpers/sp4';
 import { GET } from './route';
 

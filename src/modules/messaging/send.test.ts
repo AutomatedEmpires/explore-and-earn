@@ -13,7 +13,7 @@ import { jobHandlers } from './jobs';
 import './notification-types';
 import { messages, threads } from './schema';
 import { sendHostMessage, sendMessage } from './send';
-import { hostViewer, seedAttachment, seedThread, seekerViewer } from './test-fixture';
+import { hostViewer, seedAttachment, seedThread, seekerViewer } from './test-fixtures';
 import { getThread, markThreadHired, setThreadReadOnly } from './threads';
 
 vi.mock('@/modules/safety', async (orig) => ({

@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { createTestDb, type TestDb } from '@tests/helpers/db';
 import { markReadByData } from '@/modules/notifications';
 import { threadReads, threads } from './schema';
-import { seedThread, seekerViewer } from './test-fixture';
+import { seedThread, seekerViewer } from './test-fixtures';
 import { listThreads } from './threads';
 import { markThreadRead } from './reads';
 

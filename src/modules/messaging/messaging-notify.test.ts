@@ -1,5 +1,5 @@
 import { eq, sql } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { runWorker } from '@/modules/jobs';
@@ -10,13 +10,8 @@ import { createTestDb, type TestDb } from '@tests/helpers/db';
 import { jobHandlers as messagingJobs } from './jobs';
 import { threads } from './schema';
 import { sendMessage } from './send';
-import { hostViewer, seedMember, seedThread, seekerViewer } from './test-fixture';
+import { hostViewer, seedMember, seedThread, seekerViewer } from './test-fixtures';
 import { markThreadRead, unreadThreadCount } from './reads';
-
-vi.mock('@/modules/hiring', async (orig) => ({
-  ...(await orig<typeof import('@/modules/hiring')>()),
-  pendingInboxCount: vi.fn(async () => 2),
-}));
 
 const ADDRESS = '1 Harbor Road, Juneau, AK 99801';
 let t: TestDb;
@@ -96,7 +91,7 @@ describe('unread counts', () => {
       .set({ lastToSeekerAt: new Date(), lastToHostAt: new Date() })
       .where(eq(threads.id, seeded.threadId));
     expect(await unreadThreadCount(t.db, seeded.seekerId)).toBe(1);
-    expect(await getCounts(t.db, seeded.seekerId)).toMatchObject({ inbox: 3 });
+    expect(await getCounts(t.db, seeded.seekerId)).toMatchObject({ inbox: 1 });
     await markThreadRead(t.db, seekerViewer(seeded.seekerId), seeded.threadId);
     expect(await unreadThreadCount(t.db, seeded.seekerId)).toBe(0);
 

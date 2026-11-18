@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { NOT_SELECTED_DEFAULT } from '@/lib/messaging';
 import { createTestDb, type TestDb } from '@tests/helpers/db';
 import { createSavedReply, getNotSelectedMessage } from './replies';
-import { seedHostOrg, seedMember } from './test-fixture';
+import { seedHostOrg, seedMember } from './test-fixtures';
 
 let t: TestDb;
 

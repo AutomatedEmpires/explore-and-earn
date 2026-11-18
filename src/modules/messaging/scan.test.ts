@@ -11,7 +11,7 @@ import './notification-types';
 import { messages } from './schema';
 import { sendMessage } from './send';
 import { scanHostText } from './scan';
-import { hostViewer, seedThread, seekerViewer } from './test-fixture';
+import { hostViewer, seedThread, seekerViewer } from './test-fixtures';
 import { getThread } from './threads';
 
 const ai = vi.hoisted(() => ({

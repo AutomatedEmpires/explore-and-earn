@@ -6,7 +6,7 @@ import { newId } from '@/lib/ids';
 import { createTestDb, type TestDb } from '@tests/helpers/db';
 import { messages, threads } from './schema';
 import { privacyHandler, retentionRules } from './privacy';
-import { seedHostOrg, seedSeeker } from './test-fixture';
+import { seedHostOrg, seedSeeker } from './test-fixtures';
 
 const removeMedia = vi.hoisted(() => vi.fn(async () => {}));
 

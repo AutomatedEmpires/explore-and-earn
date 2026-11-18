@@ -1,11 +1,11 @@
 // Trust subjects, report subjects and the host page reply-time slot (SP5 W4).
 import type { DbOrTx, Tx } from '@/lib/db';
 import { REPLY_STATS } from '@/lib/messaging';
-import { registerHostPageProvider } from '@/modules/hostpages';
 import { registerReportSubject } from '@/modules/safety';
-// The hostpages index exports registration only. The slot lookup stays on the provider file.
+// Application tests replace the hostpages barrel and omit this export. The lookup is not on
+// the index, so both calls stay on the provider file.
 // eslint-disable-next-line no-restricted-imports
-import { getHostPageProvider } from '@/modules/hostpages/providers';
+import { getHostPageProvider, registerHostPageProvider } from '@/modules/hostpages/providers';
 import { eq } from 'drizzle-orm';
 import { registerSubjectHandlers } from '@/modules/trust';
 import { decideBulk } from './bulk';

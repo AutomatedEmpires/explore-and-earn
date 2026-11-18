@@ -14,7 +14,7 @@ import './notification-types';
 import { jobHandlers } from './jobs';
 import { bulkMessages, messages, threads } from './schema';
 import { getMessageForReview } from './review';
-import { seedHostOrg, seedSeeker } from './test-fixture';
+import { seedHostOrg, seedSeeker } from './test-fixtures';
 
 vi.mock('@/modules/safety', async (orig) => ({
   ...(await orig<typeof import('@/modules/safety')>()),
