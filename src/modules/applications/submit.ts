@@ -95,6 +95,16 @@ function findExisting(
     .then((rows) => rows[0]);
 }
 
+/**
+ * Why a listing takes no applications, as the seeker may hear it in `details.cause`. Any other
+ * reason, such as the host's verification status (legal review 7), reads as `not_active`.
+ */
+const SEEKER_CAUSES: readonly string[] = ['not_active', 'org_inactive', 'deadline_passed'];
+
+function seekerCause(reason: string): string {
+  return SEEKER_CAUSES.includes(reason) ? reason : 'not_active';
+}
+
 function storedSource(source: string): ApplicationSource {
   return (APPLICATION_SOURCES as readonly string[]).includes(source)
     ? (source as ApplicationSource)
@@ -110,12 +120,12 @@ async function submitInTx(
   const existing = await findExisting(tx, input.listingId, seekerUserId);
   if (existing) return { application: await buildReceipt(tx, existing), created: false };
 
-  // Step 3: closed, paused, past its deadline, or the host is inactive.
+  // Step 3: closed, paused, past its deadline, or the host is inactive or not verified.
   const accepting = await canAcceptApplications(tx, input.listingId);
   if (!accepting.ok) {
     throw conflict('This listing is no longer taking applications.', {
       reason: 'listing_closed',
-      cause: accepting.reason,
+      cause: seekerCause(accepting.reason),
     });
   }
   // Step 4: the seeker reviewed an older revision.
