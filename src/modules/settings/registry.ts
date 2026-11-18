@@ -11,6 +11,43 @@ export type Thresholds = { approveBelow: number; rejectAtOrAbove: number };
 /** A genre as operators manage it; deactivated genres stay valid on existing listings. */
 export type GenreSetting = { code: string; label: string; category: Category; active: boolean };
 
+/**
+ * What a flag-for-review phrase may signal (legal review section 2.2, plus 2.6 for minors). The
+ * listing checks hold one fixed explanation per ground, so operators add phrases, not grounds.
+ */
+export const WORDING_GROUNDS = [
+  'age',
+  'sex',
+  'national_origin',
+  'disability',
+  'religion',
+  'family_status',
+  'criminal_history',
+  'appearance',
+  'minors',
+] as const;
+export type WordingGround = (typeof WORDING_GROUNDS)[number];
+
+/**
+ * A phrase that sends a listing to review (never an automatic rejection). Matched like the
+ * block list: case, width, periods, dashes and spacing folded, on word boundaries. In `phrase`,
+ * `*` stands for any one word and `#` for any whole number. `suggestion` is the neutral wording
+ * the host is offered.
+ */
+export type FlaggedPhrase = { phrase: string; ground: WordingGround; suggestion: string };
+
+/** What a screening question may not ask about (legal review section 2.2 item 2). */
+export const QUESTION_TOPICS = [
+  'age',
+  'marital_status',
+  'pregnancy',
+  'disability',
+  'religion',
+  'national_origin',
+  'arrest_record',
+] as const;
+export type QuestionTopic = (typeof QUESTION_TOPICS)[number];
+
 /** The type of every setting, by key. */
 export interface SettingValues {
   'limits.invites_per_seeker_per_week': number;
@@ -32,7 +69,17 @@ export interface SettingValues {
   'founding.free_days': number;
   'founding.return_window_months': number;
   'team.invitation_ttl_days': number;
+  /** Phrases with no lawful use in a listing: publishing is blocked until they are removed. */
   'listings.prohibited_phrases': string[];
+  /** Phrases that send a listing to review, with the reason and neutral wording shown to the host. */
+  'listings.flagged_phrases': FlaggedPhrase[];
+  /**
+   * Nationalities (and regional or ethnic origins) flagged when they describe people: "Mexican
+   * workers", "Americans only", "must be Irish". The word alone ("the American River") is not.
+   */
+  'listings.flagged_nationalities': string[];
+  /** Phrases that make a screening question ask about a forbidden topic, by topic. */
+  'listings.question_topics': Record<QuestionTopic, string[]>;
   'listings.vague_pay_range_ratio': number;
   'listings.min_wage_cents_by_state': Record<USStateCode, number>;
   'listings.genres': GenreSetting[];
@@ -61,6 +108,512 @@ export interface SettingValues {
 
 export type SettingKey = keyof SettingValues;
 export type SettingValue<K extends SettingKey> = SettingValues[K];
+
+// --- Listing wording lists (legal review 2.2, 2.6; #121) ----------------------------------------
+// These are the agent's first lists for counsel to confirm (legal review section 13). Each one
+// errs toward review: a flagged listing costs an operator a look, never a host's listing.
+
+/** Entries of one ground that share the neutral wording offered. */
+const flag = (ground: WordingGround, suggestion: string, phrases: string[]): FlaggedPhrase[] =>
+  phrases.map((phrase) => ({ phrase, ground, suggestion }));
+
+const DESCRIBE_WORK = 'Describe the work and the skills it needs, not the kind of person you want.';
+
+const FLAGGED_PHRASES: FlaggedPhrase[] = [
+  // Age (29 CFR 1625.4 names "young" and "recent college graduate").
+  ...flag('age', 'Describe the work instead, like "Upbeat with guests and on your feet all day".', [
+    'young',
+    'youthful',
+  ]),
+  ...flag('age', 'Say "Entry level" or "No experience needed".', [
+    'recent graduate',
+    'recent graduates',
+    'recent college graduate',
+    'recent college graduates',
+    'recent grad',
+    'recent grads',
+  ]),
+  ...flag('age', 'Name the skills you need, like "Comfortable with a smartphone and email".', [
+    'digital native',
+    'digital natives',
+  ]),
+  ...flag('age', 'Remove the age limit. The only age rule a listing can set is 18 or 21 and up.', [
+    'under 30',
+    'under # years old',
+    'under the age of #',
+    'no older than #',
+    'not older than #',
+    'maximum age',
+    'max age',
+    'age limit',
+    'ages # to #',
+    'ages # #',
+    'aged # to #',
+    'aged # #',
+    'between the ages of #',
+    '# or younger',
+    '# years old or younger',
+  ]),
+  // Sex.
+  ...flag('sex', DESCRIBE_WORK, [
+    'male only',
+    'males only',
+    'female only',
+    'females only',
+    'men only',
+    'women only',
+    'must be male',
+    'must be female',
+    'male applicants',
+    'female applicants',
+    'not pregnant',
+  ]),
+  ...flag('sex', 'Try "server".', ['waitress', 'waitresses']),
+  ...flag('sex', 'Try "host".', ['hostess', 'hostesses']),
+  ...flag('sex', 'Try "salesperson" or "sales associate".', ['salesman', 'salesmen']),
+  ...flag('sex', 'Try "maintenance worker".', ['handyman', 'handymen']),
+  ...flag('sex', 'Try "housekeeper" or "room attendant".', [
+    'maid',
+    'maids',
+    'chambermaid',
+    'chambermaids',
+  ]),
+  ...flag('sex', 'Try "staff", "team" or "everyone".', ['girls', 'gals', 'guys']),
+  // National origin, citizenship and language (8 U.S.C. 1324b).
+  ...flag(
+    'national_origin',
+    'Name the language skill the job needs, like "Fluent in Spanish to help guests".',
+    [
+      'native speaker',
+      'native speakers',
+      'native * speaker',
+      'native * speakers',
+      'mother tongue',
+      'first language',
+      'no accent',
+      'without an accent',
+      'accent free',
+      'english only',
+    ],
+  ),
+  ...flag(
+    'national_origin',
+    'Say "You must be authorized to work in the US", or say whether you sponsor visas.',
+    [
+      'us citizen',
+      'us citizens',
+      'us citizenship',
+      'citizenship required',
+      'must be a citizen',
+      'green card',
+      'nationality',
+      'national origin',
+      'country of origin',
+      'foreign workers',
+      'foreigners',
+      'immigrants',
+    ],
+  ),
+  // Disability.
+  ...flag(
+    'disability',
+    'Describe the physical tasks, like "Lifts up to 50 lb" or "On your feet for 8 hours". If you mean the Able Seaman (AB) credential, name the credential.',
+    ['able bodied'],
+  ),
+  ...flag(
+    'disability',
+    'Describe the physical tasks, like "Lifts up to 50 lb" or "On your feet for 8 hours".',
+    [
+      'no disabilities',
+      'no disability',
+      'not disabled',
+      'non disabled',
+      'physically fit',
+      'perfect health',
+      'good health',
+      'excellent health',
+      'no medical conditions',
+      'no health problems',
+      'no health issues',
+      'no medications',
+      'handicapped',
+      'perfect vision',
+      'perfect eyesight',
+      'mentally stable',
+    ],
+  ),
+  // Religion. A religious organization may prefer its own members; review decides.
+  ...flag(
+    'religion',
+    'Describe the duties, like "Leads morning devotions". If you are a religious organization that may hire by religion, keep it.',
+    [
+      'christian',
+      'christians',
+      'catholic',
+      'catholics',
+      'muslim',
+      'muslims',
+      'jewish',
+      'mormon',
+      'mormons',
+      'hindu',
+      'buddhist',
+      'atheist',
+      'atheists',
+      'religious',
+      'religion',
+      'churchgoing',
+      'church member',
+      'church members',
+      'attend church',
+      'faith based',
+      'god fearing',
+      'born again',
+      'strong faith',
+    ],
+  ),
+  // Marital and family status. Housing that fits only couples is a lawful reason; say so.
+  ...flag(
+    'family_status',
+    'Describe the housing instead, like "Housing is one room for two people sharing a bed".',
+    [
+      'singles only',
+      'single applicants',
+      'single people',
+      'single men',
+      'single women',
+      'must be single',
+      'must be married',
+      'unmarried',
+      'married couple',
+      'married couples',
+      'couples only',
+      'couples preferred',
+      'husband and wife',
+      'husband/wife',
+      'no children',
+      'no kids',
+      'without children',
+      'without kids',
+      'childless',
+      'no dependents',
+      'no families',
+    ],
+  ),
+  // Criminal history.
+  ...flag(
+    'criminal_history',
+    'Name a requirement the job has, like "Must pass a background check to drive guests", not a blanket ban.',
+    [
+      'no felons',
+      'no felonies',
+      'no felony',
+      'felon',
+      'felons',
+      'felony',
+      'felonies',
+      'clean record',
+      'clean criminal record',
+      'criminal record',
+      'criminal records',
+      'criminal history',
+      'criminal background',
+      'no criminal',
+      'convicted',
+      'conviction',
+      'convictions',
+      'ex offenders',
+      'ex cons',
+    ],
+  ),
+  // Appearance.
+  ...flag(
+    'appearance',
+    'Describe the dress code or the work instead, like "Wears the provided uniform".',
+    [
+      'good looking',
+      'attractive appearance',
+      'physically attractive',
+      'attractive applicants',
+      'attractive staff',
+      'model looks',
+      'slim',
+      'slender',
+      'must be tall',
+      'height and weight',
+      'height requirement',
+      'weight requirement',
+      'clean shaven',
+      'no dreadlocks',
+      'no dreads',
+      'no braids',
+      'hair texture',
+    ],
+  ),
+  // Minors (section 2.6): seekers are 18 or older.
+  ...flag('minors', 'Everyone on Explore&Earn is 18 or older. Remove it, or say "18 and up".', [
+    'teens welcome',
+    'teens',
+    'teen',
+    'teenagers',
+    'teenager',
+    'high school students',
+    'high school student',
+    'high schoolers',
+    'minors',
+    'under 18',
+    '16 and up',
+    '16 and older',
+    '16 or older',
+    '17 and up',
+    '17 and older',
+    '17 or older',
+    '16 years old',
+    '17 years old',
+    '16 year olds',
+    '17 year olds',
+  ]),
+];
+
+const FLAGGED_NATIONALITIES = [
+  'American',
+  'Mexican',
+  'Canadian',
+  'Guatemalan',
+  'Honduran',
+  'Salvadoran',
+  'Nicaraguan',
+  'Dominican',
+  'Puerto Rican',
+  'Jamaican',
+  'Haitian',
+  'Cuban',
+  'Colombian',
+  'Venezuelan',
+  'Peruvian',
+  'Brazilian',
+  'Argentinian',
+  'Chilean',
+  'Filipino',
+  'Filipina',
+  'Chinese',
+  'Japanese',
+  'Korean',
+  'Vietnamese',
+  'Thai',
+  'Indian',
+  'Pakistani',
+  'Russian',
+  'Ukrainian',
+  'Polish',
+  'Romanian',
+  'Bulgarian',
+  'Serbian',
+  'Croatian',
+  'Irish',
+  'British',
+  'English',
+  'Scottish',
+  'German',
+  'French',
+  'Italian',
+  'Spanish',
+  'Portuguese',
+  'Dutch',
+  'Swedish',
+  'Norwegian',
+  'Czech',
+  'Slovak',
+  'Hungarian',
+  'Greek',
+  'Turkish',
+  'South African',
+  'Australian',
+  'New Zealander',
+  'Nigerian',
+  'Kenyan',
+  'Ghanaian',
+  'Ethiopian',
+  'Egyptian',
+  'Moroccan',
+  'Arab',
+  'Israeli',
+  'Iranian',
+  'Afghan',
+  'European',
+  'Asian',
+  'African',
+  'Hispanic',
+  'Latino',
+  'Latina',
+  'Caucasian',
+];
+
+/**
+ * Phrases that put a screening question on a forbidden topic. Age is special: "Are you at least
+ * 18?" and "Are you at least 21?" (and their plain variants) are removed before matching.
+ */
+const QUESTION_TOPIC_PHRASES: Record<QuestionTopic, string[]> = {
+  age: [
+    'age',
+    'ages',
+    'aged',
+    'how old',
+    'years old',
+    'year old',
+    'yrs old',
+    'date of birth',
+    'birth date',
+    'birthdate',
+    'birthday',
+    'year of birth',
+    'birth year',
+    'dob',
+    'born',
+    'graduation year',
+    'year did you graduate',
+    'year you graduated',
+    'are you at least #',
+    'are you over #',
+    'are you under #',
+    'older than #',
+    'younger than #',
+    '# or older',
+    '# or over',
+    '# and older',
+    '# and over',
+  ],
+  marital_status: [
+    'married',
+    'marital',
+    'marriage',
+    'spouse',
+    'spouses',
+    'husband',
+    'wife',
+    'divorced',
+    'widowed',
+    'are you single',
+    'fiance',
+    'fiancee',
+    'girlfriend',
+    'boyfriend',
+    'maiden name',
+    'do you have children',
+    'do you have kids',
+    'how many children',
+    'how many kids',
+  ],
+  pregnancy: [
+    'pregnant',
+    'pregnancy',
+    'expecting a baby',
+    'expecting a child',
+    'maternity',
+    'plan to have children',
+    'plan to have kids',
+    'planning to have children',
+    'start a family',
+    'starting a family',
+    'family planning',
+    'birth control',
+  ],
+  disability: [
+    'disability',
+    'disabilities',
+    'disabled',
+    'handicap',
+    'handicapped',
+    'impairment',
+    'impairments',
+    'medical condition',
+    'medical conditions',
+    'medical history',
+    'health condition',
+    'health conditions',
+    'health problems',
+    'health issues',
+    'medication',
+    'medications',
+    'prescription',
+    'prescriptions',
+    'diagnosed',
+    'diagnosis',
+    'illness',
+    'illnesses',
+    'mental health',
+    'injuries',
+    'sick days',
+    "workers' comp",
+    'workers comp',
+    "workers' compensation",
+    'workers compensation',
+    'physical limitations',
+  ],
+  religion: [
+    'religion',
+    'religious',
+    'church',
+    'churches',
+    'faith',
+    'worship',
+    'pray',
+    'prayer',
+    'sabbath',
+    'god',
+    'bible',
+    'denomination',
+    'christian',
+    'catholic',
+    'muslim',
+    'jewish',
+    'mormon',
+    'hindu',
+    'buddhist',
+    'atheist',
+  ],
+  national_origin: [
+    'national origin',
+    'nationality',
+    'citizen',
+    'citizens',
+    'citizenship',
+    'where were you born',
+    'where are you from',
+    'what country',
+    'which country',
+    'country of birth',
+    'country of origin',
+    'place of birth',
+    'birthplace',
+    'native language',
+    'first language',
+    'mother tongue',
+    'native tongue',
+    'accent',
+    'ethnicity',
+    'ethnic',
+    'your race',
+    'what race',
+    'ancestry',
+    'immigrant',
+    'immigration status',
+    'green card',
+    'visa type',
+    'type of visa',
+    'what visa',
+    'which visa',
+  ],
+  arrest_record: [
+    'arrest',
+    'arrests',
+    'arrested',
+    'charged with',
+    'police record',
+    'pending charges',
+    'mugshot',
+  ],
+};
 
 export const SETTING_DEFAULTS: { readonly [K in SettingKey]: SettingValues[K] } = {
   'limits.invites_per_seeker_per_week': 10,
@@ -91,7 +644,12 @@ export const SETTING_DEFAULTS: { readonly [K in SettingKey]: SettingValues[K] } 
     'American citizens only',
     'no foreigners',
     'native English speaker',
+    'green card holders only',
+    'no immigrants',
   ],
+  'listings.flagged_phrases': FLAGGED_PHRASES,
+  'listings.flagged_nationalities': FLAGGED_NATIONALITIES,
+  'listings.question_topics': QUESTION_TOPIC_PHRASES,
   'listings.vague_pay_range_ratio': 2.5,
   'listings.min_wage_cents_by_state': MIN_WAGE_CENTS_2026,
   'listings.genres': GENRES.map((g) => ({ ...g, active: true })),
@@ -182,6 +740,70 @@ const genres = z
     message: 'genre codes must be unique',
   });
 
+/** How a phrase compares with another: the listing checks' folding (case, periods, dashes, spaces). */
+const phraseKey = (s: string) =>
+  s
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u02bc]/g, "'")
+    .replace(/\./g, '')
+    .replace(/[-\u2010-\u2015\u2212]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const unique = <T>(key: (item: T) => string, what: string) =>
+  [
+    (list: T[]) => new Set(list.map(key)).size === list.length,
+    { message: `${what} must be unique` },
+  ] as const;
+
+/** A phrase to match: 2-100 characters with at least one letter or digit besides `*` and `#`. */
+const phrase = z
+  .string()
+  .trim()
+  .min(2)
+  .max(100)
+  .refine((s) => /[\p{L}\p{N}]/u.test(s.replace(/[*#]/g, '')), {
+    message: 'a phrase needs a word, not only * and #',
+  });
+
+const phrases = z
+  .array(phrase)
+  .min(1)
+  .max(500)
+  .refine(...unique<string>(phraseKey, 'phrases'));
+
+const flaggedPhrases = z
+  .array(
+    z.strictObject({
+      phrase,
+      ground: z.enum(WORDING_GROUNDS),
+      suggestion: z.string().trim().min(1).max(300),
+    }),
+  )
+  .min(1)
+  .max(1000)
+  .refine(...unique<FlaggedPhrase>((f) => phraseKey(f.phrase), 'phrases'));
+
+const nationalities = z
+  .array(
+    z
+      .string()
+      .trim()
+      .min(2)
+      .max(60)
+      .regex(/^[\p{L}][\p{L} '-]*$/u, 'use letters, spaces, hyphens and apostrophes'),
+  )
+  .max(500)
+  .refine(...unique<string>(phraseKey, 'nationalities'));
+
+const questionTopics = z.strictObject(
+  Object.fromEntries(QUESTION_TOPICS.map((topic) => [topic, phrases])) as Record<
+    QuestionTopic,
+    typeof phrases
+  >,
+);
+
 /** Validates a value before it is stored, and again when it is read back. */
 export const SETTING_SCHEMAS: { readonly [K in SettingKey]: z.ZodType<SettingValues[K]> } = {
   'limits.invites_per_seeker_per_week': z.number().int().min(0).max(1000),
@@ -200,6 +822,9 @@ export const SETTING_SCHEMAS: { readonly [K in SettingKey]: z.ZodType<SettingVal
   'founding.return_window_months': int(0, 24),
   'team.invitation_ttl_days': int(1, 30),
   'listings.prohibited_phrases': z.array(z.string().trim().min(2).max(100)).min(1).max(200),
+  'listings.flagged_phrases': flaggedPhrases,
+  'listings.flagged_nationalities': nationalities,
+  'listings.question_topics': questionTopics,
   'listings.vague_pay_range_ratio': z.number().min(1).max(10),
   'listings.min_wage_cents_by_state': minWages,
   'listings.genres': genres,

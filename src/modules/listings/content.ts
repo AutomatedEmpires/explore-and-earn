@@ -215,6 +215,24 @@ const contentShape = {
       .max(PERKS.length)
       .refine((perks) => perks.every((p) => PERK_CODES.has(p)), { message: 'Unknown perk' }),
     visaSponsorship: z.enum(['none', 'j1', 'h2a', 'h2b']),
+    /**
+     * For an H-2B listing, the 20 CFR 655.41(b) items the form does not otherwise capture, each
+     * optional (legal review 2.3 item 3). Absent on listings saved before #121.
+     */
+    h2b: z
+      .object({
+        /** Inbound and return transportation and daily subsistence. */
+        transportation: text(1, 1_000).nullable().default(null),
+        /** Tools, supplies and equipment provided at no charge. */
+        tools: text(1, 1_000).nullable().default(null),
+        /** A summary of the three-fourths guarantee. */
+        threeFourthsGuarantee: text(1, 1_000).nullable().default(null),
+        /** The State Workforce Agency office to apply through. */
+        swaContact: text(1, 500).nullable().default(null),
+        jobOrderNumber: text(1, 60).nullable().default(null),
+      })
+      .nullable()
+      .optional(),
   }),
 
   photos: z.object({

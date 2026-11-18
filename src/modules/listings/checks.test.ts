@@ -4,9 +4,11 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Db } from '@/lib/db';
 import { newId } from '@/lib/ids';
+import { SETTING_DEFAULTS, type SettingValue } from '@/modules/settings';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { locationsFake } from '../../../tests/fakes/sp2/locations';
 import { FIXED_NOW, seedHostOrg, seedMedia, type SeededOrg } from '../../../tests/helpers/sp2';
+import { findFlaggedWording, questionTopic } from './checks';
 import type { ListingContent } from './content';
 import {
   ackKey,
@@ -203,6 +205,263 @@ describe('runListingChecks', () => {
     });
   });
 
+  it('blocks the added no-lawful-use phrases', async () => {
+    const r = await check((c) => {
+      c.job.requiredQualifications = ['Green card holders only'];
+      c.job.description += ' No immigrants.';
+    });
+    expect(brief(r.errors)).toEqual([
+      { code: 'prohibited_wording', section: 'job', field: 'job.description' },
+      { code: 'prohibited_wording', section: 'job', field: 'job.requiredQualifications.0' },
+    ]);
+  });
+
+  describe('wording_flagged (legal review 2.2, #121)', () => {
+    const DESCRIPTION =
+      'Run the chairlift, help riders on and off safely, and keep the loading area clear.';
+
+    it('warns, says why, offers neutral wording, and is acknowledged by its code', async () => {
+      const r = await check((c) => {
+        c.job.description = `${DESCRIPTION} We are hiring a waitress for the lodge.`;
+      });
+      expect(r.errors).toEqual([]);
+      expect(r.warnings).toEqual([
+        {
+          code: 'wording_flagged',
+          section: 'job',
+          field: 'job.description',
+          message:
+            '"waitress" can read as a preference for men or for women. Try "server". If the job needs it, you can keep it: we will review the listing before it goes live.',
+        },
+      ]);
+      expect(ackKey(r.warnings[0] as Issue)).toBe('wording_flagged');
+    });
+
+    it('reads the title, qualifications, screening questions and housing notes', async () => {
+      const r = await check((c) => {
+        c.basics.title = 'Lodge Hostess';
+        c.job.preferredQualifications = ['Recent college graduates'];
+        c.applying.questions = [
+          { id: 'q1', prompt: 'Do you have a clean record?', required: true, type: 'yes_no' },
+          {
+            id: 'q2',
+            prompt: 'Which shift suits you?',
+            required: false,
+            type: 'multiple_choice',
+            choices: ['Mornings', 'Evenings with the guys'],
+            allowMultiple: false,
+          },
+        ];
+        if (c.housing.provided) c.housing.finePrint.notes = 'Cabins are for couples only.';
+      });
+      expect(r.errors).toEqual([]);
+      expect(brief(r.warnings)).toEqual([
+        { code: 'wording_flagged', section: 'basics', field: 'basics.title' },
+        { code: 'wording_flagged', section: 'housing', field: 'housing.finePrint.notes' },
+        { code: 'wording_flagged', section: 'job', field: 'job.preferredQualifications.0' },
+        { code: 'wording_flagged', section: 'applying', field: 'applying.questions.0.prompt' },
+        {
+          code: 'wording_flagged',
+          section: 'applying',
+          field: 'applying.questions.1.choices.1',
+        },
+      ]);
+    });
+
+    it('leaves a field with blocked wording to the block', async () => {
+      const r = await check((c) => {
+        c.job.description = `${DESCRIPTION} US citizens only. Young team.`;
+      });
+      expect(brief(r.errors)).toEqual([
+        { code: 'prohibited_wording', section: 'job', field: 'job.description' },
+      ]);
+      expect(r.warnings).toEqual([]);
+    });
+  });
+
+  describe('question_not_allowed (legal review 2.2 item 2, #121)', () => {
+    const ask = (prompt: string, choices?: string[]) => (c: ListingContent) => {
+      c.applying.questions = [
+        choices
+          ? {
+              id: 'q1',
+              prompt,
+              required: true,
+              type: 'multiple_choice',
+              choices,
+              allowMultiple: false,
+            }
+          : { id: 'q1', prompt, required: true, type: 'yes_no' },
+      ];
+    };
+
+    it.each<[string, string, string]>([
+      [
+        'age',
+        'How old are you?',
+        'The only question about age you can ask is "Are you at least 18?" or "Are you at least 21?".',
+      ],
+      [
+        'marital status',
+        'Are you married?',
+        "You can't ask about marriage, partners or children. Ask about what the job needs, like the schedule or shared housing.",
+      ],
+      ['pregnancy', 'Are you pregnant?', "You can't ask about pregnancy or plans for a family."],
+      [
+        'disability',
+        'Do you have any medical conditions?',
+        'You can\'t ask about disabilities, health or medication. You can ask "Can you do the tasks in this listing, with or without a reasonable accommodation?"',
+      ],
+      [
+        'religion',
+        'What church do you attend?',
+        "You can't ask about religion. You can ask whether someone can work the days in this listing.",
+      ],
+      [
+        'national origin',
+        'What country are you from?',
+        'You can\'t ask about national origin, citizenship or first language. You can ask "Are you authorized to work in the US?" and "Will you need visa sponsorship?"',
+      ],
+      ['arrest record', 'Have you ever been arrested?', "You can't ask about arrests or charges."],
+    ])('blocks a question about %s', async (_topic, prompt, message) => {
+      const r = await check(ask(prompt));
+      expect(r.errors).toEqual([
+        {
+          code: 'question_not_allowed',
+          section: 'applying',
+          field: 'applying.questions.0.prompt',
+          message,
+        },
+      ]);
+    });
+
+    it.each([
+      'Are you at least 18?',
+      'Are you at least 21 years old?',
+      'Are you 18 or older?',
+      'Are you 21 years of age or older?',
+      'Are you over 21?',
+      'Are you 18+?',
+    ])('allows %j', async (prompt) => {
+      const r = await check(ask(prompt));
+      expect(r.errors).toEqual([]);
+      expect(r.warnings).toEqual([]);
+    });
+
+    it.each([
+      'Are you at least 25?',
+      'Are you under 40?',
+      'What is your date of birth?',
+      'What year did you graduate high school?',
+      'Are you of legal age?',
+    ])('blocks the age question %j', async (prompt) => {
+      expect(brief((await check(ask(prompt))).errors)).toEqual([
+        { code: 'question_not_allowed', section: 'applying', field: 'applying.questions.0.prompt' },
+      ]);
+    });
+
+    it('checks the choices too', async () => {
+      const r = await check(ask('Which describes you?', ['Single', 'Married']));
+      expect(brief(r.errors)).toEqual([
+        {
+          code: 'question_not_allowed',
+          section: 'applying',
+          field: 'applying.questions.0.choices.1',
+        },
+      ]);
+    });
+
+    it.each([
+      'Are you authorized to work in the US?',
+      'Will you need visa sponsorship?',
+      'Can you lift 50 lb?',
+      'Can you do the tasks in this listing, with or without a reasonable accommodation?',
+      'Can you work weekends and holidays?',
+      "Do you have a valid driver's license?",
+      'Do you have childcare experience?',
+      'Have you managed a stage crew?',
+    ])('allows the lawful question %j', async (prompt) => {
+      const r = await check(ask(prompt));
+      expect(r.errors).toEqual([]);
+      expect(r.warnings).toEqual([]);
+    });
+
+    it('runs on screening questions only', async () => {
+      const r = await check((c) => {
+        c.job.description +=
+          ' We never ask your age, religion or whether you are married or have been arrested.';
+      });
+      expect(r.errors).toEqual([]);
+    });
+  });
+
+  describe('visa sponsorship (legal review 2.3, #121)', () => {
+    it('blocks H-2A without free housing, linking 20 CFR 655.122(d)', async () => {
+      const paid = await check((c) => {
+        c.job.visaSponsorship = 'h2a';
+      });
+      expect(paid.errors).toEqual([
+        {
+          code: 'h2a_housing_not_free',
+          section: 'housing',
+          field: 'housing.cost',
+          message:
+            'H-2A workers must get housing at no cost (20 CFR 655.122(d)). Make housing free, or choose another visa sponsorship.',
+          href: 'https://www.ecfr.gov/current/title-20/section-655.122#p-655.122(d)',
+        },
+      ]);
+
+      const none = await check((c) => {
+        c.job.visaSponsorship = 'h2a';
+        c.housing = { provided: false };
+      });
+      expect(brief(none.errors)).toEqual([
+        { code: 'h2a_housing_not_free', section: 'housing', field: 'housing.provided' },
+      ]);
+    });
+
+    it('allows H-2A with free housing, and paid housing without H-2A', async () => {
+      const free = await check((c) => {
+        c.job.visaSponsorship = 'h2a';
+        if (c.housing.provided) c.housing.cost = { free: true };
+      });
+      expect(free.errors).toEqual([]);
+      for (const visa of ['none', 'j1'] as const) {
+        expect((await check((c) => void (c.job.visaSponsorship = visa))).errors).toEqual([]);
+      }
+    });
+
+    it('asks an H-2B host to confirm the job order, acknowledged by its code', async () => {
+      for (const h2b of [
+        undefined,
+        {
+          transportation: null,
+          tools: 'All tools are free.',
+          threeFourthsGuarantee: null,
+          swaContact: null,
+          jobOrderNumber: 'AK10582913',
+        },
+      ]) {
+        const r = await check((c) => {
+          c.job.visaSponsorship = 'h2b';
+          if (h2b) c.job.h2b = h2b;
+        });
+        expect(r.errors).toEqual([]);
+        expect(r.warnings).toEqual([
+          {
+            code: 'h2b_job_order',
+            section: 'job',
+            field: 'job.visaSponsorship',
+            message:
+              'H-2B listings must offer pay and terms at least as good as your job order (20 CFR 655.41). Publishing confirms they match it.',
+            href: 'https://www.ecfr.gov/current/title-20/section-655.41',
+          },
+        ]);
+        expect(ackKey(r.warnings[0] as Issue)).toBe('h2b_job_order');
+      }
+    });
+  });
+
   it.each(['http://a.com', 'https://bit.ly/x'])('flags the link %s', async (url) => {
     const r = await check((c) => {
       c.applying.additionalStep = { url, note: '' };
@@ -346,5 +605,99 @@ describe('hourlyPayCents', () => {
 describe('normalizeForPhraseMatch', () => {
   it('folds case, width, periods and spacing', () => {
     expect(normalizeForPhraseMatch('  ＵＳ  Citizens.  ONLY ')).toBe('us citizens only');
+  });
+
+  it('reads dashes as spaces and folds curly apostrophes', () => {
+    expect(normalizeForPhraseMatch('Able-bodied, ages 18–30, workers’ comp')).toBe(
+      "able bodied, ages 18 30, workers' comp",
+    );
+  });
+});
+
+// The pure matchers, against the shipped lists. "Each list entry" (#121 acceptance) is tested by
+// running the entry on its own, so no other entry can be the one that matched.
+describe('the wording lists', () => {
+  const flagged = SETTING_DEFAULTS['listings.flagged_phrases'];
+  const nationalities = SETTING_DEFAULTS['listings.flagged_nationalities'];
+  const topics = SETTING_DEFAULTS['listings.question_topics'];
+  type Topics = SettingValue<'listings.question_topics'>;
+  const lists = { flagged, nationalities };
+  /** A phrase with its wildcards filled in: `*` a word, `#` a number. */
+  const sample = (phrase: string) => phrase.replace(/\*/g, 'spanish').replace(/#/g, '40');
+  const inDescription = (text: string) => ({ job: { description: `We are hiring. ${text}.` } });
+
+  it.each(flagged.map((f) => [f.phrase, f] as const))('flags %j', (_phrase, entry) => {
+    expect(
+      findFlaggedWording(inDescription(sample(entry.phrase)), {
+        flagged: [entry],
+        nationalities: [],
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        field: 'job.description',
+        phrase: entry.phrase,
+        ground: entry.ground,
+      }),
+    ]);
+  });
+
+  it.each(nationalities)('flags people named as %s', (n) => {
+    for (const text of [`${n} workers preferred`, `${n}s only`, `Must be ${n}`]) {
+      expect(
+        findFlaggedWording(inDescription(text), { flagged: [], nationalities: [n] }),
+        text,
+      ).toEqual([expect.objectContaining({ field: 'job.description', ground: 'national_origin' })]);
+    }
+  });
+
+  it.each(
+    Object.entries(topics).flatMap(([topic, phrases]) => phrases.map((p) => [topic, p] as const)),
+  )('treats a %s question with %j as not allowed', (topic, phrase) => {
+    const only = Object.fromEntries(
+      Object.keys(topics).map((k) => [k, k === topic ? [phrase] : []]),
+    ) as unknown as Topics;
+    expect(questionTopic(`Question: ${sample(phrase)}?`, only)).toBe(topic);
+  });
+
+  it.each<[string, string, string]>([
+    ['We need a young, energetic team', 'young', 'age'],
+    ['Perfect for recent college graduates', 'recent college graduates', 'age'],
+    ['Applicants under 30 preferred', 'under 30', 'age'],
+    ['Ages 18–30 only', 'ages 18 30', 'age'],
+    ['Girls camp counselor', 'girls', 'sex'],
+    ['Native Spanish speaker preferred', 'native spanish speaker', 'national_origin'],
+    ['Mexican workers preferred', 'mexican workers', 'national_origin'],
+    ['Must be able-bodied', 'able bodied', 'disability'],
+    ['Christian camp: staff lead morning devotions', 'christian', 'religion'],
+    ['Housing is for couples only', 'couples only', 'family_status'],
+    ['No felons', 'no felons', 'criminal_history'],
+    ['Must be good-looking', 'good looking', 'appearance'],
+    ['Teens welcome!', 'teens welcome', 'minors'],
+    ['Great for high school students', 'high school students', 'minors'],
+  ])('flags %j as %j (%s), the longest match winning', (text, matched, ground) => {
+    expect(findFlaggedWording(inDescription(text), lists)).toEqual([
+      expect.objectContaining({ field: 'job.description', matched, ground }),
+    ]);
+  });
+
+  it.each([
+    'Our office is in Youngstown',
+    'Rooms are single occupancy',
+    'A clean driving record is required',
+    'Guests raft the American River with us',
+    'Bilingual in Spanish and English is a plus',
+    'You must pass a background check',
+    'Able to lift 50 lb',
+  ])('does not flag %j', (text) => {
+    expect(findFlaggedWording(inDescription(text), lists)).toEqual([]);
+  });
+
+  it('reads prose fields only, not codes', () => {
+    expect(
+      findFlaggedWording(
+        { basics: { occupationCode: 'waitress', genre: 'young' }, job: { perks: ['girls'] } },
+        lists,
+      ),
+    ).toEqual([]);
   });
 });

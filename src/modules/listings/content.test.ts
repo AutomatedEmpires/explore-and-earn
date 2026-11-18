@@ -166,6 +166,60 @@ describe('ListingContentSchema', () => {
     expect(pathsOf(build((c) => void (c.job.minAge = 17)))).toEqual(['job.minAge']);
   });
 
+  describe('job.h2b (the 20 CFR 655.41(b) items the form lacks, #121)', () => {
+    const h2b = {
+      transportation: 'Bus fare from your home to Kodiak and back is paid, plus $14.68 a day.',
+      tools: 'All tools, gear and boots are provided free.',
+      threeFourthsGuarantee: 'We guarantee pay for at least 3/4 of the hours offered.',
+      swaContact: 'Alaska Job Center, Anchorage, (907) 269-4777',
+      jobOrderNumber: 'AK10582913',
+    };
+
+    it('is optional, so existing listings still parse', () => {
+      const content = build();
+      expect(content.job.h2b).toBeUndefined();
+      expect(ListingContentSchema.parse(content).job).not.toHaveProperty('h2b');
+      expect(ListingContentSchema.parse(build((c) => void (c.job.h2b = null))).job.h2b).toBeNull();
+    });
+
+    it('keeps the items, each optional', () => {
+      const full = build((c) => {
+        c.job.visaSponsorship = 'h2b';
+        c.job.h2b = h2b;
+      });
+      expect(ListingContentSchema.parse(full).job.h2b).toEqual(h2b);
+      const some = build((c) => {
+        c.job.visaSponsorship = 'h2b';
+        c.job.h2b = { jobOrderNumber: 'AK10582913' } as never;
+      });
+      expect(ListingContentSchema.parse(some).job.h2b).toEqual({
+        transportation: null,
+        tools: null,
+        threeFourthsGuarantee: null,
+        swaContact: null,
+        jobOrderNumber: 'AK10582913',
+      });
+    });
+
+    it('limits each item', () => {
+      expect(
+        pathsOf(build((c) => void (c.job.h2b = { ...h2b, jobOrderNumber: 'x'.repeat(61) }))),
+      ).toEqual(['job.h2b.jobOrderNumber']);
+      expect(pathsOf(build((c) => void (c.job.h2b = { ...h2b, tools: 'x'.repeat(1001) })))).toEqual(
+        ['job.h2b.tools'],
+      );
+      expect(pathsOf(build((c) => void (c.job.h2b = { ...h2b, swaContact: '' })))).toEqual([
+        'job.h2b.swaContact',
+      ]);
+    });
+
+    it('is partial in a draft', () => {
+      expect(ListingDraftSchema.parse({ job: { h2b: { tools: 'Free' } } })).toEqual({
+        job: { h2b: { tools: 'Free' } },
+      });
+    });
+  });
+
   it('trims text and rejects control characters other than newline and tab', () => {
     const trimmed = ListingContentSchema.parse(
       build((c) => void (c.basics.title = '  Lift Operator  ')),
