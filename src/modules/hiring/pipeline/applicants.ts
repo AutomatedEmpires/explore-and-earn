@@ -1,6 +1,7 @@
 // Applicant list, detail, and the ids a bulk message can address.
 //
-// The list and detail are refused while the host is not verified (./gate.ts). A stored fit
+// The list and detail are refused while the host is not verified (./gate.ts), and a new host's
+// detail opens count against its daily profile-view cap (legal review 7.3). A stored fit
 // score shows, and sort=fit orders by it, only on a listing whose fit is on now (spec 8.3):
 // the stored value can outlive the switch, because the daily refresh skips listings that are
 // not live and finished applicants. Where fit is off, sort=fit falls back to newest first.
@@ -19,10 +20,11 @@ import type {
   OfferStatus,
 } from '@/lib/hiring/types';
 import type { DbOrTx } from '@/lib/db';
-import { getHostCards, getSnapshot } from '@/modules/applications';
+import { getHostCards, getSnapshot, recordHostOpen } from '@/modules/applications';
 import { getPublicMediaUrls, getStorage } from '@/modules/media';
 import { getHiringInfoMany, type ListingHiringInfo } from '@/modules/listings';
 import { inScope, listingScope, threadIdsForApplications, type ListingScope } from '@/modules/messaging';
+import { requireProfileView } from '@/modules/verification';
 import type { HostContext } from '@/server/guards';
 import { requireEntry } from '../access';
 import type { PipelineEntryRow } from '../core';
@@ -283,6 +285,11 @@ async function listingIdsOf(db: DbOrTx, base: SQL | undefined, q: ApplicantsQuer
   return rows.map((row) => row.listingId);
 }
 
+/**
+ * One applicant, with the snapshot. A new host's open counts against its daily profile-view
+ * cap (429 `new_host_daily_cap` over it, before anything is read); every open is audited as
+ * `applications.snapshot_viewed` and queues SP4's silent-host check (legal review 7.3).
+ */
 export async function getApplicantDetail(
   db: DbOrTx,
   ctx: HostContext,
@@ -290,6 +297,7 @@ export async function getApplicantDetail(
 ): Promise<ApplicantDetail> {
   await requireApplicantReads(db, ctx.orgId);
   const entry = await requireEntry(db, ctx, applicationId);
+  await requireProfileView(db, ctx.orgId, entry.seekerUserId);
   const snapshot = await getSnapshot(db, { orgId: ctx.orgId, applicationId });
   if (!snapshot) throw notFound(APPLICATION_UNAVAILABLE);
   const [items, history, interviews, offers] = await Promise.all([
@@ -304,6 +312,11 @@ export async function getApplicantDetail(
   ]);
   const card = items[0];
   if (!card) throw notFound(APPLICATION_UNAVAILABLE);
+  await recordHostOpen(db, ctx, {
+    applicationId,
+    listingId: entry.listingId,
+    action: 'applications.snapshot_viewed',
+  });
   return {
     card,
     snapshot,

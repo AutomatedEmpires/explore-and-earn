@@ -20,6 +20,7 @@ import {
 import { getVerificationStatus, lockVerification, openRun, recordDecision } from './decide';
 import { businessVerifications } from './schema';
 import {
+  banCardOnFile,
   collectSignals,
   defaultSignalDeps,
   hardFlags,
@@ -242,9 +243,22 @@ export async function runVerification(
 
 const runPayload = z.object({ verificationId: z.uuid() });
 
+/**
+ * A confirmed fake host's ban (legal review 7 item 6): bans the print of the card on file.
+ * Queued by the `business_verification` ban (subjects.ts) and run after it commits, because it
+ * reads Stripe. Idempotent.
+ */
+export const BAN_FINGERPRINTS_TOPIC = 'verification.ban_fingerprints';
+
+const banPayload = z.object({ orgId: z.uuid() });
+
 export const runJobHandlers: HandlerMap = {
   [RUN_TOPIC]: async (payload, { db, now }) => {
     const { verificationId } = runPayload.parse(payload);
     await runVerification(db, verificationId, defaultSignalDeps(now));
+  },
+  [BAN_FINGERPRINTS_TOPIC]: async (payload, { db }) => {
+    const { orgId } = banPayload.parse(payload);
+    await banCardOnFile(db, orgId);
   },
 };

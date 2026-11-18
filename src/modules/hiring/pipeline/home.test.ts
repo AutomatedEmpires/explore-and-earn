@@ -1,5 +1,7 @@
+import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { newId } from '@/lib/ids';
+import type { InterviewItem } from '@/lib/hiring/types';
 import * as messaging from '@/modules/messaging';
 import { listingsFake } from '@tests/fakes/sp5/sp2';
 import { messagingFake } from '@tests/fakes/sp5/messaging';
@@ -15,9 +17,10 @@ vi.mock('@/modules/messaging', async (orig) => ({
   ...(await orig<typeof import('@/modules/messaging')>()),
   ...(await import('@tests/fakes/sp5/messaging')).messagingFake,
 }));
-vi.mock('../interviews/host', () => ({
-  listHostInterviews: vi.fn(async () => ({ items: [] })),
+const mocks = vi.hoisted(() => ({
+  listHostInterviews: vi.fn(async (): Promise<{ items: unknown[] }> => ({ items: [] })),
 }));
+vi.mock('../interviews/host', () => ({ listHostInterviews: mocks.listHostInterviews }));
 
 let t: TestDb;
 
@@ -32,6 +35,8 @@ afterAll(async () => {
 beforeEach(() => {
   listingsFake.reset();
   messagingFake.reset();
+  mocks.listHostInterviews.mockReset();
+  mocks.listHostInterviews.mockResolvedValue({ items: [] });
 });
 
 describe('host home', () => {
@@ -134,5 +139,32 @@ describe('host home', () => {
     });
     const summary = await getOrgHiringSummary(t.db, org.orgId);
     expect(summary).toMatchObject({ applicants: 3, hires: 1, invitesSent: 1, activeInterviews: 2 });
+  });
+
+  describe("today's interviews and the verified-host gate (legal review 7.1)", () => {
+    const interview = { interviewId: newId(), applicationId: newId() } as unknown as InterviewItem;
+    const setStatus = (orgId: string, status: string) =>
+      t.db.execute(sql`update app.organizations set verification_status = ${status} where id = ${orgId}`);
+    const home = (ctx: Parameters<typeof getHostHome>[1]) =>
+      getHostHome(t.db, ctx, { tz: 'America/Anchorage', now: new Date('2027-01-15T08:30:00.000Z') });
+
+    it('lists them for a verified host', async () => {
+      const org = await seedHostOrg(t.db);
+      await setStatus(org.orgId, 'verified');
+      mocks.listHostInterviews.mockResolvedValue({ items: [interview] });
+      expect((await home(org.owner.ctx)).todayInterviews).toEqual([interview]);
+    });
+
+    it.each(['unverified', 'running', 'needs_review', 'needs_info', 'failed'] as const)(
+      'shows none while verification is %s, and reads none',
+      async (status) => {
+        const org = await seedHostOrg(t.db);
+        await setStatus(org.orgId, status);
+        mocks.listHostInterviews.mockResolvedValue({ items: [interview] });
+        const out = await home(org.owner.ctx);
+        expect(out.todayInterviews).toEqual([]);
+        expect(mocks.listHostInterviews).not.toHaveBeenCalled();
+      },
+    );
   });
 });

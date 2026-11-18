@@ -1,7 +1,7 @@
 // An in-memory billing module for B1 tests that mock '@/modules/billing'. Every org starts
 // entitled on Professional monthly (host since 2026-11-03); setState changes that.
 import { newId } from '@/lib/ids';
-import type { SubscriptionState } from '@/modules/billing';
+import type { CardChecks, SubscriptionState } from '@/modules/billing';
 
 const HOST_SINCE = new Date('2026-11-03T00:00:00Z');
 
@@ -18,8 +18,6 @@ export const DEFAULT_SUBSCRIPTION_STATE: SubscriptionState = {
   hostSince: HOST_SINCE,
   founding: 'none',
 };
-
-type CardChecks = { hasCard: boolean; cvcCheck: string | null; postalCheck: string | null };
 
 const state = {
   subscriptions: new Map<string, SubscriptionState>(),

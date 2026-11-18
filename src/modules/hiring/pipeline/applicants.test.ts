@@ -10,8 +10,23 @@ import { listingsFake } from '@tests/fakes/sp5/sp2';
 import { messagingFake } from '@tests/fakes/sp5/messaging';
 import { createTestDb, type TestDb } from '@tests/helpers/db';
 import { seedLocation } from '@tests/helpers/sp2';
-import { FIXED_NOW, seedEntry, seedHostOrg, seedMember, seedSeeker } from '@tests/helpers/sp5';
+import { queryRows, type DbOrTx } from '@/lib/db';
+import { NEW_HOST_DAILY_CAP, consumeNewHostDaily } from '@/modules/ratelimit';
+import {
+  FIXED_NOW,
+  seedEntry,
+  seedHostOrg as seedUnverifiedHostOrg,
+  seedMember,
+  seedSeeker,
+} from '@tests/helpers/sp5';
 import { getApplicantDetail, listApplicants, listApplicationIdsByStatus } from './applicants';
+
+/** A verified host org: only a verified host reads applicants (legal review 7.1). */
+async function seedHostOrg(db: DbOrTx) {
+  const org = await seedUnverifiedHostOrg(db);
+  await db.execute(sql`update app.organizations set verification_status = 'verified' where id = ${org.orgId}`);
+  return org;
+}
 
 vi.mock('@/modules/applications', async (orig) => ({
   ...(await orig<typeof import('@/modules/applications')>()),
@@ -234,7 +249,7 @@ describe('applicants', () => {
     const setStatus = (orgId: string, status: string) =>
       t.db.execute(sql`update app.organizations set verification_status = ${status} where id = ${orgId}`);
 
-    it.each(['running', 'needs_review', 'needs_info', 'failed'] as const)(
+    it.each(['unverified', 'running', 'needs_review', 'needs_info', 'failed'] as const)(
       'refuses the list and the detail while verification is %s, for applicants already received',
       async (status) => {
         const { org, applicationId } = await scored();
@@ -259,6 +274,52 @@ describe('applicants', () => {
       await setStatus(org.orgId, 'verified');
       const detail = await getApplicantDetail(t.db, org.owner.ctx, applicationId);
       expect(detail.card.applicationId).toBe(applicationId);
+    });
+  });
+
+  describe('a new host opening an applicant (legal review 7.3)', () => {
+    async function oneApplicant() {
+      const org = await seedHostOrg(t.db);
+      const listingId = newId();
+      listingsFake.setListing({ id: listingId, orgId: org.orgId });
+      const seeker = await seedSeeker(t.db);
+      const applicationId = await seedEntry(t.db, { orgId: org.orgId, listingId, seekerUserId: seeker.userId });
+      vi.mocked(applications.getSnapshot).mockResolvedValue({ v: 1 } as ApplicationSnapshotV1);
+      return { org, applicationId };
+    }
+
+    it('audits the open and queues the silent-host check for that application', async () => {
+      const { org, applicationId } = await oneApplicant();
+      await getApplicantDetail(t.db, org.owner.ctx, applicationId);
+      await getApplicantDetail(t.db, org.owner.ctx, applicationId);
+      const views = await queryRows<{ actorId: string; subjectId: string }>(
+        t.db,
+        sql`select actor_id::text as "actorId", subject_id as "subjectId" from app.audit_events
+          where action = 'applications.snapshot_viewed' and org_id = ${org.orgId}`,
+      );
+      expect(views).toEqual([
+        { actorId: org.owner.userId, subjectId: applicationId },
+        { actorId: org.owner.userId, subjectId: applicationId },
+      ]);
+      const checks = await queryRows<{ dedupeKey: string }>(
+        t.db,
+        sql`select dedupe_key as "dedupeKey" from app.outbox
+          where topic = 'applications.silent_host_check' and payload->>'orgId' = ${org.orgId}`,
+      );
+      expect(checks).toEqual([{ dedupeKey: `silent-host:${org.orgId}:${applicationId}` }]);
+    });
+
+    it("refuses a new host over today's profile views with 429, and reads nothing", async () => {
+      const { org, applicationId } = await oneApplicant();
+      for (let i = 0; i < NEW_HOST_DAILY_CAP.profile_views; i++) {
+        await consumeNewHostDaily(t.db, org.orgId, 'profile_views', new Date());
+      }
+      vi.mocked(applications.getSnapshot).mockClear();
+      await expect(getApplicantDetail(t.db, org.owner.ctx, applicationId)).rejects.toMatchObject({
+        status: 429,
+        details: { reason: 'new_host_daily_cap' },
+      });
+      expect(applications.getSnapshot).not.toHaveBeenCalled();
     });
   });
 
