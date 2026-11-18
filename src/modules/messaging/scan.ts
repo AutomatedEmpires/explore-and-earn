@@ -12,9 +12,9 @@ import {
   runCheck,
   type CheckResult,
 } from '@/modules/trust';
-import { deliverMessage } from './send';
+import { releaseMessage } from './send';
 import { messages } from './schema';
-import { blockingReason, loadMessage, loadThread, stampBlocked } from './threads';
+import { loadMessage, loadThread } from './threads';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HELD = 'messaging.text_held';
@@ -114,25 +114,16 @@ export async function runMessageScan(db: Db, payload: unknown): Promise<void> {
         text: row.body ?? '',
         orgId: thread.orgId,
       });
+  const stored = { scanLabels: outcome.labels, checkId: outcome.checkId };
   // State and delivery commit together. A retry must not skip a message whose release never landed.
   await withTx(db, async (tx) => {
-    const current = (await loadThread(tx, row.threadId)) ?? thread;
-    let state = outcome.state;
-    if (state === 'clear' || state === 'warn') {
-      // A thread that became read-only while the scan ran gets nothing (plan decision 11). The
-      // host sees the message as not delivered.
-      const reason = await blockingReason(tx, current);
-      if (reason === 'blocked') await stampBlocked(tx, current);
-      if (reason) state = 'held';
+    if (outcome.state === 'held') {
+      await tx
+        .update(messages)
+        .set({ scanState: 'held', ...stored })
+        .where(and(eq(messages.id, row.id), eq(messages.scanState, 'pending')));
+      return;
     }
-    const updated = await tx
-      .update(messages)
-      .set({ scanState: state, scanLabels: outcome.labels, checkId: outcome.checkId })
-      .where(and(eq(messages.id, row.id), eq(messages.scanState, 'pending')))
-      .returning({ id: messages.id });
-    if (updated.length === 0) return;
-    if (state === 'clear' || state === 'warn') {
-      await deliverMessage(tx, current, row);
-    }
+    await releaseMessage(tx, row, 'pending', { scanState: outcome.state, ...stored });
   });
 }
