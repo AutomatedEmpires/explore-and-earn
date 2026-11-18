@@ -4,6 +4,7 @@ import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import type { Db } from '@/lib/db';
 import { withTx } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { privacyRegistry } from '@/server/privacy-registry';
 import { schedules } from '@/server/schedules';
 import { POST } from '@/app/api/jobs/run/route';
 import { enqueue, kickWorker } from './outbox';
@@ -619,7 +620,10 @@ describe('POST /api/jobs/run', () => {
     // Every registered schedule is due on first sight (no schedule_runs rows yet).
     expect(body.scheduled).toEqual(schedules.map((s) => s.topic));
     expect(body.retried).toBeGreaterThanOrEqual(1);
-    expect(body.processed + body.retried + body.dead).toBe(schedules.length + 1);
+    // The retention sweep queues one job per registered rule, and the same pass runs them.
+    expect(body.processed + body.retried + body.dead).toBe(
+      schedules.length + 1 + privacyRegistry.rules.length,
+    );
     const [row] = await rows('no.handler.here');
     expect(row?.attempts).toBe(1);
     expect(row?.status).toBe('pending');
