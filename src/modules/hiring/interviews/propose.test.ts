@@ -166,7 +166,7 @@ describe('proposeInterview', () => {
     messagingFake.reset();
     const warnView = await propose(warned.ctx, warned.applicationId, { note: 'bring boots' });
     await withTx(t.db as Db, (tx) =>
-      releaseInterviewNote(tx, warnView.id, { state: 'warn', checkId: newId(), labels: [] }),
+      releaseInterviewNote(tx, warnView.id, { state: 'warn', checkId: newId(), labels: [] }, NOW),
     );
     const listed = await listSeekerInterviews(t.db, warned.seeker.userId, { now: NOW });
     expect(listed.items.find((item) => item.id === warnView.id)?.note).toBe('bring boots');
