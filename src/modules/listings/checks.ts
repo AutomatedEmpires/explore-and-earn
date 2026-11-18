@@ -3,8 +3,8 @@
 // decision 8).
 //
 // The wording, screening-question and visa rules follow the legal review (docs/legal/
-// 2026-11-legal-review.md sections 2.2, 2.3 and 2.6; #121). Their host-facing wording is the
-// agent's, pending counsel review (section 13).
+// 2026-11-legal-review.md sections 2.2, 2.3 and 2.6; #121, widened by #200). Their host-facing
+// wording is the agent's, pending counsel review (section 13).
 import { and, eq, inArray } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
 import { FEDERAL_MIN_WAGE_CENTS } from '@/lib/min-wage';
@@ -91,6 +91,7 @@ export const RULE_LINKS = {
 } as const;
 
 type FlaggedPhrase = SettingValue<'listings.flagged_phrases'>[number];
+type FlaggedGroup = SettingValue<'listings.flagged_groups'>[number];
 type WordingGround = FlaggedPhrase['ground'];
 type QuestionTopics = SettingValue<'listings.question_topics'>;
 type QuestionTopic = keyof QuestionTopics;
@@ -99,6 +100,7 @@ type QuestionTopic = keyof QuestionTopics;
 const GROUND_WHY: Record<WordingGround, string> = {
   age: 'can read as an age limit or preference',
   sex: 'can read as a preference for men or for women',
+  race: 'can read as a preference about race or skin color',
   national_origin: 'can read as a preference about national origin, citizenship or language',
   disability: 'can read as turning away people with disabilities',
   religion: 'can read as a preference about religion',
@@ -111,6 +113,10 @@ const GROUND_WHY: Record<WordingGround, string> = {
 /** Neutral wording for a nationality that names people. */
 const NATIONALITY_SUGGESTION =
   'Name the skills the job needs, like "Speaks Spanish with guests", not where people are from.';
+
+/** Neutral wording for a maximum age or an age range the checks find on their own. */
+const AGE_LIMIT_SUGGESTION =
+  'Remove the age limit. The only age rule a listing can set is 18 or 21 and up.';
 
 /** Why a screening question is blocked, by topic, with what the host may ask instead. */
 const QUESTION_RULES: Record<QuestionTopic, string> = {
@@ -125,6 +131,7 @@ const QUESTION_RULES: Record<QuestionTopic, string> = {
   national_origin:
     'You can\'t ask about national origin, citizenship or first language. You can ask "Are you authorized to work in the US?" and "Will you need visa sponsorship?"',
   arrest_record: "You can't ask about arrests or charges.",
+  sex: "You can't ask about sex, gender or sexual orientation. If housing is split by sex, say so in the listing.",
 };
 
 export const SLOT_LABELS: Record<string, string> = {
@@ -213,15 +220,280 @@ const PEOPLE = [
   'women',
   'girls',
   'guys',
+  // #200.
+  'males',
+  'females',
+  'folks',
+  'wanted',
+  'need apply',
+  'need only apply',
+  'only need apply',
 ].join('|');
 
-/** "Mexican workers", "Americans only", "must be Irish"; not "the American River". */
-function nationalityMatcher(nationality: string): RegExp {
-  const name = escapeRegExp(normalizeForPhraseMatch(nationality));
-  return new RegExp(
-    `${BEFORE}(?:${name}(?:s|es)? (?:${PEOPLE})|must be (?:an? )?${name})${AFTER}`,
-    'u',
-  );
+/** After a noun for a group, the words that make it a preference or a limit: "women preferred". */
+const PREFERENCE_AFTER = [
+  'only',
+  'preferred',
+  'wanted',
+  'need apply',
+  'need only apply',
+  'only need apply',
+].join('|');
+
+/** Before a group, the words that make it a preference or a limit: "no blacks", "prefer men". */
+const LIMIT_BEFORE = [
+  'no',
+  'non',
+  'only',
+  'prefer',
+  'prefers',
+  'preferably',
+  'preferring',
+  'preference for',
+  'preference to',
+  'preference given to',
+  'priority to',
+  'priority for',
+  'only hire',
+  'only hiring',
+].join('|');
+
+const MUST_BE = '(?:must|should|has to|have to|needs to|need to) be';
+const ARTICLE = '(?:an? |the )?';
+/** The end of a phrase, in text whose periods are gone: the field's end, or other punctuation. */
+const PHRASE_END = String.raw`(?=\s*(?:[,;:!?)\]"]|$))`;
+
+/** A group word as a pattern, and its plurals: "lady" ladies, "woman" women, "Mexican" Mexicans. */
+function termForms(term: string): { one: string; many: string } {
+  const one = escapeRegExp(normalizeForPhraseMatch(term));
+  const many = [`${one}s`, `${one}es`];
+  if (one.endsWith('man')) many.push(`${one.slice(0, -3)}men`);
+  if (/[^aeiou]y$/.test(one)) many.push(`${one.slice(0, -1)}ies`);
+  return { one, many: `(?:${many.join('|')})` };
+}
+
+/**
+ * Where a group word states a preference or a limit (#200). A noun counts after "no", "only",
+ * "prefer" or "must be", and before "only", "preferred" or "wanted": "no women", "prefer men",
+ * "ladies only", "must be a woman". An adjective (a nationality, a color) counts where it
+ * describes people: before a word for people ("Mexican workers", "white applicants", "Americans
+ * only"), after "must be", and after "no", "only" or "prefer" as a plural, before a word for
+ * people or at the end of a phrase ("no Mexicans", "only Irish"). So "the American River", "a
+ * white shirt" and "no English required" are not flagged.
+ */
+function groupMatcher(term: string, form: FlaggedGroup['form']): RegExp {
+  const { one, many } = termForms(term);
+  const any = `(?:${one}|${many})`;
+  const forms =
+    form === 'noun'
+      ? [
+          `(?:${LIMIT_BEFORE}) ${ARTICLE}${any}`,
+          `${MUST_BE} ${ARTICLE}${any}`,
+          `${any} (?:${PREFERENCE_AFTER})`,
+        ]
+      : [
+          `(?:${LIMIT_BEFORE}) ${ARTICLE}(?:${many}(?: (?:${PEOPLE}))?|${one}(?: (?:${PEOPLE})|${PHRASE_END}))`,
+          `${MUST_BE} ${ARTICLE}${any}`,
+          `${any} (?:${PEOPLE})`,
+        ];
+  return new RegExp(`${BEFORE}(?:${forms.join('|')})${AFTER}`, 'u');
+}
+
+// --- Age limits (#200) --------------------------------------------------------------------------
+// Any maximum age or age range, in any order, found by rule rather than listed phrase by phrase:
+// "must be under 35", "between 18 and 30", "18 to 30 years old", "no one over 40", "age 21-35".
+// A number counts as an age only from 16 to 99, never after "$", and never before a unit ("under
+// 30 minutes", "between 20 and 40 hours", "18 to 30 guests"), so pay, hours and distances pass.
+
+const NUM = String.raw`\p{N}{1,3}`;
+/** Words that put an upper limit on the number after them. */
+const AGE_CAP =
+  '(?:under|below|younger than|less than|no older than|not older than|not over|at most)';
+/** Words after a number that make it an age. */
+const AGE_UNIT = String.raw`(?:(?:years?|yrs?)(?: of age| olds?)|y ?o|y/o)`;
+/** Between the two numbers of a range ("18-30" is "18 30" once dashes are folded). */
+const RANGE = '(?: to | and | through | thru | )';
+const NUM_START = String.raw`(?<![\p{L}\p{N}$])`;
+const PREFERENCE_NEXT = String.raw`(?= (?:only|preferred|wanted|welcome|encouraged|desired|needed|ideal|sought|please|need apply|apply)${AFTER})`;
+const NOBODY =
+  '(?:no one|noone|nobody|no applicants?|no candidates?|no workers?|no people|no persons|no employees?|no hires|not open to anyone|not for anyone)';
+const YOU = "(?:are you|you're|you are|were you|r u)";
+
+/** Units that make the number before them a quantity, not an age. */
+const NOT_AN_AGE = new RegExp(
+  String.raw`^ ?(?:[%/:°$]|(?:(?:a|an|per|each|every) )?(?:${[
+    'hours?',
+    'hrs?',
+    'minutes?',
+    'mins?',
+    'seconds?',
+    'days?',
+    'nights?',
+    'weeks?',
+    'wks?',
+    'weekends?',
+    'months?',
+    'seasons?',
+    'shifts?',
+    'times?',
+    'miles?',
+    'mi',
+    'mph',
+    'km',
+    'kms',
+    'kilometers?',
+    'kilometres?',
+    'meters?',
+    'metres?',
+    'feet',
+    'foot',
+    'ft',
+    'inches',
+    'yards?',
+    'lbs?',
+    'pounds?',
+    'kgs?',
+    'kilos?',
+    'kilograms?',
+    'ounces?',
+    'oz',
+    'tons?',
+    'gallons?',
+    'liters?',
+    'litres?',
+    'degrees?',
+    'percent',
+    'people',
+    'persons',
+    'guests',
+    'customers',
+    'clients',
+    'visitors',
+    'tables',
+    'covers',
+    'rooms',
+    'beds',
+    'bunks',
+    'cabins',
+    'sites',
+    'kids',
+    'children',
+    'campers',
+    'students',
+    'riders',
+    'passengers',
+    'seats',
+    'acres?',
+    'head',
+    'animals',
+    'horses',
+    'cows',
+    'boats',
+    'trips',
+    'runs',
+    'tours',
+    'cases',
+    'boxes',
+    'bags',
+    'loads',
+    'orders',
+    'calls',
+    'dollars?',
+    'usd',
+    'cents?',
+    'bucks',
+    'am',
+    'pm',
+    'staff',
+    'employees',
+    'workers',
+    'crew',
+    'members',
+    'positions',
+    'openings',
+    'spots',
+    'years? (?:of(?! age)|in|on|at|with|as|experience)',
+    'yrs? (?:of(?! age)|in|on|at|with|as|experience)',
+  ].join('|')})${AFTER})`,
+  'u',
+);
+
+/**
+ * One way to state an age limit. Named groups `lo` and `hi` hold a range, `n` a single age. With
+ * `unit`, the number must not be followed by a unit. `min` is the lowest number read as an age.
+ */
+type AgeRule = { re: RegExp; min: number; unit: boolean };
+
+const ageRule = (source: string, opts: { min?: number; unit?: boolean } = {}): AgeRule => ({
+  re: new RegExp(`${BEFORE}${source}${AFTER}`, 'gu'),
+  min: opts.min ?? 16,
+  unit: opts.unit ?? false,
+});
+
+/** The age rules for listing text. Context words before or after are read, not reported. */
+const LISTING_AGE_RULES: AgeRule[] = [
+  // "Age 21-35", "ages 18 to 30", "aged 20 through 40".
+  ageRule(`(?:age|ages|aged)(?: of| from| between)? (?<lo>${NUM})${RANGE}(?<hi>${NUM})`, {
+    min: 0,
+  }),
+  // "18 to 30 years old", "21-35 year olds".
+  ageRule(`${NUM_START}(?<lo>${NUM})${RANGE}(?<hi>${NUM}) ${AGE_UNIT}`),
+  // "Between 18 and 30".
+  ageRule(`between (?<lo>${NUM}) and (?<hi>${NUM})`, { unit: true }),
+  // "18-30 only", "21 to 35 preferred".
+  ageRule(`${NUM_START}(?<lo>${NUM})(?: to | through | thru | )(?<hi>${NUM})${PREFERENCE_NEXT}`),
+  // "Must be under 35", "should be no older than 40".
+  ageRule(`(?<=${MUST_BE} (?:aged? )?)${AGE_CAP} (?<n>${NUM})`, { unit: true }),
+  // "Under 35 years old", "younger than 40 years of age".
+  ageRule(`${AGE_CAP} (?<n>${NUM}) ${AGE_UNIT}`),
+  // "35 or younger", "35 and under", "35 years old or younger".
+  ageRule(`${NUM_START}(?<n>${NUM})(?: ${AGE_UNIT})? (?:or|and) (?:younger|under|below|less)`),
+  // "No one over 40", "nobody older than 45".
+  ageRule(`${NOBODY} (?:over|above|older than|past|aged? over|aged?) (?<n>${NUM})`, { unit: true }),
+  // "No one 40 or older".
+  ageRule(`${NOBODY} (?<n>${NUM})(?: ${AGE_UNIT})? (?:or|and) (?:older|over|above|up)`),
+  // "Under 35 preferred", "applicants younger than 40 only".
+  ageRule(`${AGE_CAP} (?<n>${NUM})(?: ${AGE_UNIT})?${PREFERENCE_NEXT}`),
+  // "Prefer candidates under 35", "looking for someone younger than 30".
+  ageRule(
+    `(?<=(?:prefer|prefers|preferably|preferring|preference for|seeking|looking for|want|only|only hiring|hiring only)(?: [\\p{L}']+){0,2} )${AGE_CAP} (?<n>${NUM})`,
+    { unit: true },
+  ),
+];
+
+/**
+ * The age rules for a screening question, read after the allowed "at least 18 (or 21)" is taken
+ * out. They need "are you" (or the like) close before, so "Have you worked with campers under 16?"
+ * is not about the applicant's age, while "Are you over 18 and under 30?" is.
+ */
+const QUESTION_AGE_RULES: AgeRule[] = [
+  // "Are you under 35?", "are you (over 18) and under 30?", "are you a student under 25?".
+  ageRule(`(?<=${YOU}(?: \\S+){0,2} )${AGE_CAP} (?<n>${NUM})`, { unit: true }),
+  // "Are you between 18 and 30?", "are you 18-30?".
+  ageRule(`(?<=${YOU} (?:between |from |aged? )?)(?<lo>${NUM})${RANGE}(?<hi>${NUM})`, {
+    unit: true,
+  }),
+  // "Are you 30 or younger?", "are you 35 and under?".
+  ageRule(
+    `(?<=${YOU}(?: \\S+){0,2} )(?<n>${NUM})(?: ${AGE_UNIT})? (?:or|and) (?:younger|under|below|less)`,
+  ),
+];
+
+/** Whether a rule's match reads as an age limit: ages in range, a real range, no unit after. */
+function isAgeLimit(rule: AgeRule, m: RegExpMatchArray, text: string): boolean {
+  const g = m.groups ?? {};
+  const ages = [g.lo, g.hi, g.n].filter((v): v is string => v !== undefined).map(Number);
+  if (ages.some((a) => a < rule.min || a > 99)) return false;
+  if (g.lo !== undefined && g.hi !== undefined && Number(g.lo) >= Number(g.hi)) return false;
+  return !(rule.unit && NOT_AN_AGE.test(text.slice((m.index ?? 0) + m[0].length)));
+}
+
+/** The first age limit a rule finds in folded text, or null. */
+function findAgeLimit(rule: AgeRule, text: string): string | null {
+  for (const m of text.matchAll(rule.re)) {
+    if (isAgeLimit(rule, m, text)) return m[0];
+  }
+  return null;
 }
 
 /** The fields a host writes as prose. Codes, ids, enums and links are not read for wording. */
@@ -253,43 +525,67 @@ export type FlaggedWording = {
   suggestion: string;
 };
 
-export type WordingLists = { flagged: FlaggedPhrase[]; nationalities: string[] };
+export type WordingLists = {
+  flagged: FlaggedPhrase[];
+  nationalities: string[];
+  groups: FlaggedGroup[];
+};
+
+/** One way to find flagged wording in folded text, with what to report when it does. */
+type WordingMatcher = { find: (text: string) => string | null; entry: FlaggedPhrase };
+
+const byRegExp =
+  (re: RegExp) =>
+  (text: string): string | null =>
+    re.exec(text)?.[0] ?? null;
 
 /**
- * The flag-for-review phrases in a draft's prose: one per field, the longest match winning
- * (so "teens welcome" is reported, not "teens"). Fields in `skip` are not read.
+ * The flag-for-review wording in a draft's prose: one per field, the longest match winning (so
+ * "teens welcome" is reported, not "teens"; on a tie, the listed phrase). It reads the phrase
+ * list, the nationalities and the group words, and finds any maximum age or age range on its
+ * own. Fields in `skip` are not read.
  */
 export function findFlaggedWording(
   draft: unknown,
   lists: WordingLists,
   skip: ReadonlySet<string> = new Set(),
 ): FlaggedWording[] {
-  const matchers: { re: RegExp; entry: FlaggedPhrase }[] = [
+  const matchers: WordingMatcher[] = [
     ...lists.flagged.flatMap((entry) => {
       const re = phraseRegExp(entry.phrase);
-      return re ? [{ re, entry }] : [];
+      return re ? [{ find: byRegExp(re), entry }] : [];
     }),
     ...lists.nationalities
       .filter((n) => normalizeForPhraseMatch(n) !== '')
       .map((n) => ({
-        re: nationalityMatcher(n),
+        find: byRegExp(groupMatcher(n, 'adjective')),
         entry: {
           phrase: n,
           ground: 'national_origin' as const,
           suggestion: NATIONALITY_SUGGESTION,
         },
       })),
+    ...lists.groups
+      .filter((g) => normalizeForPhraseMatch(g.term) !== '')
+      .map((g) => ({
+        find: byRegExp(groupMatcher(g.term, g.form)),
+        entry: { phrase: g.term, ground: g.ground, suggestion: g.suggestion },
+      })),
+    ...LISTING_AGE_RULES.map((rule) => ({
+      find: (text: string) => findAgeLimit(rule, text),
+      entry: { phrase: 'an age limit', ground: 'age' as const, suggestion: AGE_LIMIT_SUGGESTION },
+    })),
   ];
   const out: FlaggedWording[] = [];
   for (const { path, text } of textFields(draft)) {
     if (skip.has(path) || !PROSE_FIELDS.some((p) => p.test(path))) continue;
     const norm = normalizeForPhraseMatch(text);
     let best: FlaggedWording | null = null;
-    for (const { re, entry } of matchers) {
-      const m = re.exec(norm);
-      if (m && (!best || m[0].length > best.matched.length)) {
+    for (const { find, entry } of matchers) {
+      const matched = find(norm);
+      if (matched && (!best || matched.length > best.matched.length)) {
         const { phrase, ground, suggestion } = entry;
-        best = { field: path, phrase, matched: m[0], ground, suggestion };
+        best = { field: path, phrase, matched, ground, suggestion };
       }
     }
     if (best) out.push(best);
@@ -303,25 +599,35 @@ export function flaggedWordingMessage(f: FlaggedWording): string {
 }
 
 /**
- * The allowed age questions ("Are you at least 18?" or 21, "18 or older", "over 21", "18+"),
- * removed before a question is matched against the age topic.
+ * The allowed age questions ("Are you at least 18?" or 21, "18 or older", "over 21", "18+", "over
+ * the age of 18", "18 years old or older"), removed before a question is matched against the age
+ * topic. Only the minimum is removed, so "Are you over 18 and under 30?" still asks for a maximum.
  */
 const ALLOWED_AGE_QUESTION = new RegExp(
-  `${BEFORE}(?:(?:at least|over) (?:18|21)|(?:18|21)(?: years)?(?: of age)? (?:or|and) (?:older|over|up)|(?:18|21) ?\\+)(?: years(?: old| of age)?)?${AFTER}`,
+  `${BEFORE}(?:(?:at least|over|above) (?:the age of )?(?:18|21)|(?:18|21)(?: years| yrs)?(?: old| of age)? (?:or|and) (?:older|over|up|above)|(?:18|21) ?\\+)(?: years(?: old| of age)?)?${AFTER}`,
   'gu',
 );
 
 /**
  * The forbidden topic a screening question's text asks about, or null. The longest matching
- * phrase decides, so "where were you born" is national origin, not age.
+ * phrase decides, so "where were you born" is national origin, not age. Any age range or
+ * maximum age the applicant is asked about is the age topic too (#200).
  */
 export function questionTopic(text: string, topics: QuestionTopics): QuestionTopic | null {
-  const norm = normalizeForPhraseMatch(text).replace(ALLOWED_AGE_QUESTION, ' ');
+  const norm = normalizeForPhraseMatch(text)
+    .replace(ALLOWED_AGE_QUESTION, ' ')
+    .replace(/\s+/g, ' ');
   let best: { topic: QuestionTopic; length: number } | null = null;
   for (const [topic, phrases] of Object.entries(topics) as [QuestionTopic, string[]][]) {
     for (const { re } of phraseMatchers(phrases)) {
       const m = re.exec(norm);
       if (m && (!best || m[0].length > best.length)) best = { topic, length: m[0].length };
+    }
+  }
+  for (const rule of QUESTION_AGE_RULES) {
+    const matched = findAgeLimit(rule, norm);
+    if (matched && (!best || matched.length > best.length)) {
+      best = { topic: 'age', length: matched.length };
     }
   }
   return best?.topic ?? null;
@@ -427,18 +733,29 @@ export async function runListingChecks(
   const errors: Issue[] = [];
   const warnings: Issue[] = [];
 
-  const [phrases, flagged, nationalities, topics, ratio, minWages, genres, blocked, shorteners] =
-    await Promise.all([
-      getSetting(db, 'listings.prohibited_phrases'),
-      getSetting(db, 'listings.flagged_phrases'),
-      getSetting(db, 'listings.flagged_nationalities'),
-      getSetting(db, 'listings.question_topics'),
-      getSetting(db, 'listings.vague_pay_range_ratio'),
-      getSetting(db, 'listings.min_wage_cents_by_state'),
-      getSetting(db, 'listings.genres'),
-      getSetting(db, 'links.blocked_domains'),
-      getSetting(db, 'links.shortener_domains'),
-    ]);
+  const [
+    phrases,
+    flagged,
+    nationalities,
+    groups,
+    topics,
+    ratio,
+    minWages,
+    genres,
+    blocked,
+    shorteners,
+  ] = await Promise.all([
+    getSetting(db, 'listings.prohibited_phrases'),
+    getSetting(db, 'listings.flagged_phrases'),
+    getSetting(db, 'listings.flagged_nationalities'),
+    getSetting(db, 'listings.flagged_groups'),
+    getSetting(db, 'listings.question_topics'),
+    getSetting(db, 'listings.vague_pay_range_ratio'),
+    getSetting(db, 'listings.min_wage_cents_by_state'),
+    getSetting(db, 'listings.genres'),
+    getSetting(db, 'links.blocked_domains'),
+    getSetting(db, 'links.shortener_domains'),
+  ]);
 
   // Housing and meals cost.
   const costCodes: [string, 'housing_cost_missing' | 'meals_cost_missing'][] = [];
@@ -499,7 +816,7 @@ export async function runListingChecks(
 
   // Wording to review (legal review 2.2 item 1): a warning, so the listing is never rejected
   // for it; screening sends it to the review queue.
-  for (const f of findFlaggedWording(draft, { flagged, nationalities }, worded)) {
+  for (const f of findFlaggedWording(draft, { flagged, nationalities, groups }, worded)) {
     warnings.push(issue('wording_flagged', f.field, flaggedWordingMessage(f)));
   }
 
