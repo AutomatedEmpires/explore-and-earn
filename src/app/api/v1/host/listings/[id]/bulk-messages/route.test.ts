@@ -1,4 +1,6 @@
+import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { bulkMessages } from '@/db/schema';
 import { newId } from '@/lib/ids';
 import { seedHostOrg } from '@tests/helpers/sp5';
 import { listingsFake, orgsFake } from '@tests/fakes/sp5/sp2';
@@ -47,5 +49,40 @@ describe('POST /host/listings/:id/bulk-messages', () => {
       if (n < 5) expect(res.status, JSON.stringify(res.body)).toBe(200);
     }
     expect(last).toBe(429);
+  });
+
+  it('answers a Billing member 403 role_not_allowed before any listing lookup (#184)', async () => {
+    const org = await seedHostOrg(t.db);
+    const listingId = newId();
+    listingsFake.setListing({ id: listingId, orgId: org.orgId, title: 'Lift Operator' });
+    asHost({ ...org.owner.ctx, role: 'billing' });
+    const res = await call(
+      POST,
+      request('POST', `/api/v1/host/listings/${listingId}/bulk-messages`, {
+        body: { statuses: ['new'], body: 'Note' },
+      }),
+      { id: listingId },
+    );
+    expect(res.status).toBe(403);
+    expect(res.body).toMatchObject({ error: { details: { reason: 'role_not_allowed' } } });
+  });
+
+  it('answers 404 for another org’s listing, even to an owner who sees every listing (#184)', async () => {
+    const mine = await seedHostOrg(t.db);
+    const theirs = await seedHostOrg(t.db);
+    const listingId = newId();
+    listingsFake.setListing({ id: listingId, orgId: theirs.orgId, title: 'Lift Operator' });
+    orgsFake.setAccess(mine.owner.userId, { all: true });
+    asHost(mine.owner.ctx);
+    const res = await call(
+      POST,
+      request('POST', `/api/v1/host/listings/${listingId}/bulk-messages`, {
+        body: { statuses: ['new'], body: 'Note' },
+      }),
+      { id: listingId },
+    );
+    expect(res.status).toBe(404);
+    const stored = await t.db.select().from(bulkMessages).where(eq(bulkMessages.listingId, listingId));
+    expect(stored).toEqual([]);
   });
 });

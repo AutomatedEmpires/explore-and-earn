@@ -22,7 +22,7 @@ import { getOrgSummaries, listMembers } from '@/modules/orgs';
 import { getCommunityIdentities } from '@/modules/profiles';
 import { getRelationships } from '@/modules/safety';
 import type { HostContext } from '@/server/guards';
-import { inScope, listingScope, type ThreadViewer } from './access';
+import { inScope, listingScope, requireHiringCapability, type ThreadViewer } from './access';
 import { messages, threads } from './schema';
 
 const PAGE = 30;
@@ -428,7 +428,7 @@ export async function listThreads(
   if (seeker) {
     filters.push(eq(threads.seekerUserId, userId));
   } else {
-    if (!TEAM.has(viewer.ctx.role)) throw notFound();
+    requireHiringCapability(viewer.ctx, 'messages.access');
     const scope = await listingScope(db, viewer.ctx);
     filters.push(eq(threads.orgId, viewer.ctx.orgId));
     if (!scope.all) {

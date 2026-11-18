@@ -14,6 +14,7 @@ import './notification-types';
 import { jobHandlers } from './jobs';
 import { bulkMessages, messages, threads } from './schema';
 import { getMessageForReview } from './review';
+import { decideMessage } from './send';
 import { seedHostOrg, seedSeeker } from './test-fixtures';
 
 vi.mock('@/modules/safety', async (orig) => ({
@@ -232,5 +233,34 @@ describe('bulk messages', () => {
     const [removed] = await t.db.select().from(bulkMessages).where(eq(bulkMessages.id, other.bulkId));
     expect(removed?.scanState).toBe('held');
     expect(await t.db.select().from(messages).where(eq(messages.bulkId, other.bulkId))).toHaveLength(0);
+  });
+
+  it('clears a warned bulk on approve but keeps a message an operator removed (#184)', async () => {
+    const org = await seedHostOrg(t.db);
+    const listingId = newId();
+    const { applicationIds } = await applicants(org.orgId, listingId, 2);
+    const created = await createBulkMessage(t.db, org.owner.ctx, {
+      listingId,
+      statuses: ['new'],
+      body: 'Bring a deposit __flag__',
+      applicationIds,
+    });
+    await runWorker(t.db, { handlers: jobHandlers });
+    const sent = await t.db.select().from(messages).where(eq(messages.bulkId, created.bulkId));
+    expect(sent.map((row) => row.scanState)).toEqual(['warn', 'warn']);
+    const [removedOne, kept] = sent;
+    if (!removedOne || !kept) throw new Error('expected two messages');
+    await decideMessage(t.db, removedOne.id, 'remove');
+
+    const items = await listOpenReviewItems(t.db, 'bulk_message', created.bulkId);
+    await decide(t.db, items[0]?.id ?? '', operatorId, 'approve');
+    const after = new Map(
+      (await t.db.select().from(messages).where(eq(messages.bulkId, created.bulkId))).map((row) => [
+        row.id,
+        row.scanState,
+      ]),
+    );
+    expect(after.get(removedOne.id)).toBe('removed');
+    expect(after.get(kept.id)).toBe('clear');
   });
 });
