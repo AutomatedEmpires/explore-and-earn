@@ -84,4 +84,42 @@ describe('CandidateCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
     expect(onInvite).toHaveBeenCalledOnce();
   });
+
+  it('shows — in the Fit chip when fit is off, and the chip still opens', () => {
+    const onOpenChip = vi.fn();
+    render(<CandidateCard {...applicant} fit={null} onOpenChip={onOpenChip} />);
+    const chip = screen.getByRole('button', { name: /^Fit/ });
+    expect(chip).toHaveTextContent('—');
+    fireEvent.click(chip);
+    expect(onOpenChip).toHaveBeenCalledWith('fit');
+  });
+
+  it('renders a primary link when the primary action has an href (flow D Reply)', () => {
+    const onInterview = vi.fn();
+    render(
+      <CandidateCard
+        {...applicant}
+        onInterview={onInterview}
+        primaryAction={{ label: 'Reply', href: '/host/messages/t1/reply' }}
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'Reply' })).toHaveAttribute(
+      'href',
+      '/host/messages/t1/reply',
+    );
+    expect(screen.queryByRole('button', { name: 'Interview' })).toBeNull();
+  });
+
+  it('calls onInterview from the primary button without an href', () => {
+    const onInterview = vi.fn();
+    render(
+      <CandidateCard
+        {...applicant}
+        onInterview={onInterview}
+        primaryAction={{ label: 'Reply' }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
+    expect(onInterview).toHaveBeenCalledOnce();
+  });
 });
