@@ -373,10 +373,36 @@ async function insertMessage(
 }
 
 /**
- * Trust `approve` on a held message delivers it; on a warned one it drops the banner. `remove`
- * hides it from the seeker, and a later approve never brings a removed message back. A held
- * message whose thread became read-only meanwhile stays held: the seeker gets nothing (plan
- * decision 11) and the host sees it as not delivered.
+ * Releases a message that is `from` pending (the scan) or held (an operator) to `set.scanState`
+ * and delivers it. The one release path: both callers get the same block check, unread stamps,
+ * notification and thread card. A thread that became read-only meanwhile (a block, a withdrawal,
+ * a removal or a long-closed listing) gets nothing (plan decision 11): the message is held, so
+ * the host sees it as not delivered. A message that already left `from` is left alone, so a
+ * release never delivers twice. Call it inside a transaction: state and delivery commit together.
+ */
+export async function releaseMessage(
+  db: DbOrTx,
+  row: MessageRow,
+  from: 'pending' | 'held',
+  set: { scanState: 'clear' | 'warn'; scanLabels?: string[]; checkId?: string | null },
+): Promise<void> {
+  const thread = await loadThread(db, row.threadId);
+  if (!thread) return;
+  const reason = await blockingReason(db, thread);
+  if (reason === 'blocked') await stampBlocked(db, thread);
+  const updated = await db
+    .update(messages)
+    .set(reason ? { ...set, scanState: 'held' } : set)
+    .where(and(eq(messages.id, row.id), eq(messages.scanState, from)))
+    .returning({ id: messages.id });
+  if (updated.length === 0 || reason) return;
+  await deliverMessage(db, thread, row);
+}
+
+/**
+ * Trust `approve` on a held or still-pending message delivers it as a scan release does
+ * (`releaseMessage`); on a warned one it drops the banner. `remove` hides it from the seeker,
+ * and a later approve never brings a removed message back.
  */
 export async function decideMessage(
   db: DbOrTx,
@@ -390,23 +416,12 @@ export async function decideMessage(
     return;
   }
   if (row.scanState === 'removed') return;
-  if (row.scanState !== 'held') {
-    await db
-      .update(messages)
-      .set({ scanState: 'clear' })
-      .where(and(eq(messages.id, messageId), ne(messages.scanState, 'removed')));
+  if (row.scanState === 'pending' || row.scanState === 'held') {
+    await releaseMessage(db, row, row.scanState, { scanState: 'clear' });
     return;
   }
-  const thread = await loadThread(db, row.threadId);
-  if (!thread) return;
-  const reason = await blockingReason(db, thread);
-  if (reason === 'blocked') await stampBlocked(db, thread);
-  if (reason) return;
-  const released = await db
+  await db
     .update(messages)
     .set({ scanState: 'clear' })
-    .where(and(eq(messages.id, messageId), eq(messages.scanState, 'held')))
-    .returning({ id: messages.id });
-  if (released.length === 0) return;
-  await deliverMessage(db, thread, row);
+    .where(and(eq(messages.id, messageId), ne(messages.scanState, 'removed')));
 }
