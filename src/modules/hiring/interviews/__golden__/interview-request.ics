@@ -1,0 +1,17 @@
+BEGIN:VCALENDAR
+PRODID:-//Explore&Earn//Interviews//EN
+VERSION:2.0
+METHOD:REQUEST
+BEGIN:VEVENT
+UID:interview-abc@exploreandearn.com
+SEQUENCE:2
+DTSTAMP:20270501T120000Z
+DTSTART:20270601T150000Z
+DTEND:20270601T153000Z
+SUMMARY:Interview: Deckhand at Kettle Ridge
+LOCATION:Phone
+DESCRIPTION:https://exploreandearn.com/inbox/t
+ORGANIZER:mailto:hello@send.exploreandearn.com
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR

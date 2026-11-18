@@ -1,4 +1,2 @@
-// W0 stub. The owning workstream replaces the body and keeps the name.
-export async function listHostInterviews(..._args: unknown[]): Promise<never> {
-  throw new Error('not implemented: listHostInterviews (W3)');
-}
+// Host interview list. The implementation lives with the other interview reads.
+export { listHostInterviews } from './reads';
