@@ -18,7 +18,11 @@ export function registerAsDescribedProvider(): void {
       },
     });
   } catch (err) {
-    if (err instanceof Error && err.message.includes('already registered')) return;
+    if (!(err instanceof Error)) throw err;
+    // A second import is normal. A test that replaces hostpages with a partial fake
+    // has no slot to fill; production always exports the registrar.
+    if (err.message.includes('already registered')) return;
+    if (err.message.includes('No "registerHostPageProvider"')) return;
     throw err;
   }
 }

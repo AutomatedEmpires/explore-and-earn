@@ -31,7 +31,8 @@ vi.mock('@/modules/hostpages', async (orig) => ({
   ...hostpagesFake,
 }));
 
-vi.mock('@/modules/discovery', () => ({
+vi.mock('@/modules/discovery', async (orig) => ({
+  ...(await orig<typeof import('@/modules/discovery')>()),
   getListingEventCounts: async (
     _db: unknown,
     i: {

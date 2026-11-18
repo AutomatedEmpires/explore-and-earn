@@ -1,10 +1,17 @@
 // Host analytics. Reads hiring's facts and discovery counts; it writes nothing.
-import { sql } from 'drizzle-orm';
 import type { AnalyticsRange, HostAnalytics, Slice } from '@/lib/host-analytics';
-import { queryRows, type DbOrTx } from '@/lib/db';
+import type { DbOrTx } from '@/lib/db';
 import { SOURCE_LABELS } from '@/lib/hiring';
 import { getListingEventCounts } from '@/modules/discovery';
-import { getAsDescribedSummary } from '@/modules/hiring';
+import {
+  applicationSources,
+  applicationsByListing,
+  countPipelineKinds,
+  firstPipelineEventAt,
+  getAsDescribedSummary,
+  pipelineStatusCounts,
+  weeklyApplications,
+} from '@/modules/hiring';
 import { countFollowersAt } from '@/modules/hostpages';
 import { listForOrg } from '@/modules/listings';
 import { getBoostWindows } from './boost';
@@ -42,53 +49,6 @@ function sumCounts(
   return rows.reduce((sum, row) => (row.type === type ? sum + Number(row.count) : sum), 0);
 }
 
-function uuidList(ids: string[]) {
-  return sql.join(
-    ids.map((id) => sql`${id}::uuid`),
-    sql`, `,
-  );
-}
-
-async function countByKind(
-  db: DbOrTx,
-  orgId: string,
-  listingIds: string[],
-  kinds: readonly string[],
-  from: Date,
-  to: Date,
-): Promise<Map<string, number>> {
-  if (listingIds.length === 0 || kinds.length === 0) return new Map();
-  const rows = await queryRows<{ kind: string; n: number }>(
-    db,
-    sql`
-      select kind, count(*)::int as n
-      from app.pipeline_events
-      where org_id = ${orgId}::uuid
-        and listing_id in (${uuidList(listingIds)})
-        and kind in (${sql.join(
-          kinds.map((kind) => sql`${kind}`),
-          sql`, `,
-        )})
-        and occurred_at >= ${from.toISOString()}::timestamptz
-        and occurred_at < ${to.toISOString()}::timestamptz
-      group by kind
-    `,
-  );
-  return new Map(rows.map((row) => [row.kind, Number(row.n)]));
-}
-
-async function firstEventAt(db: DbOrTx, orgId: string): Promise<Date | null> {
-  const [row] = await queryRows<{ at: string | null }>(
-    db,
-    sql`
-      select min(occurred_at)::text as at
-      from app.pipeline_events
-      where org_id = ${orgId}::uuid
-    `,
-  );
-  return row?.at ? new Date(row.at) : null;
-}
-
 export async function getHostAnalytics(
   db: DbOrTx,
   q: {
@@ -112,7 +72,7 @@ export async function getHostAnalytics(
 
   let bounds: ResolvedRange = resolveRange(q.range, q.tz, now);
   if (q.range === 'all') {
-    const first = await firstEventAt(db, q.orgId);
+    const first = await firstPipelineEventAt(db, q.orgId);
     bounds = { from: first ?? new Date(0), to: bounds.to, previous: null };
   }
 
@@ -148,7 +108,7 @@ export async function getHostAnalytics(
             types: ['view', 'save'],
             bucket: 'none',
           }),
-      countByKind(
+      countPipelineKinds(
         db,
         q.orgId,
         ids,
@@ -157,7 +117,7 @@ export async function getHostAnalytics(
         bounds.to,
       ),
       bounds.previous
-        ? countByKind(
+        ? countPipelineKinds(
             db,
             q.orgId,
             ids,
@@ -166,8 +126,8 @@ export async function getHostAnalytics(
             bounds.previous.to,
           )
         : Promise.resolve(new Map<string, number>()),
-      sourceCounts(db, q.orgId, ids, bounds.from, bounds.to),
-      statusCounts(db, q.orgId, ids),
+      applicationSources(db, q.orgId, ids, bounds.from, bounds.to),
+      pipelineStatusCounts(db, q.orgId, ids),
       weeklyApplications(db, q.orgId, ids, bounds.from, bounds.to),
       ids.length === 0
         ? Promise.resolve([])
@@ -270,101 +230,4 @@ export async function getHostAnalytics(
       return value > 0 ? [slice(key, STATUS_LABELS[key] ?? key, value)] : [];
     }),
   };
-}
-
-async function applicationsByListing(
-  db: DbOrTx,
-  orgId: string,
-  listingIds: string[],
-  from: Date,
-  to: Date,
-): Promise<Map<string, number>> {
-  if (listingIds.length === 0) return new Map();
-  const rows = await queryRows<{ listingId: string; n: number }>(
-    db,
-    sql`
-      select listing_id::text as "listingId", count(*)::int as n
-      from app.pipeline_events
-      where org_id = ${orgId}::uuid
-        and listing_id in (${uuidList(listingIds)})
-        and kind = 'applied'
-        and occurred_at >= ${from.toISOString()}::timestamptz
-        and occurred_at < ${to.toISOString()}::timestamptz
-      group by listing_id
-    `,
-  );
-  return new Map(rows.map((row) => [row.listingId, Number(row.n)]));
-}
-
-async function sourceCounts(
-  db: DbOrTx,
-  orgId: string,
-  listingIds: string[],
-  from: Date,
-  to: Date,
-): Promise<Map<string, number>> {
-  if (listingIds.length === 0) return new Map();
-  const rows = await queryRows<{ source: string | null; n: number }>(
-    db,
-    sql`
-      select source, count(*)::int as n
-      from app.pipeline_events
-      where org_id = ${orgId}::uuid
-        and listing_id in (${uuidList(listingIds)})
-        and kind = 'applied'
-        and occurred_at >= ${from.toISOString()}::timestamptz
-        and occurred_at < ${to.toISOString()}::timestamptz
-      group by source
-    `,
-  );
-  const out = new Map<string, number>();
-  for (const row of rows) {
-    const key = row.source && SOURCE_LABELS[row.source as keyof typeof SOURCE_LABELS] ? row.source : 'other';
-    out.set(key, (out.get(key) ?? 0) + Number(row.n));
-  }
-  return out;
-}
-
-async function statusCounts(
-  db: DbOrTx,
-  orgId: string,
-  listingIds: string[],
-): Promise<Map<string, number>> {
-  if (listingIds.length === 0) return new Map();
-  const rows = await queryRows<{ status: string; n: number }>(
-    db,
-    sql`
-      select status, count(*)::int as n
-      from app.pipeline_entries
-      where org_id = ${orgId}::uuid
-        and listing_id in (${uuidList(listingIds)})
-      group by status
-    `,
-  );
-  return new Map(rows.map((row) => [row.status, Number(row.n)]));
-}
-
-async function weeklyApplications(
-  db: DbOrTx,
-  orgId: string,
-  listingIds: string[],
-  from: Date,
-  to: Date,
-): Promise<Map<string, number>> {
-  if (listingIds.length === 0) return new Map();
-  const rows = await queryRows<{ week: string; n: number }>(
-    db,
-    sql`
-      select to_char(date_trunc('week', occurred_at at time zone 'UTC'), 'YYYY-MM-DD') as week,
-        count(*)::int as n
-      from app.pipeline_events
-      where org_id = ${orgId}::uuid
-        and listing_id in (${uuidList(listingIds)})
-        and kind = 'applied'
-        and occurred_at >= ${from.toISOString()}::timestamptz
-        and occurred_at < ${to.toISOString()}::timestamptz
-      group by 1
-    `,
-  );
-  return new Map(rows.map((row) => [row.week, Number(row.n)]));
 }
