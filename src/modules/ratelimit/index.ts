@@ -12,4 +12,6 @@ export {
   type RateLimitResult,
 } from './limiter';
 
+export { purgeRateLimitWindows } from './retention';
+
 export const jobHandlers: HandlerMap = {};

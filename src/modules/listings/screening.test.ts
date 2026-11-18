@@ -3,7 +3,9 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryRows, type Db } from '@/lib/db';
+import { newId } from '@/lib/ids';
 import { memoryStorage } from '@/modules/media';
+import { SETTING_DEFAULTS, setSetting } from '@/modules/settings';
 import { runCheck } from '@/modules/trust';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { billingFake } from '../../../tests/fakes/sp2/billing';
@@ -103,11 +105,12 @@ async function submitted(edit?: (c: ListingContent) => void) {
 }
 
 /** A submitted listing whose publish acknowledged `warnings`. */
-async function submittedAcking(warnings: string[]) {
+async function submittedAcking(warnings: string[], edit?: (c: ListingContent) => void) {
   const id = await seedDraftListing(
     db,
     org.owner.ctx,
     fx.content((c) => {
+      edit?.(c);
       distinguish(c);
     }),
   );
@@ -357,6 +360,60 @@ it('sends a kept photo mismatch to moderation', async () => {
   const s = await state(id, revisionId);
   expect([s.status, s.review_stage]).toEqual(['in_review', 'moderation']);
   expect((await items(revisionId)).map((i) => i.reason)).toEqual(['photo_slot_mismatch_kept']);
+});
+
+describe('flagged wording (legal review 2.2, issue 121)', () => {
+  it('sends a listing with flagged wording to moderation, never returning it', async () => {
+    const { id, revisionId } = await submittedAcking(['wording_flagged'], (c) => {
+      c.job.description += ' Christian camp: staff lead morning devotions.';
+    });
+    await screen({ revisionId, attempt: 0 });
+    const s = await state(id, revisionId);
+    expect([s.state, s.status, s.review_stage]).toEqual(['in_review', 'in_review', 'moderation']);
+    expect((await items(revisionId)).map((i) => [i.queue, i.reason])).toEqual([
+      ['moderation', 'wording_flagged'],
+    ]);
+    expect(
+      (await notificationsOf(db, 'listings.returned')).some((n) => n.data.listingId === id),
+    ).toBe(false);
+  });
+
+  it('reads the lists again, so a phrase added after the publish request still counts', async () => {
+    const { id, revisionId } = await submitted((c) => {
+      c.job.description += ' Fresh blood wanted for the lift crew.';
+    });
+    await setSetting(
+      db,
+      'listings.flagged_phrases',
+      [
+        ...SETTING_DEFAULTS['listings.flagged_phrases'],
+        { phrase: 'fresh blood', ground: 'age', suggestion: 'Say "new team members".' },
+      ],
+      { operatorId: newId() },
+    );
+    await screen({ revisionId, attempt: 0 });
+    expect((await state(id, revisionId)).review_stage).toBe('moderation');
+    expect((await items(revisionId)).map((i) => i.reason)).toEqual(['wording_flagged']);
+  });
+
+  it('keeps the wording reason beside a fraud rule match', async () => {
+    const { revisionId } = await submittedAcking(['wording_flagged'], (c) => {
+      c.job.description += ' Young team. Applicants pay a $50 application fee.';
+    });
+    await screen({ revisionId, attempt: 0 });
+    expect((await items(revisionId)).map((i) => i.reason).sort()).toEqual([
+      'pay_to_apply',
+      'wording_flagged',
+    ]);
+  });
+
+  it('publishes an H-2B listing whose host confirmed the job order', async () => {
+    const { id, revisionId } = await submittedAcking(['h2b_job_order'], (c) => {
+      c.job.visaSponsorship = 'h2b';
+    });
+    await screen({ revisionId, attempt: 0 });
+    expect((await state(id, revisionId)).state).toBe('active');
+  });
 });
 
 describe('photoSlotCheck', () => {
