@@ -3,7 +3,7 @@
 // last weekly slot, or one host's double click. Entitlements are real; SP2 listings and access,
 // SP4 profiles and safety, and messaging use the SP5 fakes.
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { closeClient, createDb, queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import type { PoolCard } from '@/lib/profiles';
@@ -41,8 +41,17 @@ const url = process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL is required for integration tests');
 const db = createDb(url);
 const DAY = 86_400_000;
+let startedAt = '';
 
+beforeAll(async () => {
+  const [row] = await queryRows<{ now: string }>(db, sql`select now()::text as now`);
+  startedAt = row?.now ?? new Date().toISOString();
+});
+
+// The invite emails this file enqueues go too: the jobs worker test shares the database and
+// runs every pending event, and it has no handler for them.
 afterAll(async () => {
+  await db.execute(sql`delete from app.outbox where created_at >= ${startedAt}::timestamptz`);
   await closeClient(db);
 });
 
