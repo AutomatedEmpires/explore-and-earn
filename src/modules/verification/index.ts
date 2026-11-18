@@ -56,7 +56,7 @@ export {
   type Transport,
 } from './safe-fetch';
 export { VERIFICATION_SETTINGS_PATH } from './notifications';
-export { privacyHandlers } from './privacy';
+export { privacyHandler, retentionRules } from './privacy';
 
 /** Spec section 6: `verification.run`. */
 export const jobHandlers: HandlerMap = { ...runJobHandlers };

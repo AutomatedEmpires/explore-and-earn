@@ -19,13 +19,13 @@ import {
   getVerificationStatus,
   jobHandlers,
   openVerificationAppeal,
-  privacyHandlers,
   requestReverification,
   runVerification,
   startVerification,
   submitVerificationInfo,
   type SignalDeps,
 } from './index';
+import { privacyHandlers } from './privacy';
 
 const ai = vi.hoisted(() => ({
   override: null as null | ((o: ClassifyOptions<unknown>) => Promise<unknown>),
@@ -113,7 +113,7 @@ const runs = (orgId: string) =>
 const items = (orgId: string) =>
   queryRows<Item>(
     t.db,
-    sql`select * from app.review_items where subject_type = 'organization'
+    sql`select * from app.review_items where subject_type = 'business_verification'
       and subject_id = ${orgId} order by created_at, id`,
   );
 
@@ -242,7 +242,7 @@ describe('the verification.run job', () => {
     ).toEqual([
       {
         kind: 'business_verification',
-        subject_type: 'organization',
+        subject_type: 'business_verification',
         prompt_version: 'business_verification@1',
       },
     ]);
@@ -432,7 +432,7 @@ describe('operator decisions (subject organization)', () => {
     const { org, row } = await inReview();
     const other = await openReviewItem(t.db, {
       queue: 'fraud',
-      subjectType: 'organization',
+      subjectType: 'business_verification',
       subjectId: org.orgId,
       reason: 'listing_fraud_rejected',
       priority: 100,
@@ -503,9 +503,11 @@ describe('operator decisions (subject organization)', () => {
   it('suspend and ban sanction the org through billing', async () => {
     const { org, row } = await inReview();
     await decide(t.db, must(row.review_item_id), operatorId, 'suspend');
-    expect(billingFake.callsTo('sanctionOrg')).toEqual([
-      [org.orgId, 'suspend', { type: 'operator', id: null }],
-    ]);
+    const [status] = await queryRows<{ status: string }>(
+      t.db,
+      sql`select status from app.organizations where id = ${org.orgId}`,
+    );
+    expect(status?.status).toBe('suspended');
   });
 });
 

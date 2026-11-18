@@ -26,6 +26,7 @@ const dev = {
   JOBS_SECRET: 'j'.repeat(32),
   UNSUBSCRIBE_SECRET: 'u'.repeat(32),
   ANALYTICS_HASH_SECRET: 'a'.repeat(32),
+  SUPPORT_REPLY_SECRET: 's'.repeat(32),
   BILLING_PROVIDER: 'stub',
   GEOCODER_PROVIDER: 'stub',
   WEATHER_PROVIDER: 'stub',
@@ -62,6 +63,9 @@ const prod = {
   LINK_SAFETY_PROVIDER: 'webrisk',
   WEB_RISK_API_KEY: 'test-web-risk',
   NEXT_PUBLIC_MAPBOX_TOKEN: 'pk.test',
+  SUPPORT_REPLY_DOMAIN: 'reply.exploreandearn.test',
+  BACKUP_SUPABASE_URL: 'https://backup.supabase.test',
+  BACKUP_SUPABASE_SERVICE_ROLE_KEY: 'backup-service-role',
 } satisfies Record<string, string>;
 
 function without<T extends Record<string, string>>(source: T, ...keys: (keyof T & string)[]) {
@@ -300,6 +304,28 @@ describe('parseEnv: SP2 providers', () => {
     ] as const) {
       expect(() => parseEnv(without(dev, key))).toThrow(new RegExp(key));
     }
+  });
+});
+
+describe('parseEnv: SP8', () => {
+  it('refuses PERF_MODE in prod and requires PERF_SECRET when PERF_MODE=1', () => {
+    expect(() => parseEnv({ ...prod, PERF_MODE: '1' })).toThrow(/PERF_MODE is not allowed in prod/);
+    expect(() => parseEnv({ ...dev, PERF_MODE: '1' })).toThrow(
+      'PERF_SECRET is required when PERF_MODE=1',
+    );
+  });
+
+  it('requires the support reply domain outside dev, backup keys in prod, and GitHub keys together', () => {
+    expect(() => parseEnv(without({ ...prod, APP_ENV: 'preview' }, 'SUPPORT_REPLY_DOMAIN'))).toThrow(
+      /SUPPORT_REPLY_DOMAIN/,
+    );
+    expect(() => parseEnv(without(prod, 'BACKUP_SUPABASE_URL'))).toThrow(/BACKUP_SUPABASE_URL/);
+    expect(() => parseEnv({ ...dev, GITHUB_STATUS_TOKEN: 'gh-token' })).toThrow(/GITHUB_REPO/);
+  });
+
+  it('parses .env.local.example', () => {
+    const file = readFileSync(path.resolve('.env.local.example'), 'utf8');
+    expect(parseEnv(parseDotenv(file)).SUPPORT_REPLY_DOMAIN).toBe('reply.localhost');
   });
 });
 

@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { queryRows } from '@/lib/db';
+import { resetEnvCache } from '@/lib/env';
 import { NEW_HOST_DAILY_CAP, consume, consumeNewHostDaily, newHostWindowOpen } from './index';
 
 describe('consume (fixed-window rate limiter)', () => {
@@ -48,6 +49,26 @@ describe('consume (fixed-window rate limiter)', () => {
       sql`select count(*)::int as n from app.rate_limits where key = 'test:purge'`,
     );
     expect(rows[0]?.n).toBe(1);
+  });
+
+  it('allows every call in perf mode and writes no rate-limit row', async () => {
+    process.env.PERF_MODE = '1';
+    process.env.PERF_SECRET = 'p'.repeat(32);
+    resetEnvCache();
+    try {
+      for (let i = 0; i < 100; i++) {
+        expect(await consume(t.db, 'test:perf', 1, 60)).toMatchObject({ allowed: true, remaining: 1 });
+      }
+      const rows = await queryRows<{ n: number }>(
+        t.db,
+        sql`select count(*)::int as n from app.rate_limits where key = 'test:perf'`,
+      );
+      expect(rows[0]?.n).toBe(0);
+    } finally {
+      delete process.env.PERF_MODE;
+      delete process.env.PERF_SECRET;
+      resetEnvCache();
+    }
   });
 
   it('rejects a non-positive window or a negative limit', async () => {

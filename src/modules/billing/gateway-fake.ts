@@ -8,6 +8,7 @@ import {
   type BillingGateway,
   type CardChecks,
   type CheckoutParams,
+  type GatewayInvoice,
   type GatewayItem,
   type SubSnapshot,
   type SubscriptionUpdate,
@@ -38,6 +39,7 @@ export type FakeBillingGateway = BillingGateway & {
   /** The subscription as Stripe holds it now (a copy). */
   getSubscription(id: string): SubSnapshot | undefined;
   setCardChecks(customerId: string, checks: CardChecks): void;
+  setInvoices(customerId: string, rows: import('./gateway').GatewayInvoice[]): void;
   /** The next updateSubscription fails with a card decline. */
   declineNextUpdate(): void;
   /** The next call to `method` throws, as an outage would. */
@@ -92,6 +94,9 @@ export function makeFakeBillingGateway(
   const sessions = new Map<string, Session>();
   const subs = new Map<string, SubSnapshot>();
   const cardOverrides = new Map<string, CardChecks>();
+  const invoices = new Map<string, GatewayInvoice[]>();
+  const refunds: { id: string; amountCents: number }[] = [];
+  const promotions: { id: string; code: string }[] = [];
   const paidCustomers = new Set<string>();
   const failing = new Set<Method>();
   let decline = false;
@@ -284,6 +289,51 @@ export function makeFakeBillingGateway(
         : { hasCard: false, cvcCheck: null, postalCheck: null };
     },
 
+    async listInvoices(customerId, limit) {
+      enter('listInvoices', [customerId, limit]);
+      return (invoices.get(customerId) ?? []).slice(0, limit);
+    },
+    async retrieveInvoice(id) {
+      enter('retrieveInvoice', [id]);
+      for (const rows of invoices.values()) {
+        const found = rows.find((row) => row.id === id);
+        if (found) return found;
+      }
+      throw new Error(`No invoice ${id}`);
+    },
+    async createRefund(i, idempotencyKey) {
+      enter('createRefund', [i, idempotencyKey]);
+      const refund = { id: nextId('re'), amountCents: i.amountCents };
+      refunds.push(refund);
+      return refund;
+    },
+    async createCoupon(i, idempotencyKey) {
+      enter('createCoupon', [i, idempotencyKey]);
+      return { id: nextId('coupon') };
+    },
+    async createPromotionCode(i, idempotencyKey) {
+      enter('createPromotionCode', [i, idempotencyKey]);
+      const row = { id: nextId('promo'), code: i.code };
+      promotions.push(row);
+      return row;
+    },
+    async listPromotionCodes(limit) {
+      enter('listPromotionCodes', [limit]);
+      return promotions.slice(0, limit).map((row) => ({
+        id: row.id,
+        code: row.code,
+        couponId: 'coupon_fake',
+        percentOff: null,
+        amountOffCents: null,
+        duration: 'once' as const,
+        durationInMonths: null,
+        timesRedeemed: 0,
+        maxRedemptions: null,
+        expiresAt: null,
+        active: true,
+      }));
+    },
+
     constructEvent(rawBody, signature) {
       enter('constructEvent', [rawBody.length]);
       const expected = Buffer.from(gw.signEvent(rawBody));
@@ -315,6 +365,9 @@ export function makeFakeBillingGateway(
     },
     setCardChecks(customerId, checks) {
       cardOverrides.set(customerId, { ...checks });
+    },
+    setInvoices(customerId: string, rows: GatewayInvoice[]) {
+      invoices.set(customerId, rows);
     },
     declineNextUpdate() {
       decline = true;

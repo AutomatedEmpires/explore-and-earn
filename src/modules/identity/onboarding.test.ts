@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { queryRows, type Db } from '@/lib/db';
+import { queryRows, type Db, type Tx } from '@/lib/db';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { makeFakeClerkAdmin } from './clerk-admin';
 import { completeOnboarding, onboardingRequestSchema, setAccountType } from './onboarding';
@@ -268,6 +268,43 @@ describe('completeOnboarding', () => {
       sql`select slug, owner_user_id from app.organizations`,
     );
     expect(orgs).toEqual([{ slug: 'kettle-ridge-lodge', owner_user_id: host }]);
+  });
+
+  it('commits an inTx write with the account type, and rolls both back when Clerk fails', async () => {
+    const userId = await newUser();
+    const clerk = makeFakeClerkAdmin();
+    clerk.failNext('setPublicMetadata');
+    const insert = async (tx: Tx) => {
+      await tx.execute(
+        sql`insert into app.webhook_events (id, source) values ('evt_onboarding_in_tx', 'test')`,
+      );
+    };
+
+    await expect(
+      completeOnboarding(
+        t.db,
+        clerk,
+        userId,
+        { accountType: 'seeker', adultAttested: true },
+        { inTx: insert },
+      ),
+    ).rejects.toThrow(/setPublicMetadata/);
+    expect((await userRow(userId))?.account_type).toBeNull();
+    expect(
+      await queryRows(t.db, sql`select id from app.webhook_events where id = 'evt_onboarding_in_tx'`),
+    ).toEqual([]);
+
+    await completeOnboarding(
+      t.db,
+      makeFakeClerkAdmin(),
+      userId,
+      { accountType: 'seeker', adultAttested: true },
+      { inTx: insert },
+    );
+    expect((await userRow(userId))?.account_type).toBe('seeker');
+    expect(
+      await queryRows(t.db, sql`select id from app.webhook_events where id = 'evt_onboarding_in_tx'`),
+    ).toEqual([{ id: 'evt_onboarding_in_tx' }]);
   });
 
   it('throws conflict when a seeker tries to become a host', async () => {

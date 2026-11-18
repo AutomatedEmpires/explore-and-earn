@@ -37,7 +37,7 @@ export {
   type LocationPatch,
 } from './service';
 
-export { privacyHandlers } from './privacy';
+export { privacyHandler, retentionRules } from './privacy';
 
 export { listDestinations } from './destinations';
 

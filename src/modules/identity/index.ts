@@ -18,6 +18,7 @@ export {
   evaluateHostAccess,
   evaluateOperatorAccess,
   findUserByClerkId,
+  findUserById,
   getOperator,
   type HostAccess,
   type OperatorAccess,
@@ -59,7 +60,9 @@ export {
 
 export {
   applyClerkUser,
+  clerkIdHash,
   handleClerkEvent,
+  isErasedClerkUser,
   mapClerkRole,
   syncClerkUser,
   type ClerkEvent,
@@ -69,3 +72,6 @@ export {
 export type { AccountType, OperatorRole } from './schema';
 
 export const jobHandlers: HandlerMap = {};
+
+export { privacyHandler } from './privacy';
+export { retentionRules } from './retention';

@@ -57,6 +57,8 @@ export type OpenReviewItemInput = {
   aiConfidence?: number;
   priority?: number;
   excludeOperatorIds?: string[];
+  /** Assign this operator and skip pickAssignee. They must cover the queue and not be excluded. */
+  assigneeOperatorId?: string;
   originalItemId?: string;
 };
 

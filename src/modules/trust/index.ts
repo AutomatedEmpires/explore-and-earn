@@ -65,3 +65,6 @@ export const jobHandlers: HandlerMap = {
     await auditSample(db, now);
   },
 };
+
+export { privacyHandler } from './privacy';
+export { retentionRules } from './retention';

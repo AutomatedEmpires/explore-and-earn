@@ -16,6 +16,11 @@ export type OrgStatus = 'active' | 'suspended' | 'banned';
 export type OrgVerificationStatus =
   'unverified' | 'running' | 'verified' | 'needs_review' | 'needs_info' | 'failed';
 
+export type OrgStatusMeta = {
+  reviewItemId?: string | null;
+  endsAt?: Date | null;
+};
+
 export async function getOrgStatus(db: DbOrTx, orgId: string): Promise<OrgStatus> {
   const [row] = await db
     .select({ status: organizations.status })
@@ -25,10 +30,27 @@ export async function getOrgStatus(db: DbOrTx, orgId: string): Promise<OrgStatus
   return row.status;
 }
 
+function statusEvent(
+  orgId: string,
+  status: OrgStatus,
+  reason: string | undefined,
+  meta: OrgStatusMeta | undefined,
+) {
+  return {
+    orgId,
+    status,
+    reviewItemId: meta?.reviewItemId ?? null,
+    reason: reason ?? null,
+    endsAt: meta?.endsAt ? meta.endsAt.toISOString() : null,
+  };
+}
+
 /**
  * Sets the status, records `orgs.status_changed` (with `reason`) and emits
  * `org.status_changed`, in one transaction (a savepoint inside the caller's). Setting the
- * status the org already has changes nothing. The caller calls `kickWorker()` after commit.
+ * status the org already has changes nothing, unless `meta.reviewItemId` is set: then the
+ * event is emitted again so a new item reaches the sanction subscriber. The caller calls
+ * `kickWorker()` after commit.
  */
 export async function setOrgStatus(
   db: DbOrTx,
@@ -36,6 +58,7 @@ export async function setOrgStatus(
   status: OrgStatus,
   actor: Actor,
   reason?: string,
+  meta?: OrgStatusMeta,
 ): Promise<void> {
   await db.transaction(async (tx) => {
     const [before] = await tx
@@ -44,7 +67,12 @@ export async function setOrgStatus(
       .where(eq(organizations.id, orgId))
       .for('update');
     if (!before) throw notFound('Organization not found');
-    if (before.status === status) return;
+    if (before.status === status) {
+      if (meta?.reviewItemId) {
+        await emit(tx, 'org.status_changed', statusEvent(orgId, status, reason, meta), newId());
+      }
+      return;
+    }
 
     await tx
       .update(organizations)
@@ -59,7 +87,7 @@ export async function setOrgStatus(
       subjectId: orgId,
       data: { from: before.status, to: status, ...(reason ? { reason } : {}) },
     });
-    await emit(tx, 'org.status_changed', { orgId, status }, newId());
+    await emit(tx, 'org.status_changed', statusEvent(orgId, status, reason, meta), newId());
   });
 }
 

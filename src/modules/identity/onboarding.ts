@@ -3,7 +3,7 @@
 // changed afterwards, and `operator` can't be chosen: operators exist only by invitation.
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { type Db, withTx } from '@/lib/db';
+import { type Db, type Tx, withTx } from '@/lib/db';
 import { badRequest, conflict, notFound } from '@/lib/errors';
 import { record } from '@/modules/audit';
 // The orgs barrel imports identity while it is still evaluating, so reading the name schema
@@ -31,6 +31,9 @@ export const onboardingRequestSchema = z.discriminatedUnion('accountType', [
 ]);
 export type OnboardingRequest = z.output<typeof onboardingRequestSchema>;
 
+/** Runs inside the transaction that sets the account type (seeker) or creates the organization (host). */
+export type OnboardingInTx = (tx: Tx, accountType: 'seeker' | 'host') => Promise<void>;
+
 /**
  * Sets the user's account type, once. A seeker's 18+ attestation is stored with its time.
  * Throws bad_request for invalid input (including `operator`), not_found for an unknown or
@@ -44,6 +47,7 @@ export async function setAccountType(
   clerk: ClerkAdmin,
   userId: string,
   input: AccountTypeInput,
+  opts?: { inTx?: OnboardingInTx },
 ): Promise<void> {
   const parsed = accountTypeInputSchema.safeParse(input);
   if (!parsed.success) throw badRequest('Invalid account type', parsed.error.issues);
@@ -77,6 +81,7 @@ export async function setAccountType(
       data: { accountType },
     });
     await clerk.setPublicMetadata(updated.clerkUserId, { account_type: accountType });
+    if (opts?.inTx) await opts.inTx(tx, accountType);
   });
 }
 
@@ -94,9 +99,10 @@ export async function completeOnboarding(
   clerk: ClerkAdmin,
   userId: string,
   input: OnboardingRequest,
+  opts?: { inTx?: OnboardingInTx },
 ): Promise<{ redirectTo: '/' | '/host' }> {
   if (input.accountType === 'seeker') {
-    await setAccountType(db, clerk, userId, { accountType: 'seeker', adultAttested: true });
+    await setAccountType(db, clerk, userId, { accountType: 'seeker', adultAttested: true }, opts);
     return { redirectTo: '/' };
   }
 
@@ -116,6 +122,7 @@ export async function completeOnboarding(
     await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for('update');
     if (await findHostMembership(tx, userId, null)) throw conflict('Account type is already set');
     await createOrganization(tx, clerk, { ownerUserId: userId, name: input.organizationName });
+    if (opts?.inTx) await opts.inTx(tx, 'host');
   });
   return { redirectTo: '/host' };
 }

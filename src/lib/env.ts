@@ -98,6 +98,30 @@ const schema = z
 
     // Maps (SP2). A public token; required outside dev.
     NEXT_PUBLIC_MAPBOX_TOKEN: z.string().regex(/^pk\./, 'must start with pk.').optional(),
+
+    // SP8: support replies, backups, launch probes and the performance seeder.
+    SUPPORT_REPLY_DOMAIN: z
+      .string()
+      .regex(
+        /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/,
+        'must be a hostname',
+      )
+      .optional(),
+    SUPPORT_REPLY_SECRET: secret,
+    RESEND_INBOUND_WEBHOOK_SECRET: z
+      .string()
+      .regex(/^whsec_/, 'must start with whsec_')
+      .optional(),
+    BACKUP_SUPABASE_URL: z.url().optional(),
+    BACKUP_SUPABASE_SERVICE_ROLE_KEY: optional,
+    GITHUB_STATUS_TOKEN: optional,
+    GITHUB_REPO: z
+      .string()
+      .regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/, 'must look like owner/repo')
+      .optional(),
+    SENTRY_AUTH_TOKEN: optional,
+    PERF_MODE: z.literal('1').optional(),
+    PERF_SECRET: secret.optional(),
   })
   .superRefine((env, ctx) => {
     const need = (key: keyof typeof env, because: string) => {
@@ -137,6 +161,7 @@ const schema = z
     }
 
     if (env.APP_ENV !== 'dev') {
+      need('SUPPORT_REPLY_DOMAIN', `when APP_ENV=${env.APP_ENV}`);
       need('CLERK_SECRET_KEY', `when APP_ENV=${env.APP_ENV}`);
       need('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY', `when APP_ENV=${env.APP_ENV}`);
       need('CLERK_WEBHOOK_SECRET', `when APP_ENV=${env.APP_ENV}`);
@@ -153,7 +178,39 @@ const schema = z
       }
     }
 
+    if ((env.GITHUB_STATUS_TOKEN === undefined) !== (env.GITHUB_REPO === undefined)) {
+      const missing = env.GITHUB_STATUS_TOKEN === undefined ? 'GITHUB_STATUS_TOKEN' : 'GITHUB_REPO';
+      ctx.addIssue({
+        code: 'custom',
+        path: [missing],
+        message: `${missing} is required when the other GitHub status key is set`,
+      });
+    }
+    if (env.PERF_MODE === '1' && env.PERF_SECRET === undefined && env.APP_ENV !== 'prod') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['PERF_SECRET'],
+        message: 'PERF_SECRET is required when PERF_MODE=1',
+      });
+    }
+
     if (env.APP_ENV === 'prod') {
+      if (env.PERF_MODE !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['PERF_MODE'],
+          message: 'PERF_MODE is not allowed in prod',
+        });
+      }
+      if (env.PERF_SECRET !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['PERF_SECRET'],
+          message: 'PERF_SECRET is not allowed in prod',
+        });
+      }
+      need('BACKUP_SUPABASE_URL', 'when APP_ENV=prod');
+      need('BACKUP_SUPABASE_SERVICE_ROLE_KEY', 'when APP_ENV=prod');
       const providers = [
         'AI_PROVIDER',
         'CHILD_SAFETY_PROVIDER',

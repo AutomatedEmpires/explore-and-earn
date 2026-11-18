@@ -3,6 +3,8 @@
 // Used by apiRoute's `rateLimit` option; call it directly for limits outside an API route.
 import { sql } from 'drizzle-orm';
 import { queryRows, type DbOrTx } from '@/lib/db';
+import { getEnv } from '@/lib/env';
+import { isPerfMode } from '@/lib/perf-mode';
 
 export type RateLimitResult = {
   /** False once this call pushed the window's count over `limit`. */
@@ -32,6 +34,10 @@ export async function consume(
   }
   if (!Number.isInteger(limit) || limit < 0) {
     throw new Error(`consume: limit must be a non-negative integer, got ${limit}`);
+  }
+  // The performance seeder must not write a row per request.
+  if (isPerfMode(getEnv())) {
+    return { allowed: true, remaining: limit, resetAt: now };
   }
 
   const windowMs = windowSec * 1000;

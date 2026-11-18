@@ -89,3 +89,10 @@ export function shouldRedirectToOnboarding(i: {
 export function isAdminHost(host: string, adminHost: string): boolean {
   return normalizeHost(host) === normalizeHost(adminHost);
 }
+
+/** An actor token ("view as") may read, and nothing else. */
+export function isViewAsWrite(i: { method: string; hasActor: boolean }): boolean {
+  if (!i.hasActor) return false;
+  const method = i.method.toUpperCase();
+  return method !== 'GET' && method !== 'HEAD';
+}

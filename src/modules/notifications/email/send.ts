@@ -28,7 +28,13 @@ import {
   type EmailTemplateName,
   type NotificationData,
 } from '../types';
+import AccountStatus from './templates/AccountStatus';
 import HiringUpdate from './templates/HiringUpdate';
+import LegalUpdate from './templates/LegalUpdate';
+import OperatorDigest from './templates/OperatorDigest';
+import PrivacyDeletion from './templates/PrivacyDeletion';
+import PrivacyExportReady from './templates/PrivacyExportReady';
+import SupportReply from './templates/SupportReply';
 import BillingNotice from './templates/BillingNotice';
 import Digest, { digestSubject, type DigestItem } from './templates/Digest';
 import HostNotice from './templates/HostNotice';
@@ -54,6 +60,8 @@ export type Message = {
   headers: Record<string, string>;
   /** Makes a retried send a no-op at the provider (Resend keeps keys for 24 hours). */
   idempotencyKey?: string;
+  /** Reply-To address, when the message should land in a particular inbox. */
+  replyTo?: string;
   /** Files built for a single send. A digest does not carry them. */
   attachments?: EmailAttachment[];
 };
@@ -126,6 +134,7 @@ export function resendEmailProvider(apiKey: string, from: string): EmailProvider
           html: m.html,
           text: m.text,
           headers: m.headers,
+          ...(m.replyTo ? { replyTo: m.replyTo } : {}),
           ...(m.attachments
             ? {
                 attachments: m.attachments.map((file) => ({
@@ -262,7 +271,52 @@ function templateElement(name: EmailTemplateName, c: Content, footer: FooterProp
       });
     case 'HiringUpdate':
       return createElement(HiringUpdate, { title: c.title, body: c.body, url: c.url, footer });
+    case 'PrivacyExportReady':
+      return noticeElement(PrivacyExportReady, c, footer);
+    case 'PrivacyDeletion':
+      return noticeElement(PrivacyDeletion, c, footer);
+    case 'LegalUpdate':
+      return noticeElement(LegalUpdate, c, footer);
+    case 'AccountStatus':
+      return noticeElement(AccountStatus, c, footer);
+    case 'SupportReply':
+      return createElement(SupportReply, {
+        ticketNumber: typeof c.data.ticketNumber === 'number' ? c.data.ticketNumber : 0,
+        subject: typeof c.data.subject === 'string' ? c.data.subject : c.title,
+        replyBody: typeof c.data.replyBody === 'string' ? c.data.replyBody : c.body,
+        threadUrl: typeof c.data.threadUrl === 'string' ? c.data.threadUrl : null,
+        automatic: c.data.automatic === true,
+        footer,
+      });
+    case 'OperatorDigest':
+      return createElement(OperatorDigest, {
+        dateLabel: typeof c.data.dateLabel === 'string' ? c.data.dateLabel : '',
+        rows: Array.isArray(c.data.rows)
+          ? c.data.rows.filter(
+              (row): row is { label: string; value: string } =>
+                !!row &&
+                typeof row === 'object' &&
+                typeof (row as { label?: unknown }).label === 'string' &&
+                typeof (row as { value?: unknown }).value === 'string',
+            )
+          : [],
+        consoleUrl: typeof c.data.consoleUrl === 'string' ? c.data.consoleUrl : (c.url ?? ''),
+        footer,
+      });
   }
+}
+
+function noticeElement(
+  Template: typeof PrivacyExportReady,
+  c: Content,
+  footer: FooterProps,
+): ReactElement {
+  return createElement(Template, {
+    heading: c.title,
+    lines: c.body.split('\n').filter((line) => line.trim() !== ''),
+    button: noticeButton(c),
+    footer,
+  });
 }
 
 /** Plain-text headings keep their case (html-to-text uppercases them by default). */
@@ -373,6 +427,7 @@ async function sendOne(
   );
   const { html, text } = await renderEmail(el);
   const attachments = def.email.attachments ? await def.email.attachments(data, db) : undefined;
+  const replyTo = def.email.replyTo?.(data) ?? null;
   await provider.send({
     to: to.email,
     subject: n.title,
@@ -380,6 +435,7 @@ async function sendOne(
     text,
     headers: unsubscribeHeaders(footer),
     idempotencyKey: jobKey(n.id, 'email'),
+    ...(replyTo ? { replyTo } : {}),
     ...(attachments ? { attachments } : {}),
   });
   return 'sent';

@@ -112,7 +112,7 @@ describe('runCheck: SP2 kinds', () => {
 
     const verification = await runCheck(t.db, {
       kind: 'business_verification',
-      subjectType: 'organization',
+      subjectType: 'business_verification',
       subjectId: newId(),
       text: '__block__',
       reviewQueue: 'fraud',
@@ -128,7 +128,7 @@ describe('runCheck: SP2 kinds', () => {
     const subjectId = newId();
     const result = await runCheck(t.db, {
       kind: 'business_verification',
-      subjectType: 'organization',
+      subjectType: 'business_verification',
       subjectId,
       text: 'Kettle Ridge Lodge',
       reviewQueue: 'fraud',
@@ -137,7 +137,7 @@ describe('runCheck: SP2 kinds', () => {
     expect(await items()).toEqual([
       expect.objectContaining({
         queue: 'fraud',
-        subject_type: 'organization',
+        subject_type: 'business_verification',
         subject_id: subjectId,
         reason: 'classifier_error',
       }),
@@ -237,7 +237,7 @@ describe('decide', () => {
 
     await decide(t.db, item.id, op, 'approve', { note: 'Looks fine' });
 
-    expect(seen).toEqual([{ note: 'Looks fine', reviewItemId: item.id }]);
+    expect(seen).toEqual([{ note: 'Looks fine', reviewItemId: item.id, operatorId: op }]);
   });
 });
 

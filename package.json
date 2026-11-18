@@ -25,7 +25,15 @@
     "discovery:seed-synthetic": "tsx --import ./scripts/register-server-only.mjs scripts/seed-synthetic.ts",
     "discovery:rebuild": "tsx --import ./scripts/register-server-only.mjs scripts/discovery-rebuild.ts",
     "icons:gen": "tsx --import ./scripts/register-server-only.mjs scripts/gen-icons.ts",
-    "e2e:seed": "tsx --import ./scripts/register-server-only.mjs scripts/e2e-seed-discovery.ts"
+    "e2e:seed": "tsx --import ./scripts/register-server-only.mjs scripts/e2e-seed-discovery.ts",
+    "launch:check": "tsx --import ./scripts/register-server-only.mjs scripts/launch-check.ts",
+    "launch:smoke": "tsx --import ./scripts/register-server-only.mjs scripts/launch-smoke.ts",
+    "ops:reset-passkeys": "tsx --import ./scripts/register-server-only.mjs scripts/ops-reset-passkeys.ts",
+    "ops:replay-deletions": "tsx --import ./scripts/register-server-only.mjs scripts/ops-replay-deletions.ts",
+    "ops:resync-clerk": "tsx --import ./scripts/register-server-only.mjs scripts/ops-resync-clerk.ts",
+    "backup:manifest": "tsx --import ./scripts/register-server-only.mjs scripts/backup-manifest.ts",
+    "content:seed-legal": "tsx --import ./scripts/register-server-only.mjs scripts/seed-legal-drafts.ts",
+    "perf:seed": "tsx --import ./scripts/register-server-only.mjs tests/perf/seed-synthetic.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.4.0",
@@ -48,6 +56,7 @@
     "cron-parser": "^5.10.3",
     "disposable-email-domains": "1.0.62",
     "drizzle-orm": "^0.45.4",
+    "fflate": "0.7.5",
     "file-type": "^22.3.0",
     "lucide-react": "^1.66.0",
     "mapbox-gl": "3.33.0",
@@ -74,6 +83,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@clerk/testing": "^2.2.53",
+    "@faker-js/faker": "10.6.0",
     "@lhci/cli": "0.15.1",
     "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4.3.3",

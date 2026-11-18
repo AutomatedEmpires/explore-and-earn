@@ -427,3 +427,29 @@ describe('SP5 hiring settings', () => {
     expect(await getSetting(t.db, 'hiring.fit_disabled_states')).toEqual(['NY', 'CO']);
   });
 });
+
+describe('SP8 settings', () => {
+  it('returns the privacy, support, ops, content and launch defaults', async () => {
+    expect(await getSetting(t.db, 'support.ai_enabled')).toBe(true);
+    expect(await getSetting(t.db, 'support.ai_auto_reply_min_confidence')).toBe(0.85);
+    expect(await getSetting(t.db, 'privacy.export_ttl_days')).toBe(7);
+    expect(await getSetting(t.db, 'ops.spike_rules')).toEqual({
+      failed_payments: { minCount: 5, multiplier: 3 },
+      fraud_items: { minCount: 5, multiplier: 3 },
+    });
+    expect(await getSetting(t.db, 'content.about')).toEqual({ headline: '', bodyMd: '' });
+    expect(await getSetting(t.db, 'launch.mode')).toBe('private');
+  });
+
+  it('rejects a launch mode and an about headline outside the contract', async () => {
+    await expectBadRequest(setSetting(t.db, 'launch.mode', 'paused' as 'private', { operatorId }));
+    await expectBadRequest(
+      setSetting(
+        t.db,
+        'content.about',
+        { headline: 'x'.repeat(121), bodyMd: '' },
+        { operatorId },
+      ),
+    );
+  });
+});

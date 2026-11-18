@@ -11,6 +11,9 @@ import { getEnv } from './env';
 
 /** The only model Foundation uses for moderation and classification. */
 export const CLASSIFIER_MODEL = 'claude-haiku-5-5';
+/** The model support drafts with. */
+export const SUPPORT_MODEL = 'claude-sonnet-5-5';
+export type ClassifierModel = typeof CLASSIFIER_MODEL | typeof SUPPORT_MODEL;
 
 export const DEFAULT_CLASSIFY_TIMEOUT_MS = 15_000;
 
@@ -24,7 +27,7 @@ export type ClassifyContent =
   { type: 'text'; text: string } | { type: 'image'; mime: string; bytes: Uint8Array };
 
 export type ClassifyOptions<T> = {
-  model: typeof CLASSIFIER_MODEL;
+  model: ClassifierModel;
   system: string;
   content: ClassifyContent[];
   schema: z.ZodType<T>;
@@ -72,7 +75,24 @@ function contentHas(content: ClassifyContent[], marker: string): boolean {
  * `labels: []` and `reason: 'stub'`, plus `altText: 'Test image'` when the content has an
  * image. The answer is validated against `schema` like a real one.
  */
+const STUB_JSON_IN_CLASSIFY = /^STUB_JSON:\s*(.+)$/m;
+
 export function classifyStub<T>(opts: ClassifyOptions<T>): T {
+  if (opts.content.some((block) => block.type === 'text' && block.text.includes('__fail__'))) {
+    throw new ClassifierError('api_error', 'stub failure');
+  }
+  for (const block of opts.content) {
+    if (block.type !== 'text') continue;
+    const line = STUB_JSON_IN_CLASSIFY.exec(block.text);
+    if (!line?.[1]) continue;
+    let value: unknown;
+    try {
+      value = JSON.parse(line[1]) as unknown;
+    } catch (err) {
+      throw new ClassifierError('invalid_output', 'Classifier answer is not JSON', { cause: err });
+    }
+    return validate(opts.schema, value);
+  }
   const score = contentHas(opts.content, BLOCK_MARKER)
     ? 0.95
     : contentHas(opts.content, FLAG_MARKER)

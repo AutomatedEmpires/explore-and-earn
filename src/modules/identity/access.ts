@@ -45,6 +45,20 @@ export function evaluateOperatorAccess(i: {
 
 export type UserRecord = CurrentUser & { deletedAt: Date | null };
 
+export async function findUserById(db: DbOrTx, userId: string): Promise<UserRecord | null> {
+  const [row] = await db
+    .select({
+      id: users.id,
+      clerkUserId: users.clerkUserId,
+      accountType: users.accountType,
+      email: users.email,
+      deletedAt: users.deletedAt,
+    })
+    .from(users)
+    .where(eq(users.id, userId));
+  return row ?? null;
+}
+
 export async function findUserByClerkId(
   db: DbOrTx,
   clerkUserId: string,

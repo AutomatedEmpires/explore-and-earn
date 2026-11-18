@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import type { HandlerMap } from '@/modules/jobs';
 import { CANCEL_TOPIC, cancelSubscriptionNow } from './cancel';
+import './org-subject';
 import { applyLaunchDate, grantMonthlyCredits, reconcile } from './jobs';
 import { notifyBillingContacts } from './notifications';
 import { getSubscriptionState } from './state';
@@ -117,10 +118,33 @@ export {
   type SlotHolderSource,
 } from './change';
 export { createPortalSession } from './portal';
-export { CANCEL_TOPIC, cancelSubscriptionNow, getCardChecks, sanctionOrg } from './cancel';
+export {
+  CANCEL_TOPIC,
+  cancelSubscriptionNow,
+  getCardChecks,
+  restoreOrganization,
+  sanctionMetaFrom,
+  sanctionOrg,
+  suspendOrganization,
+} from './cancel';
 export { applyLaunchDate, grantMonthlyCredits, reconcile } from './jobs';
 /** SP8 registers these with its privacy exporter and eraser. */
-export { privacyHandlers } from './privacy';
+export { privacyHandler, retentionRules } from './privacy';
+export {
+  createCoupon,
+  extendTrial,
+  getOrgBillingSummary,
+  getRevenueMetrics,
+  grantFreeAccount,
+  listCoupons,
+  listInvoices,
+  reconcileAll,
+  refund,
+  type CouponRow,
+  type InvoiceRow,
+  type OrgBillingSummary,
+  type RevenueMetrics,
+} from './operator-ops';
 export {
   BILLING_CONTACT_ROLES,
   notifyBillingContacts,

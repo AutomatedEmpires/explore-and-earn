@@ -235,7 +235,7 @@ describe('enforceSlotLimit', () => {
 describe('close_for_org', () => {
   const handle = (status: 'active' | 'suspended' | 'banned') =>
     jobHandlers['listings.close_for_org']?.(
-      { event: 'org.status_changed', eventId: `s-${status}`, data: { orgId: org.orgId, status } },
+      { event: 'org.status_changed', eventId: `s-${status}`, data: { orgId: org.orgId, status, reviewItemId: null, reason: null, endsAt: null } },
       { db, now: FIXED_NOW },
     );
 

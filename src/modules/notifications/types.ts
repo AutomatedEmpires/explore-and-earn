@@ -53,6 +53,13 @@ export const EMAIL_TEMPLATE_NAMES = [
   'SeekerNotice',
   // SP5: a hiring notice (invite, interview, offer) with one button.
   'HiringUpdate',
+  // SP8: privacy, support, the operator digest, legal updates and account status.
+  'PrivacyExportReady',
+  'PrivacyDeletion',
+  'SupportReply',
+  'OperatorDigest',
+  'LegalUpdate',
+  'AccountStatus',
 ] as const;
 export type EmailTemplateName = (typeof EMAIL_TEMPLATE_NAMES)[number];
 
@@ -87,6 +94,8 @@ export type NotificationTypeDef = {
     attachments?: (d: NotificationData, db: DbOrTx) => Promise<EmailAttachment[]>;
     /** The per-item button label inside a Digest. */
     digestAction?: string;
+    /** Reply-To for this notification's email. Null sends with none. */
+    replyTo?: (d: NotificationData) => string | null;
   };
   /** Sends a web push to each of the user's subscribed browsers. */
   push?: boolean;

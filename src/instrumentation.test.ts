@@ -37,6 +37,10 @@ const prodEnv = {
   LINK_SAFETY_PROVIDER: 'webrisk',
   WEB_RISK_API_KEY: 'test-webrisk',
   NEXT_PUBLIC_MAPBOX_TOKEN: 'pk.test_mapbox',
+  SUPPORT_REPLY_DOMAIN: 'reply.exploreandearn.test',
+  SUPPORT_REPLY_SECRET: 's'.repeat(32),
+  BACKUP_SUPABASE_URL: 'https://backup.supabase.test',
+  BACKUP_SUPABASE_SERVICE_ROLE_KEY: 'backup-service-role',
 };
 
 function stubAll(env: Record<string, string>) {

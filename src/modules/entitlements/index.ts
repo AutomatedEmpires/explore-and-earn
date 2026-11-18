@@ -19,7 +19,7 @@ export {
 
 export { getCapacity, registerUsageCounter, withCapacity, type UsageCounter } from './capacity';
 
-export { privacyHandlers } from './privacy';
+export { privacyHandler, retentionRules } from './privacy';
 
 /** Entitlements owns no outbox topics. */
 export const jobHandlers: HandlerMap = {};

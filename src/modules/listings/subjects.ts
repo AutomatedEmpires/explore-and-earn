@@ -6,7 +6,7 @@ import type { DbOrTx } from '@/lib/db';
 import { isAppError } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import { record } from '@/modules/audit';
-import { sanctionOrg } from '@/modules/billing';
+import { sanctionMetaFrom, sanctionOrg } from '@/modules/billing';
 import { withCapacity } from '@/modules/entitlements';
 import { emit } from '@/modules/jobs';
 import { notify } from '@/modules/notifications';
@@ -83,9 +83,9 @@ const sanctionVia =
     action: 'suspend' | 'ban',
     orgOf: (db: DbOrTx, id: string) => Promise<string | null>,
   ): SubjectHandler =>
-  async (db, subjectId) => {
+  async (db, subjectId, data) => {
     const orgId = await orgOf(db, subjectId);
-    if (orgId) await sanctionOrg(db, orgId, action, OPERATOR);
+    if (orgId) await sanctionOrg(db, orgId, action, OPERATOR, sanctionMetaFrom(data));
   };
 
 const revisionOrg = async (db: DbOrTx, id: string) => (await loadRevision(db, id))?.orgId ?? null;

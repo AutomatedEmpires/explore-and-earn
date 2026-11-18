@@ -117,6 +117,7 @@ export type {
 } from './types';
 export {
   countActiveByLocation,
+  countActiveListings,
   getListingSummaries,
   getOrgListingFacts,
   getOrgListingStats,
@@ -128,7 +129,7 @@ export { closeAllForOrg, enforceSlotLimit } from './enforce';
 export { registerListingRowBadgeProvider, registerListingStatsProvider } from './providers';
 export { listOrgListings, LISTINGS_PAGE_SIZE, type ListingRow, type ListingTab } from './list';
 export { getHomeSummary } from './home';
-export { privacyHandlers } from './privacy';
+export { privacyHandler, retentionRules } from './privacy';
 
 /** The listings outbox topics (spec section 6). */
 export const jobHandlers: HandlerMap = {
