@@ -1,0 +1,232 @@
+# The restore drill (SP8 spec 8.11). Setup and how to read the result: docs/runbooks/restore.md.
+#
+# THIS WORKFLOW IS OFF until the founder turns it on. Three things must all be true before it
+# reads anything:
+#   1. Someone starts it by hand from the Actions tab (there is no timer in this file).
+#   2. The repository variable RESTORE_DRILL_ENABLED is exactly `true`.
+#   3. The GitHub environment `restore-drill` exists, has the founder as required reviewer, and
+#      holds the secrets named below, synced from Doppler config `prd_backup`. Only names appear
+#      in this file; the values live in Doppler.
+#
+# It never touches production. It reads the newest encrypted backup from the backup project,
+# restores it into a throwaway Postgres that lives only inside this job (the `postgres` service
+# below, on localhost), and checks it there. It holds no production database URL and no
+# production storage keys.
+#
+# What it proves, in order:
+#   1. The newest dump restores cleanly.
+#   2. `pnpm db:migrate` applies nothing: the dump already holds every migration.
+#   3. Row counts match the manifest taken with the dump, and the restore point is at most
+#      24 hours old.
+#   4. `pnpm ops:replay-deletions` erases again everyone erased since the dump, and
+#      tests/restore passes.
+#   5. All of it took at most 8 hours.
+# The result is uploaded as restore-summary.json; that file is what the `restore.drill` launch
+# gate is checked against.
+name: Restore drill
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restore-drill
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  off:
+    name: the restore drill is off
+    runs-on: ubuntu-latest
+    if: vars.RESTORE_DRILL_ENABLED != 'true'
+    steps:
+      - run: |
+          echo "::notice::The restore drill is off. Nothing was read. To turn it on, follow docs/runbooks/restore.md and set the repository variable RESTORE_DRILL_ENABLED to true."
+
+  drill:
+    name: restore the newest backup and check it
+    runs-on: ubuntu-latest
+    if: vars.RESTORE_DRILL_ENABLED == 'true'
+    environment: restore-drill
+    timeout-minutes: 480
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # The throwaway database inside this job. Never a secret, never production.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - name: Record the start time and choose the working paths
+        run: |
+          echo "DRILL_STARTED_AT=$(date -u +%s)" >> "$GITHUB_ENV"
+          echo "DRILL_DIR=$RUNNER_TEMP/drill" >> "$GITHUB_ENV"
+          echo "RCLONE_CONFIG=$RUNNER_TEMP/rclone.conf" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check that every drill secret is set
+        env:
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          BACKUP_CRYPT_PASSWORD: ${{ secrets.BACKUP_CRYPT_PASSWORD }}
+          BACKUP_CRYPT_SALT: ${{ secrets.BACKUP_CRYPT_SALT }}
+          BACKUP_SUPABASE_URL: ${{ secrets.BACKUP_SUPABASE_URL }}
+          BACKUP_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BACKUP_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          missing=0
+          for name in BACKUP_S3_ENDPOINT BACKUP_S3_ACCESS_KEY_ID BACKUP_S3_SECRET_ACCESS_KEY \
+            BACKUP_CRYPT_PASSWORD BACKUP_CRYPT_SALT BACKUP_SUPABASE_URL \
+            BACKUP_SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not set in the restore-drill environment (Doppler config prd_backup)."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Install the PostgreSQL 17 client tools and rclone
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common rclone jq
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Write the rclone configuration (backup project only)
+        env:
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          BACKUP_S3_REGION: ${{ vars.BACKUP_S3_REGION || 'us-east-1' }}
+          BACKUP_CRYPT_PASSWORD: ${{ secrets.BACKUP_CRYPT_PASSWORD }}
+          BACKUP_CRYPT_SALT: ${{ secrets.BACKUP_CRYPT_SALT }}
+        run: |
+          umask 077
+          crypt_password="$(rclone obscure "$BACKUP_CRYPT_PASSWORD")"
+          crypt_salt="$(rclone obscure "$BACKUP_CRYPT_SALT")"
+          echo "::add-mask::$crypt_password"
+          echo "::add-mask::$crypt_salt"
+          cat > "$RCLONE_CONFIG" <<EOF
+          [backup]
+          type = s3
+          provider = Other
+          endpoint = $BACKUP_S3_ENDPOINT
+          region = $BACKUP_S3_REGION
+          access_key_id = $BACKUP_S3_ACCESS_KEY_ID
+          secret_access_key = $BACKUP_S3_SECRET_ACCESS_KEY
+          force_path_style = true
+          no_check_bucket = true
+
+          [backupcrypt]
+          type = crypt
+          remote = backup:backups
+          password = $crypt_password
+          password2 = $crypt_salt
+          filename_encryption = standard
+          directory_name_encryption = true
+          EOF
+
+      - name: Fetch the newest backup
+        run: |
+          newest="$(rclone lsf --dirs-only backupcrypt:pg/ | sort | tail -n 1)"
+          if [ -z "$newest" ]; then
+            echo "::error::No backup found under backupcrypt:pg/. Run the Backup workflow first."
+            exit 1
+          fi
+          mkdir -p "$DRILL_DIR"
+          rclone copy "backupcrypt:pg/$newest" "$DRILL_DIR" --stats-one-line --stats 60s
+          test -s "$DRILL_DIR/dump.pgcustom"
+          test -s "$DRILL_DIR/manifest.json"
+          echo "RESTORE_TAKEN_AT=$(jq -er .takenAt "$DRILL_DIR/manifest.json")" >> "$GITHUB_ENV"
+
+      - name: Restore the dump into the throwaway database
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'create extension if not exists postgis'
+          pg_restore --no-owner --no-privileges --exit-on-error -d "$DATABASE_URL" "$DRILL_DIR/dump.pgcustom"
+
+      - name: Check that no migration is left to apply
+        run: |
+          set -o pipefail
+          pnpm db:migrate | tee "$DRILL_DIR/migrate.log"
+          if ! grep -q '"count":0' "$DRILL_DIR/migrate.log"; then
+            echo "::error::pnpm db:migrate applied a migration. The dump is older than the code in this commit."
+            exit 1
+          fi
+
+      - name: Compare row counts with the manifest (restore point at most 24 hours old)
+        run: pnpm backup:manifest --verify "$DRILL_DIR/manifest.json" --max-age-hours 24
+
+      - name: Replay deletions made since the dump
+        env:
+          BACKUP_SUPABASE_URL: ${{ secrets.BACKUP_SUPABASE_URL }}
+          BACKUP_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BACKUP_SUPABASE_SERVICE_ROLE_KEY }}
+        # --apply is safe here: DATABASE_URL is the throwaway database of this job.
+        run: pnpm ops:replay-deletions --since "$RESTORE_TAKEN_AT" --apply --summary "$DRILL_DIR/replay.json"
+
+      - name: Run the restore tests
+        env:
+          RESTORE_DRILL: '1'
+          BACKUP_SUPABASE_URL: ${{ secrets.BACKUP_SUPABASE_URL }}
+          BACKUP_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BACKUP_SUPABASE_SERVICE_ROLE_KEY }}
+        run: pnpm test:integration tests/restore
+
+      - name: Write the summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          mkdir -p "$DRILL_DIR"
+          now="$(date -u +%s)"
+          elapsed_minutes=$(( (now - DRILL_STARTED_AT) / 60 ))
+          age_hours=null
+          if [ -n "${RESTORE_TAKEN_AT:-}" ]; then
+            taken="$(date -u -d "$RESTORE_TAKEN_AT" +%s)"
+            age_hours="$(jq -n --argjson s "$DRILL_STARTED_AT" --argjson t "$taken" '(($s - $t) / 36 | round) / 100')"
+          fi
+          replayed=null
+          if [ -s "$DRILL_DIR/replay.json" ]; then replayed="$(jq .replayed "$DRILL_DIR/replay.json")"; fi
+          passed=false
+          if [ "$JOB_STATUS" = "success" ] && [ "$elapsed_minutes" -le 480 ]; then passed=true; fi
+          jq -n --argjson age "$age_hours" --argjson elapsed "$elapsed_minutes" \
+            --argjson replayed "$replayed" --argjson passed "$passed" \
+            '{ restorePointAgeHours: $age, elapsedMinutes: $elapsed, replayed: $replayed, passed: $passed }' \
+            > restore-summary.json
+          cat restore-summary.json
+          if [ "$elapsed_minutes" -gt 480 ]; then
+            echo "::error::The drill took $elapsed_minutes minutes; the limit is 480 (8 hours)."
+            exit 1
+          fi
+
+      - name: Upload the summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: restore-summary
+          path: restore-summary.json
+          if-no-files-found: error
+
+      - name: Remove the local copies
+        if: always()
+        run: rm -rf "$DRILL_DIR" "$RCLONE_CONFIG"
