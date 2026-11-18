@@ -1,5 +1,13 @@
 // Public API of the hiring module. Importing it registers notification types.
 import { getAsDescribedPrompt, submitAsDescribed } from './as-described/form';
+import {
+  applicationSources,
+  applicationsByListing,
+  countPipelineKinds,
+  firstPipelineEventAt,
+  pipelineStatusCounts,
+  weeklyApplications,
+} from './as-described/pipeline-read';
 import { getAsDescribedSummary } from './as-described/summary';
 import { getCardPayloads } from './cards';
 import { scoreApplications } from './fit-store';
@@ -57,14 +65,18 @@ export {
   FIT_WEIGHTS,
   FIT_WEIGHTS_VERSION,
   acceptOffer,
+  applicationSources,
+  applicationsByListing,
   buildIcs,
   cancelInterview,
   cancelOffer,
   certKey,
   computeFit,
+  countPipelineKinds,
   declineInterview,
   declineOffer,
   fitAvailable,
+  firstPipelineEventAt,
   getApplicantDetail,
   getAsDescribedPrompt,
   getAsDescribedSummary,
@@ -92,6 +104,7 @@ export {
   pass,
   pendingInboxCount,
   pickSlot,
+  pipelineStatusCounts,
   privacyHandler,
   proposeInterview,
   proposeNewRound,
@@ -111,4 +124,5 @@ export {
   toFitListing,
   toPoolListing,
   undoPass,
+  weeklyApplications,
 };
