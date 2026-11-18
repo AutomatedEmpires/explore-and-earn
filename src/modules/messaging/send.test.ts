@@ -11,15 +11,42 @@ import { createTestDb, type TestDb } from '@tests/helpers/db';
 import { safetyFake } from '@tests/fakes/sp5/sp4';
 import { jobHandlers } from './jobs';
 import './notification-types';
-import { messages, threads } from './schema';
-import { sendHostMessage, sendMessage } from './send';
+import { unreadThreadCount } from './reads';
+import { messages, threadReads, threads } from './schema';
+import { decideMessage, sendHostMessage, sendMessage } from './send';
 import { hostViewer, seedAttachment, seedThread, seekerViewer } from './test-fixtures';
-import { getThread, markThreadHired, setThreadReadOnly } from './threads';
+import { getThread, listThreads, markThreadHired, setThreadReadOnly } from './threads';
+
+// `race.beforeAttachmentCheck` runs once, inside the next attachment check: after a send has
+// looked its client id up and before it inserts. A test uses it to land a competing send there.
+const race = vi.hoisted(() => ({ beforeAttachmentCheck: null as null | (() => Promise<void>) }));
+
+vi.mock('@/modules/media', async (orig) => {
+  const actual = await orig<typeof import('@/modules/media')>();
+  return {
+    ...actual,
+    getMediaMeta: vi.fn(async (...args: Parameters<typeof actual.getMediaMeta>) => {
+      const hook = race.beforeAttachmentCheck;
+      race.beforeAttachmentCheck = null;
+      if (hook) await hook();
+      return actual.getMediaMeta(...args);
+    }),
+  };
+});
 
 vi.mock('@/modules/safety', async (orig) => ({
   ...(await orig<typeof import('@/modules/safety')>()),
   ...(await import('@tests/fakes/sp5/sp4')).safetyFake,
 }));
+
+async function seekerNotes(seekerId: string): Promise<number> {
+  const [notes] = await queryRows<{ n: number }>(
+    t.db,
+    sql`select count(*)::int as n from app.notifications
+        where user_id = ${seekerId} and type = 'messages.new'`,
+  );
+  return notes?.n ?? 0;
+}
 
 let t: TestDb;
 let operatorId: string;
@@ -38,6 +65,7 @@ beforeEach(() => {
   const saved = [...safetyFake.subjects];
   safetyFake.reset();
   for (const subject of saved) safetyFake.subjects.push(subject);
+  race.beforeAttachmentCheck = null;
 });
 
 describe('sending', () => {
@@ -237,5 +265,136 @@ describe('trust and reports', () => {
     await expect(
       getThread(t.db, seekerViewer(seeded.seekerId), seeded.threadId),
     ).resolves.toMatchObject({ readOnly: 'removed' });
+  });
+});
+
+describe('releasing a message later', () => {
+  it('does not deliver a scanned host message once the seeker has blocked the org', async () => {
+    const seeded = await seedThread(t.db);
+    const host = hostViewer(seeded.ownerId, seeded.orgId, 'owner');
+    const sent = await sendMessage(t.db, host, seeded.threadId, {
+      clientId: newId(),
+      body: 'On my way',
+    });
+    safetyFake.setBlocked(seeded.orgId, seeded.seekerId);
+    await runWorker(t.db, { handlers: jobHandlers });
+
+    const seeker = await getThread(t.db, seekerViewer(seeded.seekerId), seeded.threadId);
+    expect(seeker.messages.map((row) => row.id)).not.toContain(sent.message.id);
+    expect(seeker.readOnly).toBe('blocked');
+    const hostView = await getThread(t.db, host, seeded.threadId);
+    expect(hostView.messages.find((row) => row.id === sent.message.id)?.state).toBe('not_delivered');
+    expect(await seekerNotes(seeded.seekerId)).toBe(0);
+    const [thread] = await t.db.select().from(threads).where(eq(threads.id, seeded.threadId));
+    expect(thread?.lastToSeekerAt).toBeNull();
+  });
+
+  it('does not deliver an approved held message once the seeker has blocked the org', async () => {
+    const seeded = await seedThread(t.db);
+    const sent = await sendMessage(t.db, hostViewer(seeded.ownerId, seeded.orgId, 'owner'), seeded.threadId, {
+      clientId: newId(),
+      body: '__block__',
+    });
+    await runWorker(t.db, { handlers: jobHandlers });
+    safetyFake.setBlocked(seeded.orgId, seeded.seekerId);
+    const [item] = await listOpenReviewItems(t.db, 'message', sent.message.id);
+    await decide(t.db, item?.id ?? '', operatorId, 'approve');
+
+    const seeker = await getThread(t.db, seekerViewer(seeded.seekerId), seeded.threadId);
+    expect(seeker.messages.map((row) => row.id)).not.toContain(sent.message.id);
+    expect(await seekerNotes(seeded.seekerId)).toBe(0);
+    const [row] = await t.db.select().from(messages).where(eq(messages.id, sent.message.id));
+    expect(row?.scanState).toBe('held');
+  });
+
+  it('never brings a removed message back when another item on it is approved later', async () => {
+    const seeded = await seedThread(t.db);
+    const sent = await sendMessage(t.db, hostViewer(seeded.ownerId, seeded.orgId, 'owner'), seeded.threadId, {
+      clientId: newId(),
+      body: 'Deposit first __flag__',
+    });
+    await runWorker(t.db, { handlers: jobHandlers });
+    await decideMessage(t.db, sent.message.id, 'remove');
+    await decideMessage(t.db, sent.message.id, 'approve');
+    const [row] = await t.db.select().from(messages).where(eq(messages.id, sent.message.id));
+    expect(row?.scanState).toBe('removed');
+    const seeker = await getThread(t.db, seekerViewer(seeded.seekerId), seeded.threadId);
+    expect(seeker.messages.map((message) => message.id)).not.toContain(sent.message.id);
+  });
+
+  it('marks the thread unread when a message is released after the seeker last read it', async () => {
+    const minute = 60_000;
+    const scanned = await seedThread(t.db);
+    const approved = await seedThread(t.db);
+    const ids: Record<string, string> = {};
+    for (const [seeded, body] of [
+      [scanned, 'On my way'],
+      [approved, '__block__'],
+    ] as const) {
+      const sent = await sendMessage(t.db, hostViewer(seeded.ownerId, seeded.orgId, 'owner'), seeded.threadId, {
+        clientId: newId(),
+        body,
+      });
+      ids[seeded.threadId] = sent.message.id;
+      await t.db
+        .update(messages)
+        .set({ createdAt: new Date(Date.now() - 10 * minute) })
+        .where(eq(messages.id, sent.message.id));
+      await t.db.insert(threadReads).values({
+        threadId: seeded.threadId,
+        userId: seeded.seekerId,
+        lastReadAt: new Date(Date.now() - 5 * minute),
+      });
+    }
+    await runWorker(t.db, { handlers: jobHandlers });
+    const [item] = await listOpenReviewItems(t.db, 'message', ids[approved.threadId] ?? '');
+    await decide(t.db, item?.id ?? '', operatorId, 'approve');
+
+    for (const seeded of [scanned, approved]) {
+      const list = await listThreads(t.db, seekerViewer(seeded.seekerId));
+      expect(list.items.find((row) => row.threadId === seeded.threadId)?.unread).toBe(true);
+      expect(await unreadThreadCount(t.db, seeded.seekerId)).toBe(1);
+    }
+  });
+});
+
+describe('one client id, two sends', () => {
+  it('returns the stored message when a send with the same client id lands in between', async () => {
+    const seeded = await seedThread(t.db);
+    const cases = [
+      {
+        viewer: seekerViewer(seeded.seekerId),
+        mediaId: await seedAttachment(t.db, { ownerUserId: seeded.seekerId }),
+      },
+      {
+        viewer: hostViewer(seeded.ownerId, seeded.orgId, 'owner'),
+        mediaId: await seedAttachment(t.db, { ownerUserId: seeded.ownerId, ownerOrgId: seeded.orgId }),
+      },
+    ];
+    for (const { viewer, mediaId } of cases) {
+      const input = { clientId: newId(), body: 'My resume', attachmentMediaIds: [mediaId] };
+      let first: string | undefined;
+      race.beforeAttachmentCheck = async () => {
+        first = (await sendMessage(t.db, viewer, seeded.threadId, input)).message.id;
+      };
+      const second = await sendMessage(t.db, viewer, seeded.threadId, input);
+      expect(first).toBeDefined();
+      expect(second.message.id).toBe(first);
+      expect(second.message.attachments).toEqual([{ mediaId, mime: 'application/pdf' }]);
+      const [rows] = await queryRows<{ n: number }>(
+        t.db,
+        sql`select count(*)::int as n from app.messages
+            where thread_id = ${seeded.threadId} and client_id = ${input.clientId}`,
+      );
+      expect(rows?.n).toBe(1);
+    }
+    const [jobs] = await queryRows<{ n: number }>(
+      t.db,
+      sql`select count(*)::int as n from app.outbox
+          where topic = 'messaging.scan' and payload->>'messageId' in (
+            select id::text from app.messages where thread_id = ${seeded.threadId} and sender_type = 'host'
+          )`,
+    );
+    expect(jobs?.n).toBe(1);
   });
 });

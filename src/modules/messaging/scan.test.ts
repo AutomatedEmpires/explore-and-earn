@@ -11,7 +11,7 @@ import './notification-types';
 import { messages } from './schema';
 import { sendMessage } from './send';
 import { scanHostText } from './scan';
-import { hostViewer, seedThread, seekerViewer } from './test-fixtures';
+import { hostViewer, seedAttachment, seedThread, seekerViewer } from './test-fixtures';
 import { getThread } from './threads';
 
 const ai = vi.hoisted(() => ({
@@ -117,5 +117,68 @@ describe('message scan', () => {
           where org_id = ${seeded.orgId} and action = 'messaging.text_held'`,
     );
     expect(audits?.n).toBe(4);
+  });
+
+  it('counts a retried held scan once and never trips the fraud item on its own', async () => {
+    const { seeded, messageId } = await hostSend('Pay first __block__');
+    // Two attempts that died after the scan and before the state update, then the retry.
+    for (let n = 0; n < 2; n++) {
+      await scanHostText(t.db, {
+        subjectType: 'message',
+        subjectId: messageId,
+        text: 'Pay first __block__',
+        orgId: seeded.orgId,
+      });
+    }
+    await scanPending();
+
+    const [row] = await t.db.select().from(messages).where(eq(messages.id, messageId));
+    expect(row?.scanState).toBe('held');
+    const [audits] = await queryRows<{ n: number }>(
+      t.db,
+      sql`select count(*)::int as n from app.audit_events
+          where action = 'messaging.text_held' and subject_id = ${messageId}`,
+    );
+    expect(audits?.n).toBe(1);
+    const [checks] = await queryRows<{ n: number }>(
+      t.db,
+      sql`select count(*)::int as n from app.trust_checks where subject_id = ${messageId}`,
+    );
+    expect(checks?.n).toBe(1);
+    const items = await listOpenReviewItems(t.db, 'message', messageId);
+    expect(items.filter((item) => item.reason === 'message_scam_held')).toHaveLength(1);
+    const fraud = await listOpenReviewItems(t.db, 'organization', seeded.orgId);
+    expect(fraud.filter((item) => item.reason === 'repeated_scam_text')).toEqual([]);
+  });
+
+  it('opens one moderation item for a retried warn scan', async () => {
+    const seeded = await seedThread(t.db);
+    const subjectId = newId();
+    for (let n = 0; n < 2; n++) {
+      await scanHostText(t.db, { subjectType: 'message', subjectId, text: 'Hm __flag__', orgId: seeded.orgId });
+    }
+    const items = await listOpenReviewItems(t.db, 'message', subjectId);
+    expect(items.filter((item) => item.queue === 'moderation')).toHaveLength(1);
+  });
+
+  it('delivers an attachment-only host message with a warning', async () => {
+    const seeded = await seedThread(t.db);
+    const mediaId = await seedAttachment(t.db, {
+      ownerUserId: seeded.ownerId,
+      ownerOrgId: seeded.orgId,
+      mime: 'image/jpeg',
+    });
+    const sent = await sendMessage(t.db, hostViewer(seeded.ownerId, seeded.orgId, 'owner'), seeded.threadId, {
+      clientId: newId(),
+      attachmentMediaIds: [mediaId],
+    });
+    await scanPending();
+    const [row] = await t.db.select().from(messages).where(eq(messages.id, sent.message.id));
+    expect(row?.scanState).toBe('warn');
+    const view = await getThread(t.db, seekerViewer(seeded.seekerId), seeded.threadId);
+    expect(view.messages.find((message) => message.id === sent.message.id)).toMatchObject({
+      warn: true,
+      attachments: [{ mediaId, mime: 'image/jpeg' }],
+    });
   });
 });

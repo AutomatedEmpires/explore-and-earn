@@ -20,6 +20,7 @@ import { requireEntry, requireListing } from '../access';
 import { staleStatus, transitionStatus } from '../core';
 import { enqueueNoteScan } from '../notes';
 import { offers, pipelineEntries } from '../schema';
+import { blockedConflict, stampIfBlocked } from '../interviews/blocks';
 import { placeOf, seekerFirstName } from '../interviews/deliver';
 import { publishOffer } from './deliver';
 import { setOfferState } from '../interviews/state';
@@ -262,6 +263,9 @@ export async function sendOffer(
       .where(and(eq(offers.applicationId, applicationId), eq(offers.status, 'sent')));
     if (open) throw conflict('An offer is already open for this application.', { reason: 'offer_open' });
     if (!OPENABLE.has(entry.status)) throw staleStatus(entry.status as ApplicationStatus);
+    if (await stampIfBlocked(tx, { orgId: entry.orgId, seekerUserId: entry.seekerUserId, applicationId })) {
+      return null;
+    }
     const listing = await requireListing(tx, ctx, entry.listingId);
     if (input.startDate < todayInZone(listing.timezone, now)) {
       throw badRequest('The start date must be today or later.', { reason: 'start_in_past' });
@@ -275,6 +279,10 @@ export async function sendOffer(
     });
     const offerId = newId();
     const note = input.note?.trim() ? input.note.trim() : null;
+    const position = input.position?.trim() || listing.title;
+    // A position the host typed reaches the seeker in the card and the notification, so it is
+    // scanned like the note. The listing title was reviewed with the listing.
+    const scanned = note !== null || position !== listing.title;
     const row: OfferRow = {
       id: offerId,
       orgId: entry.orgId,
@@ -283,7 +291,7 @@ export async function sendOffer(
       threadId,
       createdBy: ctx.user.id,
       status: 'sent',
-      position: input.position?.trim() || listing.title,
+      position,
       startDate: input.startDate,
       payAmountCents: input.pay.amountCents,
       payMaxCents: input.pay.maxCents ?? null,
@@ -293,7 +301,7 @@ export async function sendOffer(
       letterMediaId: input.letterMediaId ?? null,
       priorStatus: entry.status,
       respondedAt: null,
-      scanState: note ? 'pending' : 'clear',
+      scanState: scanned ? 'pending' : 'clear',
       checkId: null,
       createdAt: now,
       updatedAt: now,
@@ -312,7 +320,7 @@ export async function sendOffer(
     );
     if (!moved.ok) throw staleStatus(moved.current);
     await setOfferState(tx, applicationId, 'sent');
-    if (note) await enqueueNoteScan(tx, 'offer', offerId);
+    if (scanned) await enqueueNoteScan(tx, 'offer', offerId);
     else await publishOffer(tx, row);
     await record(tx, {
       actorType: 'user',
@@ -324,6 +332,7 @@ export async function sendOffer(
     });
     return offerId;
   });
+  if (id === null) throw blockedConflict();
   track('hiring.offer_sent', { offerId: id });
   return hostItem(db, id);
 }
@@ -352,7 +361,9 @@ export async function cancelOffer(db: Db, ctx: HostContext, offerId: string, now
     );
     if (!moved.ok) throw staleStatus(moved.current);
     await setOfferState(tx, existing.applicationId, 'canceled');
-    await postEvent(tx, existing.threadId, { code: 'offer_canceled', visibleTo: 'all' });
+    // The seeker never saw a pending or held offer, so its cancel is for the host only.
+    const delivered = updated.scanState === 'clear' || updated.scanState === 'warn';
+    await postEvent(tx, existing.threadId, { code: 'offer_canceled', visibleTo: delivered ? 'all' : 'host' });
     await record(tx, {
       actorType: 'user',
       actorId: ctx.user.id,
