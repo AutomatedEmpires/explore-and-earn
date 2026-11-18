@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 // The onboarding page (C-1 in design audit 1): it reads `returnTo`, passes the checked path to
 // the form, and sends a finished user on to it, so the guest's action survives onboarding.
+// A session whose sign-up was refused (legal review 2.6) opens on the refusal.
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CurrentUser } from '@/server/guards';
@@ -9,9 +10,18 @@ const session = vi.hoisted(() => ({
   userId: 'user_1' as string | null,
   user: null as CurrentUser | null,
   hasOrg: true,
+  cookies: new Map<string, string>(),
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({ auth: async () => ({ userId: session.userId }) }));
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: (name: string) => {
+      const value = session.cookies.get(name);
+      return value === undefined ? undefined : { name, value };
+    },
+  }),
+}));
 vi.mock('@/server/guards', () => ({
   requireUser: async () => {
     if (!session.user) throw new Error('no user');
@@ -29,7 +39,7 @@ vi.mock('next/navigation', () => ({
 }));
 // The form is a client component; here it only shows what the page gave it.
 vi.mock('./OnboardingForm', () => ({
-  OnboardingForm: (props: { hostOnly?: boolean; returnTo?: string }) => (
+  OnboardingForm: (props: { hostOnly?: boolean; refused?: boolean; returnTo?: string }) => (
     <output aria-label="Onboarding form">{JSON.stringify(props)}</output>
   ),
 }));
@@ -51,15 +61,20 @@ beforeEach(() => {
   session.userId = 'user_1';
   session.user = user(null);
   session.hasOrg = true;
+  session.cookies = new Map();
 });
 
 describe('OnboardingPage', () => {
   it("gives the form the guest's returnTo", async () => {
-    await expect(open({ returnTo: JOB })).resolves.toEqual({ hostOnly: false, returnTo: JOB });
+    await expect(open({ returnTo: JOB })).resolves.toEqual({
+      hostOnly: false,
+      refused: false,
+      returnTo: JOB,
+    });
   });
 
   it('gives the form / without a returnTo', async () => {
-    await expect(open({})).resolves.toEqual({ hostOnly: false, returnTo: '/' });
+    await expect(open({})).resolves.toEqual({ hostOnly: false, refused: false, returnTo: '/' });
   });
 
   it.each([
@@ -69,12 +84,17 @@ describe('OnboardingPage', () => {
     ['javascript:alert(1)'],
     ['/onboarding?returnTo=%2Fprofile'],
   ])('drops returnTo %j', async (returnTo) => {
-    await expect(open({ returnTo })).resolves.toEqual({ hostOnly: false, returnTo: '/' });
+    await expect(open({ returnTo })).resolves.toEqual({
+      hostOnly: false,
+      refused: false,
+      returnTo: '/',
+    });
   });
 
   it('ignores a repeated returnTo', async () => {
     await expect(open({ returnTo: [JOB, '/profile'] })).resolves.toEqual({
       hostOnly: false,
+      refused: false,
       returnTo: '/',
     });
   });
@@ -84,6 +104,7 @@ describe('OnboardingPage', () => {
     session.hasOrg = false;
     await expect(open({ returnTo: '/host/billing', step: 'seeker' })).resolves.toEqual({
       hostOnly: true,
+      refused: false,
       returnTo: '/host/billing',
     });
   });
@@ -143,5 +164,27 @@ describe('OnboardingPage', () => {
     await expect(
       OnboardingPage({ searchParams: Promise.resolve({ returnTo: JOB }) }),
     ).rejects.toThrow(/^redirect:http:\/\/admin\.localhost:3000\/$/);
+  });
+
+  it('opens on the refusal for a session whose sign-up was refused', async () => {
+    session.cookies.set('ee_signup_refused', '1');
+    await expect(open({ returnTo: JOB })).resolves.toEqual({
+      hostOnly: false,
+      refused: true,
+      returnTo: JOB,
+    });
+  });
+
+  it('ignores any other value of the refusal cookie', async () => {
+    session.cookies.set('ee_signup_refused', 'yes');
+    await expect(open({})).resolves.toMatchObject({ refused: false });
+  });
+
+  it('still sends a finished account on, whatever the cookie says', async () => {
+    session.user = user('seeker');
+    session.cookies.set('ee_signup_refused', '1');
+    await expect(OnboardingPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
+      /^redirect:\/$/,
+    );
   });
 });
