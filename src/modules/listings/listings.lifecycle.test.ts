@@ -213,6 +213,23 @@ describe('canAcceptApplications', () => {
       reason: 'not_active',
     });
   });
+
+  it('refuses applications while the host verification is failed', async () => {
+    const id = await live();
+    await db.execute(
+      sql`update app.organizations set verification_status = 'failed' where id = ${org.orgId}`,
+    );
+    try {
+      expect(await canAcceptApplications(db, id, FIXED_NOW)).toEqual({
+        ok: false,
+        reason: 'failed',
+      });
+    } finally {
+      await db.execute(
+        sql`update app.organizations set verification_status = 'unverified' where id = ${org.orgId}`,
+      );
+    }
+  });
 });
 
 describe('closeListing', () => {

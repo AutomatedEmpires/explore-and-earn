@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { queryRows } from '@/lib/db';
-import { consume } from './index';
+import { NEW_HOST_DAILY_CAP, consume, consumeNewHostDaily, newHostWindowOpen } from './index';
 
 describe('consume (fixed-window rate limiter)', () => {
   let t: TestDb;
@@ -53,5 +53,39 @@ describe('consume (fixed-window rate limiter)', () => {
   it('rejects a non-positive window or a negative limit', async () => {
     await expect(consume(t.db, 'test:bad', 1, 0)).rejects.toThrow(/windowSec/);
     await expect(consume(t.db, 'test:bad', -1, 60)).rejects.toThrow(/limit/);
+  });
+
+  const created = new Date('2026-01-01T00:00:00Z');
+  const dayMs = 86_400_000;
+  const inside = new Date(created.getTime() + 29 * dayMs);
+  const boundary = new Date(created.getTime() + 30 * dayMs);
+
+  it('applies each cap inside the first 30 days and stops at the boundary', async () => {
+    expect(newHostWindowOpen(created, new Date(boundary.getTime() - 1))).toBe(true);
+    expect(newHostWindowOpen(created, boundary)).toBe(false);
+
+    for (let i = 0; i < NEW_HOST_DAILY_CAP.invites; i++) {
+      expect((await consumeNewHostDaily(t.db, 'org-invites', 'invites', created, inside)).allowed).toBe(
+        true,
+      );
+    }
+    expect(await consumeNewHostDaily(t.db, 'org-invites', 'invites', created, inside)).toMatchObject({
+      allowed: false,
+      limited: true,
+    });
+
+    for (let i = 0; i < NEW_HOST_DAILY_CAP.profile_views; i++) {
+      expect(
+        (await consumeNewHostDaily(t.db, 'org-views', 'profile_views', created, inside)).allowed,
+      ).toBe(true);
+    }
+    expect(
+      await consumeNewHostDaily(t.db, 'org-views', 'profile_views', created, inside),
+    ).toMatchObject({ allowed: false, limited: true });
+
+    expect(await consumeNewHostDaily(t.db, 'org-invites', 'invites', created, boundary)).toMatchObject({
+      allowed: true,
+      limited: false,
+    });
   });
 });

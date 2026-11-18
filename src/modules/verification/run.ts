@@ -23,6 +23,7 @@ import {
   collectSignals,
   defaultSignalDeps,
   hardFlags,
+  manualReviewReasons,
   type HardFlag,
   type SignalDeps,
   type VerificationSignals,
@@ -106,6 +107,11 @@ function checkText(
     `Website reachable over HTTPS: ${yesNo(s.websiteReachable)}`,
     `Owner email domain: ${s.emailDomain ?? 'unknown'}`,
     `Free email provider: ${yesNo(s.freeEmail)}`,
+    `Domain registered before the account: ${yesNo(s.domainPredatesAccount)}`,
+    `Card country fits the business: ${yesNo(s.cardCountryFits)}`,
+    `Card name fits the business: ${yesNo(s.cardNameFits)}`,
+    `Banned card, device or phone: ${yesNo(s.bannedFingerprint)}`,
+    `Brand careers contact mismatch: ${yesNo(s.brandCareersMismatch)}`,
     `Disposable email provider: ${yesNo(s.disposableEmail)}`,
     `Email domain matches the website: ${yesNo(s.domainMatch)}`,
     `Domain age in days: ${s.domainAgeDays ?? 'unknown'}`,
@@ -132,8 +138,10 @@ async function itemOpenedBy(tx: DbOrTx, orgId: string, check: CheckResult): Prom
  * Runs one verification (the `verification.run` job). A no-op unless the run is `running`.
  * - With hard flags: the check runs with no review queue, and the run opens its own `fraud`
  *   item `hard_flags:<codes>` at priority 100.
- * - Without: the check runs with queue `fraud`. Approved with a card verifies the org
- *   (`decided_by: 'auto'`); approved without one opens a `no_card` item; anything else waits
+ * - Without: the check runs with queue `fraud`. Approved with a card and no manual-review
+ *   reason verifies the org (`decided_by: 'auto'`); a free email, a banned fingerprint, a brand
+ *   careers mismatch, a card that does not fit, or a domain registered after the account opens
+ *   a `manual_review` item; approved without a card opens a `no_card` item; anything else waits
  *   in the queue. A rejection is never applied: it waits for an operator too.
  * The run stores its signals, check and review item. A re-run never lowers a verified org.
  */
@@ -151,6 +159,7 @@ export async function runVerification(
 
   const signals = await collectSignals(db, orgId, deps);
   const flags = hardFlags(signals);
+  const review = manualReviewReasons(signals);
   const org = (await getOrgSummaries(db, [orgId])).get(orgId);
   const locations = await listOrgLocations(db, orgId);
   const location = locations.find((l) => l.id === org?.primaryLocationId) ?? locations[0] ?? null;
@@ -161,7 +170,7 @@ export async function runVerification(
     subjectType: 'organization',
     subjectId: orgId,
     text: checkText(org, location, signals, flags),
-    reviewQueue: flags.length > 0 ? null : 'fraud',
+    reviewQueue: flags.length > 0 || review.length > 0 ? null : 'fraud',
   });
 
   await db.transaction(async (tx) => {
@@ -186,10 +195,16 @@ export async function runVerification(
         })
       ).id;
 
-    const verified = flags.length === 0 && check.decision === 'approved' && signals.hasCard;
+    const verified =
+      flags.length === 0 &&
+      review.length === 0 &&
+      check.decision === 'approved' &&
+      signals.hasCard;
     let reviewItemId: string | null = null;
     if (flags.length > 0) {
       reviewItemId = await fraudItem(`hard_flags:${flags.join(',')}`, HARD_FLAG_PRIORITY);
+    } else if (review.length > 0) {
+      reviewItemId = await fraudItem(`manual_review:${review.join(',')}`);
     } else if (check.decision === 'approved' && !signals.hasCard) {
       reviewItemId = await fraudItem('no_card');
     } else if (check.decision === 'needs_review') {
