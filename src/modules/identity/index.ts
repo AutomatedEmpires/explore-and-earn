@@ -50,11 +50,16 @@ export {
 
 export { getUserContacts, type UserContactFacts } from './contacts';
 
+export { isAnalyticsOptedOut, recordAnalyticsOptOut } from './analytics-opt-out';
+
 export {
   completeOnboarding,
+  isSignupRefusal,
   onboardingRequestSchema,
   setAccountType,
+  signupRefused,
   type AccountTypeInput,
+  type OnboardingOptions,
   type OnboardingRequest,
 } from './onboarding';
 

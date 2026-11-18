@@ -424,7 +424,7 @@ test.describe('Foundation exit criteria', () => {
 
     const onboarded = await browserFetch(seeker.page, '/api/v1/onboarding', {
       method: 'POST',
-      json: { accountType: 'seeker', adultAttested: true },
+      json: { accountType: 'seeker', dateOfBirth: '1990-04-03' },
     });
     expect(onboarded.status, JSON.stringify(onboarded.body)).toBe(200);
     expect(onboarded.body).toEqual({ redirectTo: '/' });

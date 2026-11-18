@@ -1,0 +1,181 @@
+# The encrypted off-platform backup (SP8 spec 8.11). Setup: docs/runbooks/backups.md.
+#
+# THIS WORKFLOW IS OFF until the founder turns it on. Three things must all be true before it
+# reads anything:
+#   1. Someone starts it by hand from the Actions tab (there is no timer in this file).
+#   2. The repository variable BACKUPS_ENABLED is exactly `true`.
+#   3. The GitHub environment `backup` exists and holds the secrets named below, synced from
+#      Doppler config `prd_backup`. Only names appear in this file; the values live in Doppler.
+# The nightly timer (02:00 UTC) is added by the founder once the first manual run has passed;
+# the runbook has the exact lines.
+#
+# What it does, in order:
+#   1. Takes the database dump and its row manifest from ONE snapshot, through
+#      `pnpm backup:manifest --dump`, as the read-only role `backup_reader`. The dump tool is
+#      never started here as its own step: a second session would see different rows.
+#   2. Writes an rclone configuration with a crypt remote, so everything is encrypted before it
+#      leaves the runner.
+#   3. Copies the dump and manifest to backupcrypt:pg/<date>/ and checks the copy.
+#   4. Syncs the two media buckets to backupcrypt:files/, keeping changed and deleted files
+#      under backupcrypt:files-deleted/<date>/.
+#   5. Deletes dumps and kept files older than 35 days.
+# Only the buckets media-public and media-private are read. No other bucket is listed anywhere
+# in this file, and none may be added without a decision recorded in the runbook.
+name: Backup
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One backup at a time; never cancel one halfway through an upload.
+concurrency:
+  group: backup-production
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  off:
+    name: backups are off
+    runs-on: ubuntu-latest
+    if: vars.BACKUPS_ENABLED != 'true'
+    steps:
+      - run: |
+          echo "::notice::Backups are off. Nothing was read. To turn them on, follow docs/runbooks/backups.md and set the repository variable BACKUPS_ENABLED to true."
+
+  backup:
+    name: encrypted off-platform backup
+    runs-on: ubuntu-latest
+    if: vars.BACKUPS_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    environment: backup
+    timeout-minutes: 180
+    steps:
+      - name: Choose the working paths
+        run: |
+          echo "BACKUP_DIR=$RUNNER_TEMP/backup" >> "$GITHUB_ENV"
+          echo "RCLONE_CONFIG=$RUNNER_TEMP/rclone.conf" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check that every backup secret is set
+        env:
+          PROD_BACKUP_DATABASE_URL: ${{ secrets.PROD_BACKUP_DATABASE_URL }}
+          PROD_S3_ENDPOINT: ${{ secrets.PROD_S3_ENDPOINT }}
+          PROD_S3_ACCESS_KEY_ID: ${{ secrets.PROD_S3_ACCESS_KEY_ID }}
+          PROD_S3_SECRET_ACCESS_KEY: ${{ secrets.PROD_S3_SECRET_ACCESS_KEY }}
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          BACKUP_CRYPT_PASSWORD: ${{ secrets.BACKUP_CRYPT_PASSWORD }}
+          BACKUP_CRYPT_SALT: ${{ secrets.BACKUP_CRYPT_SALT }}
+        run: |
+          missing=0
+          for name in PROD_BACKUP_DATABASE_URL PROD_S3_ENDPOINT PROD_S3_ACCESS_KEY_ID \
+            PROD_S3_SECRET_ACCESS_KEY BACKUP_S3_ENDPOINT BACKUP_S3_ACCESS_KEY_ID \
+            BACKUP_S3_SECRET_ACCESS_KEY BACKUP_CRYPT_PASSWORD BACKUP_CRYPT_SALT; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not set in the backup environment (Doppler config prd_backup)."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Install the PostgreSQL 17 client tools and rclone
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common rclone
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Take the dump and its manifest from one snapshot
+        env:
+          DATABASE_URL: ${{ secrets.PROD_BACKUP_DATABASE_URL }}
+        run: |
+          mkdir -p "$BACKUP_DIR"
+          pnpm backup:manifest --out "$BACKUP_DIR/manifest.json" --dump "$BACKUP_DIR/dump.pgcustom"
+          test -s "$BACKUP_DIR/dump.pgcustom"
+          test -s "$BACKUP_DIR/manifest.json"
+
+      - name: Write the rclone configuration
+        env:
+          PROD_S3_ENDPOINT: ${{ secrets.PROD_S3_ENDPOINT }}
+          PROD_S3_ACCESS_KEY_ID: ${{ secrets.PROD_S3_ACCESS_KEY_ID }}
+          PROD_S3_SECRET_ACCESS_KEY: ${{ secrets.PROD_S3_SECRET_ACCESS_KEY }}
+          PROD_S3_REGION: ${{ vars.PROD_S3_REGION || 'us-east-1' }}
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          BACKUP_S3_REGION: ${{ vars.BACKUP_S3_REGION || 'us-east-1' }}
+          BACKUP_CRYPT_PASSWORD: ${{ secrets.BACKUP_CRYPT_PASSWORD }}
+          BACKUP_CRYPT_SALT: ${{ secrets.BACKUP_CRYPT_SALT }}
+        run: |
+          umask 077
+          crypt_password="$(rclone obscure "$BACKUP_CRYPT_PASSWORD")"
+          crypt_salt="$(rclone obscure "$BACKUP_CRYPT_SALT")"
+          echo "::add-mask::$crypt_password"
+          echo "::add-mask::$crypt_salt"
+          cat > "$RCLONE_CONFIG" <<EOF
+          [prod]
+          type = s3
+          provider = Other
+          endpoint = $PROD_S3_ENDPOINT
+          region = $PROD_S3_REGION
+          access_key_id = $PROD_S3_ACCESS_KEY_ID
+          secret_access_key = $PROD_S3_SECRET_ACCESS_KEY
+          force_path_style = true
+          no_check_bucket = true
+
+          [backup]
+          type = s3
+          provider = Other
+          endpoint = $BACKUP_S3_ENDPOINT
+          region = $BACKUP_S3_REGION
+          access_key_id = $BACKUP_S3_ACCESS_KEY_ID
+          secret_access_key = $BACKUP_S3_SECRET_ACCESS_KEY
+          force_path_style = true
+          no_check_bucket = true
+
+          [backupcrypt]
+          type = crypt
+          remote = backup:backups
+          password = $crypt_password
+          password2 = $crypt_salt
+          filename_encryption = standard
+          directory_name_encryption = true
+          EOF
+
+      - name: Upload the dump and its manifest
+        run: |
+          date="$(date -u +%F)"
+          echo "BACKUP_DATE=$date" >> "$GITHUB_ENV"
+          rclone copy "$BACKUP_DIR" "backupcrypt:pg/$date/" --stats-one-line --stats 60s
+          # Reads the upload back through the crypt remote and compares it byte for byte.
+          rclone check "$BACKUP_DIR" "backupcrypt:pg/$date/" --one-way --download
+
+      - name: Sync the media buckets
+        run: |
+          for bucket in media-public media-private; do
+            rclone sync "prod:$bucket" "backupcrypt:files/$bucket" \
+              --backup-dir "backupcrypt:files-deleted/$BACKUP_DATE/$bucket" \
+              --transfers 8 --checkers 16 --stats-one-line --stats 60s
+          done
+
+      - name: Delete dumps and kept files older than 35 days
+        run: |
+          rclone delete --min-age 35d backupcrypt:pg
+          rclone delete --min-age 35d backupcrypt:files-deleted
+          rclone rmdirs --leave-root backupcrypt:pg
+          rclone rmdirs --leave-root backupcrypt:files-deleted
+
+      - name: Remove the local copies
+        if: always()
+        run: rm -rf "$BACKUP_DIR" "$RCLONE_CONFIG"

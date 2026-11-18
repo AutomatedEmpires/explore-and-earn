@@ -86,6 +86,8 @@ describe('SP2 settings', () => {
       'American citizens only',
       'no foreigners',
       'native English speaker',
+      'green card holders only',
+      'no immigrants',
     ]);
     expect(await getSetting(t.db, 'listings.vague_pay_range_ratio')).toBe(2.5);
     const wages = await getSetting(t.db, 'listings.min_wage_cents_by_state');
@@ -189,6 +191,128 @@ describe('SP2 settings', () => {
       'bad.example',
       'xn--bcher-kva.example',
     ]);
+  });
+});
+
+describe('listing wording settings (legal review 2.2, issue 121)', () => {
+  const GROUNDS = [
+    'age',
+    'sex',
+    'national_origin',
+    'disability',
+    'religion',
+    'family_status',
+    'criminal_history',
+    'appearance',
+    'minors',
+  ];
+  const TOPICS = [
+    'age',
+    'marital_status',
+    'pregnancy',
+    'disability',
+    'religion',
+    'national_origin',
+    'arrest_record',
+  ];
+
+  it('lists a flag-for-review entry for every ground, each with neutral wording', async () => {
+    const flagged = await getSetting(t.db, 'listings.flagged_phrases');
+    expect([...new Set(flagged.map((f) => f.ground))].sort()).toEqual([...GROUNDS].sort());
+    for (const f of flagged) expect(f.suggestion.length, f.phrase).toBeGreaterThan(0);
+    // The section 2.2 and 2.6 examples are all there.
+    const phrases = flagged.map((f) => f.phrase);
+    for (const p of [
+      'young',
+      'recent graduate',
+      'under 30',
+      'digital native',
+      'male only',
+      'female only',
+      'waitress',
+      'girls',
+      'guys',
+      'native speaker',
+      'able bodied',
+      'no disabilities',
+      'couples only',
+      'no children',
+      'no felons',
+      'clean record',
+      'teens welcome',
+      'high school students',
+    ]) {
+      expect(phrases).toContain(p);
+    }
+  });
+
+  it('lists nationalities and the forbidden screening-question topics', async () => {
+    const nationalities = await getSetting(t.db, 'listings.flagged_nationalities');
+    expect(nationalities).toEqual(expect.arrayContaining(['Mexican', 'Filipino', 'Irish']));
+    const topics = await getSetting(t.db, 'listings.question_topics');
+    expect(Object.keys(topics).sort()).toEqual([...TOPICS].sort());
+    for (const topic of TOPICS) {
+      expect(topics[topic as keyof typeof topics].length, topic).toBeGreaterThan(0);
+    }
+  });
+
+  it('lets an operator extend the lists', async () => {
+    const flagged = await getSetting(t.db, 'listings.flagged_phrases');
+    const extended = [
+      ...flagged,
+      { phrase: 'fresh blood', ground: 'age' as const, suggestion: 'Say "new team members".' },
+    ];
+    await setSetting(t.db, 'listings.flagged_phrases', extended, { operatorId });
+    expect(await getSetting(t.db, 'listings.flagged_phrases')).toEqual(extended);
+
+    const topics = await getSetting(t.db, 'listings.question_topics');
+    const withMore = { ...topics, religion: [...topics.religion, 'house of worship'] };
+    await setSetting(t.db, 'listings.question_topics', withMore, { operatorId });
+    expect((await getSetting(t.db, 'listings.question_topics')).religion).toContain(
+      'house of worship',
+    );
+
+    await setSetting(t.db, 'listings.flagged_nationalities', ['Mexican', 'South African'], {
+      operatorId,
+    });
+    expect(await getSetting(t.db, 'listings.flagged_nationalities')).toEqual([
+      'Mexican',
+      'South African',
+    ]);
+  });
+
+  it('validates the wording lists', async () => {
+    const entry = { phrase: 'fresh blood', ground: 'age' as const, suggestion: 'Say "new".' };
+    // An unknown ground, no suggestion, a wildcard-only phrase, a repeated phrase, an empty list.
+    for (const bad of [
+      [{ ...entry, ground: 'height' }],
+      [{ ...entry, suggestion: ' ' }],
+      [{ ...entry, phrase: '* #' }],
+      [entry, { ...entry, phrase: 'Fresh  Blood' }],
+      [],
+    ]) {
+      await expectBadRequest(
+        setSetting(t.db, 'listings.flagged_phrases', bad as never, { operatorId }),
+      );
+    }
+
+    const topics = await getSetting(t.db, 'listings.question_topics');
+    const { arrest_record: _arrest, ...missingArrest } = topics;
+    for (const bad of [
+      missingArrest,
+      { ...topics, height: ['tall'] },
+      { ...topics, religion: [] },
+    ]) {
+      await expectBadRequest(
+        setSetting(t.db, 'listings.question_topics', bad as typeof topics, { operatorId }),
+      );
+    }
+
+    for (const bad of [['Mexican', 'mexican'], ['R2D2'], ['x']]) {
+      await expectBadRequest(
+        setSetting(t.db, 'listings.flagged_nationalities', bad, { operatorId }),
+      );
+    }
   });
 });
 
@@ -444,12 +568,7 @@ describe('SP8 settings', () => {
   it('rejects a launch mode and an about headline outside the contract', async () => {
     await expectBadRequest(setSetting(t.db, 'launch.mode', 'paused' as 'private', { operatorId }));
     await expectBadRequest(
-      setSetting(
-        t.db,
-        'content.about',
-        { headline: 'x'.repeat(121), bodyMd: '' },
-        { operatorId },
-      ),
+      setSetting(t.db, 'content.about', { headline: 'x'.repeat(121), bodyMd: '' }, { operatorId }),
     );
   });
 });

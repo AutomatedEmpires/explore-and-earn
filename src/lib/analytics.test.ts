@@ -1,22 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { allowedByConsent, readConsent } from '@/modules/privacy';
+import { runWithRequestContext } from '@/server/request-context';
 import { resetAnalyticsForTests, scrubProps, track } from './analytics';
-import { initAnalytics } from './analytics-client';
+import { initAnalytics, trackClient } from './analytics-client';
 import { scrubClientProps } from './analytics-scrub';
 import { resetEnvCache } from './env';
 
 const sent = vi.hoisted(() => ({ events: [] as unknown[], options: [] as unknown[] }));
 
 const browser = vi.hoisted(() => ({
+  posthog: { __loaded: false } as { __loaded: boolean },
   init: vi.fn<(key: string, config: Record<string, unknown>) => void>(),
+  capture: vi.fn<(event: string, props?: Record<string, unknown>) => void>(),
 }));
 
-vi.mock('posthog-js', () => ({
-  default: {
-    __loaded: false,
-    init: browser.init,
-    capture: vi.fn(),
-  },
-}));
+vi.mock('posthog-js', () => {
+  Object.assign(browser.posthog, { init: browser.init, capture: browser.capture });
+  return { default: browser.posthog };
+});
 
 vi.mock('posthog-node', () => ({
   PostHog: class {
@@ -35,6 +36,9 @@ vi.mock('posthog-node', () => ({
 beforeEach(() => {
   sent.events.length = 0;
   sent.options.length = 0;
+  browser.posthog.__loaded = false;
+  browser.init.mockClear();
+  browser.capture.mockClear();
   vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_test_key');
   resetEnvCache();
   resetAnalyticsForTests();
@@ -74,6 +78,38 @@ describe('track', () => {
   });
 });
 
+// Legal review 4.5 (P0 item 18): Global Privacy Control is a rejection everywhere, not only in
+// the EU. apiRoute puts the consent verdict in the request context; track reads it.
+describe('track and Global Privacy Control', () => {
+  const contextFor = (headers: Record<string, string>) => ({
+    requestId: 'req-test-0001',
+    analyticsAllowed: allowedByConsent(
+      readConsent(new Request('http://localhost:3000/api/v1/thing', { headers })),
+    ),
+  });
+
+  it('sends nothing for a US request that carries Sec-GPC: 1', () => {
+    runWithRequestContext(contextFor({ 'x-vercel-ip-country': 'US', 'sec-gpc': '1' }), () =>
+      track('discovery_search', { surface: 'seek' }, 'user-123'),
+    );
+    expect(sent.events).toHaveLength(0);
+  });
+
+  it('still sends for the same US request without the signal', () => {
+    runWithRequestContext(contextFor({ 'x-vercel-ip-country': 'US' }), () =>
+      track('discovery_search', { surface: 'seek' }, 'user-123'),
+    );
+    expect(sent.events).toHaveLength(1);
+  });
+
+  it('sends nothing whenever the request context disallows analytics', () => {
+    runWithRequestContext({ requestId: 'req-test-0002', analyticsAllowed: false }, () =>
+      track('x', { listingId: '1' }),
+    );
+    expect(sent.events).toHaveLength(0);
+  });
+});
+
 describe('scrubProps', () => {
   it('removes every key that looks like personal data, at any depth', () => {
     expect(
@@ -94,6 +130,57 @@ describe('scrubProps', () => {
       items: [{ id: 1 }],
       count: 3,
     });
+  });
+
+  // Legal review 4.5: events never carry message text, resume text or work-authorization values.
+  it('never carries message text, resume text or work-authorization values', () => {
+    expect(
+      scrubProps({
+        listingId: '1',
+        threadId: 't1',
+        surface: 'seek',
+        context: 'feed',
+        subjectId: 's1',
+        contentType: 'image/jpeg',
+        message: 'Can you start in May?',
+        text: 'Can you start in May?',
+        preview: 'Can you start',
+        resume: 'Ten seasons as a lift operator',
+        resumeText: 'Ten seasons as a lift operator',
+        coverNote: 'Hi there',
+        answers: ['Yes'],
+        workAuthorization: 'authorized',
+        authorizedToWork: true,
+        needsSponsorship: false,
+        visaType: 'J-1',
+        citizenship: 'US',
+        immigrationStatus: 'x',
+        dateOfBirth: '2001-04-03',
+        birthYear: 2001,
+        dob: '2001-04-03',
+        nested: { screeningAnswer: 'Yes', applicationId: 'a1' },
+      }),
+    ).toEqual({
+      listingId: '1',
+      threadId: 't1',
+      surface: 'seek',
+      context: 'feed',
+      subjectId: 's1',
+      contentType: 'image/jpeg',
+      nested: { applicationId: 'a1' },
+    });
+  });
+
+  it('drops free text under any key: long strings never reach analytics', () => {
+    const sentence =
+      'I am authorized to work in the US and can start on May 18, here is my phone number.';
+    expect(
+      scrubProps({
+        listingId: '019a4a3c-0000-7000-8000-00000000a001',
+        detail: sentence,
+        tags: ['farm', sentence],
+      }),
+    ).toEqual({ listingId: '019a4a3c-0000-7000-8000-00000000a001', tags: ['farm'] });
   });
 });
 
@@ -136,12 +223,18 @@ describe('scrubClientProps', () => {
       listingId: '1',
     });
   });
+
+  it('keeps long PostHog URLs but drops message and resume text', () => {
+    const url = `https://app.example.test/jobs/view/1/${'a'.repeat(120)}`;
+    expect(
+      scrubClientProps({ $current_url: url, messageText: 'hi', resume: 'x', listingId: '1' }),
+    ).toEqual({ $current_url: url, listingId: '1' });
+  });
 });
 
 describe('initAnalytics', () => {
   it('masks URL tokens at the source and strips URLs again before sending', () => {
     vi.stubGlobal('window', {});
-    browser.init.mockClear();
 
     initAnalytics();
 
@@ -170,7 +263,6 @@ describe('initAnalytics', () => {
   // (spec section 10), and before_send must keep cutting every URL back to origin and path.
   it('never sends discovery search text or coordinates from a page URL', () => {
     vi.stubGlobal('window', {});
-    browser.init.mockClear();
 
     initAnalytics();
 
@@ -188,5 +280,61 @@ describe('initAnalytics', () => {
       $referrer: 'https://exploreandearn.com/map',
       $pathname: '/map',
     });
+  });
+
+  // Legal review 4.5: session replay is off in production, and so in every environment.
+  it('never records a session, records no element text and sends no message text', () => {
+    vi.stubGlobal('window', {});
+
+    initAnalytics();
+
+    const config = browser.init.mock.calls[0]?.[1] ?? {};
+    expect(config).toMatchObject({ disable_session_recording: true, autocapture: false });
+    const beforeSend = config.before_send as (e: { properties: Record<string, unknown> }) => {
+      properties: Record<string, unknown>;
+    };
+    expect(
+      beforeSend({ properties: { $pathname: '/inbox', messageText: 'hi', threadId: 't1' } })
+        .properties,
+    ).toEqual({ $pathname: '/inbox', threadId: 't1' });
+  });
+
+  it('does not load PostHog when the browser sends Global Privacy Control', () => {
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('navigator', { globalPrivacyControl: true });
+
+    initAnalytics();
+
+    expect(browser.init).not.toHaveBeenCalled();
+  });
+
+  it('loads PostHog when the browser does not send the signal', () => {
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('navigator', { globalPrivacyControl: false });
+
+    initAnalytics();
+
+    expect(browser.init).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('trackClient', () => {
+  it('sends nothing until PostHog has loaded', () => {
+    trackClient('listing.saved', { listingId: '1' });
+    expect(browser.capture).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing under Global Privacy Control, even if PostHog loaded earlier', () => {
+    browser.posthog.__loaded = true;
+    vi.stubGlobal('navigator', { globalPrivacyControl: true });
+    trackClient('listing.saved', { listingId: '1' });
+    expect(browser.capture).not.toHaveBeenCalled();
+  });
+
+  it('sends scrubbed props once PostHog has loaded', () => {
+    browser.posthog.__loaded = true;
+    vi.stubGlobal('navigator', {});
+    trackClient('listing.saved', { listingId: '1', messageText: 'hi' });
+    expect(browser.capture).toHaveBeenCalledWith('listing.saved', { listingId: '1' });
   });
 });
