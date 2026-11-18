@@ -4,4 +4,7 @@ import type { HandlerMap } from '@/modules/jobs';
 export { record, redact, type AuditEventInput } from './record';
 export { searchAudit, type AuditEvent, type AuditSearch } from './search';
 
+export { privacyHandler } from './privacy';
+export { retentionRules } from './retention';
+
 export const jobHandlers: HandlerMap = {};

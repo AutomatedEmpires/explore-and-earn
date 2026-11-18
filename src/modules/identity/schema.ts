@@ -21,6 +21,8 @@ export const users = app.table('users', {
   accountType: text('account_type', { enum: ACCOUNT_TYPES }),
   adultAttestedAt: ts('adult_attested_at'),
   deletedAt: ts('deleted_at'),
+  /** SHA-256 of the Clerk user id, set when the person is erased. Null until then. */
+  erasedClerkIdSha256: text('erased_clerk_id_sha256').unique(),
   /** Clerk `updated_at` of the snapshot this row was last written from; null on placeholders. */
   clerkUpdatedAt: ts('clerk_updated_at'),
   createdAt: ts('created_at').notNull().defaultNow(),
@@ -42,7 +44,7 @@ export const operators = app.table('operators', {
   updatedAt: ts('updated_at').notNull().defaultNow(),
 });
 
-export const WEBHOOK_EVENT_STATUSES = ['applied', 'rejected'] as const;
+export const WEBHOOK_EVENT_STATUSES = ['applied', 'rejected', 'ignored'] as const;
 
 export const webhookEvents = app.table('webhook_events', {
   id: text('id').primaryKey(),

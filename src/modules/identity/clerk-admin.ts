@@ -3,6 +3,7 @@
 // notifications loads identity. Importing orgs from this file made that a cycle and left
 // defineType uninitialized.
 import type { UserJSON } from '@clerk/nextjs/server';
+import { getEnv } from '@/lib/env';
 
 /** Clerk public-metadata mark on every organization this server creates. */
 export const CREATED_VIA_KEY = 'created_via';
@@ -37,6 +38,32 @@ export interface ClerkAdmin {
   deleteOrganization(clerkOrgId: string): Promise<void>;
   /** Renames the organization in Clerk, so Clerk's next snapshot doesn't undo a rename here. */
   updateOrganization(clerkOrgId: string, patch: { name: string }): Promise<void>;
+  banUser(clerkUserId: string): Promise<void>;
+  unbanUser(clerkUserId: string): Promise<void>;
+  /** A 404 (already gone) resolves. */
+  deleteUser(clerkUserId: string): Promise<void>;
+  createActorToken(input: {
+    operatorClerkUserId: string;
+    targetClerkUserId: string;
+    expiresInSeconds: number;
+  }): Promise<{ url: string; tokenId: string }>;
+  /** Deletes every passkey on the user. Returns how many were removed. */
+  deletePasskeys(clerkUserId: string): Promise<number>;
+  createSignInToken(input: {
+    clerkUserId: string;
+    expiresInSeconds: number;
+  }): Promise<{ url: string }>;
+}
+
+function isClerkNotFound(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && 'status' in err && err.status === 404;
+}
+
+/** The 8.12 re-enrollment URL. `http` only in dev. */
+function passkeySignInUrl(token: string): string {
+  const env = getEnv();
+  const scheme = env.APP_ENV === 'dev' ? 'http' : 'https';
+  return `${scheme}://${env.ADMIN_HOST}/sign-in?__clerk_ticket=${encodeURIComponent(token)}&redirect_url=%2Fadmin%2Fpasskey`;
 }
 
 /**
@@ -139,6 +166,49 @@ export function clerkAdmin(): ClerkAdmin {
     async updateOrganization(clerkOrgId, patch) {
       await (await client()).organizations.updateOrganization(clerkOrgId, { name: patch.name });
     },
+    async banUser(clerkUserId) {
+      await (await client()).users.banUser(clerkUserId);
+    },
+    async unbanUser(clerkUserId) {
+      await (await client()).users.unbanUser(clerkUserId);
+    },
+    async deleteUser(clerkUserId) {
+      try {
+        await (await client()).users.deleteUser(clerkUserId);
+      } catch (err) {
+        if (!isClerkNotFound(err)) throw err;
+      }
+    },
+    async createActorToken({ operatorClerkUserId, targetClerkUserId, expiresInSeconds }) {
+      const created = await (
+        await client()
+      ).actorTokens.create({
+        userId: targetClerkUserId,
+        actor: { sub: operatorClerkUserId },
+        expiresInSeconds,
+      });
+      return { url: created.url ?? '', tokenId: created.id };
+    },
+    async deletePasskeys(clerkUserId) {
+      const raw = (await rawUser(clerkUserId)) as { passkeys?: { id?: string }[] } | null;
+      const ids = (raw?.passkeys ?? [])
+        .map((passkey) => passkey.id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0);
+      const api = await client();
+      for (const passkeyIdentificationId of ids) {
+        await api.users.deleteUserPasskey({ userId: clerkUserId, passkeyIdentificationId });
+      }
+      return ids.length;
+    },
+    async createSignInToken({ clerkUserId, expiresInSeconds }) {
+      const created = await (
+        await client()
+      ).signInTokens.createSignInToken({
+        userId: clerkUserId,
+        expiresInSeconds,
+      });
+      return { url: passkeySignInUrl(created.token) };
+    },
   };
 }
 
@@ -158,6 +228,18 @@ export type FakeClerkAdmin = ClerkAdmin & {
   passkeys: Set<string>;
   /** Clerk user IDs that have two-step sign-in (a passkey also counts as strong). */
   twoStep: Set<string>;
+  /** Clerk user IDs currently banned. */
+  banned: Set<string>;
+  /** Clerk user IDs passed to deleteUser. */
+  deleted: Set<string>;
+  actorTokens: {
+    operatorClerkUserId: string;
+    targetClerkUserId: string;
+    expiresInSeconds: number;
+    url: string;
+    tokenId: string;
+  }[];
+  signInTokens: { clerkUserId: string; expiresInSeconds: number; url: string }[];
   /** Makes the next call to `method` reject. */
   failNext(method: keyof ClerkAdmin, error?: Error): void;
 };
@@ -182,6 +264,10 @@ export function makeFakeClerkAdmin(
     invitations: [],
     passkeys: new Set(opts.passkeys),
     twoStep: new Set(opts.twoStep),
+    banned: new Set(),
+    deleted: new Set(),
+    actorTokens: [],
+    signInTokens: [],
     failNext(method, error = new Error(`fake Clerk: ${method} failed`)) {
       failures.set(method, error);
     },
@@ -237,6 +323,38 @@ export function makeFakeClerkAdmin(
     async updateOrganization(clerkOrgId, patch) {
       call('updateOrganization', [clerkOrgId, patch]);
       for (const o of fake.organizations) if (o.clerkOrgId === clerkOrgId) o.name = patch.name;
+    },
+    async banUser(clerkUserId) {
+      call('banUser', [clerkUserId]);
+      fake.banned.add(clerkUserId);
+    },
+    async unbanUser(clerkUserId) {
+      call('unbanUser', [clerkUserId]);
+      fake.banned.delete(clerkUserId);
+    },
+    async deleteUser(clerkUserId) {
+      call('deleteUser', [clerkUserId]);
+      fake.deleted.add(clerkUserId);
+    },
+    async createActorToken(input) {
+      call('createActorToken', [input]);
+      const tokenId = `act_fake_${fake.actorTokens.length + 1}`;
+      const url = `https://example.test/actor/${tokenId}`;
+      const row = { ...input, url, tokenId };
+      fake.actorTokens.push(row);
+      return { url, tokenId };
+    },
+    async deletePasskeys(clerkUserId) {
+      call('deletePasskeys', [clerkUserId]);
+      if (!fake.passkeys.has(clerkUserId)) return 0;
+      fake.passkeys.delete(clerkUserId);
+      return 1;
+    },
+    async createSignInToken(input) {
+      call('createSignInToken', [input]);
+      const url = `https://admin.example.test/sign-in?__clerk_ticket=fake&redirect_url=%2Fadmin%2Fpasskey`;
+      fake.signInTokens.push({ ...input, url });
+      return { url };
     },
   };
 

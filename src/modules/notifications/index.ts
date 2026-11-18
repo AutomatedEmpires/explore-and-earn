@@ -31,6 +31,7 @@ export {
   MANDATORY_CATEGORIES,
   defineType,
   getType,
+  adminUrl,
   isMandatory,
   type Category,
   type Channel,
@@ -65,6 +66,7 @@ export {
 
 export {
   EMAIL_DIRECT_TOPIC,
+  sendDirectEmail,
   sendEmailDirectJob,
   sendEmailNow,
   sendEmailTo,
@@ -104,3 +106,6 @@ export const jobHandlers: HandlerMap = {
     await sendPushJob(db, payload, { now });
   },
 };
+
+export { privacyHandler } from './privacy';
+export { retentionRules } from './retention';

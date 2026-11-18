@@ -3,6 +3,7 @@
 // (and, for operators, who created founding codes).
 import { eq } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
+import { stubPrivacyHandler, type RetentionRule } from '@/modules/privacy';
 import { billingChanges, foundingCodes } from './schema';
 
 export const privacyHandlers: {
@@ -35,3 +36,11 @@ export const privacyHandlers: {
       .where(eq(foundingCodes.createdBy, userId));
   },
 };
+
+export const privacyHandler = stubPrivacyHandler('billing', [
+  'billing_accounts',
+  'subscriptions',
+  'billing_changes',
+  'founding_codes',
+]);
+export const retentionRules: RetentionRule[] = [];

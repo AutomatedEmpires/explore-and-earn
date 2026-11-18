@@ -1,52 +1,37 @@
-// Public API of the privacy module: SP8 section 3's registration types, types only. SP3 W0 lands
-// this file because SP8 has not yet (the same file SP4's W0 would create); SP8 W0 owns it from
-// here and adds the registry, export, deletion and retention sweep.
-//
-// Every module's index exports `privacyHandler: PrivacyHandler` and
-// `retentionRules: RetentionRule[]`; src/server/privacy-registry.ts (SP8) collects them.
-import type { DbOrTx, Db, Tx } from '@/lib/db';
+// Public API of the privacy module. Barrels are re-exported so later workstreams edit one file each.
+import type { HandlerMap } from '@/modules/jobs';
+import { engineJobHandlers } from './engine';
+import { retentionJobHandlers } from './retention';
 
-export type PrivacySubject = { kind: 'user'; userId: string } | { kind: 'org'; orgId: string };
+import './notification-types';
 
-export type HoldScope = 'all' | 'applications' | 'messages' | 'reports' | 'billing';
+export type {
+  EraseResult,
+  ExportPart,
+  HoldScope,
+  MediaColumnRef,
+  PrivacyHandler,
+  PrivacySubject,
+  RetainReason,
+  RetentionRule,
+} from './types';
+export { HOLD_SCOPES, RETAIN_REASONS } from './types';
+export { PRIVACY_EXEMPT_TABLES } from './exempt';
+export { stubPrivacyHandler } from './handler-stub';
+export * from './consent-cookie';
+export * from './engine';
+export * from './retention';
+export * from './consent';
+export * from './ports';
 
-export type RetainReason = 'shared_record' | 'safety' | 'legal_obligation' | 'legal_hold' | 'audit';
+let registry: Promise<import('@/server/privacy-registry').PrivacyRegistry> | null = null;
 
-/** A column holding app.media ids, so the orphan sweep never deletes a file still in use. */
-export type MediaColumnRef = { table: string; column: string; array: boolean };
-
-export type ExportPart = {
-  /** File name (no extension) -> rows, minimized. */
-  records: Record<string, unknown[]>;
-  /** Copied to files/<module>/<name>. */
-  files: { mediaId: string; name: string }[];
-};
-
-export type EraseResult = {
-  erased: number;
-  /** `until` is an ISO date. */
-  retained: { table: string; reason: RetainReason; until: string | null }[];
-};
-
-export interface PrivacyHandler {
-  module: string;
-  /** Every app table the module owns (bare names, without the `app.` schema). */
-  tables: readonly string[];
-  /** Columns holding app.media ids (orphan sweep). */
-  mediaColumns?: readonly MediaColumnRef[];
-  exportData(db: DbOrTx, s: PrivacySubject): Promise<ExportPart>;
-  erase(
-    tx: Tx,
-    s: PrivacySubject,
-    ctx: { requestId: string; now: Date; holds: HoldScope[] },
-  ): Promise<EraseResult>;
+/** The process-wide registry. Loaded after every module has exported its handler. */
+export function loadPrivacyRegistry(): Promise<
+  import('@/server/privacy-registry').PrivacyRegistry
+> {
+  registry ??= import('@/server/privacy-registry').then((mod) => mod.privacyRegistry);
+  return registry;
 }
 
-export interface RetentionRule {
-  /** '<module>.<what>', unique. */
-  key: string;
-  /** Shown in the console and generated into the privacy policy. */
-  description: string;
-  /** Deletes at most `limit` rows. */
-  run(db: Db, now: Date, limit: number): Promise<{ deleted: number }>;
-}
+export const jobHandlers: HandlerMap = { ...engineJobHandlers, ...retentionJobHandlers };

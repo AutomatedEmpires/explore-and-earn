@@ -323,6 +323,16 @@ describe('searchAudit', () => {
     expect(err).toBeInstanceOf(AppError);
     expect((err as AppError).code).toBe('bad_request');
   });
+
+  it('returns only operator rows when actorType is operator', async () => {
+    const action = uniqueAction('actor-type');
+    await record(t.db, event({ action, actorType: 'user', actorId: newId() }));
+    await record(t.db, event({ action, actorType: 'operator', actorId: newId() }));
+    await record(t.db, event({ action, actorType: 'system' }));
+    const { items } = await searchAudit(t.db, { action, actorType: 'operator' });
+    expect(items).toHaveLength(1);
+    expect(items[0]?.actorType).toBe('operator');
+  });
 });
 
 describe('the audit_events table', () => {

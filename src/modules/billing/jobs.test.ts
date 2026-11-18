@@ -10,7 +10,8 @@ import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { FIXED_NOW, seedHostOrg, type SeededOrg } from '../../../tests/helpers/sp2';
 import type { SubSnapshot } from './gateway';
 import { makeFakeBillingGateway, type FakeBillingGateway } from './gateway-fake';
-import { jobHandlers, privacyHandlers } from './index';
+import { jobHandlers } from './index';
+import { privacyHandlers } from './privacy';
 import { applyLaunchDate, grantMonthlyCredits, reconcile } from './jobs';
 import { syncSubscription } from './sync';
 

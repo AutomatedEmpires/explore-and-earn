@@ -2,6 +2,7 @@
 // location belongs to its org, so erasing a user only forgets who created it.
 import { asc, eq } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
+import { stubPrivacyHandler, type RetentionRule } from '@/modules/privacy';
 import { locations } from './schema';
 
 export const privacyHandlers: {
@@ -21,3 +22,6 @@ export const privacyHandlers: {
     await db.update(locations).set({ createdBy: null }).where(eq(locations.createdBy, userId));
   },
 };
+
+export const privacyHandler = stubPrivacyHandler('locations', ['locations', 'location_weather']);
+export const retentionRules: RetentionRule[] = [];

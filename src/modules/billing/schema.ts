@@ -78,6 +78,9 @@ export const subscriptions = app.table('subscriptions', {
   /** When it was first paid (FD-7 eligibility); set once by sync, never cleared. */
   activatedAt: ts('activated_at'),
   lastSyncedAt: ts('last_synced_at'),
+  /** Extra trial days an operator granted. FD-7 does not add founding.free_days on top. */
+  operatorTrialDays: integer('operator_trial_days').notNull().default(0),
+  freeUntil: ts('free_until'),
   planGrantSeq: integer('plan_grant_seq').notNull().default(0),
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),

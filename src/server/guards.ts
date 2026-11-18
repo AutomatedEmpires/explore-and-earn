@@ -7,20 +7,25 @@
 // a host who needs strong sign-in goes to /host/security, an operator without a passkey to
 // /admin/passkey and a user who hasn't onboarded to /onboarding.
 import { auth, currentUser } from '@clerk/nextjs/server';
+import { headers } from 'next/headers';
 import { getDb } from '@/lib/db';
 import { getEnv } from '@/lib/env';
 import { forbidden, unauthorized } from '@/lib/errors';
+import { isPerfMode, perfUserFromHeader } from '@/lib/perf-mode';
 import {
   evaluateHostAccess,
   evaluateOperatorAccess,
   findUserByClerkId,
+  findUserById,
   getOperator,
   syncClerkUser,
   userHasPasskey,
   userHasStrongAuth,
   type CurrentUser,
   type OrgRole,
+  type UserRecord,
 } from '@/modules/identity';
+import { getActiveSanction } from '@/modules/operator';
 import { findHostMembership } from '@/modules/orgs';
 
 export type { CurrentUser, OrgRole };
@@ -46,7 +51,12 @@ export type GuardDenial =
   | { reason: 'not_an_operator' }
   | { reason: 'queue_not_assigned' }
   | { reason: 'needs_passkey'; redirectTo: '/admin/passkey' }
-  | { reason: 'reverification_required'; reverification: typeof SENSITIVE_REVERIFICATION };
+  | {
+      reason: 'reverification_required';
+      reverification:
+        | typeof SENSITIVE_REVERIFICATION
+        | { level: 'first_factor'; afterMinutes: number };
+    };
 
 function deny(message: string, details: GuardDenial) {
   return forbidden(message, details);
@@ -57,11 +67,40 @@ async function clerkUserJson() {
   return (await currentUser())?.raw ?? null;
 }
 
+function toCurrentUser(user: UserRecord): CurrentUser {
+  return {
+    id: user.id,
+    clerkUserId: user.clerkUserId,
+    accountType: user.accountType,
+    email: user.email,
+  };
+}
+
+async function assertNotSuspended(userId: string): Promise<void> {
+  const sanction = await getActiveSanction(getDb(), { userId });
+  if (sanction) {
+    throw unauthorized('Your account is suspended', { reason: 'account_suspended' });
+  }
+}
+
 /**
  * The signed-in user. If Clerk's webhook for a new user hasn't arrived yet (or can't, as with
  * keyless development), the user is provisioned from Clerk's Backend API, the same way.
+ * In perf mode a valid `x-perf-user` header selects that user without Clerk.
  */
 export async function requireUser(): Promise<CurrentUser> {
+  const env = getEnv();
+  if (isPerfMode(env)) {
+    const header = (await headers()).get('x-perf-user');
+    const userId = perfUserFromHeader(header, env);
+    if (userId) {
+      const user = await findUserById(getDb(), userId);
+      if (!user || user.deletedAt) throw unauthorized('Account not found');
+      await assertNotSuspended(user.id);
+      return toCurrentUser(user);
+    }
+  }
+
   const { userId: clerkUserId } = await auth();
   if (!clerkUserId) throw unauthorized();
 
@@ -74,13 +113,24 @@ export async function requireUser(): Promise<CurrentUser> {
     user = await findUserByClerkId(db, clerkUserId);
   }
   if (!user || user.deletedAt) throw unauthorized('Account not found');
+  await assertNotSuspended(user.id);
 
-  return {
-    id: user.id,
-    clerkUserId: user.clerkUserId,
-    accountType: user.accountType,
-    email: user.email,
-  };
+  return toCurrentUser(user);
+}
+
+/**
+ * Confirms the session was reverified within `maxAgeSec` (default 10 minutes). Clerk's `has`
+ * speaks in whole minutes, so the window is rounded up.
+ */
+export async function requireRecentAuth(maxAgeSec = 600): Promise<void> {
+  const afterMinutes = Math.ceil(maxAgeSec / 60);
+  const { has } = await auth();
+  if (!has({ reverification: { level: 'first_factor', afterMinutes } })) {
+    throw forbidden('Confirm it is you to continue', {
+      reason: 'reverification_required',
+      reverification: { level: 'first_factor', afterMinutes },
+    });
+  }
 }
 
 function requireAccountType(user: CurrentUser, type: 'seeker' | 'host'): void {
@@ -109,11 +159,15 @@ export async function requireHost(opts?: { roles?: OrgRole[] }): Promise<HostCon
   const user = await requireUser();
   requireAccountType(user, 'host');
 
-  const { orgId: activeClerkOrgId } = await auth();
-  const membership = await findHostMembership(getDb(), user.id, activeClerkOrgId ?? null);
+  const perf = isPerfMode(getEnv());
+  const activeClerkOrgId = perf ? null : ((await auth()).orgId ?? null);
+  const membership = await findHostMembership(getDb(), user.id, activeClerkOrgId);
   const role = membership?.role ?? null;
-  const strongAuth =
-    role === 'owner' || role === 'admin' ? userHasStrongAuth(await clerkUserJson()) : false;
+  const strongAuth = perf
+    ? true
+    : role === 'owner' || role === 'admin'
+      ? userHasStrongAuth(await clerkUserJson())
+      : false;
 
   const access = evaluateHostAccess({ role, strongAuth, required: opts?.roles });
   if (!membership) {

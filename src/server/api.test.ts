@@ -4,13 +4,29 @@ import { createTestDb, type TestDb } from '../../tests/helpers/db';
 import { sql } from 'drizzle-orm';
 import { users } from '@/db/schema';
 import { queryRows, type Db } from '@/lib/db';
-import { notFound, unauthorized } from '@/lib/errors';
+import { forbidden, notFound, unauthorized } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
 import { record } from '@/modules/audit';
 import { GET as health } from '@/app/api/v1/health/route';
+import { consentCookieValue } from '@/modules/privacy';
+import { reverificationError } from '@clerk/nextjs/server';
 import { apiRoute, toErrorResponse } from './api';
 import { requireHost, requireUser, type CurrentUser } from './guards';
+import { getRequestContext } from './request-context';
+
+const clerkSession = vi.hoisted(() => ({ act: undefined as unknown }));
+vi.mock('@clerk/nextjs/server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@clerk/nextjs/server')>();
+  return {
+    ...actual,
+    auth: vi.fn(async () => ({
+      userId: null,
+      sessionClaims: clerkSession.act ? { act: clerkSession.act } : {},
+      has: () => false,
+    })),
+  };
+});
 
 const state = vi.hoisted(() => ({ db: undefined as Db | undefined }));
 
@@ -76,6 +92,7 @@ afterAll(async () => {
 beforeEach(() => {
   vi.mocked(requireUser).mockReset();
   vi.mocked(requireHost).mockReset();
+  clerkSession.act = undefined;
 });
 
 describe('apiRoute errors', () => {
@@ -386,6 +403,89 @@ describe('apiRoute rate limit', () => {
     expect(retryAfter).toBeGreaterThan(0);
     expect(retryAfter).toBeLessThanOrEqual(3600);
     expect(handler).toHaveBeenCalledTimes(2);
+  });
+});
+
+const consentId = '018f6b2e-6c3a-7b2e-8c3a-6c3a7b2e8c3a';
+
+describe('apiRoute SP8 context', () => {
+  it('adds clerk_error only on a reverification 403', async () => {
+    const route = apiRoute({
+      handler: async () => {
+        throw forbidden('Confirm it is you to continue', {
+          reason: 'reverification_required',
+          reverification: { level: 'first_factor', afterMinutes: 10 },
+        });
+      },
+    });
+    const res = await route(new Request(`${APP_URL}/api/v1/thing`));
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as ErrorBody & { clerk_error?: unknown };
+    expect(body.error.details).toMatchObject({
+      reason: 'reverification_required',
+      reverification: { level: 'first_factor', afterMinutes: 10 },
+    });
+    expect(body.clerk_error).toEqual(
+      reverificationError({ level: 'first_factor', afterMinutes: 10 }),
+    );
+
+    const other = await apiRoute({
+      handler: async () => {
+        throw forbidden('nope');
+      },
+    })(new Request(`${APP_URL}/api/v1/thing`));
+    expect(await other.json()).not.toHaveProperty('clerk_error');
+  });
+
+  it('treats optional auth as the signed-in user or null', async () => {
+    vi.mocked(requireUser).mockRejectedValue(unauthorized());
+    const signedOut = await apiRoute({
+      auth: 'optional',
+      handler: async (ctx) => ({ user: ctx.user }),
+    })(new Request(`${APP_URL}/api/v1/thing`));
+    expect(await signedOut.json()).toEqual({ user: null });
+
+    vi.mocked(requireUser).mockResolvedValue(user);
+    const signedIn = await apiRoute({
+      auth: 'optional',
+      handler: async (ctx) => ({ id: ctx.user?.id }),
+    })(new Request(`${APP_URL}/api/v1/thing`));
+    expect(await signedIn.json()).toEqual({ id: user.id });
+  });
+
+  it('sets analyticsAllowed from consent and viewAs from the actor claim', async () => {
+    const route = apiRoute({
+      handler: async () => ({
+        analyticsAllowed: getRequestContext()?.analyticsAllowed ?? null,
+        viewAs: getRequestContext()?.viewAs ?? null,
+      }),
+    });
+    const read = (headers: Record<string, string>) =>
+      route(new Request(`${APP_URL}/api/v1/thing`, { headers })).then((res) => res.json());
+
+    expect(await read({ 'x-vercel-ip-country': 'DE' })).toEqual({
+      analyticsAllowed: false,
+      viewAs: false,
+    });
+    expect(await read({ 'x-vercel-ip-country': 'US' })).toEqual({
+      analyticsAllowed: true,
+      viewAs: false,
+    });
+    expect(await read({ 'x-vercel-ip-country': 'US', 'sec-gpc': '1' })).toEqual({
+      analyticsAllowed: false,
+      viewAs: false,
+    });
+    const cookie = consentCookieValue(consentId, true, new Date());
+    expect(await read({ 'x-vercel-ip-country': 'DE', cookie: `ee_consent=${cookie}` })).toEqual({
+      analyticsAllowed: true,
+      viewAs: false,
+    });
+
+    clerkSession.act = { sub: 'user_operator' };
+    expect(await read({ 'x-vercel-ip-country': 'US' })).toEqual({
+      analyticsAllowed: false,
+      viewAs: true,
+    });
   });
 });
 

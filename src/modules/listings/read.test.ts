@@ -19,8 +19,8 @@ import {
   getPublishedListing,
   getRevision,
   listActiveListings,
-  privacyHandlers,
 } from './index';
+import { privacyHandlers } from './privacy';
 import {
   seedDraftListing,
   seedListingFixture,

@@ -9,6 +9,7 @@
 // - deletions are kept (deleted_at), so a reordered create or update can't bring a row back.
 // An event that can never apply (bad_request) is recorded as rejected and alerted on, not
 // retried: Clerk redelivers every non-2xx response for days, and it would fail the same way.
+import { createHash } from 'node:crypto';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { type Db, type DbOrTx, withTx } from '@/lib/db';
@@ -23,8 +24,24 @@ import {
   CREATED_VIA_KEY,
   deleteClerkOrganization,
   type OrgSnapshot,
+  orgMemberships,
+  organizations,
 } from '@/modules/orgs';
 import { OPERATOR_ROLES, operators, users, webhookEvents } from './schema';
+
+/** Hex SHA-256 of a Clerk user id. The erasure tombstone stores this, never the id. */
+export function clerkIdHash(clerkUserId: string): string {
+  return createHash('sha256').update(clerkUserId).digest('hex');
+}
+
+/** True when this Clerk user was erased and must not be recreated. */
+export async function isErasedClerkUser(db: DbOrTx, clerkUserId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.erasedClerkIdSha256, clerkIdHash(clerkUserId)));
+  return Boolean(row);
+}
 
 export { mapClerkRole } from '@/modules/orgs';
 
@@ -102,6 +119,16 @@ function displayName(first?: string | null, last?: string | null, fallback?: str
     .filter(Boolean)
     .join(' ');
   return name || fallback?.trim() || null;
+}
+
+/**
+ * Our user ID for a Clerk creator, or null when that Clerk user was erased. A late snapshot must
+ * not restore a closed org's Owner or create a placeholder for someone we already deleted.
+ */
+async function createdByUserId(db: DbOrTx, clerkUserId: string | null | undefined): Promise<string | null> {
+  if (!clerkUserId) return null;
+  if (await isErasedClerkUser(db, clerkUserId)) return null;
+  return ensureUser(db, clerkUserId);
 }
 
 /** Our user ID for a Clerk user, inserting a placeholder row if the user is new to us. */
@@ -200,7 +227,7 @@ async function embeddedOrg(
   return {
     clerkOrgId: o.id,
     name: o.name ?? null,
-    createdByUserId: o.created_by ? await ensureUser(db, o.created_by) : null,
+    createdByUserId: await createdByUserId(db, o.created_by),
     createdViaApp: createdViaApp(o.public_metadata),
     // A partial organization (no name) only seeds a placeholder.
     clerkUpdatedAt: o.name ? (o.updated_at ?? null) : null,
@@ -224,7 +251,7 @@ async function apply(db: DbOrTx, type: string, data: unknown): Promise<void> {
       await applyClerkOrganization(db, {
         clerkOrgId: o.id,
         name: o.name,
-        createdByUserId: o.created_by ? await ensureUser(db, o.created_by) : null,
+        createdByUserId: await createdByUserId(db, o.created_by),
         createdViaApp: createdViaApp(o.public_metadata),
         clerkUpdatedAt: o.updated_at,
       });
@@ -260,7 +287,54 @@ async function apply(db: DbOrTx, type: string, data: unknown): Promise<void> {
   }
 }
 
-export type ClerkEventResult = 'applied' | 'duplicate' | 'rejected';
+export type ClerkEventResult = 'applied' | 'duplicate' | 'rejected' | 'ignored_erased';
+
+const MEMBERSHIP_EVENTS = new Set([
+  'organizationMembership.created',
+  'organizationMembership.updated',
+  'organizationMembership.deleted',
+]);
+
+/**
+ * Events that must change nothing: an erased Clerk user, or a membership for a deleted
+ * organization the user has no row in. Returns the reason stored on webhook_events.
+ */
+async function ignoredReason(
+  db: DbOrTx,
+  type: string,
+  data: unknown,
+): Promise<'erased' | 'org_deleted' | null> {
+  if (type === 'user.created' || type === 'user.updated') {
+    const user = parse(userSchema, data, 'user');
+    return (await isErasedClerkUser(db, user.id)) ? 'erased' : null;
+  }
+  if (type === 'user.deleted') {
+    const user = parse(deletedSchema, data, type);
+    return (await isErasedClerkUser(db, user.id)) ? 'erased' : null;
+  }
+  if (!MEMBERSHIP_EVENTS.has(type)) return null;
+
+  const membership = parse(membershipSchema, data, type);
+  const clerkUserId = membership.public_user_data.user_id;
+  if (await isErasedClerkUser(db, clerkUserId)) return 'erased';
+
+  const [org] = await db
+    .select({ id: organizations.id, deletedAt: organizations.deletedAt })
+    .from(organizations)
+    .where(eq(organizations.clerkOrgId, membership.organization.id));
+  if (!org?.deletedAt) return null;
+
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkUserId, clerkUserId));
+  if (!user) return 'org_deleted';
+  const [row] = await db
+    .select({ userId: orgMemberships.userId })
+    .from(orgMemberships)
+    .where(and(eq(orgMemberships.orgId, org.id), eq(orgMemberships.userId, user.id)));
+  return row ? null : 'org_deleted';
+}
 
 const MAX_REASON_LENGTH = 500;
 
@@ -283,7 +357,9 @@ export async function handleClerkEvent(
   evt: ClerkEvent,
   opts: { requestId?: string } = {},
 ): Promise<ClerkEventResult> {
-  type Outcome = { result: 'applied' | 'duplicate' } | { result: 'rejected'; error: AppError };
+  type Outcome =
+    | { result: 'applied' | 'duplicate' | 'ignored_erased' }
+    | { result: 'rejected'; error: AppError };
 
   const outcome = await withTx(db, async (tx): Promise<Outcome> => {
     const [fresh] = await tx
@@ -294,6 +370,14 @@ export async function handleClerkEvent(
     if (!fresh) return { result: 'duplicate' };
 
     try {
+      const reason = await ignoredReason(tx, evt.type, evt.data);
+      if (reason) {
+        await tx
+          .update(webhookEvents)
+          .set({ status: 'ignored', reason })
+          .where(eq(webhookEvents.id, evt.id));
+        return { result: 'ignored_erased' };
+      }
       // A savepoint, so a rejected event's partial writes roll back but its record stays.
       await tx.transaction((sp) => apply(sp, evt.type, evt.data));
       return { result: 'applied' };

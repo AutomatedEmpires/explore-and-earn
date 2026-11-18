@@ -6,7 +6,7 @@
 // module's index is imported.
 import type { Actor } from '@/modules/entitlements';
 import { registerSubjectHandlers, type SubjectHandler } from '@/modules/trust';
-import { sanctionOrg } from './cancel';
+import { sanctionMetaFrom, sanctionOrg } from './cancel';
 import { BILLING_SUBJECT } from './sync';
 
 /** The deciding operator is recorded by trust on the review item. */
@@ -18,6 +18,6 @@ registerSubjectHandlers(BILLING_SUBJECT, {
   approve: resolveOnly,
   remove: resolveOnly,
   ask_info: resolveOnly,
-  suspend: (db, orgId) => sanctionOrg(db, orgId, 'suspend', OPERATOR),
-  ban: (db, orgId) => sanctionOrg(db, orgId, 'ban', OPERATOR),
+  suspend: (db, orgId, data) => sanctionOrg(db, orgId, 'suspend', OPERATOR, sanctionMetaFrom(data)),
+  ban: (db, orgId, data) => sanctionOrg(db, orgId, 'ban', OPERATOR, sanctionMetaFrom(data)),
 });

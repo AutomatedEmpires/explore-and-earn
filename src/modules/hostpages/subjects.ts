@@ -7,7 +7,7 @@
 // the one that holds the current change.
 import { sql } from 'drizzle-orm';
 import { queryRows, type DbOrTx } from '@/lib/db';
-import { sanctionOrg, type Actor } from '@/modules/billing';
+import { sanctionMetaFrom, sanctionOrg, type Actor } from '@/modules/billing';
 import { registerSubjectHandlers } from '@/modules/trust';
 import { HOST_PAGE_SUBJECT } from './check';
 import { applyPending, discardPending, loadPage, type HostPageRow } from './editor';
@@ -58,6 +58,6 @@ registerSubjectHandlers(HOST_PAGE_SUBJECT, {
       ...(note ? { note } : {}),
     });
   },
-  suspend: (db, orgId) => sanctionOrg(db, orgId, 'suspend', OPERATOR),
-  ban: (db, orgId) => sanctionOrg(db, orgId, 'ban', OPERATOR),
+  suspend: (db, orgId, data) => sanctionOrg(db, orgId, 'suspend', OPERATOR, sanctionMetaFrom(data)),
+  ban: (db, orgId, data) => sanctionOrg(db, orgId, 'ban', OPERATOR, sanctionMetaFrom(data)),
 });
