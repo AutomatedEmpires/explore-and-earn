@@ -308,11 +308,12 @@ async function wordingFlagged(
   content: ListingContent,
 ): Promise<boolean> {
   if (rev.acknowledgedWarnings.includes('wording_flagged')) return true;
-  const [flagged, nationalities] = await Promise.all([
+  const [flagged, nationalities, groups] = await Promise.all([
     getSetting(db, 'listings.flagged_phrases'),
     getSetting(db, 'listings.flagged_nationalities'),
+    getSetting(db, 'listings.flagged_groups'),
   ]);
-  return findFlaggedWording(content, { flagged, nationalities }).length > 0;
+  return findFlaggedWording(content, { flagged, nationalities, groups }).length > 0;
 }
 
 type MediaVerdict = 'ready' | 'rejected' | 'pending' | 'held';
@@ -407,7 +408,7 @@ export async function screenRevision(
   }
 
   // Flagged wording (legal review 2.2) always goes to an operator and is never a reason to
-  // return the listing.
+  // return the listing, by itself or through an AI check that reads it (step 6).
   const wording = await wordingFlagged(db, rev, content);
 
   // 5. The AI checks, in parallel.
@@ -467,13 +468,24 @@ export async function screenRevision(
     .set({ trustCheckIds: [moderation.checkId, fraud.checkId], checks: summary })
     .where(and(eq(listingRevisions.id, rev.id), eq(listingRevisions.status, 'screening')));
 
-  const rejected = [moderation, fraud].filter((c) => c.decision === 'rejected');
-  if (rejected.length > 0) {
-    const labels = [...new Set(rejected.flatMap((c) => c.labels))];
+  const rejected = (
+    [
+      ['listing_moderation', moderation],
+      ['listing_fraud', fraud],
+    ] as const
+  ).filter(([, c]) => c.decision === 'rejected');
+  // A revision with flagged wording always reaches an operator (legal review 2.2; #200). The
+  // moderation check reads the same wording and can score a lawful use, like a religious camp, as
+  // discrimination, so an AI rejection goes to moderation with its verdict instead of returning
+  // the listing. The fraud item on the org above still opens.
+  if (rejected.length > 0 && !wording) {
+    const labels = [...new Set(rejected.flatMap(([, c]) => c.labels))];
     await rejectRevision(db, rev.id, labels.length > 0 ? labels : ['moderation'], now);
     return;
   }
-  const reasons: { reason: string; onlyIfNoItem?: boolean }[] = [];
+  const reasons: { reason: string; onlyIfNoItem?: boolean }[] = rejected.map(([kind]) => ({
+    reason: `${kind}_rejected`,
+  }));
   if (link === 'unknown') reasons.push({ reason: 'link_unknown' });
   if (keptMismatch) reasons.push({ reason: 'photo_slot_mismatch_kept', onlyIfNoItem: true });
   if (wording) reasons.push({ reason: WORDING_REASON });

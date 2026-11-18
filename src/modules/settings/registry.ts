@@ -18,6 +18,7 @@ export type GenreSetting = { code: string; label: string; category: Category; ac
 export const WORDING_GROUNDS = [
   'age',
   'sex',
+  'race',
   'national_origin',
   'disability',
   'religion',
@@ -36,7 +37,26 @@ export type WordingGround = (typeof WORDING_GROUNDS)[number];
  */
 export type FlaggedPhrase = { phrase: string; ground: WordingGround; suggestion: string };
 
-/** What a screening question may not ask about (legal review section 2.2 item 2). */
+/** How a group word names people: by itself ("women"), or only before a word for people ("white"). */
+export const GROUP_FORMS = ['noun', 'adjective'] as const;
+
+/**
+ * A word for a group of people protected from hiring discrimination (#200). It sends a listing to
+ * review where it states a preference or a limit, not wherever it appears. A `noun` counts after
+ * "no", "only", "prefer" or "must be" and before "only", "preferred" or "wanted" ("no women",
+ * "ladies only"). An `adjective` counts before a word for people ("white applicants"), after
+ * "must be", and after "no", "only" or "prefer" as a plural, before a word for people or at the
+ * end of a phrase ("no whites"), so "white shirt" and "no English required" are not flagged.
+ * Plurals are matched too ("lady", "ladies"; "woman", "women").
+ */
+export type FlaggedGroup = {
+  term: string;
+  ground: WordingGround;
+  form: (typeof GROUP_FORMS)[number];
+  suggestion: string;
+};
+
+/** What a screening question may not ask about (legal review section 2.2 item 2; sex, #200). */
 export const QUESTION_TOPICS = [
   'age',
   'marital_status',
@@ -45,6 +65,7 @@ export const QUESTION_TOPICS = [
   'religion',
   'national_origin',
   'arrest_record',
+  'sex',
 ] as const;
 export type QuestionTopic = (typeof QUESTION_TOPICS)[number];
 
@@ -78,6 +99,8 @@ export interface SettingValues {
    * workers", "Americans only", "must be Irish". The word alone ("the American River") is not.
    */
   'listings.flagged_nationalities': string[];
+  /** Words for protected groups, flagged where they state a preference or a limit ("men preferred"). */
+  'listings.flagged_groups': FlaggedGroup[];
   /** Phrases that make a screening question ask about a forbidden topic, by topic. */
   'listings.question_topics': Record<QuestionTopic, string[]>;
   'listings.vague_pay_range_ratio': number;
@@ -137,6 +160,26 @@ const FLAGGED_PHRASES: FlaggedPhrase[] = [
     'digital native',
     'digital natives',
   ]),
+  // #200. The listing checks also find any maximum age and any age range on their own ("must be
+  // under 35", "between 18 and 30", "no one over 40"), so these are the wordings without a number.
+  ...flag('age', 'Describe the work instead, like "Upbeat with guests and on your feet all day".', [
+    'younger applicants',
+    'younger candidates',
+    'younger workers',
+    'younger people',
+    'millennial',
+    'millennials',
+    'gen z',
+    'in your #s',
+    'in their #s',
+    'in your twenties',
+    'in their twenties',
+    'in your thirties',
+    'in their thirties',
+    'born in #',
+    'born after #',
+    'born before #',
+  ]),
   ...flag('age', 'Remove the age limit. The only age rule a listing can set is 18 or 21 and up.', [
     'under 30',
     'under # years old',
@@ -167,6 +210,10 @@ const FLAGGED_PHRASES: FlaggedPhrase[] = [
     'male applicants',
     'female applicants',
     'not pregnant',
+    // #200. Pregnancy is sex discrimination (42 U.S.C. 2000e(k)).
+    'no pregnant women',
+    'pregnant',
+    'pregnancy',
   ]),
   ...flag('sex', 'Try "server".', ['waitress', 'waitresses']),
   ...flag('sex', 'Try "host".', ['hostess', 'hostesses']),
@@ -179,6 +226,23 @@ const FLAGGED_PHRASES: FlaggedPhrase[] = [
     'chambermaids',
   ]),
   ...flag('sex', 'Try "staff", "team" or "everyone".', ['girls', 'gals', 'guys']),
+  // Race and color (42 U.S.C. 2000e-3(b) names them first; #200). Words for the groups are in
+  // `listings.flagged_groups`.
+  ...flag('race', DESCRIBE_WORK, [
+    'skin color',
+    'skin colour',
+    'skin tone',
+    'light skinned',
+    'light skin',
+    'fair skinned',
+    'fair skin',
+    'dark skinned',
+    'dark skin',
+    'complexion',
+    'people of color',
+    'person of color',
+    'racial background',
+  ]),
   // National origin, citizenship and language (8 U.S.C. 1324b).
   ...flag(
     'national_origin',
@@ -212,6 +276,29 @@ const FLAGGED_PHRASES: FlaggedPhrase[] = [
       'foreign workers',
       'foreigners',
       'immigrants',
+    ],
+  ),
+  // #200: where someone was born.
+  ...flag(
+    'national_origin',
+    'Say "You must be authorized to work in the US", or say whether you sponsor visas.',
+    [
+      'us born',
+      'usa born',
+      'american born',
+      'native born',
+      'foreign born',
+      'born in the us',
+      'born in the usa',
+      'born in the united states',
+      'born in the states',
+      'born in america',
+      'born in this country',
+      'born abroad',
+      'born outside the us',
+      'born in *',
+      'ethnicity',
+      'ethnic background',
     ],
   ),
   // Disability.
@@ -449,6 +536,44 @@ const FLAGGED_NATIONALITIES = [
   'Caucasian',
 ];
 
+/** Group words of one ground and form that share the neutral wording offered. */
+const group = (
+  ground: WordingGround,
+  form: FlaggedGroup['form'],
+  suggestion: string,
+  terms: string[],
+): FlaggedGroup[] => terms.map((term) => ({ term, ground, form, suggestion }));
+
+/** #200: words for protected groups ("men preferred", "whites only", "citizens preferred"). */
+const FLAGGED_GROUPS: FlaggedGroup[] = [
+  ...group('sex', 'noun', DESCRIBE_WORK, [
+    'man',
+    'woman',
+    'male',
+    'female',
+    'lady',
+    'gentleman',
+    'boy',
+    'girl',
+    'guy',
+    'gal',
+  ]),
+  ...group('race', 'adjective', DESCRIBE_WORK, [
+    'white',
+    'black',
+    'African American',
+    'Native American',
+    'Asian American',
+  ]),
+  ...group('race', 'noun', DESCRIBE_WORK, ['minority']),
+  ...group(
+    'national_origin',
+    'noun',
+    'Say "You must be authorized to work in the US", or say whether you sponsor visas.',
+    ['citizen', 'permanent resident', 'green card holder'],
+  ),
+];
+
 /**
  * Phrases that put a screening question on a forbidden topic. Age is special: "Are you at least
  * 18?" and "Are you at least 21?" (and their plain variants) are removed before matching.
@@ -473,6 +598,34 @@ const QUESTION_TOPIC_PHRASES: Record<QuestionTopic, string[]> = {
     'graduation year',
     'year did you graduate',
     'year you graduated',
+    // #200: when someone finished school says how old they are. Any age range or maximum age
+    // ("between 18 and 30", "over 18 and under 30") is found by the listing checks on its own.
+    'when did you graduate',
+    'when did you finish school',
+    'when did you finish high school',
+    'when did you finish college',
+    'when did you finish university',
+    'when did you complete high school',
+    'when did you leave school',
+    'what year did you finish school',
+    'what year did you finish high school',
+    'what year did you finish college',
+    'year you finished school',
+    'year you finished high school',
+    'graduation date',
+    'date of graduation',
+    'year of graduation',
+    'date you graduated',
+    'when you graduated',
+    'graduated in #',
+    'class of #',
+    'how long ago did you graduate',
+    'how long ago did you finish school',
+    'how long since you graduated',
+    'in your #s',
+    'in your twenties',
+    'in your thirties',
+    'are you above #',
     'are you at least #',
     'are you over #',
     'are you under #',
@@ -503,6 +656,35 @@ const QUESTION_TOPIC_PHRASES: Record<QuestionTopic, string[]> = {
     'do you have kids',
     'how many children',
     'how many kids',
+    // #200: children and family, without "do you have" right before.
+    'have any kids',
+    'have any children',
+    'have kids',
+    'have children',
+    'any dependents',
+    'dependents',
+    'are you a parent',
+    'are you a mother',
+    'are you a father',
+    'are you a mom',
+    'are you a dad',
+    'single parent',
+    'single mom',
+    'single mother',
+    'single dad',
+    'single father',
+    'number of children',
+    'number of kids',
+    'your kids',
+    'your children',
+    'kids at home',
+    'children at home',
+    'childcare arrangements',
+    'child care arrangements',
+    'family status',
+    'family situation',
+    'your partner',
+    'do you have a partner',
   ],
   pregnancy: [
     'pregnant',
@@ -613,6 +795,42 @@ const QUESTION_TOPIC_PHRASES: Record<QuestionTopic, string[]> = {
     'pending charges',
     'mugshot',
   ],
+  // #200. Title VII covers sex, and with it sexual orientation and gender identity (Bostock v.
+  // Clayton County, 590 U.S. 644 (2020)). Housing split by sex is described in the listing.
+  sex: [
+    'gender',
+    'genders',
+    'gender identity',
+    'your sex',
+    'what sex',
+    'which sex',
+    'biological sex',
+    'sex at birth',
+    'male or female',
+    'female or male',
+    'man or woman',
+    'woman or man',
+    'a man or a woman',
+    'a woman or a man',
+    'boy or girl',
+    'girl or boy',
+    'guy or girl',
+    'are you a man',
+    'are you a woman',
+    'are you male',
+    'are you female',
+    'male',
+    'female',
+    'males',
+    'females',
+    'sexual orientation',
+    'transgender',
+    'gay',
+    'lesbian',
+    'bisexual',
+    'pronoun',
+    'pronouns',
+  ],
 };
 
 export const SETTING_DEFAULTS: { readonly [K in SettingKey]: SettingValues[K] } = {
@@ -649,6 +867,7 @@ export const SETTING_DEFAULTS: { readonly [K in SettingKey]: SettingValues[K] } 
   ],
   'listings.flagged_phrases': FLAGGED_PHRASES,
   'listings.flagged_nationalities': FLAGGED_NATIONALITIES,
+  'listings.flagged_groups': FLAGGED_GROUPS,
   'listings.question_topics': QUESTION_TOPIC_PHRASES,
   'listings.vague_pay_range_ratio': 2.5,
   'listings.min_wage_cents_by_state': MIN_WAGE_CENTS_2026,
@@ -785,17 +1004,31 @@ const flaggedPhrases = z
   .max(1000)
   .refine(...unique<FlaggedPhrase>((f) => phraseKey(f.phrase), 'phrases'));
 
+/** A word for people: letters, spaces, hyphens and apostrophes. */
+const peopleWord = z
+  .string()
+  .trim()
+  .min(2)
+  .max(60)
+  .regex(/^[\p{L}][\p{L} '-]*$/u, 'use letters, spaces, hyphens and apostrophes');
+
 const nationalities = z
-  .array(
-    z
-      .string()
-      .trim()
-      .min(2)
-      .max(60)
-      .regex(/^[\p{L}][\p{L} '-]*$/u, 'use letters, spaces, hyphens and apostrophes'),
-  )
+  .array(peopleWord)
   .max(500)
   .refine(...unique<string>(phraseKey, 'nationalities'));
+
+const flaggedGroups = z
+  .array(
+    z.strictObject({
+      term: peopleWord,
+      ground: z.enum(WORDING_GROUNDS),
+      form: z.enum(GROUP_FORMS),
+      suggestion: z.string().trim().min(1).max(300),
+    }),
+  )
+  .min(1)
+  .max(500)
+  .refine(...unique<FlaggedGroup>((g) => phraseKey(g.term), 'group words'));
 
 const questionTopics = z.strictObject(
   Object.fromEntries(QUESTION_TOPICS.map((topic) => [topic, phrases])) as Record<
@@ -824,6 +1057,7 @@ export const SETTING_SCHEMAS: { readonly [K in SettingKey]: z.ZodType<SettingVal
   'listings.prohibited_phrases': z.array(z.string().trim().min(2).max(100)).min(1).max(200),
   'listings.flagged_phrases': flaggedPhrases,
   'listings.flagged_nationalities': nationalities,
+  'listings.flagged_groups': flaggedGroups,
   'listings.question_topics': questionTopics,
   'listings.vague_pay_range_ratio': z.number().min(1).max(10),
   'listings.min_wage_cents_by_state': minWages,
