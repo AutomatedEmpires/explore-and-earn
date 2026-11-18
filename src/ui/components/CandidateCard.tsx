@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { MouseEvent } from 'react';
 import type { Category } from '@/ui/categories';
 import {
@@ -11,6 +12,7 @@ import {
   Star,
   Target,
   X,
+  type IconComponent,
 } from '@/ui/icons';
 import { Avatar } from './Avatar';
 import { Badge } from './Badge';
@@ -40,7 +42,8 @@ type CandidateBase = {
   availableThrough?: string;
   /** Second line of the Resume chip, e.g. "3 seasons". */
   resume: { summary: string };
-  fit: { score: number; label?: string };
+  /** Null when fit is off for the listing: the chip reads "—" and still opens. */
+  fit: { score: number; label?: string } | null;
   skills: { count: number };
   onOpenChip?: (chip: CandidateCardChip) => void;
   onOpen?: (event: MouseEvent<HTMLAnchorElement>) => void;
@@ -56,6 +59,11 @@ export type ApplicantCardProps = CandidateBase & {
   onPass?: () => void;
   onInterview?: () => void;
   onShortlist?: () => void;
+  /**
+   * The primary button between Pass and Shortlist. Interview by default; flow D's Applicants
+   * uses Reply. With `href` it is a link; otherwise it calls `onInterview`.
+   */
+  primaryAction?: { label: string; icon?: IconComponent; href?: string };
 };
 
 export type PoolCandidateCardProps = CandidateBase & {
@@ -71,6 +79,27 @@ export type CandidateCardProps = ApplicantCardProps | PoolCandidateCardProps;
 function appliedAgo(days: number): string {
   if (days <= 0) return 'Applied today';
   return `Applied ${days} ${days === 1 ? 'day' : 'days'} ago`;
+}
+
+function ApplicantPrimary({ props }: { props: ApplicantCardProps }) {
+  const { label, icon: Icon = CalendarDays, href } = props.primaryAction ?? {
+    label: 'Interview',
+  };
+  if (href) {
+    return (
+      <Button asChild size="lg" className="flex-1">
+        <Link href={href}>
+          <Icon className="size-5" />
+          {label}
+        </Link>
+      </Button>
+    );
+  }
+  return (
+    <Button size="lg" icon={Icon} className="flex-1" onClick={props.onInterview}>
+      {label}
+    </Button>
+  );
 }
 
 /**
@@ -160,10 +189,14 @@ export function CandidateCard(props: CandidateCardProps) {
           label="Fit"
           icon={Target}
           value={
-            <>
-              {fit.score}
-              {fit.label ? <span className="font-semibold text-muted"> · {fit.label}</span> : null}
-            </>
+            fit ? (
+              <>
+                {fit.score}
+                {fit.label ? <span className="font-semibold text-muted"> · {fit.label}</span> : null}
+              </>
+            ) : (
+              '—'
+            )
           }
           onOpen={open('fit')}
         />,
@@ -179,9 +212,7 @@ export function CandidateCard(props: CandidateCardProps) {
         props.variant === 'applicant' ? (
           <>
             <IconButton icon={X} label="Pass" variant="outline" size="lg" onClick={props.onPass} />
-            <Button size="lg" icon={CalendarDays} className="flex-1" onClick={props.onInterview}>
-              Interview
-            </Button>
+            <ApplicantPrimary props={props} />
             <IconButton
               icon={Star}
               label="Shortlist"
