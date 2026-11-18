@@ -1,6 +1,8 @@
 // `pnpm ops:replay-deletions --since <ISO time> [--apply] [--summary <file>]`: after a restore,
-// erases again every user whose erasure was mirrored to the backup project since `--since` (the
-// backup's `takenAt`).
+// erases again every user whose erasure was mirrored to the backup project from one hour before
+// `--since` (the restore point: the backup's `takenAt`). The hour covers an erasure that
+// committed just after the snapshot with a ledger time just before it; a user the database
+// already shows as erased is skipped.
 //
 // DRY RUN BY DEFAULT. Without `--apply` it changes nothing and reports how many erasures it
 // would replay. With `--apply` it erases those users in DATABASE_URL, which cannot be undone.
@@ -12,7 +14,11 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { closeClient, createDb } from '../src/lib/db';
 import { logger } from '../src/lib/logger';
-import { engineLedgerMirror, replayDeletions } from '../src/server/ops/replay-deletions';
+import {
+  engineLedgerMirror,
+  replayDeletions,
+  replayFrom,
+} from '../src/server/ops/replay-deletions';
 
 const USAGE = 'usage: pnpm ops:replay-deletions --since <ISO time> [--apply] [--summary <file>]';
 
@@ -48,6 +54,7 @@ try {
   const report = {
     dryRun: !apply,
     since: since.toISOString(),
+    from: replayFrom(since).toISOString(),
     replayed: result.replayed,
     skipped: result.skipped,
     pending: result.pending,

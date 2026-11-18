@@ -11,10 +11,12 @@ How Explore&Earn's off-platform backup works, how to set it up, and how to turn 
 | What | Where it goes | Kept for |
 |---|---|---|
 | Supabase's own daily backup of `ee-prod` | Supabase (Pro plan) | 7 days |
-| A dump of schema `app`, with a manifest | `ee-backup`, bucket `backups`, `pg/<date>/` | 35 days |
+| A dump of schema `app`, with a manifest | `ee-backup`, bucket `backups`, `pg/<date>/` | 35 days from `<date>` |
 | Buckets `media-public` and `media-private` | `ee-backup`, bucket `backups`, `files/<bucket>/` | Current copy |
-| Files changed or deleted in those buckets | `ee-backup`, bucket `backups`, `files-deleted/<date>/<bucket>/` | 35 days |
+| Files changed or deleted in those buckets | `ee-backup`, bucket `backups`, `files-deleted/<date>/<bucket>/` | 35 days from the day they were changed or deleted |
 | The deletion ledger (who was erased, IDs only) | `ee-backup`, bucket `ledger`, `<date>/<ledgerId>.json` | Never deleted |
+
+`<date>` is the UTC day of the run that wrote the folder. The last step of each run deletes a dated folder once its date is more than 35 days before the run's date, so a file deleted on 15 January is still there on 19 February and goes on the 20 February run. It goes by the date in the folder's name and never by a file's own time: rclone keeps a file's modification time when it moves it into `files-deleted/`, so a photo uploaded 60 days ago and deleted today carries a 60-day-old time, and pruning by file age would delete it the same night. `scripts/backup-prune.ts` decides which folders are due (`src/server/ops/backup-prune.ts`, with its tests); a folder whose name is not a date is never deleted and is named in the run log.
 
 Everything in bucket `backups` is encrypted by rclone before it leaves the GitHub runner, file names included. Without `BACKUP_CRYPT_PASSWORD` and `BACKUP_CRYPT_SALT` the bucket cannot be read. **Keep a second copy of those two values outside Doppler** (a password manager). If they are lost, every backup is lost.
 
@@ -29,6 +31,8 @@ Everything in bucket `backups` is encrypted by rclone before it leaves the GitHu
 Each dump has a `manifest.json` beside it: the time it was taken, the applied migrations, and for every table in schema `app` its row count and newest `created_at`. The restore drill compares it with the restored database, so a restore that lost rows fails instead of looking fine.
 
 The dump and the manifest read **one snapshot**. `pnpm backup:manifest --dump` opens a read-only transaction, exports its snapshot, counts the rows inside it, and runs `pg_dump --snapshot=<id>` while that transaction stays open. Busy tables then match exactly. Never run `pg_dump` and the manifest as two separate sessions: the counts would differ and the drill would fail for no real reason.
+
+The manifest's `takenAt` is read just **before** the transaction begins, so it is never later than the snapshot. After a restore, `pnpm ops:replay-deletions` replays erasures from an hour before `takenAt` ([restore.md](restore.md)); a `takenAt` later than the snapshot could let an erasure that committed during the dump be undone.
 
 ## How it is kept off
 
@@ -116,7 +120,8 @@ Create the two GitHub environments (Settings → Environments):
 1. Set the repository variable `BACKUPS_ENABLED` to `true` (Settings → Secrets and variables → Actions → Variables).
 2. Actions → Backup → Run workflow, on `main`.
 3. Check the run: the "Upload" step ends with rclone's check reporting 0 differences, and `ee-backup` bucket `backups` has new (encrypted) objects.
-4. Run a restore drill ([restore.md](restore.md)). A backup that has never been restored is not yet a backup.
+4. Check that deleted files are kept. The first run moves nothing into `files-deleted/`. After a later run, `rclone lsf --dirs-only backupcrypt:files-deleted/` lists a folder named with that run's date if any file was deleted or replaced since the run before; check after the next run that the folder and its files are still there. Do not delete a production file to test this.
+5. Run a restore drill ([restore.md](restore.md)). A backup that has never been restored is not yet a backup.
 
 ### 6. Make it nightly
 
@@ -177,5 +182,7 @@ Do not restore a file that was removed by a moderation decision or by a user's d
 | The dump step fails with "permission denied for table" | A table was created by a role other than the one that ran `alter default privileges`. Re-run `grant select on all tables in schema app to backup_reader` |
 | The dump has tables but 0 rows | The role lost `bypassrls`. Run `alter role backup_reader bypassrls` |
 | rclone fails with a signature or region error | Set `PROD_S3_REGION` or `BACKUP_S3_REGION` to the project's region |
+| "Could not list backupcrypt:files-deleted/" on the first run | Nothing has been deleted from the live buckets yet, so the folder does not exist. Nothing was pruned; no action |
+| "backup-prune: not a dated folder, left in place" | Someone put a folder that is not a date under `pg/` or `files-deleted/`. It is never deleted automatically. Move or delete it by hand after checking what it is |
 
 A failed backup deletes nothing: the pruning step runs only after the upload has been checked.

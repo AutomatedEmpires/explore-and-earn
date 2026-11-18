@@ -49,8 +49,8 @@ It reads nothing until all three of these are true:
 | Restore | `pg_restore` loads the newest dump with no error |
 | Migrations | `pnpm db:migrate` applies nothing. The dump already holds every migration in the commit |
 | Row counts | `pnpm backup:manifest --verify` finds no difference from the manifest taken with the dump, and the dump is at most 24 hours old |
-| Deletions | `pnpm ops:replay-deletions --since <takenAt> --apply` replays every erasure mirrored since the dump, with none failing |
-| Tests | `tests/restore` passes: every mirrored user is erased, and `schema_migrations` lists every file in `drizzle/` |
+| Deletions | `pnpm ops:replay-deletions --since <takenAt> --apply` replays every erasure mirrored from one hour before the dump's `takenAt`, with none failing |
+| Tests | `tests/restore` passes: every user mirrored over that same window is erased, and `schema_migrations` lists every file in `drizzle/` |
 | Time | The whole job took at most 8 hours |
 
 `restore-summary.json` looks like this:
@@ -101,6 +101,8 @@ Both are **dry runs by default**. Without `--apply` they change nothing and prin
 `ops:replay-deletions` needs `DATABASE_URL`, `BACKUP_SUPABASE_URL` and `BACKUP_SUPABASE_SERVICE_ROLE_KEY`. `ops:resync-clerk` needs `DATABASE_URL` and `CLERK_SECRET_KEY`. Both are safe to run twice: a second run finds nothing left to do.
 
 `--since` is the restore point: the `takenAt` in the dump's `manifest.json`, or for a Supabase restore the time of the backup you restored. When unsure, use an earlier time. Replaying an erasure the database already has is skipped, and missing one leaves a deleted person's data in place.
+
+The command starts **one hour before** `--since`, and its summary shows that time as `from`. Two clocks are involved: the erasing job stamps a ledger entry with its own time just before the erasure commits, and `takenAt` is read on the backup runner just before the snapshot begins. An erasure that commits just after the snapshot is missing from the dump but can carry a ledger time a little before `takenAt`. Without the hour it would be skipped, and the restore would bring that person back for good. The hour costs nothing: entries the restored database already reflects are skipped.
 
 ## A real incident
 
