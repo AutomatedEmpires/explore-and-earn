@@ -268,6 +268,29 @@ describe('the verification.run job', () => {
     expect(await getVerificationStatus(t.db, org.orgId)).toBe('verified');
   });
 
+  it('checks the card on file against the banned list with the default signal sources', async () => {
+    // As above: a `.test` email and no website, so nothing is fetched over the network.
+    const org = await seedHostOrg(t.db, { ownerEmail: `sam-${short()}@kettle.test` });
+    const print = `Fp${short()}Banned`;
+    billingFake.setCardChecks(org.orgId, {
+      hasCard: true,
+      cvcCheck: 'pass',
+      postalCheck: 'pass',
+      fingerprint: print,
+    });
+    await t.db.execute(sql`
+      insert into app.verification_banned_fingerprints (id, kind, value)
+      values (${newId()}, 'card', ${print})
+    `);
+    await t.db.execute(sql`delete from app.outbox where topic = 'verification.run'`);
+    await startVerification(t.db, org.orgId, newId());
+    await runWorker(t.db, { handlers: { 'verification.run': must(jobHandlers['verification.run']) } });
+    expect(await getVerificationStatus(t.db, org.orgId)).toBe('needs_review');
+    expect(await items(org.orgId)).toEqual([
+      expect.objectContaining({ queue: 'fraud', reason: 'manual_review:banned_fingerprint' }),
+    ]);
+  });
+
   it('sends an org with no card on file to the fraud queue', async () => {
     const { orgId } = await seedOrg();
     billingFake.setCardChecks(orgId, { hasCard: false, cvcCheck: null, postalCheck: null });
@@ -357,10 +380,14 @@ describe('the verification.run job', () => {
 
   it('sends a card country and name that do not fit to manual review', async () => {
     const { orgId } = await seedOrg({ website: 'https://www.kettle-lodge.com' });
-    const row = await verify(orgId, {
-      ...signalDeps(),
-      cardProfile: { country: 'CA', name: 'Other Lodge' },
+    billingFake.setCardChecks(orgId, {
+      hasCard: true,
+      cvcCheck: 'pass',
+      postalCheck: 'pass',
+      country: 'CA',
+      name: 'Other Lodge',
     });
+    const row = await verify(orgId);
     expect(row.status).toBe('needs_review');
     expect(await items(orgId)).toEqual([
       expect.objectContaining({ reason: 'manual_review:card_country,card_name' }),
@@ -508,6 +535,56 @@ describe('operator decisions (subject organization)', () => {
       sql`select status from app.organizations where id = ${org.orgId}`,
     );
     expect(status?.status).toBe('suspended');
+  });
+
+  it('a ban (a confirmed fake host) bans the card on file, after the decision commits', async () => {
+    const { org, row } = await inReview();
+    const print = `Fp${short()}Fake`;
+    billingFake.setCardChecks(org.orgId, {
+      hasCard: true,
+      cvcCheck: 'pass',
+      postalCheck: 'pass',
+      fingerprint: print,
+    });
+    await decide(t.db, must(row.review_item_id), operatorId, 'ban');
+    const [status] = await queryRows<{ status: string }>(
+      t.db,
+      sql`select status from app.organizations where id = ${org.orgId}`,
+    );
+    expect(status?.status).toBe('banned');
+
+    const banned = () =>
+      queryRows<{ kind: string; value: string }>(
+        t.db,
+        sql`select kind, value from app.verification_banned_fingerprints where value = ${print}`,
+      );
+    // The Stripe read runs in a job, outside the decision's transaction.
+    expect(await banned()).toEqual([]);
+    const jobs = await queryRows<{ id: string }>(
+      t.db,
+      sql`select id from app.outbox where topic = 'verification.ban_fingerprints'
+        and payload->>'orgId' = ${org.orgId}`,
+    );
+    expect(jobs).toHaveLength(1);
+    await runWorker(t.db, {
+      handlers: {
+        'verification.ban_fingerprints': must(jobHandlers['verification.ban_fingerprints']),
+      },
+    });
+    expect(await banned()).toEqual([{ kind: 'card', value: print }]);
+
+    // The next host who signs up with that card waits for an operator.
+    const again = await seedOrg({ website: 'https://www.kettle-lodge.com' });
+    billingFake.setCardChecks(again.orgId, {
+      hasCard: true,
+      cvcCheck: 'pass',
+      postalCheck: 'pass',
+      fingerprint: print,
+    });
+    expect((await verify(again.orgId)).status).toBe('needs_review');
+    expect(await items(again.orgId)).toEqual([
+      expect.objectContaining({ reason: 'manual_review:banned_fingerprint' }),
+    ]);
   });
 });
 

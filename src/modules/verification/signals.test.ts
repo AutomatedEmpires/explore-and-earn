@@ -3,6 +3,7 @@
 // operator blocklist. Sibling SP2 modules are W0 fakes; settings is real.
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { billingFake } from '../../../tests/fakes/sp2/billing';
 import { locationsFake } from '../../../tests/fakes/sp2/locations';
@@ -10,6 +11,7 @@ import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { FIXED_NOW, seedHostOrg } from '../../../tests/helpers/sp2';
 import {
   FREE_EMAIL_DOMAINS,
+  banFingerprints,
   brandCareersMismatch,
   cardFitsBusiness,
   collectSignals,
@@ -211,7 +213,7 @@ describe('collectSignals', () => {
     expect(hardFlags(s)).toEqual(['cvc_failed']);
   });
 
-  it('reads a banned fingerprint, a brand careers mismatch and a card that does not fit', async () => {
+  it('reads a banned device, a brand careers mismatch, and the card on file from billing', async () => {
     const orgId = await org('sam@gmail.com', 'https://hilton.example');
     await t.db.execute(sql`
       insert into app.verification_banned_fingerprints (id, kind, value)
@@ -222,10 +224,17 @@ describe('collectSignals', () => {
       values ('Kettle Ridge', 'kettle.com')
     `);
     locationsFake.setLocation({ id: newId(), orgId, state: 'MT' });
+    billingFake.setCardChecks(orgId, {
+      hasCard: true,
+      cvcCheck: 'pass',
+      postalCheck: 'pass',
+      fingerprint: 'Fp1Kettle',
+      country: 'GB',
+      name: 'Someone Else',
+    });
     const s = await collectSignals(t.db, orgId, {
       ...deps().deps,
       fingerprints: { device: 'DEV-1' },
-      cardProfile: { country: 'GB', name: 'Someone Else' },
     });
     expect(s).toMatchObject({
       bannedFingerprint: true,
@@ -234,6 +243,81 @@ describe('collectSignals', () => {
       cardNameFits: false,
       freeEmail: true,
     });
+    // The stored signals keep no card print and no cardholder name.
+    expect(JSON.stringify(s)).not.toContain('Fp1Kettle');
+    expect(JSON.stringify(s)).not.toContain('Someone Else');
+  });
+
+  it('checks the card print on file against the banned list exactly as Stripe gives it', async () => {
+    const orgId = await org('owner@prints.com');
+    const card = (fingerprint: string) =>
+      billingFake.setCardChecks(orgId, {
+        hasCard: true,
+        cvcCheck: 'pass',
+        postalCheck: 'pass',
+        fingerprint,
+      });
+    await banFingerprints(t.db, { card: 'Fp2Kettle' });
+
+    card('Fp2Kettle');
+    expect((await collectSignals(t.db, orgId, deps().deps)).bannedFingerprint).toBe(true);
+    // Stripe prints are case-sensitive: one that differs only in case is another card.
+    card('fp2kettle');
+    expect((await collectSignals(t.db, orgId, deps().deps)).bannedFingerprint).toBe(false);
+    card('FP2KETTLE');
+    expect((await collectSignals(t.db, orgId, deps().deps)).bannedFingerprint).toBe(false);
+  });
+
+  it('fits a card in the name of one of the org members, or of the business with its suffix', async () => {
+    // seedHostOrg's Owner is Sam Rivera.
+    const orgId = await org('owner@fits.com');
+    locationsFake.setLocation({ id: newId(), orgId, state: 'WA' });
+    const named = async (name: string) => {
+      billingFake.setCardChecks(orgId, {
+        hasCard: true,
+        cvcCheck: 'pass',
+        postalCheck: 'pass',
+        country: 'US',
+        name,
+      });
+      return collectSignals(t.db, orgId, deps().deps);
+    };
+    expect(await named('SAM RIVERA')).toMatchObject({ cardNameFits: true, cardCountryFits: true });
+    expect(await named('Kettle Ridge Lodge, LLC')).toMatchObject({ cardNameFits: true });
+    expect(await named('Jordan Blake')).toMatchObject({ cardNameFits: false });
+  });
+});
+
+describe('banFingerprints', () => {
+  const rows = () =>
+    queryRows<{ kind: string; value: string }>(
+      t.db,
+      sql`select kind, value from app.verification_banned_fingerprints order by kind, value`,
+    );
+
+  it('stores a card print exactly and a device or phone lowercased, each once', async () => {
+    expect(
+      await banFingerprints(t.db, { card: ' Fp3Kettle ', device: ' DEV-9 ', phone: '+1 555 010 0199' }),
+    ).toBe(3);
+    expect(
+      await banFingerprints(t.db, { card: 'Fp3Kettle', device: 'dev-9', phone: '+1 555 010 0199' }),
+    ).toBe(0);
+    expect(await banFingerprints(t.db, { card: null, device: '  ', phone: undefined })).toBe(0);
+    expect(await rows()).toEqual([
+      { kind: 'card', value: 'Fp3Kettle' },
+      { kind: 'device', value: 'dev-9' },
+      { kind: 'phone', value: '+1 555 010 0199' },
+    ]);
+  });
+
+  it('matches a banned device whatever its case', async () => {
+    const orgId = await org('owner@devices.com');
+    await banFingerprints(t.db, { device: 'Phone-Home' });
+    const s = await collectSignals(t.db, orgId, {
+      ...deps().deps,
+      fingerprints: { device: 'PHONE-home' },
+    });
+    expect(s.bannedFingerprint).toBe(true);
   });
 });
 
@@ -320,6 +404,46 @@ describe('the signals that wait for an operator', () => {
       countryFits: null,
       nameFits: null,
     });
+    expect(cardFitsBusiness({ country: 'US', name: ' .,- ' }, { name: 'Lodge', inUs: true })).toEqual({
+      countryFits: true,
+      nameFits: null,
+    });
+  });
+
+  it('matches a card name across case, punctuation, legal suffixes and a close spelling', () => {
+    const fits = (card: string, name = 'Kettle Ridge Lodge') =>
+      cardFitsBusiness({ country: 'US', name: card }, { name, inUs: true }).nameFits;
+    expect(fits('KETTLE RIDGE LODGE')).toBe(true);
+    expect(fits('Kettle Ridge Lodge, LLC')).toBe(true);
+    expect(fits('KETTLE RIDGE LODGE L.L.C.')).toBe(true);
+    expect(fits('Kettle Ridge Lodge Inc.')).toBe(true);
+    expect(fits('The Kettle Ridge Lodge Co')).toBe(true);
+    expect(fits('Kettle-Ridge Lodge')).toBe(true);
+    expect(fits('KETTLE RIDGE LODG')).toBe(true);
+    expect(fits('Kettle Rdge Lodge')).toBe(true);
+    expect(fits('Ketle Rige Lodge')).toBe(true);
+    expect(fits('Kettle Ridge Lodge', 'Kettle Ridge Lodge LLC')).toBe(true);
+    expect(fits('Café Rosé', 'CAFE ROSE')).toBe(true);
+    expect(fits('Smith & Sons', 'Smith and Sons Inc')).toBe(true);
+    // Not close enough.
+    expect(fits('Lodge')).toBe(false);
+    expect(fits('Ridge Lodge')).toBe(false);
+    expect(fits('Copper Ridge Lodge')).toBe(false);
+    expect(fits('LLC')).toBe(false);
+    expect(fits('Sam Lee', 'Pam Lee')).toBe(false);
+  });
+
+  it('matches a card in the name of one of the org people, with or without a middle initial', () => {
+    const fits = (card: string) =>
+      cardFitsBusiness(
+        { country: 'US', name: card },
+        { name: 'Kettle Ridge Lodge', inUs: true, people: ['Sam Rivera', 'Alex Kim', null] },
+      ).nameFits;
+    expect(fits('SAM RIVERA')).toBe(true);
+    expect(fits('Sam J. Rivera')).toBe(true);
+    expect(fits('ALEX KIM')).toBe(true);
+    expect(fits('Jordan Blake')).toBe(false);
+    expect(fits('Sam')).toBe(false);
   });
 
   it('flags a known brand whose email is not that brand\'s careers contact', () => {

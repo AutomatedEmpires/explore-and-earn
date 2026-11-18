@@ -3,12 +3,13 @@
 // host* (SP4 plan): authorizeHostApplication requires owner, admin or recruiter (403, reason
 // role_not_allowed) and canAccessListing (404). Billing members get 403. A seeker who blocked
 // the org is not_found. FD-2: the PDF is rendered from the frozen snapshot, never an upload.
-// A host whose verification is running, needs_review, needs_info or failed gets 409
-// `verification_<status>` before anything is read, rendered or audited (legal review 7.1).
+// A host that is not verified gets 409 `verification_<status>` before anything is read, rendered
+// or audited (legal review 7.1). A new host's download counts against its daily profile-view
+// cap (429 `new_host_daily_cap` over it) and queues the silent-host check (legal review 7.3).
 import { forbidden, notFound } from '@/lib/errors';
-import { authorizeHostApplication, getSnapshot } from '@/modules/applications';
-import { record } from '@/modules/audit';
+import { authorizeHostApplication, getSnapshot, recordHostOpen } from '@/modules/applications';
 import { idParamSchema, renderResumePdf, resumePdfResponse } from '@/modules/profiles';
+import { requireProfileView } from '@/modules/verification';
 import { apiRoute } from '@/server/api';
 import { requireVerifiedHost } from '../../_shared/verified-host';
 
@@ -24,6 +25,7 @@ export const GET = apiRoute({
     if (!host) throw forbidden();
     await requireVerifiedHost(db, host.orgId);
     const ref = await authorizeHostApplication(db, host, input.id);
+    await requireProfileView(db, host.orgId, ref.seekerUserId);
     const snapshot = await getSnapshot(db, {
       orgId: ref.orgId,
       applicationId: ref.applicationId,
@@ -32,13 +34,10 @@ export const GET = apiRoute({
     const bytes = await renderResumePdf(snapshot.profile, snapshot.resume.template, {
       creationDate: ref.submittedAt,
     });
-    await record(db, {
-      actorType: 'user',
-      actorId: host.user.id,
-      orgId: ref.orgId,
+    await recordHostOpen(db, host, {
+      applicationId: ref.applicationId,
+      listingId: ref.listingId,
       action: 'applications.resume_downloaded',
-      subjectType: 'application',
-      subjectId: ref.applicationId,
     });
     return resumePdfResponse(bytes, snapshot.profile);
   },

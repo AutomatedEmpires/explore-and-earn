@@ -2,6 +2,7 @@
 // `interested` stage only after the seeker answers Interested and a reveal exists, only on a
 // listing in scope, and never when SP4 drops the card (a block either way).
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { rateLimited } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import type { CandidateCard, PoolCard, ProfileSnapshotV1 } from '@/lib/profiles';
 import type { HostContext } from '@/server/guards';
@@ -15,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   getCandidateCards: vi.fn(),
   revealed: new Set<string>(),
   hostApplicantGate: vi.fn(),
+  requireProfileView: vi.fn(),
 }));
 
 vi.mock('@/modules/listings', async (orig) => ({
@@ -41,6 +43,7 @@ vi.mock('@/modules/messaging', async (orig) => ({
 vi.mock('@/modules/verification', async (orig) => ({
   ...(await orig<typeof import('@/modules/verification')>()),
   hostApplicantGate: mocks.hostApplicantGate,
+  requireProfileView: mocks.requireProfileView,
 }));
 
 import '../notification-types';
@@ -118,6 +121,8 @@ beforeEach(() => {
   mocks.getCandidateCards.mockImplementation(interestedCards);
   mocks.hostApplicantGate.mockReset();
   mocks.hostApplicantGate.mockResolvedValue({ ok: true });
+  mocks.requireProfileView.mockReset();
+  mocks.requireProfileView.mockResolvedValue(undefined);
 });
 
 function setRevealed(orgId: string, seekerUserId: string): void {
@@ -207,5 +212,34 @@ describe('getInterestedCandidate', () => {
       details: { reason: 'verification_failed' },
     });
     expect(mocks.getCandidateCards).not.toHaveBeenCalled();
+  });
+
+  it("counts the view of the seeker's profile against the new-host daily cap (legal review 7.3)", async () => {
+    const s = await setup();
+    await respondToInvite(t.db, s.seekerUserId, s.inviteId, { response: 'interested' }, NOW);
+    setRevealed(s.orgId, s.seekerUserId);
+    await getInterestedCandidate(t.db, s.ctx, s.inviteId, NOW);
+    expect(mocks.requireProfileView).toHaveBeenCalledWith(expect.anything(), s.orgId, s.seekerUserId, NOW);
+
+    mocks.getCandidateCards.mockClear();
+    mocks.requireProfileView.mockRejectedValueOnce(
+      rateLimited('Over the cap', { reason: 'new_host_daily_cap' }),
+    );
+    await expect(getInterestedCandidate(t.db, s.ctx, s.inviteId, NOW)).rejects.toMatchObject({
+      status: 429,
+      details: { reason: 'new_host_daily_cap' },
+    });
+    expect(mocks.getCandidateCards).not.toHaveBeenCalled();
+  });
+
+  it('counts no view for an invite it refuses', async () => {
+    const s = await setup();
+    await expect(getInterestedCandidate(t.db, s.ctx, s.inviteId, NOW)).rejects.toMatchObject({ code: 'not_found' });
+    mocks.hostApplicantGate.mockResolvedValue({ ok: false, reason: 'unverified' });
+    await respondToInvite(t.db, s.seekerUserId, s.inviteId, { response: 'interested' }, NOW);
+    await expect(getInterestedCandidate(t.db, s.ctx, s.inviteId, NOW)).rejects.toMatchObject({
+      details: { reason: 'verification_unverified' },
+    });
+    expect(mocks.requireProfileView).not.toHaveBeenCalled();
   });
 });

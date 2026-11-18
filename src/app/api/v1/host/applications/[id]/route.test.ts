@@ -38,7 +38,7 @@ describe('GET /api/v1/host/applications/{id}', () => {
     expect(mocks.getHostApplication).toHaveBeenCalledWith(t.db, host, APP_ID);
   });
 
-  it.each(['running', 'needs_review', 'needs_info', 'failed'] as const)(
+  it.each(['unverified', 'running', 'needs_review', 'needs_info', 'failed'] as const)(
     'refuses a host whose verification is %s with 409 before reading or auditing',
     async (status) => {
       await signedInHost(status);

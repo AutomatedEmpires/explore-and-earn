@@ -358,6 +358,89 @@ describe('releasing a message later', () => {
       expect(await unreadThreadCount(t.db, seeded.seekerId)).toBe(1);
     }
   });
+
+  // An item can be open on a message the scan has not released yet: the scan opens it before
+  // it stores the state, and a report can land on it.
+  async function pendingWithItem(body: string) {
+    const seeded = await seedThread(t.db);
+    const host = hostViewer(seeded.ownerId, seeded.orgId, 'owner');
+    const sent = await sendMessage(t.db, host, seeded.threadId, { clientId: newId(), body });
+    const { openReviewItem } = await import('@/modules/trust');
+    const item = await openReviewItem(t.db, {
+      queue: 'moderation',
+      subjectType: 'message',
+      subjectId: sent.message.id,
+      reason: 'report',
+    });
+    return { seeded, host, messageId: sent.message.id, itemId: item.id };
+  }
+
+  it('delivers a pending message when an operator approves it, as a scan release does', async () => {
+    const minute = 60_000;
+    const { seeded, messageId, itemId } = await pendingWithItem('On my way');
+    await t.db
+      .update(messages)
+      .set({ createdAt: new Date(Date.now() - 10 * minute) })
+      .where(eq(messages.id, messageId));
+    await t.db.insert(threadReads).values({
+      threadId: seeded.threadId,
+      userId: seeded.seekerId,
+      lastReadAt: new Date(Date.now() - 5 * minute),
+    });
+    const before = Date.now();
+    await decide(t.db, itemId, operatorId, 'approve');
+
+    const [row] = await t.db.select().from(messages).where(eq(messages.id, messageId));
+    expect(row?.scanState).toBe('clear');
+    const seeker = await getThread(t.db, seekerViewer(seeded.seekerId), seeded.threadId);
+    expect(seeker.messages.map((message) => message.id)).toContain(messageId);
+    expect(await seekerNotes(seeded.seekerId)).toBe(1);
+    const [thread] = await t.db.select().from(threads).where(eq(threads.id, seeded.threadId));
+    expect(thread?.lastToSeekerAt?.getTime()).toBeGreaterThanOrEqual(before);
+    expect(thread?.firstHostReplyAt).toEqual(row?.createdAt);
+    const list = await listThreads(t.db, seekerViewer(seeded.seekerId));
+    expect(list.items.find((card) => card.threadId === seeded.threadId)).toMatchObject({
+      unread: true,
+      lastMessage: { preview: 'On my way' },
+    });
+
+    // The scan job queued at send finds the message released and delivers nothing more.
+    await runWorker(t.db, { handlers: jobHandlers });
+    expect(await seekerNotes(seeded.seekerId)).toBe(1);
+    const [after] = await t.db.select().from(messages).where(eq(messages.id, messageId));
+    expect(after?.scanState).toBe('clear');
+  });
+
+  it('holds an approved pending message once the seeker has blocked the org', async () => {
+    const { seeded, host, messageId, itemId } = await pendingWithItem('On my way');
+    safetyFake.setBlocked(seeded.orgId, seeded.seekerId);
+    await decide(t.db, itemId, operatorId, 'approve');
+
+    const [row] = await t.db.select().from(messages).where(eq(messages.id, messageId));
+    expect(row?.scanState).toBe('held');
+    const seeker = await getThread(t.db, seekerViewer(seeded.seekerId), seeded.threadId);
+    expect(seeker.messages.map((message) => message.id)).not.toContain(messageId);
+    expect(seeker.readOnly).toBe('blocked');
+    const hostView = await getThread(t.db, host, seeded.threadId);
+    expect(hostView.messages.find((message) => message.id === messageId)?.state).toBe(
+      'not_delivered',
+    );
+    expect(await seekerNotes(seeded.seekerId)).toBe(0);
+    const [thread] = await t.db.select().from(threads).where(eq(threads.id, seeded.threadId));
+    expect(thread?.lastToSeekerAt).toBeNull();
+  });
+
+  it('holds an approved pending message on a thread that became read-only', async () => {
+    const { seeded, messageId, itemId } = await pendingWithItem('On my way');
+    await withTx(t.db, (tx) => setThreadReadOnly(tx, seeded.threadId, 'withdrawn'));
+    await decide(t.db, itemId, operatorId, 'approve');
+
+    const [row] = await t.db.select().from(messages).where(eq(messages.id, messageId));
+    expect(row?.scanState).toBe('held');
+    expect(await seekerNotes(seeded.seekerId)).toBe(0);
+    const [thread] = await t.db.select().from(threads).where(eq(threads.id, seeded.threadId));
+    expect(thread?.lastToSeekerAt).toBeNull();
+  });
 });
 
 describe('one client id, two sends', () => {

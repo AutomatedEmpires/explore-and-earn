@@ -1,42 +1,105 @@
-// W1 replaces these with the export and erasure engine. W0 keeps the signatures.
-import type { HandlerMap } from '@/modules/jobs';
-import type { HoldScope, PrivacySubject } from './types';
-import { stubPrivacyHandler } from './handler-stub';
-import { CONSENT_TABLES } from './consent';
+// The privacy engine's barrel (Plan decision 32): legal holds, the module's own handler,
+// export, deletion, the ledger mirror and the overdue watch. Loading it registers the engine's
+// job handlers, its dead-letter follow-ups and the `privacy_request` trust subject.
+import { z } from 'zod';
+import { registerDeadLetterHandler, type HandlerMap } from '@/modules/jobs';
+import {
+  deactivateRequester,
+  finalizeDeletion,
+  handleDeadStep,
+  runEraseStep,
+} from './erase';
+import { finalizeExport, runExportStep } from './export';
+import { mirrorLedgerEntry } from './mirror';
+import {
+  DEACTIVATE_TOPIC,
+  ERASE_FINALIZE_TOPIC,
+  ERASE_STEP_TOPIC,
+  EXPORT_FINALIZE_TOPIC,
+  EXPORT_STEP_TOPIC,
+  LEDGER_MIRROR_TOPIC,
+  REQUEST_WATCH_TOPIC,
+} from './requests';
+import { registerPrivacySubjects } from './subjects';
+import { watchRequests } from './watch';
 
-const noop: HandlerMap[string] = async () => {};
+export {
+  activeHolds,
+  holdsInclude,
+  isOnLegalHold,
+  listLegalHolds,
+  releaseLegalHold,
+  setLegalHold,
+  type LegalHoldRow,
+} from './holds';
+export { privacyHandler } from './privacy';
+export {
+  listPrivacyRequests,
+  listPrivacyRequestsForConsole,
+  type ConsolePrivacyRequest,
+} from './requests';
+export {
+  finalizeExport,
+  getExportDownload,
+  requestExport,
+  runExportStep,
+  type ExportDeps,
+} from './export';
+export {
+  advanceErasure,
+  finalizeDeletion,
+  FINALIZE_MODULES,
+  LAST_WAVE_MODULES,
+  replayErasure,
+  requestDeletion,
+  runEraseStep,
+  type EraseDeps,
+} from './erase';
+export {
+  getLedgerMirror,
+  mirrorLedgerEntry,
+  NOOP_LEDGER_MIRROR,
+  type LedgerEntry,
+  type LedgerMirror,
+} from './mirror';
+export { watchRequests } from './watch';
 
-export const privacyHandler = stubPrivacyHandler('privacy', [...CONSENT_TABLES]);
-
-export async function activeHolds(_db: unknown, _subject: PrivacySubject): Promise<HoldScope[]> {
-  return [];
-}
-
-export async function isOnLegalHold(
-  _db: unknown,
-  _input: { userId?: string; orgId?: string; scope: HoldScope },
-): Promise<boolean> {
-  return false;
-}
-
-export function requestExport(_db: unknown, _userId: string): Promise<{ requestId: string }> {
-  return Promise.reject(new Error('not implemented: requestExport (W1)'));
-}
-
-export function requestDeletion(
-  _db: unknown,
-  _clerk: unknown,
-  _userId: string,
-): Promise<{ requestId: string }> {
-  return Promise.reject(new Error('not implemented: requestDeletion (W1)'));
-}
+const stepPayload = z.object({ stepId: z.uuid() });
+const requestPayload = z.object({ requestId: z.uuid() });
+const ledgerPayload = z.object({ ledgerId: z.uuid() });
 
 export const engineJobHandlers: HandlerMap = {
-  'privacy.export_step': noop,
-  'privacy.export_finalize': noop,
-  'privacy.deactivate': noop,
-  'privacy.erase_step': noop,
-  'privacy.erase_finalize': noop,
-  'privacy.ledger_mirror': noop,
-  'privacy.request_watch': noop,
+  [EXPORT_STEP_TOPIC]: async (payload, { db, now }) => {
+    await runExportStep(db, stepPayload.parse(payload).stepId, { now });
+  },
+  [EXPORT_FINALIZE_TOPIC]: async (payload, { db, now }) => {
+    await finalizeExport(db, requestPayload.parse(payload).requestId, { now });
+  },
+  [DEACTIVATE_TOPIC]: async (payload, { db }) => {
+    await deactivateRequester(db, requestPayload.parse(payload).requestId);
+  },
+  [ERASE_STEP_TOPIC]: async (payload, { db, now }) => {
+    await runEraseStep(db, stepPayload.parse(payload).stepId, { now });
+  },
+  [ERASE_FINALIZE_TOPIC]: async (payload, { db, now }) => {
+    await finalizeDeletion(db, requestPayload.parse(payload).requestId, { now });
+  },
+  [LEDGER_MIRROR_TOPIC]: async (payload, { db, now }) => {
+    await mirrorLedgerEntry(db, ledgerPayload.parse(payload).ledgerId, { now });
+  },
+  [REQUEST_WATCH_TOPIC]: async (_payload, { db, now }) => {
+    await watchRequests(db, now);
+  },
 };
+
+// A step whose job is dead reaches its request here (Plan decision 11), not through a sweep.
+for (const topic of [
+  EXPORT_STEP_TOPIC,
+  EXPORT_FINALIZE_TOPIC,
+  ERASE_STEP_TOPIC,
+  ERASE_FINALIZE_TOPIC,
+]) {
+  registerDeadLetterHandler(topic, (db, e) => handleDeadStep(db, topic, e));
+}
+
+registerPrivacySubjects();
