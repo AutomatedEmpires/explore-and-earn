@@ -235,7 +235,7 @@ describe('bulk messages', () => {
     expect(await t.db.select().from(messages).where(eq(messages.bulkId, other.bulkId))).toHaveLength(0);
   });
 
-  it('clears a warned bulk on approve but keeps a message an operator removed (#184)', async () => {
+  it('clears a warned bulk on approve but keeps a message an operator removed', async () => {
     const org = await seedHostOrg(t.db);
     const listingId = newId();
     const { applicationIds } = await applicants(org.orgId, listingId, 2);

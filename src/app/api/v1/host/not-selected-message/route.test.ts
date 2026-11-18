@@ -37,7 +37,7 @@ describe('not-selected message', () => {
     expect(saved.body).toEqual({ body: 'Custom thanks', isDefault: false });
   });
 
-  it('answers a Billing member 403 role_not_allowed on read and write (#184)', async () => {
+  it('answers a Billing member 403 role_not_allowed on read and write', async () => {
     const org = await seedHostOrg(t.db);
     const billing = await seedMember(t.db, org.orgId, 'billing');
     asHost(billing.ctx);

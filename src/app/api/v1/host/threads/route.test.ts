@@ -9,7 +9,7 @@ vi.mock('@/server/guards', async () => (await import('@tests/helpers/sp4')).guar
 const t = setupRouteDb();
 
 describe('GET /host/threads', () => {
-  it('lists for the owner and answers a Billing member 403 role_not_allowed (#184)', async () => {
+  it('lists for the owner and answers a Billing member 403 role_not_allowed', async () => {
     const org = await seedHostOrg(t.db);
     asHost(org.owner.ctx);
     const owner = await call(GET, request('GET', '/api/v1/host/threads'));

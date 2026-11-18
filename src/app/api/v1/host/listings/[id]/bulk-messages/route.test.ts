@@ -51,7 +51,7 @@ describe('POST /host/listings/:id/bulk-messages', () => {
     expect(last).toBe(429);
   });
 
-  it('answers a Billing member 403 role_not_allowed before any listing lookup (#184)', async () => {
+  it('answers a Billing member 403 role_not_allowed before any listing lookup', async () => {
     const org = await seedHostOrg(t.db);
     const listingId = newId();
     listingsFake.setListing({ id: listingId, orgId: org.orgId, title: 'Lift Operator' });
@@ -67,7 +67,7 @@ describe('POST /host/listings/:id/bulk-messages', () => {
     expect(res.body).toMatchObject({ error: { details: { reason: 'role_not_allowed' } } });
   });
 
-  it('answers 404 for another org’s listing, even to an owner who sees every listing (#184)', async () => {
+  it('answers 404 for another org’s listing, even to an owner who sees every listing', async () => {
     const mine = await seedHostOrg(t.db);
     const theirs = await seedHostOrg(t.db);
     const listingId = newId();

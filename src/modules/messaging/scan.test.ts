@@ -119,7 +119,7 @@ describe('message scan', () => {
     expect(audits?.n).toBe(4);
   });
 
-  it('counts a retried held scan once and never trips the fraud item on its own (#184)', async () => {
+  it('counts a retried held scan once and never trips the fraud item on its own', async () => {
     const { seeded, messageId } = await hostSend('Pay first __block__');
     // Two attempts that died after the scan and before the state update, then the retry.
     for (let n = 0; n < 2; n++) {
@@ -151,7 +151,7 @@ describe('message scan', () => {
     expect(fraud.filter((item) => item.reason === 'repeated_scam_text')).toEqual([]);
   });
 
-  it('opens one moderation item for a retried warn scan (#184)', async () => {
+  it('opens one moderation item for a retried warn scan', async () => {
     const seeded = await seedThread(t.db);
     const subjectId = newId();
     for (let n = 0; n < 2; n++) {
@@ -161,7 +161,7 @@ describe('message scan', () => {
     expect(items.filter((item) => item.queue === 'moderation')).toHaveLength(1);
   });
 
-  it('delivers an attachment-only host message with a warning (#184)', async () => {
+  it('delivers an attachment-only host message with a warning', async () => {
     const seeded = await seedThread(t.db);
     const mediaId = await seedAttachment(t.db, {
       ownerUserId: seeded.ownerId,

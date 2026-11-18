@@ -268,7 +268,7 @@ describe('trust and reports', () => {
   });
 });
 
-describe('releasing a message later (#184)', () => {
+describe('releasing a message later', () => {
   it('does not deliver a scanned host message once the seeker has blocked the org', async () => {
     const seeded = await seedThread(t.db);
     const host = hostViewer(seeded.ownerId, seeded.orgId, 'owner');
@@ -358,7 +358,7 @@ describe('releasing a message later (#184)', () => {
   });
 });
 
-describe('one client id, two sends (#184)', () => {
+describe('one client id, two sends', () => {
   it('returns the stored message when a send with the same client id lands in between', async () => {
     const seeded = await seedThread(t.db);
     const cases = [
