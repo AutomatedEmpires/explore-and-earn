@@ -42,6 +42,28 @@ export const EXPECTED_PRIVACY_MODULES = [
   'launch',
 ] as const;
 
+/**
+ * Folders under src/modules that register no privacy handler, each with the reason. A folder
+ * belongs here only when every table it owns is in PRIVACY_EXEMPT_TABLES.
+ */
+export const PRIVACY_EXEMPT_MODULE_DIRS: Readonly<Record<string, string>> = {
+  ratelimit: 'Owns only app.rate_limits, which is exempt.',
+};
+
+/**
+ * Tables a handler already claims whose migration has not merged yet, each with its owner. A
+ * claim with no table is not a privacy gap (nothing is stored), so these are the only entries
+ * the enforcing test tolerates in `claimedButMissing`. A media column is declared only once its
+ * table exists.
+ * Remove an entry when its table lands; never add a table that exists.
+ */
+export const PENDING_CLAIMED_TABLES: Readonly<Record<string, string>> = {
+  reports: 'SP4 W5 safety (drizzle/3300_safety.sql is still a shell)',
+  blocks: 'SP4 W5 safety (drizzle/3300_safety.sql is still a shell)',
+  mutes: 'SP4 W5 safety (drizzle/3300_safety.sql is still a shell)',
+  resume_imports: 'SP4 profiles, AI import staging',
+};
+
 export type CoverageReport = {
   unclaimed: string[];
   claimedButMissing: string[];
@@ -58,7 +80,7 @@ function sorted(values: Iterable<string>): string[] {
 }
 
 /**
- * Report-only until W1. Tables are base tables in schema `app`. Media-id columns are any
+ * The D2 coverage report, enforced by coverage.test.ts. Tables are base tables in schema `app`. Media-id columns are any
  * column whose name contains `media_id`, except columns of `app.media` itself.
  */
 export async function computeCoverage(
@@ -104,6 +126,10 @@ export async function computeCoverage(
     undeclaredMediaColumns: sorted(mediaIdColumns.filter((name) => !declared.has(name))),
     declaredMediaColumnsMissing: sorted([...declared].filter((name) => !existingColumns.has(name))),
     missingModules: sorted(EXPECTED_PRIVACY_MODULES.filter((name) => !registered.has(name))),
-    unregisteredModuleDirs: sorted(moduleDirs.filter((name) => !registered.has(name))),
+    unregisteredModuleDirs: sorted(
+      moduleDirs.filter(
+        (name) => !registered.has(name) && !Object.hasOwn(PRIVACY_EXEMPT_MODULE_DIRS, name),
+      ),
+    ),
   };
 }

@@ -32,7 +32,10 @@ export const privacyHandler: PrivacyHandler = {
   mediaColumns: [
     { table: 'seeker_profiles', column: 'avatar_media_id', array: false },
     { table: 'seeker_profiles', column: 'cover_media_id', array: false },
-    { table: 'resume_imports', column: 'source_media_id', array: false },
+    // app.resume_imports is not migrated yet (drizzle/3050_profiles.sql is a shell). The media
+    // retention rules refuse to run while a declared column does not exist, so the migration
+    // that creates the table declares resume_imports.source_media_id here; the coverage test
+    // fails until it does.
   ],
   async exportData(db, subject) {
     if (subject.kind !== 'user') return emptyExport();

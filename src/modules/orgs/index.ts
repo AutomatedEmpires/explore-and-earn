@@ -6,6 +6,7 @@
 // slugs and the activity log, and imports entitlements. Reverse flows to other SP2 modules go
 // through domain events (org.status_changed, org.member_removed, hostpage.updated).
 import type { HandlerMap } from '@/modules/jobs';
+import { DELETE_CLERK_ORG_TOPIC, deleteClerkOrgJob } from './close';
 import { SEND_INVITATION_TOPIC, sendInvitationJob } from './invitations';
 
 export { registerOrgNotificationTypes } from './notifications';
@@ -125,6 +126,8 @@ export const jobHandlers: HandlerMap = {
   [SEND_INVITATION_TOPIC]: async (payload, { db, now }) => {
     await sendInvitationJob(db, payload, now);
   },
-  // W1 deletes the Clerk organization. A delivery before then changes nothing.
-  'orgs.delete_clerk_org': async () => {},
+  // Queued when an organization is closed for its only member's deletion (SP8 Plan decision 10).
+  [DELETE_CLERK_ORG_TOPIC]: async (payload) => {
+    await deleteClerkOrgJob(payload);
+  },
 };
