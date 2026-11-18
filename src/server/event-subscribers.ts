@@ -14,7 +14,13 @@ export interface EventPayloads {
     reason: 'host' | 'end_date' | 'downgrade' | 'lapsed' | 'org_suspended';
   };
   'listing.removed': { listingId: string; orgId: string; reason?: string };
-  'org.status_changed': { orgId: string; status: 'active' | 'suspended' | 'banned' };
+  'org.status_changed': {
+    orgId: string;
+    status: 'active' | 'suspended' | 'banned';
+    reviewItemId: string | null;
+    reason: string | null;
+    endsAt: string | null;
+  };
   'org.member_removed': { orgId: string; userId: string; reassignToUserId: string };
   'location.updated': { locationId: string; orgId: string };
   'hostpage.updated': { orgId: string };
@@ -28,6 +34,7 @@ export interface EventPayloads {
     status: 'unverified' | 'running' | 'verified' | 'needs_review' | 'needs_info' | 'failed';
   };
   'billing.stripe_event': { eventId: string; type: string; objectId: string | null };
+  'billing.refunded': { orgId: string; invoiceId: string; amountCents: number };
   // SP4 (spec 3.3). Emitted in the change's transaction; eventId is the application_events row id.
   'application.submitted': {
     applicationId: string;
@@ -73,7 +80,7 @@ export const eventSubscribers: Record<keyof EventPayloads, string[]> = {
   'listing.removed': ['discovery.sync_listing'],
   // A suspension, ban or reinstatement re-syncs the host's search rows directly. A suspension or
   // ban also reaches search through the listing.closed events that listings.close_for_org emits.
-  'org.status_changed': ['listings.close_for_org', 'discovery.sync_host'],
+  'org.status_changed': ['listings.close_for_org', 'discovery.sync_host', 'operator.org_sanction'],
   // SP5 moves the member's threads and interviews.
   'org.member_removed': ['hiring.member_removed'],
   'location.updated': ['locations.resolve_nws_grid', 'discovery.sync_host'],
@@ -82,10 +89,13 @@ export const eventSubscribers: Record<keyof EventPayloads, string[]> = {
     'listings.enforce_slot_limit',
     'hostpages.mark_public',
     'discovery.sync_host',
+    'support.enterprise_onboarding',
   ],
   'verification.decided': ['listings.resume_screening'],
   // SP6 subscribes for one-time payments.
   'billing.stripe_event': [],
+  // Task 18's refund emits this. W3 cannot edit this file, so the event is registered here.
+  'billing.refunded': [],
   // SP4 records an `apply` listing event in SP3. SP5 appends hiring.application_submitted and
   // hiring.application_withdrawn; never add a topic without a handler (the worker retries an
   // unknown topic until it is dead).

@@ -25,6 +25,7 @@ import {
 } from '@/lib/security-headers';
 import {
   isAdminHost,
+  isViewAsWrite,
   onboardingState,
   routeForHost,
   shouldRedirectToOnboarding,
@@ -73,6 +74,27 @@ async function handle(req: NextRequest, auth: ClerkMiddlewareAuth | null): Promi
 
   if (auth) {
     const { userId, sessionClaims } = await auth();
+    const hasActor = Boolean(
+      sessionClaims &&
+        typeof sessionClaims === 'object' &&
+        'act' in sessionClaims &&
+        (sessionClaims as { act?: unknown }).act,
+    );
+    if (isViewAsWrite({ method: req.method, hasActor })) {
+      return decorate(
+        NextResponse.json(
+          {
+            error: {
+              code: 'forbidden',
+              message: 'View as is read-only',
+              details: { reason: 'view_as_read_only' },
+              requestId,
+            },
+          },
+          { status: 403 },
+        ),
+      );
+    }
     const redirect = shouldRedirectToOnboarding({
       signedIn: userId !== null,
       state: onboardingState(sessionClaims),

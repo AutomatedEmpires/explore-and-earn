@@ -99,7 +99,7 @@ export {
 
 export { ROLE_LABELS, ROLE_PHRASES } from './notifications';
 
-export { INVITATION_ROLES, ORG_ROLES } from './schema';
+export { INVITATION_ROLES, ORG_ROLES, orgMemberships, organizations } from './schema';
 
 export { changeMember, changeMemberSchema, removeMember, transferOwnership } from './member-admin';
 
@@ -115,11 +115,16 @@ export {
 export { deleteOrganization } from './deletion';
 
 /** SP8 registers these with its privacy exporter and eraser. */
-export { privacyHandlers } from './privacy';
+export { privacyHandler } from './privacy';
+export { retentionRules } from './retention';
+export { getOwnershipSummary } from './ownership';
+export { closeOrganization, eraseMembership } from './close';
 
 export const jobHandlers: HandlerMap = {
   // Creates the invitation token and emails it in one step (SP2 plan decision 9).
   [SEND_INVITATION_TOPIC]: async (payload, { db, now }) => {
     await sendInvitationJob(db, payload, now);
   },
+  // W1 deletes the Clerk organization. A delivery before then changes nothing.
+  'orgs.delete_clerk_org': async () => {},
 };

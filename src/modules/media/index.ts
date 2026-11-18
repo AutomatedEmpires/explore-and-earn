@@ -102,3 +102,8 @@ export const jobHandlers: HandlerMap = mediaJobHandlers;
 // (or a kept rejected one, when an appeal or an accuracy sample overturns the rejection);
 // remove takes a file down and keeps a private copy, or on a blocked file confirms the block.
 registerSubjectHandlers('media', createMediaSubjectHandlers(getStorage));
+
+export { readMediaForExport } from './export';
+export { purgeBlockedMedia } from './purge';
+export { privacyHandler } from './privacy';
+export { retentionRules } from './retention';

@@ -67,7 +67,7 @@ describe('SP2 registries', () => {
       'hostpages.notify_followers',
     ]);
     expect(Object.keys(verification)).toEqual(['verification.run']);
-    expect(Object.keys(orgs)).toEqual(['orgs.send_invitation']);
+    expect(Object.keys(orgs)).toEqual(['orgs.send_invitation', 'orgs.delete_clerk_org']);
     expect(Object.keys(entitlements)).toEqual([]);
   });
 

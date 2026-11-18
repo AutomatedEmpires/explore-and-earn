@@ -285,7 +285,9 @@ describe('decide and the second sign-off', () => {
 
     expect(await codeOf(decide(t.db, id, a, 'approve'))).toBe('bad_request');
     await decide(t.db, id, a, 'remove', { note: 'Spam' });
-    expect(seen).toEqual([{ subjectId, data: { note: 'Spam', reviewItemId: id } }]);
+    expect(seen).toEqual([
+      { subjectId, data: { note: 'Spam', reviewItemId: id, operatorId: a } },
+    ]);
 
     const unknown = await openReviewItem(t.db, {
       queue: 'moderation',
@@ -587,5 +589,98 @@ describe('addNote', () => {
     const { id } = await open();
     expect(await codeOf(addNote(t.db, id, a, '   '))).toBe('bad_request');
     expect(await codeOf(addNote(t.db, id, newId(), 'hello'))).toBe('forbidden');
+  });
+});
+
+describe('SP8 decision data and named assignees', () => {
+  it('gives an unassigned open to the lighter operator, and a named assignee to that operator', async () => {
+    const b = await addOperator(t.db, { queues: ['reports'] });
+    const a = await addOperator(t.db, { queues: ['reports'], shift: 'away' });
+    await open('reports');
+    await open('reports');
+    await open('reports');
+    await setShift(t.db, a, 'on_shift');
+
+    const routed = await open('reports');
+    expect((await getItem(t.db, routed.id)).assignee_operator_id).toBe(a);
+    await expect(decide(t.db, routed.id, b, 'approve')).rejects.toMatchObject({
+      code: 'forbidden',
+      message: 'Another operator holds this item',
+    });
+
+    const named = await openReviewItem(t.db, {
+      queue: 'reports',
+      subjectType: 'test_item',
+      subjectId: newId(),
+      reason: 'named',
+      assigneeOperatorId: b,
+    });
+    expect((await getItem(t.db, named.id)).assignee_operator_id).toBe(b);
+    expect(await decide(t.db, named.id, b, 'approve')).toEqual({ status: 'applied' });
+  });
+
+  it('refuses an assignee who is excluded or does not cover the queue', async () => {
+    const reports = await addOperator(t.db, { queues: ['reports'] });
+    const support = await addOperator(t.db, { queues: ['support'] });
+    await expect(
+      openReviewItem(t.db, {
+        queue: 'reports',
+        subjectType: 'test_item',
+        subjectId: newId(),
+        reason: 'excluded',
+        assigneeOperatorId: reports,
+        excludeOperatorIds: [reports],
+      }),
+    ).rejects.toMatchObject({
+      code: 'bad_request',
+      message: 'That operator cannot take this item',
+    });
+    await expect(
+      openReviewItem(t.db, {
+        queue: 'reports',
+        subjectType: 'test_item',
+        subjectId: newId(),
+        reason: 'wrong queue',
+        assigneeOperatorId: support,
+      }),
+    ).rejects.toMatchObject({ code: 'bad_request' });
+  });
+
+  it('passes reason, endsAt, the item and the deciding operator to the handler', async () => {
+    const a = await addOperator(t.db, { queues: ['reports'] });
+    const b = await addOperator(t.db, { queues: ['reports'], shift: 'away' });
+    const endsAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const { id } = await open('reports');
+
+    await decide(t.db, id, a, 'remove', {
+      reason: 'Spam or misleading content',
+      endsAt,
+    });
+    expect(testItemLog.at(-1)?.data).toMatchObject({
+      reason: 'Spam or misleading content',
+      reviewItemId: id,
+      operatorId: a,
+    });
+    expect((testItemLog.at(-1)?.data as { endsAt: Date }).endsAt).toEqual(endsAt);
+
+    const past = await open('reports');
+    await expect(
+      decide(t.db, past.id, a, 'remove', { endsAt: new Date(Date.now() - 60_000) }),
+    ).rejects.toMatchObject({ code: 'bad_request', message: 'endsAt must be in the future' });
+    await expect(decide(t.db, past.id, a, 'remove', { reason: 'short' })).rejects.toMatchObject({
+      code: 'bad_request',
+    });
+
+    const ban = await open('reports');
+    expect(await decide(t.db, ban.id, a, 'ban', { endsAt: null })).toEqual({
+      status: 'pending_second',
+    });
+    const [pending] = await actions(ban.id);
+    await approveSecond(t.db, pending?.id ?? '', b);
+    expect(testItemLog.at(-1)?.data).toMatchObject({
+      endsAt: null,
+      reviewItemId: ban.id,
+      operatorId: a,
+    });
   });
 });

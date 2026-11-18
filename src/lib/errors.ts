@@ -4,6 +4,7 @@ export type ErrorCode =
   | 'forbidden'
   | 'not_found'
   | 'conflict'
+  | 'gone'
   | 'rate_limited'
   | 'internal';
 
@@ -13,6 +14,7 @@ export const ERROR_STATUS: Record<ErrorCode, number> = {
   forbidden: 403,
   not_found: 404,
   conflict: 409,
+  gone: 410,
   rate_limited: 429,
   internal: 500,
 };
@@ -23,6 +25,7 @@ const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   forbidden: 'Forbidden',
   not_found: 'Not found',
   conflict: 'Conflict',
+  gone: 'Gone',
   rate_limited: 'Too many requests',
   internal: 'Internal error',
 };
@@ -56,5 +59,6 @@ export const notFound = (message?: string, details?: unknown) =>
   new AppError('not_found', message, details);
 export const conflict = (message?: string, details?: unknown) =>
   new AppError('conflict', message, details);
+export const gone = (message?: string, details?: unknown) => new AppError('gone', message, details);
 export const rateLimited = (message?: string, details?: unknown) =>
   new AppError('rate_limited', message, details);

@@ -46,7 +46,7 @@ async function beginRun(tx: DbOrTx, orgId: string, triggerListingId: string | nu
     actorId: null,
     orgId,
     action: 'verification.started',
-    subjectType: 'organization',
+    subjectType: 'business_verification',
     subjectId: orgId,
     data: { verificationId: id, triggerListingId, reverification: triggerListingId === null },
   });
@@ -130,7 +130,7 @@ function checkText(
 
 /** The fraud item runCheck opened for a `needs_review` decision (the newest one with its reason). */
 async function itemOpenedBy(tx: DbOrTx, orgId: string, check: CheckResult): Promise<string | null> {
-  const open = await listOpenReviewItems(tx, 'organization', orgId);
+  const open = await listOpenReviewItems(tx, 'business_verification', orgId);
   return open.filter((i) => i.queue === 'fraud' && i.reason === check.reason).at(-1)?.id ?? null;
 }
 
@@ -167,7 +167,7 @@ export async function runVerification(
   // The classifier call runs outside any transaction (it can take seconds).
   const check = await runCheck(db, {
     kind: 'business_verification',
-    subjectType: 'organization',
+    subjectType: 'business_verification',
     subjectId: orgId,
     text: checkText(org, location, signals, flags),
     reviewQueue: flags.length > 0 || review.length > 0 ? null : 'fraud',
@@ -186,7 +186,7 @@ export async function runVerification(
       (
         await openReviewItem(tx, {
           queue: 'fraud',
-          subjectType: 'organization',
+          subjectType: 'business_verification',
           subjectId: orgId,
           reason,
           checkId: check.checkId,

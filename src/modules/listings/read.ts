@@ -117,6 +117,12 @@ export async function getListingSummaries(
   return out;
 }
 
+/** Active listings across every organization. */
+export async function countActiveListings(db: DbOrTx): Promise<number> {
+  const [row] = await db.select({ n: count() }).from(listings).where(eq(listings.state, 'active'));
+  return Number(row?.n ?? 0);
+}
+
 /** Active listings per location (location archiving, host page groups). */
 export async function countActiveByLocation(
   db: DbOrTx,

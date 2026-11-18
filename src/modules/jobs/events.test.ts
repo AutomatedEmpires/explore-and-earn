@@ -81,11 +81,18 @@ describe('emit', () => {
       'discovery.sync_host',
       'hostpages.mark_public',
       'listings.enforce_slot_limit',
+      'support.enterprise_onboarding',
     ]);
   });
 
   it('fans org.status_changed out to listings.close_for_org and discovery.sync_host', async () => {
-    const payload: EventPayloads['org.status_changed'] = { orgId: 'org-1', status: 'suspended' };
+    const payload: EventPayloads['org.status_changed'] = {
+      orgId: 'org-1',
+      status: 'suspended',
+      reviewItemId: null,
+      reason: null,
+      endsAt: null,
+    };
     await emit(t.db, 'org.status_changed', payload, 'e6');
 
     const envelope = { event: 'org.status_changed', eventId: 'e6', data: payload };
@@ -94,6 +101,11 @@ describe('emit', () => {
       {
         topic: 'listings.close_for_org',
         dedupeKey: 'e6:listings.close_for_org',
+        payload: envelope,
+      },
+      {
+        topic: 'operator.org_sanction',
+        dedupeKey: 'e6:operator.org_sanction',
         payload: envelope,
       },
     ]);
@@ -109,6 +121,7 @@ describe('eventSubscribers', () => {
     expect(eventSubscribers['org.status_changed']).toEqual([
       'listings.close_for_org',
       'discovery.sync_host',
+      'operator.org_sanction',
     ]);
     expect(eventSubscribers['location.updated']).toEqual([
       'locations.resolve_nws_grid',
@@ -118,6 +131,7 @@ describe('eventSubscribers', () => {
       'listings.enforce_slot_limit',
       'hostpages.mark_public',
       'discovery.sync_host',
+      'support.enterprise_onboarding',
     ]);
     expect(eventSubscribers['verification.decided']).toEqual(['listings.resume_screening']);
     for (const event of ['listing.changed', 'listing.closed', 'listing.removed'] as const) {

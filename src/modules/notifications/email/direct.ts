@@ -16,9 +16,15 @@ import { getSetting } from '@/modules/settings';
 import { isEmailSuppressed } from '../notify';
 import { CATEGORIES, EMAIL_TEMPLATE_NAMES, type Category, type EmailTemplateName } from '../types';
 import { getEmailProvider, renderEmail, type EmailProvider } from './send';
+import AccountStatus from './templates/AccountStatus';
 import BillingNotice from './templates/BillingNotice';
 import HostNotice from './templates/HostNotice';
+import LegalUpdate from './templates/LegalUpdate';
 import type { DirectFooterProps } from './templates/Layout';
+import OperatorDigest, { operatorDigestSubject } from './templates/OperatorDigest';
+import PrivacyDeletion from './templates/PrivacyDeletion';
+import PrivacyExportReady from './templates/PrivacyExportReady';
+import SupportReply, { supportReplySubject } from './templates/SupportReply';
 import TeamInvite, { teamInviteSubject } from './templates/TeamInvite';
 
 export const EMAIL_DIRECT_TOPIC = 'notifications.email_direct';
@@ -28,13 +34,15 @@ export type DirectEmailInput = {
   template: EmailTemplateName;
   data: Record<string, unknown>;
   category: Category;
+  replyTo?: string;
 };
 
 const httpUrl = z.url({ protocol: /^https?$/ });
 const notice = z.object({
   heading: z.string().min(1),
   lines: z.array(z.string()),
-  button: z.object({ label: z.string().min(1), href: httpUrl }),
+  button: z.object({ label: z.string().min(1), href: httpUrl }).nullable(),
+  subject: z.string().min(1).optional(),
 });
 
 /**
@@ -65,13 +73,55 @@ function directEmail(
     case 'SeekerNotice':
     case 'HiringUpdate':
       throw badRequest(`The ${template} email can't be sent as a direct email`);
-    case 'HostNotice': {
+    case 'HostNotice':
+    case 'BillingNotice':
+    case 'PrivacyExportReady':
+    case 'PrivacyDeletion':
+    case 'LegalUpdate':
+    case 'AccountStatus': {
       const d = parse(notice);
-      return { subject: d.heading, element: createElement(HostNotice, { ...d, footer }) };
+      const props = { heading: d.heading, lines: d.lines, button: d.button, footer };
+      const element =
+        template === 'BillingNotice'
+          ? createElement(BillingNotice, props)
+          : template === 'PrivacyExportReady'
+            ? createElement(PrivacyExportReady, props)
+            : template === 'PrivacyDeletion'
+              ? createElement(PrivacyDeletion, props)
+              : template === 'LegalUpdate'
+                ? createElement(LegalUpdate, props)
+                : template === 'AccountStatus'
+                  ? createElement(AccountStatus, props)
+                  : createElement(HostNotice, props);
+      return { subject: d.subject ?? d.heading, element };
     }
-    case 'BillingNotice': {
-      const d = parse(notice);
-      return { subject: d.heading, element: createElement(BillingNotice, { ...d, footer }) };
+    case 'SupportReply': {
+      const d = parse(
+        z.object({
+          ticketNumber: z.number().int().nonnegative(),
+          subject: z.string().min(1),
+          replyBody: z.string(),
+          threadUrl: httpUrl.nullable(),
+          automatic: z.boolean(),
+        }),
+      );
+      return {
+        subject: supportReplySubject(d.ticketNumber, d.subject),
+        element: createElement(SupportReply, { ...d, footer }),
+      };
+    }
+    case 'OperatorDigest': {
+      const d = parse(
+        z.object({
+          dateLabel: z.string().min(1),
+          rows: z.array(z.object({ label: z.string(), value: z.string() })),
+          consoleUrl: httpUrl,
+        }),
+      );
+      return {
+        subject: operatorDigestSubject(d.dateLabel),
+        element: createElement(OperatorDigest, { ...d, footer }),
+      };
     }
     case 'TeamInvite': {
       const d = parse(
@@ -115,10 +165,45 @@ export async function sendEmailTo(
   const to = normalizeAddress(i.to);
   directEmail(i.template, i.data, { mailingAddress: '' });
   if (await isEmailSuppressed(db, to)) return;
+  const messageId = newId();
+  const dedupeKey = i.dedupeKey ? `email_direct:${i.dedupeKey}` : undefined;
   await enqueue(db, {
     topic: EMAIL_DIRECT_TOPIC,
-    payload: { messageId: newId(), to, template: i.template, data: i.data, category: i.category },
-    ...(i.dedupeKey ? { dedupeKey: `email_direct:${i.dedupeKey}` } : {}),
+    payload: {
+      messageId,
+      to,
+      template: i.template,
+      data: i.data,
+      category: i.category,
+      ...(i.replyTo ? { replyTo: i.replyTo } : {}),
+      idempotencyKey: dedupeKey ?? `direct:${messageId}`,
+    },
+    ...(dedupeKey ? { dedupeKey } : {}),
+  });
+}
+
+/**
+ * One direct email through sendEmailTo. `dedupeKey` is prefixed so a caller key and an SP2
+ * key cannot collide. Category defaults to account.
+ */
+export async function sendDirectEmail(
+  db: DbOrTx,
+  i: {
+    to: string;
+    template: EmailTemplateName;
+    data: Record<string, unknown>;
+    replyTo?: string;
+    dedupeKey: string;
+    category?: Category;
+  },
+): Promise<void> {
+  await sendEmailTo(db, {
+    to: i.to,
+    template: i.template,
+    data: i.data,
+    category: i.category ?? 'account',
+    dedupeKey: `direct:${i.dedupeKey}`,
+    ...(i.replyTo ? { replyTo: i.replyTo } : {}),
   });
 }
 
@@ -128,13 +213,21 @@ export async function sendEmailTo(
  */
 export async function sendEmailNow(
   db: DbOrTx,
-  i: DirectEmailInput,
+  i: DirectEmailInput & { idempotencyKey?: string },
   deps: { provider?: EmailProvider } = {},
 ): Promise<'sent' | 'suppressed'> {
   const to = normalizeAddress(i.to);
   if (await isEmailSuppressed(db, to)) return 'suppressed';
   const { subject, html, text } = await render(db, i);
-  await (deps.provider ?? getEmailProvider()).send({ to, subject, html, text, headers: {} });
+  await (deps.provider ?? getEmailProvider()).send({
+    to,
+    subject,
+    html,
+    text,
+    headers: {},
+    ...(i.replyTo ? { replyTo: i.replyTo } : {}),
+    ...(i.idempotencyKey ? { idempotencyKey: i.idempotencyKey } : {}),
+  });
   return 'sent';
 }
 
@@ -144,6 +237,8 @@ const jobPayload = z.object({
   template: z.enum(EMAIL_TEMPLATE_NAMES),
   data: z.record(z.string(), z.unknown()),
   category: z.enum(CATEGORIES),
+  replyTo: z.string().optional(),
+  idempotencyKey: z.string().min(1).optional(),
 });
 
 /**
@@ -166,7 +261,8 @@ export async function sendEmailDirectJob(
     html,
     text,
     headers: {},
-    idempotencyKey: `direct:${p.messageId}`,
+    ...(p.replyTo ? { replyTo: p.replyTo } : {}),
+    idempotencyKey: p.idempotencyKey ?? `direct:${p.messageId}`,
   });
   return 'sent';
 }

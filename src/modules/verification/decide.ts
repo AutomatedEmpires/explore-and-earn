@@ -104,7 +104,7 @@ export async function recordDecision(
     actorId: null,
     orgId: d.orgId,
     action: 'verification.decided',
-    subjectType: 'organization',
+    subjectType: 'business_verification',
     subjectId: d.orgId,
     data: {
       verificationId: d.verificationId,
@@ -177,7 +177,7 @@ export async function operatorApprove(
   orgId: string,
   reviewItemId: string | null,
 ): Promise<void> {
-  const others = (await listOpenReviewItems(db, 'organization', orgId)).filter(
+  const others = (await listOpenReviewItems(db, 'business_verification', orgId)).filter(
     (i) => i.id !== reviewItemId,
   );
   if (others.length > 0) return;
@@ -259,7 +259,7 @@ export async function submitVerificationInfo(
     }
     const item = await openReviewItem(tx, {
       queue: 'fraud',
-      subjectType: 'organization',
+      subjectType: 'business_verification',
       subjectId: orgId,
       reason: 'info_provided',
       ...(open.checkId ? { checkId: open.checkId } : {}),
@@ -281,7 +281,7 @@ export async function submitVerificationInfo(
       actorId: ctx.user.id,
       orgId,
       action: 'verification.info_provided',
-      subjectType: 'organization',
+      subjectType: 'business_verification',
       subjectId: orgId,
       data: { verificationId: open.id, reviewItemId: item.id, websiteUrl: websiteUrl ?? null },
     });

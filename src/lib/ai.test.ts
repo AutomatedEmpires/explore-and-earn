@@ -5,6 +5,7 @@ import {
   AiError,
   CLASSIFIER_MODEL,
   ClassifierError,
+  SUPPORT_MODEL,
   classify,
   classifyStub,
   classifyWith,
@@ -117,6 +118,25 @@ describe('classifyStub', () => {
     expect(classifyStub(opts(ImageSafety, [image('xx__block__xx')], v)).score).toBe(0.95);
   });
 
+  it('returns STUB_JSON, rejects a mismatch, and fails on __fail__', () => {
+    const Draft = z.object({ category: z.string(), confidence: z.number() });
+    expect(
+      classifyStub(
+        opts(Draft, [text('note\nSTUB_JSON: {"category":"account","confidence":0.9}')]),
+      ),
+    ).toEqual({ category: 'account', confidence: 0.9 });
+    expect(() =>
+      classifyStub(opts(z.object({ category: z.number() }), [text('STUB_JSON: {"category":"account"}')])),
+    ).toThrow(ClassifierError);
+    try {
+      classifyStub(opts(Draft, [text('please __fail__')]));
+      throw new Error('expected a failure');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ClassifierError);
+      expect((err as ClassifierError).kind).toBe('api_error');
+    }
+  });
+
   it('validates its answer against the schema', () => {
     const Strict = z.object({ verdict: z.enum(['ok', 'bad']) });
     expect(() => classifyStub(opts(Strict, [text('hello')]))).toThrow(ClassifierError);
@@ -173,6 +193,17 @@ describe('classifyWith (Anthropic)', () => {
       },
     });
     expect(message?.content[1]).toEqual({ type: 'text', text: 'hello' });
+  });
+
+  it('sends the support model when asked', async () => {
+    const captured: Captured[] = [];
+    const client = fakeClient(
+      async () =>
+        messageResponse([{ type: 'text', text: '{"score":0.1,"labels":[],"reason":"ok"}' }]),
+      captured,
+    );
+    await classifyWith(client, opts(Safety, [text('hello')], { model: SUPPORT_MODEL }));
+    expect(captured[0]?.body.model).toBe('claude-sonnet-5-5');
   });
 
   it('rejects an answer that does not match the schema', async () => {

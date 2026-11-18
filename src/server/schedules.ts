@@ -33,4 +33,14 @@ export const schedules: { topic: string; cron: string }[] = [
   { topic: 'hiring.fit_refresh', cron: '0 8 * * *' },
   { topic: 'hiring.as_described_due', cron: '0 15 * * *' },
   { topic: 'messaging.daily', cron: '30 8 * * *' },
+  // SP8: retention, privacy-request watch, support, operator console and launch.
+  { topic: 'privacy.retention_sweep', cron: '30 3 * * *' },
+  { topic: 'privacy.request_watch', cron: '0 * * * *' },
+  { topic: 'support.auto_resolve', cron: '0 * * * *' },
+  { topic: 'operator.metrics_snapshot', cron: '*/15 * * * *' },
+  { topic: 'operator.daily_digest', cron: '0 13 * * *' },
+  { topic: 'operator.heartbeat', cron: '*/5 * * * *' },
+  { topic: 'operator.sanction_expiry', cron: '*/15 * * * *' },
+  { topic: 'content.legal_effective', cron: '*/15 * * * *' },
+  { topic: 'launch.check', cron: '0 6 * * *' },
 ];

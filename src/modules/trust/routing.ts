@@ -6,10 +6,11 @@
 // alerts the Owner once it is overdue, so nothing is lost (Review Focus 4).
 import { sql } from 'drizzle-orm';
 import { queryRows, type DbOrTx } from '@/lib/db';
+import { badRequest } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import { record } from '@/modules/audit';
 import { raiseAlert } from './alerts';
-import { leastLoadedOperator, touchOperator, transact } from './internal';
+import { coversQueue, findOperator, leastLoadedOperator, touchOperator, transact } from './internal';
 import { reviewItems } from './schema';
 import type { OpenReviewItemInput, Queue } from './types';
 
@@ -54,7 +55,20 @@ export async function openReviewItem(db: DbOrTx, i: OpenReviewItemInput): Promis
     const id = newId();
     const now = new Date();
     const exclude = i.excludeOperatorIds ?? [];
-    const assignee = await pickAssignee(tx, i.queue, exclude);
+    let assignee: string | null;
+    if (i.assigneeOperatorId) {
+      const chosen = await findOperator(tx, i.assigneeOperatorId);
+      if (
+        !chosen ||
+        !coversQueue(chosen, i.queue) ||
+        exclude.includes(chosen.userId)
+      ) {
+        throw badRequest('That operator cannot take this item');
+      }
+      assignee = chosen.userId;
+    } else {
+      assignee = await pickAssignee(tx, i.queue, exclude);
+    }
 
     await tx.insert(reviewItems).values({
       id,

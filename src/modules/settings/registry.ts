@@ -48,6 +48,15 @@ export interface SettingValues {
   'hiring.fit_enabled': boolean;
   /** US state codes where fit is off for listings located in that state. */
   'hiring.fit_disabled_states': USStateCode[];
+  'support.ai_enabled': boolean;
+  'support.ai_auto_reply_min_confidence': number;
+  'privacy.export_ttl_days': number;
+  'ops.spike_rules': {
+    failed_payments: { minCount: number; multiplier: number };
+    fraud_items: { minCount: number; multiplier: number };
+  };
+  'content.about': { headline: string; bodyMd: string };
+  'launch.mode': 'private' | 'public';
 }
 
 export type SettingKey = keyof SettingValues;
@@ -110,6 +119,15 @@ export const SETTING_DEFAULTS: { readonly [K in SettingKey]: SettingValues[K] } 
   'discovery.alert_push_daily_cap': 5,
   'hiring.fit_enabled': true,
   'hiring.fit_disabled_states': [],
+  'support.ai_enabled': true,
+  'support.ai_auto_reply_min_confidence': 0.85,
+  'privacy.export_ttl_days': 7,
+  'ops.spike_rules': {
+    failed_payments: { minCount: 5, multiplier: 3 },
+    fraud_items: { minCount: 5, multiplier: 3 },
+  },
+  'content.about': { headline: '', bodyMd: '' },
+  'launch.mode': 'private',
 };
 
 export const SETTING_KEYS = Object.keys(SETTING_DEFAULTS) as readonly SettingKey[];
@@ -198,4 +216,22 @@ export const SETTING_SCHEMAS: { readonly [K in SettingKey]: z.ZodType<SettingVal
     .refine((codes) => new Set(codes).size === codes.length, {
       message: 'state codes must be unique',
     }),
+  'support.ai_enabled': z.boolean(),
+  'support.ai_auto_reply_min_confidence': z.number().min(0.5).max(1),
+  'privacy.export_ttl_days': int(1, 30),
+  'ops.spike_rules': z.strictObject({
+    failed_payments: z.strictObject({
+      minCount: z.number().int().min(1).max(1000),
+      multiplier: z.number().min(1).max(100),
+    }),
+    fraud_items: z.strictObject({
+      minCount: z.number().int().min(1).max(1000),
+      multiplier: z.number().min(1).max(100),
+    }),
+  }),
+  'content.about': z.strictObject({
+    headline: z.string().max(120),
+    bodyMd: z.string().max(10_000),
+  }),
+  'launch.mode': z.enum(['private', 'public']),
 };

@@ -30,3 +30,6 @@ export * from '../modules/messaging/schema';
 export * from '../modules/analytics/schema';
 // SP8 (types only until SP8 W0)
 export * from '../modules/privacy/schema';
+export * from '../modules/support/schema';
+export * from '../modules/content/schema';
+export * from '../modules/launch/schema';

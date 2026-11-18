@@ -18,6 +18,7 @@ export type AuditSearch = {
   from?: Date;
   /** Exclusive. */
   to?: Date;
+  actorType?: 'user' | 'operator' | 'system';
   /** Page size, 1 to 200. Default 50. */
   limit?: number;
   /** The previous page's `nextBefore`. */
@@ -58,6 +59,7 @@ export async function searchAudit(
   }
   if (f.from !== undefined) where.push(gte(auditEvents.createdAt, f.from));
   if (f.to !== undefined) where.push(lt(auditEvents.createdAt, f.to));
+  if (f.actorType !== undefined) where.push(eq(auditEvents.actorType, f.actorType));
   if (f.before !== undefined) where.push(lt(auditEvents.id, f.before));
 
   const rows = await db

@@ -80,6 +80,31 @@ export type SubscriptionUpdate = {
 
 export type CardChecks = { hasCard: boolean; cvcCheck: string | null; postalCheck: string | null };
 
+export type GatewayInvoice = {
+  id: string;
+  number: string | null;
+  status: string;
+  amountPaidCents: number;
+  amountRefundedCents: number;
+  paymentIntentId: string | null;
+  created: Date;
+  hostedInvoiceUrl: string | null;
+};
+
+export type GatewayPromotionCode = {
+  id: string;
+  code: string;
+  couponId: string;
+  percentOff: number | null;
+  amountOffCents: number | null;
+  duration: 'once' | 'repeating' | 'forever';
+  durationInMonths: number | null;
+  timesRedeemed: number;
+  maxRedemptions: number | null;
+  expiresAt: Date | null;
+  active: boolean;
+};
+
 export type WebhookEvent = {
   id: string;
   type: string;
@@ -129,6 +154,29 @@ export interface BillingGateway {
     lookupKeys: string[],
   ): Promise<{ lookupKey: string; unitAmountCents: number; interval: BillingInterval }[]>;
   getDefaultCardChecks(customerId: string): Promise<CardChecks>;
+  listInvoices(customerId: string, limit: number): Promise<GatewayInvoice[]>;
+  retrieveInvoice(id: string): Promise<GatewayInvoice>;
+  createRefund(
+    i: { paymentIntentId: string; amountCents: number; metadata: Record<string, string> },
+    idempotencyKey: string,
+  ): Promise<{ id: string; amountCents: number }>;
+  createCoupon(
+    i: {
+      percentOff: number | null;
+      amountOffCents: number | null;
+      duration: 'once' | 'repeating' | 'forever';
+      durationInMonths: number | null;
+      maxRedemptions: number | null;
+      redeemBy: Date | null;
+      metadata: Record<string, string>;
+    },
+    idempotencyKey: string,
+  ): Promise<{ id: string }>;
+  createPromotionCode(
+    i: { couponId: string; code: string; maxRedemptions: number | null; expiresAt: Date | null },
+    idempotencyKey: string,
+  ): Promise<{ id: string; code: string }>;
+  listPromotionCodes(limit: number): Promise<GatewayPromotionCode[]>;
   /** Verifies the Stripe-Signature header on the raw body (300 s tolerance) and parses it. */
   constructEvent(rawBody: string, signature: string): WebhookEvent;
 }
@@ -476,6 +524,25 @@ export function stripeGateway(stripe: Stripe, webhookSecret?: string): BillingGa
         cvcCheck: card.checks?.cvc_check ?? null,
         postalCheck: card.checks?.address_postal_code_check ?? null,
       };
+    },
+
+    async listInvoices() {
+      throw new Error('not implemented: BillingGateway.listInvoices (W3)');
+    },
+    async retrieveInvoice() {
+      throw new Error('not implemented: BillingGateway.retrieveInvoice (W3)');
+    },
+    async createRefund() {
+      throw new Error('not implemented: BillingGateway.createRefund (W3)');
+    },
+    async createCoupon() {
+      throw new Error('not implemented: BillingGateway.createCoupon (W3)');
+    },
+    async createPromotionCode() {
+      throw new Error('not implemented: BillingGateway.createPromotionCode (W3)');
+    },
+    async listPromotionCodes() {
+      throw new Error('not implemented: BillingGateway.listPromotionCodes (W3)');
     },
 
     constructEvent(rawBody, signature) {

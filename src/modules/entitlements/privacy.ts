@@ -2,6 +2,7 @@
 // the SP8 retention rules; for a user, only the `created_by` link is personal.
 import { asc, eq } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
+import { stubPrivacyHandler, type RetentionRule } from '@/modules/privacy';
 import { entitlementConsumptions as consumptions, entitlementGrants as grants } from './schema';
 
 export const privacyHandlers: {
@@ -55,3 +56,9 @@ export const privacyHandlers: {
     });
   },
 };
+
+export const privacyHandler = stubPrivacyHandler('entitlements', [
+  'entitlement_grants',
+  'entitlement_consumptions',
+]);
+export const retentionRules: RetentionRule[] = [];

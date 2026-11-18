@@ -10,10 +10,10 @@ import {
   changeMember,
   getListingAccess,
   getMember,
-  privacyHandlers,
   removeMember,
   transferOwnership,
 } from './index';
+import { privacyHandlers } from './privacy';
 
 // org.member_removed has no SP2 subscriber yet (SP5 adds one); a test topic makes it visible.
 vi.mock('@/server/event-subscribers', async (orig) => {

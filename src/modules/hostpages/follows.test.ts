@@ -20,10 +20,10 @@ import {
   jobHandlers,
   listFollowerIds,
   listFollows,
-  privacyHandlers,
   unfollow,
   unfollowHost,
 } from './index';
+import { privacyHandlers } from './privacy';
 
 vi.mock('@/modules/orgs', async (orig) => ({
   ...(await orig<typeof import('@/modules/orgs')>()),

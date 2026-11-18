@@ -9,9 +9,13 @@
 //     handler: async ({ input, user, db }) => createThing(db, user, input),
 //   });
 import { captureException } from '@sentry/nextjs';
+import { auth, reverificationError } from '@clerk/nextjs/server';
 import { unstable_rethrow } from 'next/navigation';
 import type { z } from 'zod';
 import { getDb, type Db } from '@/lib/db';
+import { allowedByConsent, readConsent } from '@/modules/privacy';
+import { getConsentNotBefore } from '@/modules/content';
+import '@/server/sp8-wiring';
 import { getEnv, type Env } from '@/lib/env';
 import { AppError, badRequest, forbidden, isAppError, rateLimited } from '@/lib/errors';
 import { logger } from '@/lib/logger';
@@ -40,7 +44,7 @@ import '@/server/sp2-wiring';
 // SP4 module-load registrations (notification types, report subjects, providers) for every route.
 import '@/server/module-registrations';
 
-export type AuthMode = 'none' | 'user' | 'seeker' | 'host' | 'operator';
+export type AuthMode = 'none' | 'optional' | 'user' | 'seeker' | 'host' | 'operator';
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export type ApiContext<I> = {
@@ -129,7 +133,31 @@ export function toErrorResponse(err: unknown, requestId: string): Response {
     requestId,
   };
   if (appError.details !== undefined) error.details = appError.details;
-  return Response.json({ error }, { status: appError.status, headers: baseHeaders(requestId) });
+  const body: { error: typeof error; clerk_error?: ReturnType<typeof reverificationError> } = {
+    error,
+  };
+  const hint = clerkReverificationHint(appError);
+  if (hint) body.clerk_error = hint;
+  return Response.json(body, { status: appError.status, headers: baseHeaders(requestId) });
+}
+
+/** Clerk's `useReverification` reads this beside `error` on a reverification 403. */
+function clerkReverificationHint(err: AppError): ReturnType<typeof reverificationError> | undefined {
+  if (err.status !== 403 || !isPlainObject(err.details)) return undefined;
+  if (err.details.reason !== 'reverification_required' || err.details.reverification === undefined) {
+    return undefined;
+  }
+  const config = err.details.reverification;
+  if (config === 'strict' || isFirstFactor(config)) return reverificationError(config);
+  return undefined;
+}
+
+function isFirstFactor(value: unknown): value is { level: 'first_factor'; afterMinutes: number } {
+  return (
+    isPlainObject(value) &&
+    value.level === 'first_factor' &&
+    typeof value.afterMinutes === 'number'
+  );
 }
 
 function originOf(value: string): string | null {
@@ -166,12 +194,37 @@ function checkOrigin(req: Request, env: Env): void {
   }
 }
 
+/** No Clerk session. Account-not-found and suspension still propagate. */
+function isSignedOut(err: unknown): boolean {
+  return isAppError(err) && err.code === 'unauthorized' && err.message === 'Sign in required';
+}
+
+async function clerkViewAs(): Promise<boolean> {
+  try {
+    const session = await auth();
+    const claims = session.sessionClaims;
+    return Boolean(
+      claims && typeof claims === 'object' && 'act' in claims && (claims as { act?: unknown }).act,
+    );
+  } catch {
+    // Tests and the keyless dev proxy call routes without a Clerk request scope.
+    return false;
+  }
+}
+
 async function authenticate(
   mode: AuthMode,
 ): Promise<Pick<ApiContext<unknown>, 'user' | 'host' | 'operator'>> {
   switch (mode) {
     case 'none':
       return { user: null };
+    case 'optional':
+      try {
+        return { user: await requireUser() };
+      } catch (err) {
+        if (isSignedOut(err)) return { user: null };
+        throw err;
+      }
     case 'user':
       return { user: await requireUser() };
     case 'seeker':
@@ -284,6 +337,13 @@ export function apiRoute<I = undefined, O = unknown>(opts: ApiRouteOptions<I, O>
         context.ipHash = hashIp(clientIp(req), env.JOBS_SECRET);
         checkOrigin(req, env);
 
+        const viewAs = await clerkViewAs();
+        context.viewAs = viewAs;
+        context.analyticsAllowed =
+          !viewAs &&
+          allowedByConsent(
+            readConsent(req, { notBefore: await getConsentNotBefore(getDb()) }),
+          );
         const who = await authenticate(auth);
         const params = (await route?.params) ?? {};
         const input = opts.input ? await readInput(req, opts.input, params) : (undefined as I);

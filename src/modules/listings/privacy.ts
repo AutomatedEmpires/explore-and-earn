@@ -3,6 +3,7 @@
 // is removed.
 import { asc, eq } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
+import { stubPrivacyHandler, type RetentionRule } from '@/modules/privacy';
 import { listingRevisions, listings } from './schema';
 
 export const privacyHandlers: {
@@ -40,3 +41,14 @@ export const privacyHandlers: {
     });
   },
 };
+
+export const privacyHandler = stubPrivacyHandler(
+  'listings',
+  ['listings', 'listing_revisions', 'photo_slot_checks'],
+  [
+    { table: 'listings', column: 'draft_media_ids', array: true },
+    { table: 'listing_revisions', column: 'content_media_ids', array: true },
+    { table: 'photo_slot_checks', column: 'media_id', array: false },
+  ],
+);
+export const retentionRules: RetentionRule[] = [];

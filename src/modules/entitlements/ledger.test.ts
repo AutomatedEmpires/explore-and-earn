@@ -12,12 +12,12 @@ import {
   getBalance,
   grant,
   listOpenGrants,
-  privacyHandlers,
   reverse,
   type Actor,
   type EntitlementKind,
   type GrantSource,
 } from './index';
+import { privacyHandlers } from './privacy';
 
 let t: TestDb;
 const SYSTEM: Actor = { type: 'system', id: null };

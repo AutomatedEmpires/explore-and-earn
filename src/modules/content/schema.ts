@@ -1,3 +1,3 @@
-// Counsel drafts live in ./drafts. This module has no tables yet.
-// SP8 adds the legal-document tables later. Issue 116 does not.
-export {};
+// Content's Drizzle tables. Each workstream owns one file; this file only re-exports them.
+export * from './schema-help';
+export * from './schema-legal';
