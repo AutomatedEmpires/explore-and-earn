@@ -1,6 +1,7 @@
 // POST /api/v1/onboarding returns `returnTo` (C-1 in design audit 1): after onboarding, the
-// guest's action is where the API sends them, and a path off this site is never returned. On
-// PGlite, with the session guard mocked and a fake Clerk admin.
+// guest's action is where the API sends them, and a path off this site is never returned. It
+// also runs the age screen (legal review 2.6): a refused sign-up closes onboarding for the rest
+// of the browser session. On PGlite, with the session guard mocked and a fake Clerk admin.
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryRows, type Db } from '@/lib/db';
@@ -70,18 +71,36 @@ beforeEach(async () => {
 });
 
 const JOB = '/jobs/view/1/lift-operator?intent=save%3A1';
-const SEEKER = { accountType: 'seeker', adultAttested: true } as const;
+const SEEKER = { accountType: 'seeker', dateOfBirth: '1990-04-03' } as const;
 const HOST = { accountType: 'host', organizationName: 'Kettle Ridge Lodge' } as const;
+/** A date of birth that is under the cut-off on any day this test can run. */
+const CHILD = { accountType: 'seeker', dateOfBirth: `${new Date().getUTCFullYear() - 10}-06-01` };
 
-async function post(body: unknown): Promise<{ status: number; json: unknown }> {
+async function send(
+  body: unknown,
+  headers: Record<string, string> = {},
+): Promise<{ status: number; json: unknown; headers: Headers }> {
   const res = await POST(
     new Request('http://localhost:3000/api/v1/onboarding', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', origin: 'http://localhost:3000' },
+      headers: { 'content-type': 'application/json', origin: 'http://localhost:3000', ...headers },
       body: JSON.stringify(body),
     }),
   );
-  return { status: res.status, json: await res.json() };
+  return { status: res.status, json: await res.json(), headers: res.headers };
+}
+
+async function post(body: unknown): Promise<{ status: number; json: unknown }> {
+  const { status, json } = await send(body);
+  return { status, json };
+}
+
+async function accountType(): Promise<string | null | undefined> {
+  const [row] = await queryRows<{ account_type: string | null }>(
+    t.db,
+    sql`select account_type from app.users where id = ${session.user?.id ?? ''}`,
+  );
+  return row?.account_type;
 }
 
 describe('POST /api/v1/onboarding with returnTo', () => {
@@ -146,5 +165,53 @@ describe('POST /api/v1/onboarding with returnTo', () => {
 
   it('refuses a returnTo that is not a string', async () => {
     await expect(post({ ...SEEKER, returnTo: 42 })).resolves.toMatchObject({ status: 400 });
+  });
+});
+
+describe('POST /api/v1/onboarding: the age screen (legal review 2.6)', () => {
+  const REFUSAL = {
+    error: {
+      code: 'forbidden',
+      message: 'We can’t make you an account',
+      details: { reason: 'signup_refused' },
+    },
+  };
+
+  it('refuses an under-age date without hinting at the cut-off, and closes the session', async () => {
+    const res = await send(CHILD);
+
+    expect(res.status).toBe(403);
+    expect(res.json).toMatchObject(REFUSAL);
+    const { message, details } = (res.json as { error: { message: string; details: unknown } })
+      .error;
+    expect(`${message} ${JSON.stringify(details)}`).not.toMatch(/\d|\bage\b|adult|old/i);
+    // A session cookie (no Max-Age or Expires): it ends when the browser closes.
+    const cookie = res.headers.get('set-cookie') ?? '';
+    expect(cookie).toMatch(/^ee_signup_refused=1; /);
+    expect(cookie).toMatch(/; Path=\//);
+    expect(cookie).toMatch(/; HttpOnly/);
+    expect(cookie).toMatch(/; Secure/);
+    expect(cookie).toMatch(/; SameSite=Lax/);
+    expect(cookie).not.toMatch(/Max-Age|Expires/i);
+    expect(await accountType()).toBeNull();
+  });
+
+  it('refuses a second try in the same session, with any date or as a host', async () => {
+    const cookie = { cookie: 'theme=dark; ee_signup_refused=1' };
+
+    await expect(send(SEEKER, cookie)).resolves.toMatchObject({ status: 403, json: REFUSAL });
+    await expect(send(HOST, cookie)).resolves.toMatchObject({ status: 403, json: REFUSAL });
+    expect(await accountType()).toBeNull();
+  });
+
+  it('lets an adult through when the session has no refusal', async () => {
+    await expect(send(SEEKER, { cookie: 'theme=dark' })).resolves.toMatchObject({ status: 200 });
+    expect(await accountType()).toBe('seeker');
+  });
+
+  it('answers 400, without closing the session, for a date that is not real', async () => {
+    const res = await send({ accountType: 'seeker', dateOfBirth: '2001-02-30' });
+    expect(res.status).toBe(400);
+    expect(res.headers.get('set-cookie')).toBeNull();
   });
 });

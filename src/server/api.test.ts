@@ -8,6 +8,7 @@ import { forbidden, notFound, unauthorized } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
 import { record } from '@/modules/audit';
+import { recordAnalyticsOptOut } from '@/modules/identity';
 import { GET as health } from '@/app/api/v1/health/route';
 import { consentCookieValue } from '@/modules/privacy';
 import { reverificationError } from '@clerk/nextjs/server';
@@ -47,6 +48,22 @@ vi.mock('@sentry/nextjs', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sentry/nextjs')>()),
   captureException: sentry.captureException,
 }));
+
+// The Global Privacy Control stamp goes through the real identity function, which a test can
+// make fail.
+const optOut = vi.hoisted(() => ({ fail: false }));
+vi.mock('@/modules/identity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/modules/identity')>();
+  return {
+    ...actual,
+    recordAnalyticsOptOut: vi.fn(
+      async (...args: Parameters<typeof actual.recordAnalyticsOptOut>) => {
+        if (optOut.fail) throw new Error('database unavailable');
+        return actual.recordAnalyticsOptOut(...args);
+      },
+    ),
+  };
+});
 
 // The real guards need a Clerk request; each test decides what they return.
 vi.mock('./guards', () => ({
@@ -494,5 +511,80 @@ describe('GET /api/v1/health', () => {
     const res = await health(new Request(`${APP_URL}/api/v1/health`));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, env: 'dev' });
+  });
+});
+
+// Legal review 4.5 (P0 item 18): Global Privacy Control is a rejection everywhere, and the
+// opt-out is recorded. A signed-in request with Sec-GPC: 1 stamps users.analytics_opt_out_at
+// once, after the response, and the stamp never fails or holds up the request.
+describe('apiRoute and Global Privacy Control', () => {
+  let userId: string;
+  const route = apiRoute({ auth: 'user', handler: async () => ({ ok: true }) });
+  const open = apiRoute({ handler: async () => ({ ok: true }) });
+  const request = (headers: Record<string, string> = {}) =>
+    new Request(`${APP_URL}/api/v1/thing`, {
+      headers: { 'x-vercel-ip-country': 'US', ...headers },
+    });
+
+  async function stampedAt(id: string): Promise<string | null> {
+    const [row] = await queryRows<{ at: string | null }>(
+      t.db,
+      sql`select analytics_opt_out_at::text as at from app.users where id = ${id}`,
+    );
+    return row?.at ?? null;
+  }
+
+  beforeEach(async () => {
+    optOut.fail = false;
+    vi.mocked(recordAnalyticsOptOut).mockClear();
+    userId = newId();
+    await t.db.insert(users).values({ id: userId, clerkUserId: `user_gpc_${userId}` });
+    vi.mocked(requireUser).mockResolvedValue({ ...user, id: userId });
+  });
+
+  it('stamps the signed-in user once, and a second request keeps the first time', async () => {
+    const first = await route(request({ 'sec-gpc': '1' }));
+    expect(first.status).toBe(200);
+    await vi.waitFor(async () => expect(await stampedAt(userId)).not.toBeNull());
+    const at = await stampedAt(userId);
+
+    const second = await route(request({ 'sec-gpc': '1' }));
+    expect(second.status).toBe(200);
+    // The second stamp runs after the response too, and is a no-op.
+    await vi.waitFor(() => expect(recordAnalyticsOptOut).toHaveLastResolvedWith(false));
+    expect(recordAnalyticsOptOut).toHaveBeenCalledTimes(2);
+    expect(await stampedAt(userId)).toBe(at);
+  });
+
+  it('does not stamp, or touch the database for it, without the header', async () => {
+    expect((await route(request())).status).toBe(200);
+    expect((await route(request({ 'sec-gpc': '0' }))).status).toBe(200);
+    expect(recordAnalyticsOptOut).not.toHaveBeenCalled();
+    expect(await stampedAt(userId)).toBeNull();
+  });
+
+  it('does not stamp a signed-out request or a view-as session', async () => {
+    expect((await open(request({ 'sec-gpc': '1' }))).status).toBe(200);
+    clerkSession.act = { sub: 'user_operator' };
+    expect((await route(request({ 'sec-gpc': '1' }))).status).toBe(200);
+    expect(recordAnalyticsOptOut).not.toHaveBeenCalled();
+    expect(await stampedAt(userId)).toBeNull();
+  });
+
+  it('answers normally and logs a warning when the stamp fails', async () => {
+    optOut.fail = true;
+    const warned = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+
+    const res = await route(request({ 'sec-gpc': '1' }));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    await vi.waitFor(() =>
+      expect(warned).toHaveBeenCalledWith(
+        'Could not record the Global Privacy Control opt-out',
+        expect.objectContaining({ err: expect.any(Error) }),
+      ),
+    );
+    warned.mockRestore();
   });
 });

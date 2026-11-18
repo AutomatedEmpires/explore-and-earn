@@ -1,7 +1,7 @@
-// Drizzle tables for the identity module (drizzle/0100_identity.sql and 0101). Only this module
+// Drizzle tables for the identity module (drizzle/0100_identity.sql to 0102). Only this module
 // reads or writes them; other code goes through `@/modules/identity`.
 import { sql } from 'drizzle-orm';
-import { pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { pgSchema, smallint, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 const app = pgSchema('app');
 
@@ -19,7 +19,15 @@ export const users = app.table('users', {
   email: text('email'),
   displayName: text('display_name'),
   accountType: text('account_type', { enum: ACCOUNT_TYPES }),
+  /** "18 or older: yes", with when the seeker passed the age screen. Every seeker has it. */
   adultAttestedAt: ts('adult_attested_at'),
+  /**
+   * The year from the age screen's date of birth (legal review 2.6). The full date is never
+   * stored. Null for hosts, operators and seekers who onboarded before the screen.
+   */
+  birthYear: smallint('birth_year'),
+  /** When a signed-in request first carried Global Privacy Control (legal review 4.5). */
+  analyticsOptOutAt: ts('analytics_opt_out_at'),
   deletedAt: ts('deleted_at'),
   /** SHA-256 of the Clerk user id, set when the person is erased. Null until then. */
   erasedClerkIdSha256: text('erased_clerk_id_sha256').unique(),

@@ -11,8 +11,11 @@
 import { captureException } from '@sentry/nextjs';
 import { auth, reverificationError } from '@clerk/nextjs/server';
 import { unstable_rethrow } from 'next/navigation';
+import { after } from 'next/server';
 import type { z } from 'zod';
 import { getDb, type Db } from '@/lib/db';
+import { gpcFromHeaders } from '@/lib/privacy-signals';
+import { recordAnalyticsOptOut } from '@/modules/identity';
 import { allowedByConsent, readConsent } from '@/modules/privacy';
 import { getConsentNotBefore } from '@/modules/content';
 import '@/server/sp8-wiring';
@@ -317,6 +320,27 @@ function finish(result: unknown, requestId: string): Response {
   return Response.json(result, { status: 200, headers: baseHeaders(requestId) });
 }
 
+/**
+ * Records a signed-in user's Global Privacy Control opt-out (users.analytics_opt_out_at): one
+ * conditional UPDATE that is a no-op once stamped. It runs after the response through
+ * `after()`, so it never slows or blocks the request, and an error is logged, never thrown.
+ * Outside a request scope (tests, scripts) `after()` throws, and it runs at once, unawaited.
+ */
+function stampAnalyticsOptOut(userId: string): void {
+  const run = async (): Promise<void> => {
+    try {
+      await recordAnalyticsOptOut(getDb(), userId);
+    } catch (err) {
+      logger.warn('Could not record the Global Privacy Control opt-out', { err });
+    }
+  };
+  try {
+    after(run);
+  } catch {
+    void run();
+  }
+}
+
 /** Wraps a route handler with the API conventions. See the example at the top of this file. */
 export function apiRoute<I = undefined, O = unknown>(opts: ApiRouteOptions<I, O>): RouteHandler {
   const auth = opts.auth ?? 'none';
@@ -345,6 +369,9 @@ export function apiRoute<I = undefined, O = unknown>(opts: ApiRouteOptions<I, O>
             readConsent(req, { notBefore: await getConsentNotBefore(getDb()) }),
           );
         const who = await authenticate(auth);
+        // Global Privacy Control is a rejection everywhere (legal review 4.5): analyticsAllowed
+        // is already false for it, and a signed-in user's opt-out is recorded once.
+        if (who.user && !viewAs && gpcFromHeaders(req.headers)) stampAnalyticsOptOut(who.user.id);
         const params = (await route?.params) ?? {};
         const input = opts.input ? await readInput(req, opts.input, params) : (undefined as I);
         const ctx: ApiContext<I> = { input, requestId, db: getDb(), req, ...who };
