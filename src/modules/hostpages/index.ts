@@ -48,7 +48,7 @@ export {
   unfollowHost,
 } from './follows';
 /** SP8 registers these with its privacy exporter and eraser. */
-export { privacyHandlers } from './privacy';
+export { privacyHandler, retentionRules } from './privacy';
 
 export const jobHandlers: HandlerMap = {
   /** Enqueued by saveHostPage with `{ orgId }`. */

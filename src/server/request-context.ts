@@ -15,6 +15,10 @@ export type RequestContext = {
   path?: string;
   /** The caller's IP, hashed (`hashIp`), for audit rows. Never the address itself. */
   ipHash?: string | null;
+  /** False when the visitor is in a region that has not accepted analytics, or this is view-as. */
+  analyticsAllowed?: boolean;
+  /** The Clerk session is an actor token ("view as"). */
+  viewAs?: boolean;
 };
 
 const storage = new AsyncLocalStorage<RequestContext>();

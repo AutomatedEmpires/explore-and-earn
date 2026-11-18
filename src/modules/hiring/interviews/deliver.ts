@@ -8,6 +8,7 @@ import { notify } from '@/modules/notifications';
 import { getOrgSummaries } from '@/modules/orgs';
 import { getCommunityIdentities } from '@/modules/profiles';
 import { interviews, pipelineEntries } from '../schema';
+import { isBlocked } from './blocks';
 import '../notification-types';
 
 type InterviewRow = typeof interviews.$inferSelect;
@@ -71,6 +72,8 @@ export async function publishInterviewInvite(tx: Tx, row: InterviewRow): Promise
     .from(pipelineEntries)
     .where(eq(pipelineEntries.applicationId, row.applicationId));
   if (!entry) return;
+  // A block can land while the text is being scanned; nothing goes out after it.
+  if (await isBlocked(tx, { orgId: row.orgId, seekerUserId: entry.seekerUserId })) return;
   await postCard(tx, row.threadId, { type: 'interview', refId: row.id }, row.organizerUserId);
   await notifyInterview(
     tx,

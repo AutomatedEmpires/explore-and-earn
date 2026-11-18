@@ -41,12 +41,16 @@ vi.mock('@/modules/orgs', async (orig) => ({
   ...(await orig<typeof import('@/modules/orgs')>()),
   ...spied((await import('@tests/fakes/sp4/sp2')).orgsAdditions),
 }));
-vi.mock('@/modules/hostpages', async () =>
-  spied((await import('@tests/fakes/sp4/sp2')).hostpagesModule),
-);
-vi.mock('@/modules/locations', async () =>
-  spied((await import('@tests/fakes/sp4/sp2')).locationsModule),
-);
+vi.mock('@/modules/hostpages', async () => {
+  const { privacyHandler, retentionRules, ...fns } = (await import('@tests/fakes/sp4/sp2'))
+    .hostpagesModule;
+  return { ...spied(fns), privacyHandler, retentionRules };
+});
+vi.mock('@/modules/locations', async () => {
+  const { privacyHandler, retentionRules, ...fns } = (await import('@tests/fakes/sp4/sp2'))
+    .locationsModule;
+  return { ...spied(fns), privacyHandler, retentionRules };
+});
 vi.mock('@/modules/profiles', async () => (await import('./test-fixtures')).profilesMock());
 vi.mock('@/modules/safety', async () => (await import('./test-fixtures')).safetyMock());
 vi.mock('@/modules/notifications', async (orig) => ({

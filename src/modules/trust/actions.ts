@@ -34,7 +34,12 @@ import { reviewActions, reviewItems, reviewNotes } from './schema';
 import { findSubjectHandler, type SubjectHandler } from './subjects';
 import { REVIEW_ACTIONS, type ReviewAction } from './types';
 
-export type DecisionData = { amountCents?: number; note?: string };
+export type DecisionData = {
+  amountCents?: number;
+  note?: string;
+  reason?: string;
+  endsAt?: Date | null;
+};
 
 type ItemRecord = typeof reviewItems.$inferSelect;
 
@@ -349,6 +354,8 @@ export async function escalate(
 const decisionData = z.strictObject({
   amountCents: z.number().int().positive().optional(),
   note: z.string().max(MAX_NOTE_LENGTH).optional(),
+  reason: z.string().trim().min(10).max(1000).optional(),
+  endsAt: z.coerce.date().nullable().optional(),
 });
 
 function parseDecision(action: ReviewAction, data: DecisionData | undefined): DecisionData {
@@ -361,6 +368,13 @@ function parseDecision(action: ReviewAction, data: DecisionData | undefined): De
   if (parsed.data.amountCents !== undefined) out.amountCents = parsed.data.amountCents;
   const note = parsed.data.note?.trim();
   if (note) out.note = note;
+  if (parsed.data.reason) out.reason = parsed.data.reason;
+  if (parsed.data.endsAt !== undefined) {
+    if (parsed.data.endsAt !== null && parsed.data.endsAt.getTime() <= Date.now()) {
+      throw badRequest('endsAt must be in the future');
+    }
+    out.endsAt = parsed.data.endsAt;
+  }
   if (action === 'refund' && out.amountCents === undefined) {
     throw badRequest('A refund needs amountCents');
   }
@@ -395,7 +409,11 @@ async function applyDecision(
   },
 ): Promise<void> {
   // Handlers learn which item decided them (a subject with two open items needs both approved).
-  await a.handler(tx, item.subjectId, { ...a.data, reviewItemId: item.id });
+  await a.handler(tx, item.subjectId, {
+    ...a.data,
+    reviewItemId: item.id,
+    operatorId: a.decidedBy,
+  });
 
   const now = new Date();
   await tx
@@ -568,7 +586,7 @@ export async function approveSecond(
     await applyDecision(tx, item, {
       actionId: action.id,
       action: action.action,
-      data: (action.data ?? {}) as DecisionData,
+      data: parseDecision(action.action, (action.data ?? {}) as DecisionData),
       handler,
       decidedBy: action.actorOperatorId,
       appliedBy: op.userId,

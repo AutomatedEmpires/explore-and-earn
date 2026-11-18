@@ -3,6 +3,7 @@
 // memberships go, and their id is cleared from what they did for a team.
 import { asc, eq } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
+import { stubPrivacyHandler, type RetentionRule } from '@/modules/privacy';
 import { orgInvitations, orgMemberships, organizations } from './schema';
 
 export const privacyHandlers: {
@@ -60,3 +61,12 @@ export const privacyHandlers: {
     });
   },
 };
+
+export const privacyHandler = stubPrivacyHandler('orgs', [
+  'organizations',
+  'org_memberships',
+  'member_assignments',
+  'org_invitations',
+  'org_slugs',
+]);
+export const retentionRules: RetentionRule[] = [];

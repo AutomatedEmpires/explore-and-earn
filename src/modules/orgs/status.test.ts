@@ -49,7 +49,7 @@ const statusEvents = () =>
   );
 
 // org.status_changed fans out to these topics (src/server/event-subscribers.ts), by topic.
-const STATUS_TOPICS = ['discovery.sync_host', 'listings.close_for_org'];
+const STATUS_TOPICS = ['discovery.sync_host', 'listings.close_for_org', 'operator.org_sanction'];
 
 describe('setOrgStatus', () => {
   it('emits one org.status_changed and records orgs.status_changed, once', async () => {
@@ -63,7 +63,13 @@ describe('setOrgStatus', () => {
     expect(events.map((e) => e.topic)).toEqual(STATUS_TOPICS);
     expect(new Set(events.map((e) => e.payload.eventId)).size).toBe(1);
     for (const e of events) {
-      expect(e.payload.data, e.topic).toEqual({ orgId: org.orgId, status: 'suspended' });
+      expect(e.payload.data, e.topic).toEqual({
+        orgId: org.orgId,
+        status: 'suspended',
+        reviewItemId: null,
+        reason: 'Fake listings',
+        endsAt: null,
+      });
     }
 
     const audit = await auditRows(org.orgId, 'orgs.status_changed');

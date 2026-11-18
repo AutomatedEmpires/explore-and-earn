@@ -8,6 +8,7 @@ import { apiRoute } from '@/server/api';
 import { handlers, onDeadEvent } from '@/server/job-handlers';
 // SP2 module-load registrations, so every job sees them on a cold server.
 import '@/server/sp2-wiring';
+import '@/server/sp8-wiring';
 
 export const maxDuration = 60;
 

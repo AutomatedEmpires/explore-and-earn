@@ -3,7 +3,7 @@
 // approve -> verified, remove -> failed, ask_info -> needs_info with the note, suspend or ban ->
 // billing.sanctionOrg (a ban also cancels the subscription at once).
 import { z } from 'zod';
-import { sanctionOrg, type Actor } from '@/modules/billing';
+import { sanctionMetaFrom, suspendOrganization, type Actor } from '@/modules/billing';
 import { registerSubjectHandlers } from '@/modules/trust';
 import { askForInfo, operatorApprove, operatorFail } from './decide';
 
@@ -22,7 +22,7 @@ function readData(data: unknown): { note?: string; reviewItemId: string | null }
 /** The handlers don't learn which operator decided; trust.decided records that. */
 const OPERATOR: Actor = { type: 'operator', id: null };
 
-registerSubjectHandlers('organization', {
+registerSubjectHandlers('business_verification', {
   approve: async (db, orgId, data) => {
     await operatorApprove(db, orgId, readData(data).reviewItemId);
   },
@@ -33,10 +33,26 @@ registerSubjectHandlers('organization', {
     const d = readData(data);
     await askForInfo(db, orgId, d.note, d.reviewItemId);
   },
-  suspend: async (db, orgId) => {
-    await sanctionOrg(db, orgId, 'suspend', OPERATOR);
+  suspend: async (db, orgId, data) => {
+    const meta = sanctionMetaFrom(data);
+    await suspendOrganization(db, {
+      orgId,
+      action: 'suspend',
+      reviewItemId: meta.reviewItemId ?? '',
+      reason: meta.reason ?? 'Other violation of our terms',
+      endsAt: meta.endsAt ?? null,
+      actor: OPERATOR,
+    });
   },
-  ban: async (db, orgId) => {
-    await sanctionOrg(db, orgId, 'ban', OPERATOR);
+  ban: async (db, orgId, data) => {
+    const meta = sanctionMetaFrom(data);
+    await suspendOrganization(db, {
+      orgId,
+      action: 'ban',
+      reviewItemId: meta.reviewItemId ?? '',
+      reason: meta.reason ?? 'Other violation of our terms',
+      endsAt: null,
+      actor: OPERATOR,
+    });
   },
 });

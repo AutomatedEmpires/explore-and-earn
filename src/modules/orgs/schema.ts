@@ -8,6 +8,7 @@ const app = pgSchema('app');
 const ts = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 
 export const ORG_ROLES = ['owner', 'admin', 'recruiter', 'billing'] as const;
+export type OrgRole = (typeof ORG_ROLES)[number];
 export const ORG_STATUSES = ['active', 'suspended', 'banned'] as const;
 export const VERIFICATION_STATUSES = [
   'unverified',

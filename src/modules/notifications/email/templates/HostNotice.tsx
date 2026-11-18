@@ -7,7 +7,7 @@ import { Action, Layout, Title, styles, type AnyFooterProps } from './Layout';
 export type NoticeProps = {
   heading: string;
   lines: string[];
-  button: { label: string; href: string };
+  button: { label: string; href: string } | null;
   footer: AnyFooterProps;
 };
 
@@ -27,7 +27,7 @@ export function Notice({
           {line}
         </Text>
       ))}
-      <Action href={button.href}>{button.label}</Action>
+      {button ? <Action href={button.href}>{button.label}</Action> : null}
     </Layout>
   );
 }

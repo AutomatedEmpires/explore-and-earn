@@ -1,5 +1,7 @@
 // Public API of the operator module: operator console data and stats. Owned by W8 (Task 24).
 import type { HandlerMap } from '@/modules/jobs';
+import { operatorJobHandlers } from './stubs';
+import './notification-types';
 
 export {
   coversQueue,
@@ -34,5 +36,9 @@ export {
 } from './operators';
 export { operatorStats, type OperatorStats } from './stats';
 export { createTestItem, DEFAULT_TEST_ITEM_TEXT, testItemText, type TestItem } from './test-items';
+export { getActiveSanction, type ActiveSanction } from './stubs';
+export { privacyHandler } from './privacy';
+export { retentionRules } from './retention';
+export * from './ports';
 
-export const jobHandlers: HandlerMap = {};
+export const jobHandlers: HandlerMap = { ...operatorJobHandlers };

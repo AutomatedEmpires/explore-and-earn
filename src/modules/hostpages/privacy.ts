@@ -2,6 +2,7 @@
 // eraser: a person's follows, and their name on the host pages they edited.
 import { asc, eq } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
+import { stubPrivacyHandler, type RetentionRule } from '@/modules/privacy';
 import { getOrgSummaries } from '@/modules/orgs';
 import { transact } from './editor';
 import { hostFollows, hostPages } from './schema';
@@ -39,3 +40,13 @@ export const privacyHandlers: {
     });
   },
 };
+
+export const privacyHandler = stubPrivacyHandler(
+  'hostpages',
+  ['host_pages', 'host_follows'],
+  [
+    { table: 'host_pages', column: 'content_media_ids', array: true },
+    { table: 'host_pages', column: 'pending_media_ids', array: true },
+  ],
+);
+export const retentionRules: RetentionRule[] = [];

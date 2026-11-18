@@ -331,7 +331,21 @@ const unfollow: Hostpages['unfollow'] = async (_db, userId, orgId) => {
 };
 
 /** Stands in for the whole hostpages module in SP4 tests. */
-export const hostpagesModule = { getHostIdentities, unfollow };
+export const hostpagesModule = {
+  getHostIdentities,
+  unfollow,
+  privacyHandler: {
+    module: 'hostpages',
+    tables: ['host_pages', 'host_follows'],
+    async exportData() {
+      return { records: {}, files: [] };
+    },
+    async erase() {
+      return { erased: 0, retained: [] };
+    },
+  },
+  retentionRules: [] as const,
+};
 
 const getLocations: Locations['getLocations'] = async (_db, ids) => {
   const out = new Map<string, Location>();
@@ -343,4 +357,17 @@ const getLocations: Locations['getLocations'] = async (_db, ids) => {
 };
 
 /** Stands in for the whole locations module in SP4 tests. */
-export const locationsModule = { getLocations };
+export const locationsModule = {
+  getLocations,
+  privacyHandler: {
+    module: 'locations',
+    tables: ['locations', 'location_weather'],
+    async exportData() {
+      return { records: {}, files: [] };
+    },
+    async erase() {
+      return { erased: 0, retained: [] };
+    },
+  },
+  retentionRules: [] as const,
+};

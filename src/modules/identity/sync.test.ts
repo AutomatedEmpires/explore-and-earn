@@ -5,7 +5,8 @@ import { AppError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { findHostMembership } from '@/modules/orgs';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
-import { handleClerkEvent, mapClerkRole } from './sync';
+import { clerkIdHash, handleClerkEvent, mapClerkRole } from './sync';
+import { newId } from '@/lib/ids';
 
 // Clerk webhook payload builders (snake_case JSON, as Clerk sends it). Timestamps are ms.
 const ms = (iso: string) => new Date(iso).getTime();
@@ -681,6 +682,153 @@ describe('handleClerkEvent', () => {
         data: { id: 'sess_1' },
       }),
     ).toBe('duplicate');
+  });
+});
+
+describe('erased Clerk ids', () => {
+  let t: TestDb;
+
+  beforeAll(async () => {
+    t = await createTestDb();
+  });
+
+  afterAll(async () => {
+    await t.close();
+  });
+
+  beforeEach(async () => {
+    await t.db.execute(
+      sql`truncate app.org_memberships, app.organizations, app.operators, app.users, app.webhook_events cascade`,
+    );
+    await t.db.execute(sql`
+      insert into app.users (id, clerk_user_id, erased_clerk_id_sha256)
+      values (${newId()}, 'deleted:tomb', ${clerkIdHash('user_abc')})
+    `);
+  });
+
+  it('ignores events for an erased Clerk user and does not recreate them', async () => {
+    const updated = userJson({
+      id: 'user_abc',
+      email: 'maya@example.test',
+      updatedAt: '2026-11-02T00:00:00Z',
+    });
+    expect(
+      await handleClerkEvent(t.db, { id: 'msg_erased_upd', type: 'user.updated', data: updated }),
+    ).toBe('ignored_erased');
+    expect(
+      await handleClerkEvent(t.db, {
+        id: 'msg_erased_del',
+        type: 'user.deleted',
+        data: { id: 'user_abc', deleted: true },
+      }),
+    ).toBe('ignored_erased');
+    const org = orgJson({
+      id: 'org_erased',
+      name: 'Closed Lodge',
+      updatedAt: '2026-11-02T00:00:00Z',
+      publicMetadata: APP_CREATED,
+    });
+    expect(
+      await handleClerkEvent(t.db, {
+        id: 'msg_erased_mem',
+        type: 'organizationMembership.deleted',
+        data: membershipJson({
+          role: 'org:admin',
+          organization: org,
+          userId: 'user_abc',
+          updatedAt: '2026-11-02T00:00:01Z',
+        }),
+      }),
+    ).toBe('ignored_erased');
+
+    const events = await queryRows<{ id: string; status: string; reason: string | null }>(
+      t.db,
+      sql`select id, status, reason from app.webhook_events order by id`,
+    );
+    expect(events).toEqual([
+      { id: 'msg_erased_del', status: 'ignored', reason: 'erased' },
+      { id: 'msg_erased_mem', status: 'ignored', reason: 'erased' },
+      { id: 'msg_erased_upd', status: 'ignored', reason: 'erased' },
+    ]);
+    const people = await queryRows<{ clerk_user_id: string; email: string | null }>(
+      t.db,
+      sql`select clerk_user_id, email from app.users`,
+    );
+    expect(people.some((row) => row.clerk_user_id === 'user_abc' || row.email === 'maya@example.test')).toBe(
+      false,
+    );
+  });
+
+  it('does not restore an owner from an erased created_by, and skips a membership on a deleted org', async () => {
+    const org = orgJson({
+      id: 'org_open',
+      name: 'Open Lodge',
+      updatedAt: '2026-11-02T00:00:00Z',
+      publicMetadata: APP_CREATED,
+    });
+    await handleClerkEvent(t.db, { id: 'msg_org', type: 'organization.created', data: org });
+    expect(
+      await handleClerkEvent(t.db, {
+        id: 'msg_org_upd',
+        type: 'organization.updated',
+        data: orgJson({
+          id: 'org_open',
+          name: 'Open Lodge',
+          createdBy: 'user_abc',
+          updatedAt: '2026-11-03T00:00:00Z',
+          publicMetadata: APP_CREATED,
+        }),
+      }),
+    ).toBe('applied');
+    const [owner] = await queryRows<{ owner_user_id: string | null }>(
+      t.db,
+      sql`select owner_user_id from app.organizations where clerk_org_id = 'org_open'`,
+    );
+    expect(owner?.owner_user_id).toBeNull();
+    expect(
+      await queryRows(
+        t.db,
+        sql`select id from app.users where clerk_user_id = 'user_abc'`,
+      ),
+    ).toEqual([]);
+
+    await t.db.execute(
+      sql`update app.organizations set deleted_at = now() where clerk_org_id = 'org_open'`,
+    );
+    const before = await queryRows(t.db, sql`select user_id from app.org_memberships`);
+    expect(
+      await handleClerkEvent(t.db, {
+        id: 'msg_dead_org',
+        type: 'organizationMembership.created',
+        data: membershipJson({
+          role: 'org:recruiter',
+          organization: org,
+          userId: 'user_newcomer',
+          updatedAt: '2026-11-04T00:00:00Z',
+        }),
+      }),
+    ).toBe('ignored_erased');
+    expect(await queryRows(t.db, sql`select user_id from app.org_memberships`)).toEqual(before);
+
+    await t.db.execute(sql`update app.organizations set deleted_at = null where clerk_org_id = 'org_open'`);
+    expect(
+      await handleClerkEvent(t.db, {
+        id: 'msg_live_org',
+        type: 'organizationMembership.created',
+        data: membershipJson({
+          role: 'org:recruiter',
+          organization: org,
+          userId: 'user_live',
+          updatedAt: '2026-11-04T00:00:00Z',
+        }),
+      }),
+    ).toBe('applied');
+    expect(
+      await queryRows<{ clerk_user_id: string }>(
+        t.db,
+        sql`select clerk_user_id from app.users where clerk_user_id = 'user_live'`,
+      ),
+    ).toEqual([{ clerk_user_id: 'user_live' }]);
   });
 });
 

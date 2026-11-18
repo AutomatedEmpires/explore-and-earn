@@ -38,3 +38,30 @@ describe('the fake ClerkAdmin (SP2 membership calls)', () => {
     expect(clerk.memberships).toHaveLength(1);
   });
 });
+
+describe('makeFakeClerkAdmin SP8 methods', () => {
+  it('bans and unbans, deletes passkeys, and records an actor token', async () => {
+    const clerk = makeFakeClerkAdmin({ passkeys: ['u1'] });
+    await clerk.banUser('u1');
+    await clerk.unbanUser('u1');
+    expect(clerk.banned.size).toBe(0);
+    expect(clerk.calls.map((call) => call.method)).toEqual(['banUser', 'unbanUser']);
+
+    expect(await clerk.deletePasskeys('u1')).toBe(1);
+    expect(await clerk.deletePasskeys('u1')).toBe(0);
+    expect(clerk.passkeys.has('u1')).toBe(false);
+
+    await clerk.createActorToken({
+      operatorClerkUserId: 'user_op',
+      targetClerkUserId: 'user_maya',
+      expiresInSeconds: 1800,
+    });
+    expect(clerk.actorTokens).toEqual([
+      expect.objectContaining({
+        operatorClerkUserId: 'user_op',
+        targetClerkUserId: 'user_maya',
+        expiresInSeconds: 1800,
+      }),
+    ]);
+  });
+});

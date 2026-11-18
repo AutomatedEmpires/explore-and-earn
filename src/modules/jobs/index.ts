@@ -8,13 +8,18 @@ export {
   LOCK_TIMEOUT_MINUTES,
   MAX_ATTEMPTS,
   nextDelayMs,
+  registerDeadLetterHandler,
   runWorker,
   type DeadEvent,
   type DeadEventHook,
+  type DeadLetterHandler,
   type Handler,
   type HandlerMap,
   type WorkerOptions,
   type WorkerResult,
 } from './worker';
+
+export { privacyHandler } from './privacy';
+export { retentionRules } from './retention';
 
 export const jobHandlers: HandlerMap = {};

@@ -124,3 +124,6 @@ export async function setSetting<K extends SettingKey>(
 }
 
 export const jobHandlers: HandlerMap = {};
+
+export { privacyHandler } from './privacy';
+export { retentionRules } from './retention';

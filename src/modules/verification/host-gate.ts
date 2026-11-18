@@ -41,7 +41,7 @@ export async function alertSilentHost(
   if (!silentHostAlert(opened, replies)) return false;
   await openReviewItem(db, {
     queue: 'fraud',
-    subjectType: 'organization',
+    subjectType: 'business_verification',
     subjectId: orgId,
     reason: `silent_host:opened=${opened}`,
   });
