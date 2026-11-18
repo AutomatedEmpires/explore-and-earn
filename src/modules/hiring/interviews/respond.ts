@@ -1,5 +1,6 @@
 // Seeker answers: pick a slot, ask for new times, or decline.
 import { and, eq } from 'drizzle-orm';
+import { TERMINAL_STATUSES } from '@/lib/applications';
 import { withdraw } from '@/modules/applications';
 import { record } from '@/modules/audit';
 import type { Db, DbOrTx } from '@/lib/db';
@@ -56,7 +57,17 @@ export async function pickSlot(
   now = new Date(),
 ): Promise<SeekerInterviewItem> {
   await withTx(db, async (tx) => {
-    await loadVisible(tx, seekerUserId, interviewId);
+    const visible = await loadVisible(tx, seekerUserId, interviewId);
+    // The entry is locked before the interview, as a pipeline transition locks them.
+    const [entry] = await tx
+      .select()
+      .from(pipelineEntries)
+      .where(eq(pipelineEntries.applicationId, visible.entry.applicationId))
+      .for('update');
+    if (!entry) throw notFound('Interview not found', { reason: 'not_found' });
+    if ((TERMINAL_STATUSES as readonly string[]).includes(entry.status)) {
+      throw conflict('This application is closed.', { reason: 'application_closed' });
+    }
     const [locked] = await tx.select().from(interviews).where(eq(interviews.id, interviewId)).for('update');
     if (!locked || locked.status !== 'invited' || locked.round !== input.round) {
       throw conflict('These times changed. Refresh to see the latest.', { reason: 'round_changed' });
@@ -88,11 +99,6 @@ export async function pickSlot(
       .where(and(eq(interviews.id, interviewId), eq(interviews.status, 'invited'), eq(interviews.round, input.round)))
       .returning();
     if (!updated) throw conflict('These times changed. Refresh to see the latest.', { reason: 'round_changed' });
-    const [entry] = await tx
-      .select()
-      .from(pipelineEntries)
-      .where(eq(pipelineEntries.applicationId, locked.applicationId));
-    if (!entry) throw notFound('Interview not found', { reason: 'not_found' });
     await setInterviewState(tx, entry.applicationId, 'scheduled');
     await recordPipelineEvent(tx, {
       orgId: entry.orgId,
@@ -154,6 +160,7 @@ function assertWindows(windows: { start: string; end: string }[], now: Date): vo
   for (const window of windows) {
     const start = new Date(window.start).getTime();
     const end = new Date(window.end).getTime();
+    if (end <= now.getTime()) throw badRequest('Choose a time that has not passed.', { reason: 'window_passed' });
     if (end - start < min) throw badRequest('Each window is at least 30 minutes.', { reason: 'window_too_short' });
     if (start > now.getTime() + max) throw badRequest('Ask for a time within 60 days.', { reason: 'window_too_far' });
   }
@@ -172,6 +179,10 @@ export async function requestNewTimes(
     const [locked] = await tx.select().from(interviews).where(eq(interviews.id, interviewId)).for('update');
     if (!locked || (locked.status !== 'invited' && locked.status !== 'scheduled')) {
       throw conflict('This interview is no longer open.', { reason: 'interview_closed' });
+    }
+    // The same answer `pickSlot` gives: an invite past its expiry is not reopened.
+    if (locked.status === 'invited' && locked.expiresAt && locked.expiresAt.getTime() <= now.getTime()) {
+      throw conflict('This interview invite has expired.', { reason: 'expired' });
     }
     const wasScheduled = locked.status === 'scheduled';
     const previous = scheduleFields(locked);

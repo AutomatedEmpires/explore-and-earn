@@ -63,6 +63,65 @@ function CheckRow({ ok, children }: { ok: boolean; children: ReactNode }) {
   );
 }
 
+/** A cited rule (eCFR), opened in a new tab. */
+function RuleLink({ href }: { href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="font-semibold text-ink underline underline-offset-2"
+    >
+      Read the rule<span className="sr-only"> (opens in a new tab)</span>
+    </a>
+  );
+}
+
+/** A warning's title, its action and where the action goes, and what follows the message. */
+function warningCopy(w: IssueJson): {
+  title: string;
+  action: string;
+  step: StepKey;
+  field: string;
+  after: string;
+} {
+  switch (w.code) {
+    case 'pay_below_min_wage':
+      return {
+        title: 'Pay may be below the minimum wage',
+        action: 'Change hours or costs',
+        step: 'pay',
+        field: 'pay.amount',
+        after: ' You can still publish. We will check this listing before it goes live.',
+      };
+    case 'wording_flagged':
+      // The message already says the listing will be reviewed.
+      return {
+        title: 'Check this wording',
+        action: 'Change the wording',
+        step: sectionOfPath(w.field),
+        field: w.field,
+        after: '',
+      };
+    case 'h2b_job_order':
+      return {
+        title: 'Check your H-2B job order',
+        action: 'Review the job details',
+        step: 'job',
+        field: w.field,
+        after: '',
+      };
+    default:
+      return {
+        title: 'Check this photo',
+        action: 'Change the photo',
+        step: sectionOfPath(w.field),
+        field: w.field,
+        after: ' You can still publish.',
+      };
+  }
+}
+
 type PublishFailure =
   | { kind: 'network' }
   | { kind: 'blocked'; message: string; action?: { href: string; label: string } };
@@ -271,7 +330,16 @@ export function ReviewSection({
                 ? `All ${photoCount} housing and meal photos are added`
                 : 'Photos are added'}
             </CheckRow>
-            <CheckRow ok={!has((i) => i.code === 'prohibited_wording' || i.code === 'link_unsafe')}>
+            <CheckRow
+              ok={
+                !has(
+                  (i) =>
+                    i.code === 'prohibited_wording' ||
+                    i.code === 'question_not_allowed' ||
+                    i.code === 'link_unsafe',
+                ) && !warnings.some((w) => w.code === 'wording_flagged')
+              }
+            >
               No wording problems found
             </CheckRow>
           </ul>
@@ -282,8 +350,16 @@ export function ReviewSection({
               {/* One entry per field: this host's own check first (it names what to type), then
                   the server's. */}
               {[
-                ...localErrors.map(([field, message]) => ({ field: fieldKeyFor(field), message })),
-                ...errors.map((i) => ({ field: fieldKeyFor(i.field), message: i.message })),
+                ...localErrors.map(([field, message]) => ({
+                  field: fieldKeyFor(field),
+                  message,
+                  href: undefined,
+                })),
+                ...errors.map((i) => ({
+                  field: fieldKeyFor(i.field),
+                  message: i.message,
+                  href: i.href,
+                })),
               ]
                 .filter((v, i, all) => all.findIndex((o) => o.field === v.field) === i)
                 .map((i) => {
@@ -293,6 +369,12 @@ export function ReviewSection({
                       <span>
                         <span className="font-semibold">{stepTitle(step, form.draft)}:</span>{' '}
                         {i.message}
+                        {i.href ? (
+                          <>
+                            {' '}
+                            <RuleLink href={i.href} />
+                          </>
+                        ) : null}
                       </span>
                       <Button variant="secondary" onClick={() => onGoTo(step, i.field)}>
                         Fix it
@@ -303,35 +385,30 @@ export function ReviewSection({
             </ul>
           </Notice>
         ) : null}
-        {warnings.map((w) =>
-          w.code === 'pay_below_min_wage' ? (
+        {warnings.map((w) => {
+          const copy = warningCopy(w);
+          return (
             <Notice
-              key={w.field}
+              key={`${w.code}:${w.field}`}
               tone="warning"
-              title="Pay may be below the minimum wage"
+              title={copy.title}
               action={
-                <Button variant="secondary" onClick={() => onGoTo('pay', 'pay.amount')}>
-                  Change hours or costs
+                <Button variant="secondary" onClick={() => onGoTo(copy.step, copy.field)}>
+                  {copy.action}
                 </Button>
               }
             >
-              {w.message} You can still publish. We will check this listing before it goes live.
+              {w.message}
+              {copy.after}
+              {w.href ? (
+                <>
+                  {' '}
+                  <RuleLink href={w.href} />
+                </>
+              ) : null}
             </Notice>
-          ) : (
-            <Notice
-              key={w.field}
-              tone="warning"
-              title="Check this photo"
-              action={
-                <Button variant="secondary" onClick={() => onGoTo(sectionOfPath(w.field), w.field)}>
-                  Change the photo
-                </Button>
-              }
-            >
-              {w.message} You can still publish.
-            </Notice>
-          ),
-        )}
+          );
+        })}
       </div>
 
       <fieldset className="flex flex-col">

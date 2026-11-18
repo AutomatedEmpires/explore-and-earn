@@ -30,7 +30,7 @@ import {
 } from '@/modules/trust';
 import { getVerificationStatus, startVerification } from '@/modules/verification';
 import { findListing, isUuid, type ListingRecord } from './access';
-import { SLOT_LABELS } from './checks';
+import { SLOT_LABELS, findFlaggedWording } from './checks';
 import { HOUSING_SLOTS, MEAL_SLOTS, type ListingContent } from './content';
 import { getLinkSafety, domainStatus, type DomainStatus, type LinkSafety } from './link-safety';
 import { checkLinkSyntax } from './links';
@@ -199,7 +199,8 @@ function bodyFraudText(c: ListingContent, org: OrgSummary | undefined): string {
 function readableContent(value: unknown): ListingContent | null {
   if (!value || typeof value !== 'object') return null;
   const c = value as Partial<ListingContent>;
-  if (!c.basics || !c.job || !c.photos || !c.housing || !c.pay || !c.when || !c.applying) return null;
+  if (!c.basics || !c.job || !c.photos || !c.housing || !c.pay || !c.when || !c.applying)
+    return null;
   return c as ListingContent;
 }
 
@@ -217,7 +218,10 @@ async function fraudPeers(db: DbOrTx, revisionId: string) {
         inArray(listingRevisions.status, ['approved', 'in_review']),
       ),
     );
-  const summaries = await getOrgSummaries(db, rows.map((row) => row.orgId));
+  const summaries = await getOrgSummaries(
+    db,
+    rows.map((row) => row.orgId),
+  );
   const peers = [];
   for (const row of rows) {
     const content = readableContent(row.content);
@@ -289,6 +293,26 @@ async function checkOnce(db: DbOrTx, i: RunCheckInput): Promise<CheckResult> {
     subjectId: i.subjectId,
   });
   return previous ?? runCheck(db, i);
+}
+
+/** The review item reason for flag-for-review wording. */
+const WORDING_REASON = 'wording_flagged';
+
+/**
+ * Whether a revision has wording to review: the host kept a `wording_flagged` warning, or the
+ * lists (read again now) find some, so a phrase added since the publish request still counts.
+ */
+async function wordingFlagged(
+  db: DbOrTx,
+  rev: RevisionRecord,
+  content: ListingContent,
+): Promise<boolean> {
+  if (rev.acknowledgedWarnings.includes('wording_flagged')) return true;
+  const [flagged, nationalities] = await Promise.all([
+    getSetting(db, 'listings.flagged_phrases'),
+    getSetting(db, 'listings.flagged_nationalities'),
+  ]);
+  return findFlaggedWording(content, { flagged, nationalities }).length > 0;
 }
 
 type MediaVerdict = 'ready' | 'rejected' | 'pending' | 'held';
@@ -382,6 +406,10 @@ export async function screenRevision(
     }
   }
 
+  // Flagged wording (legal review 2.2) always goes to an operator and is never a reason to
+  // return the listing.
+  const wording = await wordingFlagged(db, rev, content);
+
   // 5. The AI checks, in parallel.
   const org = (await getOrgSummaries(db, [rev.orgId])).get(rev.orgId);
   const text = listingCheckText(content, org);
@@ -395,12 +423,10 @@ export async function screenRevision(
     peers: await fraudPeers(db, rev.id),
   });
   if (fraudMatches.length > 0) {
-    await toModeration(
-      db,
-      rev,
-      l,
-      fraudMatches.map((match) => ({ reason: match.rule })),
-    );
+    await toModeration(db, rev, l, [
+      ...fraudMatches.map((match) => ({ reason: match.rule })),
+      ...(wording ? [{ reason: WORDING_REASON }] : []),
+    ]);
     return;
   }
   const subject = { subjectType: REVISION_SUBJECT, subjectId: rev.id, text };
@@ -434,6 +460,7 @@ export async function screenRevision(
     },
     fraud: { decision: fraud.decision, score: fraud.score, checkId: fraud.checkId },
     photoSlotMismatchKept: keptMismatch,
+    wordingFlagged: wording,
   };
   await db
     .update(listingRevisions)
@@ -449,6 +476,7 @@ export async function screenRevision(
   const reasons: { reason: string; onlyIfNoItem?: boolean }[] = [];
   if (link === 'unknown') reasons.push({ reason: 'link_unknown' });
   if (keptMismatch) reasons.push({ reason: 'photo_slot_mismatch_kept', onlyIfNoItem: true });
+  if (wording) reasons.push({ reason: WORDING_REASON });
   if (
     moderation.decision === 'needs_review' ||
     fraud.decision === 'needs_review' ||

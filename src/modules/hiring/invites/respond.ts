@@ -1,15 +1,17 @@
 // A seeker's answer to an invite (SP5 spec 8.4, plan Task 15). Only a delivered `sent` invite
-// can be answered; one past `expires_at` is 409 `expired` before the sweep runs. Repeating the
-// recorded answer returns it unchanged and a different one is 409 `already_responded` (plan
-// decision 21). Interested opens the thread, posts the invite card and lets the host see the
-// seeker at SP4's `interested` stage. Mute host mutes the org and answers Not interested.
+// can be answered; one past `expires_at`, or whose listing stopped being live, is 409 `expired`
+// before the sweep runs, so a listing paused or closed opens no thread and reveals nothing.
+// Repeating the recorded answer returns it unchanged and a different one is 409
+// `already_responded` (plan decision 21). Interested opens the thread, posts the invite card and
+// lets the host see the seeker at SP4's `interested` stage. Mute host mutes the org and answers
+// Not interested while the invite is open.
 import { and, eq } from 'drizzle-orm';
 import type { Actor } from '@/lib/applications';
 import { withTx, type Db, type DbOrTx, type Tx } from '@/lib/db';
 import { conflict, notFound } from '@/lib/errors';
 import { INVITE_EXPIRED, type InviteResponse, type SeekerInviteItem } from '@/lib/hiring';
 import { record } from '@/modules/audit';
-import { getHiringInfoMany } from '@/modules/listings';
+import { getHiringInfoMany, type ListingHiringInfo } from '@/modules/listings';
 import { ensureThread, listingTeam, postCard, postEvent } from '@/modules/messaging';
 import { listMembers } from '@/modules/orgs';
 import { getCommunityIdentities, grantReveal } from '@/modules/profiles';
@@ -36,6 +38,15 @@ function isExpired(row: InviteRow, now: Date): boolean {
   return row.status === 'expired' || (row.status === 'sent' && row.expiresAt.getTime() <= now.getTime());
 }
 
+/**
+ * The invite's listing while it is live, read in the answer's transaction. The sweep expires a
+ * sent invite whose listing stopped being live; until it runs, null answers as expired.
+ */
+async function liveListing(tx: Tx, row: InviteRow): Promise<ListingHiringInfo | null> {
+  const [listing] = await getHiringInfoMany(tx, [row.listingId]);
+  return listing?.status === 'active' ? listing : null;
+}
+
 /** The answer an invite already records, or null while it is open. */
 function recordedAnswer(row: InviteRow): InviteResponse['response'] | null {
   if (row.status === 'interested' || row.status === 'applied') return 'interested';
@@ -54,6 +65,7 @@ async function hostRecipients(db: DbOrTx, row: InviteRow): Promise<string[]> {
 async function answer(
   tx: Tx,
   row: InviteRow,
+  listing: ListingHiringInfo,
   i: { response: InviteResponse['response']; reason: InviteResponse['reason'] | null; threadId: string | null },
   now: Date,
 ): Promise<void> {
@@ -67,12 +79,11 @@ async function answer(
       ...(i.threadId ? { threadId: i.threadId } : {}),
     })
     .where(eq(invites.id, row.id));
-  const [listing] = await getHiringInfoMany(tx, [row.listingId]);
   const actor: Actor = { type: 'seeker', userId: row.seekerUserId };
   await recordPipelineEvent(tx, {
     orgId: row.orgId,
     listingId: row.listingId,
-    locationId: listing?.locationId ?? null,
+    locationId: listing.locationId,
     inviteId: row.id,
     kind: interested ? 'invite_interested' : 'invite_not_interested',
     actor,
@@ -118,9 +129,11 @@ export async function respondToInvite(
     if (recorded !== null) {
       throw conflict('You already answered this invite.', { reason: 'already_responded' });
     }
+    const listing = await liveListing(tx, row);
+    if (!listing) throw conflict(INVITE_EXPIRED, { reason: 'expired' });
 
     if (i.response === 'not_interested') {
-      await answer(tx, row, { response: 'not_interested', reason: i.reason ?? null, threadId: null }, now);
+      await answer(tx, row, listing, { response: 'not_interested', reason: i.reason ?? null, threadId: null }, now);
       return null;
     }
 
@@ -130,7 +143,7 @@ export async function respondToInvite(
       seekerUserId,
       inviteId: row.id,
     });
-    await answer(tx, row, { response: 'interested', reason: null, threadId: thread.threadId }, now);
+    await answer(tx, row, listing, { response: 'interested', reason: null, threadId: thread.threadId }, now);
     await postCard(tx, thread.threadId, { type: 'invite', refId: row.id }, null);
     await postEvent(tx, thread.threadId, { code: 'invite_interested', visibleTo: 'all' });
     await grantReveal(tx, { seekerUserId, orgId: row.orgId, reason: 'invite_interested', sourceId: row.id });
@@ -149,9 +162,9 @@ export async function muteInviteHost(
   await withTx(db, async (tx) => {
     const row = await lockOwnInvite(tx, seekerUserId, inviteId);
     await mute(tx, { userId: seekerUserId, orgId: row.orgId });
-    if (row.status === 'sent' && !isExpired(row, now)) {
-      await answer(tx, row, { response: 'not_interested', reason: null, threadId: null }, now);
-    }
+    if (row.status !== 'sent' || isExpired(row, now)) return;
+    const listing = await liveListing(tx, row);
+    if (listing) await answer(tx, row, listing, { response: 'not_interested', reason: null, threadId: null }, now);
   });
   return { invite: await seekerItem(db, seekerUserId, inviteId, now) };
 }
