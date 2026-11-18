@@ -1,6 +1,10 @@
 // Automatic checks before publishing (spec sections 8.2 and 8.3 step 1). Blocking issues stop a
 // publish; warnings need the host's acknowledgement (by `ackKey`). Issue codes are fixed (Plan
 // decision 8).
+//
+// The wording, screening-question and visa rules follow the legal review (docs/legal/
+// 2026-11-legal-review.md sections 2.2, 2.3 and 2.6; #121). Their host-facing wording is the
+// agent's, pending counsel review (section 13).
 import { and, eq, inArray } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
 import { FEDERAL_MIN_WAGE_CENTS } from '@/lib/min-wage';
@@ -8,7 +12,7 @@ import { isUSStateCode } from '@/lib/us-states';
 import { getCapacity } from '@/modules/entitlements';
 import { getLocations, type Location } from '@/modules/locations';
 import { getMediaInfo, type MediaKind } from '@/modules/media';
-import { getSetting } from '@/modules/settings';
+import { getSetting, type SettingValue } from '@/modules/settings';
 import type { HostContext } from '@/server/guards';
 import { isUuid, loadListing, type ListingRecord } from './access';
 import { BUILDER_SECTIONS, sectionOfPath } from './checklist';
@@ -37,11 +41,25 @@ export const BLOCKING_CODES = [
   'location_unavailable',
   'photo_unavailable',
   'genre_invalid',
+  'question_not_allowed',
+  'h2a_housing_not_free',
 ] as const;
-export const WARNING_CODES = ['pay_below_min_wage', 'photo_slot_mismatch'] as const;
+export const WARNING_CODES = [
+  'pay_below_min_wage',
+  'photo_slot_mismatch',
+  'wording_flagged',
+  'h2b_job_order',
+] as const;
 
 export type IssueCode = (typeof BLOCKING_CODES)[number] | (typeof WARNING_CODES)[number];
-export type Issue = { code: IssueCode; section: BuilderSection; field: string; message: string };
+/** One problem, on one field. `href` points at the rule, where one is cited. */
+export type Issue = {
+  code: IssueCode;
+  section: BuilderSection;
+  field: string;
+  message: string;
+  href?: string;
+};
 
 export type ListingChecksResult = {
   errors: Issue[];
@@ -60,7 +78,54 @@ const MESSAGES = {
   location_unavailable: 'Choose one of your current locations.',
   photo_unavailable: 'Choose another photo.',
   genre_invalid: 'Choose a genre for this category.',
+  h2a_housing_not_free:
+    'H-2A workers must get housing at no cost (20 CFR 655.122(d)). Make housing free, or choose another visa sponsorship.',
+  h2b_job_order:
+    'H-2B listings must offer pay and terms at least as good as your job order (20 CFR 655.41). Publishing confirms they match it.',
 } as const;
+
+/** The rules the visa checks cite. */
+export const RULE_LINKS = {
+  h2a_housing: 'https://www.ecfr.gov/current/title-20/section-655.122#p-655.122(d)',
+  h2b_advertising: 'https://www.ecfr.gov/current/title-20/section-655.41',
+} as const;
+
+type FlaggedPhrase = SettingValue<'listings.flagged_phrases'>[number];
+type WordingGround = FlaggedPhrase['ground'];
+type QuestionTopics = SettingValue<'listings.question_topics'>;
+type QuestionTopic = keyof QuestionTopics;
+
+/** Why a ground's phrase is flagged, after the quoted phrase. */
+const GROUND_WHY: Record<WordingGround, string> = {
+  age: 'can read as an age limit or preference',
+  sex: 'can read as a preference for men or for women',
+  national_origin: 'can read as a preference about national origin, citizenship or language',
+  disability: 'can read as turning away people with disabilities',
+  religion: 'can read as a preference about religion',
+  family_status: 'can read as a preference about marriage or children',
+  criminal_history: 'can read as a blanket ban on people with a criminal record',
+  appearance: 'can read as a preference about how people look',
+  minors: 'can read as inviting people under 18',
+};
+
+/** Neutral wording for a nationality that names people. */
+const NATIONALITY_SUGGESTION =
+  'Name the skills the job needs, like "Speaks Spanish with guests", not where people are from.';
+
+/** Why a screening question is blocked, by topic, with what the host may ask instead. */
+const QUESTION_RULES: Record<QuestionTopic, string> = {
+  age: 'The only question about age you can ask is "Are you at least 18?" or "Are you at least 21?".',
+  marital_status:
+    "You can't ask about marriage, partners or children. Ask about what the job needs, like the schedule or shared housing.",
+  pregnancy: "You can't ask about pregnancy or plans for a family.",
+  disability:
+    'You can\'t ask about disabilities, health or medication. You can ask "Can you do the tasks in this listing, with or without a reasonable accommodation?"',
+  religion:
+    "You can't ask about religion. You can ask whether someone can work the days in this listing.",
+  national_origin:
+    'You can\'t ask about national origin, citizenship or first language. You can ask "Are you authorized to work in the US?" and "Will you need visa sponsorship?"',
+  arrest_record: "You can't ask about arrests or charges.",
+};
 
 export const SLOT_LABELS: Record<string, string> = {
   bedroom: 'Bedroom',
@@ -81,24 +146,185 @@ export function ackKey(issue: Pick<Issue, 'code' | 'field'>): string {
 }
 
 /**
- * Text as phrases are matched: NFKC, lowercase, periods removed, every whitespace run
- * (non-breaking spaces included) collapsed to one space, trimmed.
+ * Text as phrases are matched: NFKC, lowercase, curly apostrophes made straight, periods
+ * removed, dashes read as spaces ("able-bodied" is "able bodied"), every whitespace run
+ * (non-breaking spaces included) collapsed to one space, trimmed. The settings registry folds
+ * phrases the same way to keep its lists free of repeats.
  */
 export function normalizeForPhraseMatch(s: string): string {
-  return s.normalize('NFKC').toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ').trim();
+  return s
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u02bc]/g, "'")
+    .replace(/\./g, '')
+    .replace(/[-\u2010-\u2015\u2212]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** A matcher for each phrase that needs a word boundary on both sides. */
+const BEFORE = String.raw`(?<![\p{L}\p{N}])`;
+const AFTER = String.raw`(?![\p{L}\p{N}])`;
+/** What `*` matches in a phrase: one word, apostrophes inside it allowed. */
+const ANY_WORD = String.raw`[\p{L}\p{N}]+(?:'[\p{L}\p{N}]+)*`;
+/** What `#` matches in a phrase: a whole number. */
+const ANY_NUMBER = String.raw`\p{N}+`;
+
+/** A phrase as a pattern: folded, `*` for any one word and `#` for any whole number. */
+function phrasePattern(phrase: string): string {
+  return normalizeForPhraseMatch(phrase)
+    .split(/([*#])/)
+    .map((part) => (part === '*' ? ANY_WORD : part === '#' ? ANY_NUMBER : escapeRegExp(part)))
+    .join('');
+}
+
+/** A phrase's matcher, with a word boundary on both sides; null for a phrase that folds to "". */
+function phraseRegExp(phrase: string): RegExp | null {
+  if (normalizeForPhraseMatch(phrase) === '') return null;
+  return new RegExp(`${BEFORE}${phrasePattern(phrase)}${AFTER}`, 'u');
+}
+
+/** A matcher for each phrase. */
 function phraseMatchers(phrases: string[]): { phrase: string; re: RegExp }[] {
-  return phrases
-    .map((phrase) => ({ phrase, norm: normalizeForPhraseMatch(phrase) }))
-    .filter((p) => p.norm !== '')
-    .map(({ phrase, norm }) => ({
-      phrase,
-      re: new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(norm)}(?![\\p{L}\\p{N}])`, 'u'),
-    }));
+  return phrases.flatMap((phrase) => {
+    const re = phraseRegExp(phrase);
+    return re ? [{ phrase, re }] : [];
+  });
+}
+
+/** Words for people that, after a nationality, make it describe who may apply. */
+const PEOPLE = [
+  'only',
+  'applicants?',
+  'candidates?',
+  'workers?',
+  'employees?',
+  'staff',
+  'people',
+  'persons',
+  'nationals',
+  'preferred',
+  'citizens',
+  'students',
+  'hires',
+  'crews?',
+  'men',
+  'women',
+  'girls',
+  'guys',
+].join('|');
+
+/** "Mexican workers", "Americans only", "must be Irish"; not "the American River". */
+function nationalityMatcher(nationality: string): RegExp {
+  const name = escapeRegExp(normalizeForPhraseMatch(nationality));
+  return new RegExp(
+    `${BEFORE}(?:${name}(?:s|es)? (?:${PEOPLE})|must be (?:an? )?${name})${AFTER}`,
+    'u',
+  );
+}
+
+/** The fields a host writes as prose. Codes, ids, enums and links are not read for wording. */
+const PROSE_FIELDS: RegExp[] = [
+  /^basics\.title$/,
+  /^when\.minCommitment$/,
+  /^pay\.(bonuses|deductions)$/,
+  /^housing\.(note|finePrint\.notes)$/,
+  /^meals\.(note|dietary)$/,
+  /^genreDetails\.(vesselType|homePort|rotation|timeAtSea|operationType|harvestWindow|timeZoneOverlap|equipmentProvided|internet)$/,
+  /^genreDetails\.(staffPerks|equipment|certifications)\.\d+$/,
+  /^job\.(description|typicalDay|physicalDemands)$/,
+  /^job\.(responsibilities|requiredQualifications|preferredQualifications|skills|certifications)\.\d+$/,
+  /^applying\.questions\.\d+\.(prompt|choices\.\d+)$/,
+  /^applying\.additionalStep\.note$/,
+];
+
+/** A screening question's prompt or one of its choices. */
+const QUESTION_FIELD = /^applying\.questions\.\d+\.(prompt|choices\.\d+)$/;
+
+/** A flagged phrase found in one field: the list entry, what it matched, and the ground. */
+export type FlaggedWording = {
+  field: string;
+  /** The list entry (for a nationality, the nationality). */
+  phrase: string;
+  /** The text it matched, folded. */
+  matched: string;
+  ground: WordingGround;
+  suggestion: string;
+};
+
+export type WordingLists = { flagged: FlaggedPhrase[]; nationalities: string[] };
+
+/**
+ * The flag-for-review phrases in a draft's prose: one per field, the longest match winning
+ * (so "teens welcome" is reported, not "teens"). Fields in `skip` are not read.
+ */
+export function findFlaggedWording(
+  draft: unknown,
+  lists: WordingLists,
+  skip: ReadonlySet<string> = new Set(),
+): FlaggedWording[] {
+  const matchers: { re: RegExp; entry: FlaggedPhrase }[] = [
+    ...lists.flagged.flatMap((entry) => {
+      const re = phraseRegExp(entry.phrase);
+      return re ? [{ re, entry }] : [];
+    }),
+    ...lists.nationalities
+      .filter((n) => normalizeForPhraseMatch(n) !== '')
+      .map((n) => ({
+        re: nationalityMatcher(n),
+        entry: {
+          phrase: n,
+          ground: 'national_origin' as const,
+          suggestion: NATIONALITY_SUGGESTION,
+        },
+      })),
+  ];
+  const out: FlaggedWording[] = [];
+  for (const { path, text } of textFields(draft)) {
+    if (skip.has(path) || !PROSE_FIELDS.some((p) => p.test(path))) continue;
+    const norm = normalizeForPhraseMatch(text);
+    let best: FlaggedWording | null = null;
+    for (const { re, entry } of matchers) {
+      const m = re.exec(norm);
+      if (m && (!best || m[0].length > best.matched.length)) {
+        const { phrase, ground, suggestion } = entry;
+        best = { field: path, phrase, matched: m[0], ground, suggestion };
+      }
+    }
+    if (best) out.push(best);
+  }
+  return out;
+}
+
+/** The host-facing reason a phrase is flagged, with the neutral wording to use. */
+export function flaggedWordingMessage(f: FlaggedWording): string {
+  return `"${f.matched}" ${GROUND_WHY[f.ground]}. ${f.suggestion} If the job needs it, you can keep it: we will review the listing before it goes live.`;
+}
+
+/**
+ * The allowed age questions ("Are you at least 18?" or 21, "18 or older", "over 21", "18+"),
+ * removed before a question is matched against the age topic.
+ */
+const ALLOWED_AGE_QUESTION = new RegExp(
+  `${BEFORE}(?:(?:at least|over) (?:18|21)|(?:18|21)(?: years)?(?: of age)? (?:or|and) (?:older|over|up)|(?:18|21) ?\\+)(?: years(?: old| of age)?)?${AFTER}`,
+  'gu',
+);
+
+/**
+ * The forbidden topic a screening question's text asks about, or null. The longest matching
+ * phrase decides, so "where were you born" is national origin, not age.
+ */
+export function questionTopic(text: string, topics: QuestionTopics): QuestionTopic | null {
+  const norm = normalizeForPhraseMatch(text).replace(ALLOWED_AGE_QUESTION, ' ');
+  let best: { topic: QuestionTopic; length: number } | null = null;
+  for (const [topic, phrases] of Object.entries(topics) as [QuestionTopic, string[]][]) {
+    for (const { re } of phraseMatchers(phrases)) {
+      const m = re.exec(norm);
+      if (m && (!best || m[0].length > best.length)) best = { topic, length: m[0].length };
+    }
+  }
+  return best?.topic ?? null;
 }
 
 /** Every string in the draft with its path (arrays indexed), skipping ids. */
@@ -114,11 +340,12 @@ function textFields(value: unknown, prefix = ''): { path: string; text: string }
   return [];
 }
 
-const issue = (code: IssueCode, field: string, message: string): Issue => ({
+const issue = (code: IssueCode, field: string, message: string, href?: string): Issue => ({
   code,
   section: sectionOfPath(field),
   field,
   message,
+  ...(href ? { href } : {}),
 });
 
 function bySection(issues: Issue[]): Issue[] {
@@ -200,14 +427,18 @@ export async function runListingChecks(
   const errors: Issue[] = [];
   const warnings: Issue[] = [];
 
-  const [phrases, ratio, minWages, genres, blocked, shorteners] = await Promise.all([
-    getSetting(db, 'listings.prohibited_phrases'),
-    getSetting(db, 'listings.vague_pay_range_ratio'),
-    getSetting(db, 'listings.min_wage_cents_by_state'),
-    getSetting(db, 'listings.genres'),
-    getSetting(db, 'links.blocked_domains'),
-    getSetting(db, 'links.shortener_domains'),
-  ]);
+  const [phrases, flagged, nationalities, topics, ratio, minWages, genres, blocked, shorteners] =
+    await Promise.all([
+      getSetting(db, 'listings.prohibited_phrases'),
+      getSetting(db, 'listings.flagged_phrases'),
+      getSetting(db, 'listings.flagged_nationalities'),
+      getSetting(db, 'listings.question_topics'),
+      getSetting(db, 'listings.vague_pay_range_ratio'),
+      getSetting(db, 'listings.min_wage_cents_by_state'),
+      getSetting(db, 'listings.genres'),
+      getSetting(db, 'links.blocked_domains'),
+      getSetting(db, 'links.shortener_domains'),
+    ]);
 
   // Housing and meals cost.
   const costCodes: [string, 'housing_cost_missing' | 'meals_cost_missing'][] = [];
@@ -238,11 +469,14 @@ export async function runListingChecks(
   if (vagueField) errors.push(issue('pay_vague', vagueField, MESSAGES.pay_vague));
 
   // Prohibited wording, in every text field (questions, choices and the step note included).
+  // A field reports one wording problem: blocked wording, then a forbidden question, then a flag.
+  const worded = new Set<string>();
   const matchers = phraseMatchers(phrases);
   for (const { path, text } of textFields(draft)) {
     const norm = normalizeForPhraseMatch(text);
     const hit = matchers.find((m) => m.re.test(norm));
     if (hit) {
+      worded.add(path);
       errors.push(
         issue(
           'prohibited_wording',
@@ -251,6 +485,50 @@ export async function runListingChecks(
         ),
       );
     }
+  }
+
+  // Screening questions may not ask about protected traits (legal review 2.2 item 2).
+  for (const { path, text } of textFields(draft)) {
+    if (worded.has(path) || !QUESTION_FIELD.test(path)) continue;
+    const topic = questionTopic(text, topics);
+    if (topic) {
+      worded.add(path);
+      errors.push(issue('question_not_allowed', path, QUESTION_RULES[topic]));
+    }
+  }
+
+  // Wording to review (legal review 2.2 item 1): a warning, so the listing is never rejected
+  // for it; screening sends it to the review queue.
+  for (const f of findFlaggedWording(draft, { flagged, nationalities }, worded)) {
+    warnings.push(issue('wording_flagged', f.field, flaggedWordingMessage(f)));
+  }
+
+  // Visa sponsorship (legal review 2.3). H-2A housing must be free (20 CFR 655.122(d)).
+  const job = obj(draft.job);
+  const housing = obj(draft.housing);
+  if (job.visaSponsorship === 'h2a') {
+    const field =
+      housing.provided === false
+        ? 'housing.provided'
+        : housing.provided === true && obj(housing.cost).free === false
+          ? 'housing.cost'
+          : null;
+    if (field) {
+      errors.push(
+        issue('h2a_housing_not_free', field, MESSAGES.h2a_housing_not_free, RULE_LINKS.h2a_housing),
+      );
+    }
+  }
+  // H-2B: publishing confirms the listing matches the job order (20 CFR 655.41(a)).
+  if (job.visaSponsorship === 'h2b') {
+    warnings.push(
+      issue(
+        'h2b_job_order',
+        'job.visaSponsorship',
+        MESSAGES.h2b_job_order,
+        RULE_LINKS.h2b_advertising,
+      ),
+    );
   }
 
   // The Additional step link.
