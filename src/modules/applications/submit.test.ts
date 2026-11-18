@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applicationSnapshotV1Schema, type SubmitInput } from '@/lib/applications';
 import { queryRows } from '@/lib/db';
+import * as listings from '@/modules/listings';
 import { notify } from '@/modules/notifications';
 import {
   bumpRevision,
@@ -329,6 +330,19 @@ describe('submitApplication', () => {
     const err = await rejection(submitApplication(t.db, w.seeker.id, input(l)));
     expect(err.details).toEqual({ reason: 'listing_closed', cause: 'deadline_passed' });
   });
+
+  it.each(['running', 'needs_review', 'needs_info', 'failed'] as const)(
+    "never tells the seeker the host's verification status (%s)",
+    async (status) => {
+      const l = deckhand(w);
+      vi.spyOn(listings, 'canAcceptApplications').mockResolvedValueOnce({ ok: false, reason: status });
+      const err = await rejection(submitApplication(t.db, w.seeker.id, input(l)));
+      expect(err.status).toBe(409);
+      expect(err.details).toEqual({ reason: 'listing_closed', cause: 'not_active' });
+      expect(JSON.stringify({ message: err.message, details: err.details })).not.toContain(status);
+      expect(await rowsOf(w.seeker.id)).toEqual([]);
+    },
+  );
 
   it('returns the existing application after the listing closes', async () => {
     const l = deckhand(w);
