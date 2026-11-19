@@ -5,6 +5,11 @@
 // `already_responded` (plan decision 21). Interested opens the thread, posts the invite card and
 // lets the host see the seeker at SP4's `interested` stage. Mute host mutes the org and answers
 // Not interested while the invite is open.
+//
+// A host the applicant gate refuses (not verified, legal review 7.1, issue 198) may not receive
+// the seeker: Interested is refused with a neutral 409 `not_taking_answers` that does not say
+// why, before any thread, reveal or notification, and the invite stays open. Not interested
+// (and Mute host) is still recorded, but the host is told "A candidate", never the first name.
 import { and, eq } from 'drizzle-orm';
 import type { Actor } from '@/lib/applications';
 import { withTx, type Db, type DbOrTx, type Tx } from '@/lib/db';
@@ -16,6 +21,7 @@ import { ensureThread, listingTeam, postCard, postEvent } from '@/modules/messag
 import { listMembers } from '@/modules/orgs';
 import { getCommunityIdentities, grantReveal } from '@/modules/profiles';
 import { mute } from '@/modules/safety';
+import { hostApplicantGate } from '@/modules/verification';
 import { recordPipelineEvent } from '../core';
 import { invites } from '../schema';
 import { notifyInviteResponse } from './notify';
@@ -23,6 +29,9 @@ import { INVITE_NOT_FOUND, seekerInviteItems, type InviteRow } from './reads';
 import { isDelivered } from './status';
 
 const SOMEONE = 'A candidate';
+
+/** What the seeker sees answering Interested while the host may not receive them. */
+export const INVITE_NOT_TAKING_ANSWERS = "This job isn't taking answers right now";
 
 async function lockOwnInvite(tx: Tx, seekerUserId: string, inviteId: string): Promise<InviteRow> {
   const [row] = await tx
@@ -61,12 +70,25 @@ async function hostRecipients(db: DbOrTx, row: InviteRow): Promise<string[]> {
   return listingTeam(db, { orgId: row.orgId, listingId: row.listingId });
 }
 
-/** Writes the answer, its pipeline event and audit row, and tells the host side. */
+/** Whether the host may receive this seeker's name, read in the answer's transaction. */
+async function hostMayReceive(tx: Tx, row: InviteRow): Promise<boolean> {
+  return (await hostApplicantGate(tx, row.orgId)).ok;
+}
+
+/**
+ * Writes the answer, its pipeline event and audit row, and tells the host side: with the
+ * seeker's first name only when `named` (the host passes the applicant gate).
+ */
 async function answer(
   tx: Tx,
   row: InviteRow,
   listing: ListingHiringInfo,
-  i: { response: InviteResponse['response']; reason: InviteResponse['reason'] | null; threadId: string | null },
+  i: {
+    response: InviteResponse['response'];
+    reason: InviteResponse['reason'] | null;
+    threadId: string | null;
+    named: boolean;
+  },
   now: Date,
 ): Promise<void> {
   const interested = i.response === 'interested';
@@ -98,11 +120,13 @@ async function answer(
     subjectId: row.id,
     data: { response: i.response, reason: interested ? null : (i.reason ?? null) },
   });
-  const name = (await getCommunityIdentities(tx, [row.seekerUserId])).get(row.seekerUserId);
+  const firstName = i.named
+    ? (await getCommunityIdentities(tx, [row.seekerUserId])).get(row.seekerUserId)?.firstName
+    : undefined;
   await notifyInviteResponse(tx, await hostRecipients(tx, row), {
     inviteId: row.id,
     listingId: row.listingId,
-    firstName: name?.firstName ?? SOMEONE,
+    firstName: firstName ?? SOMEONE,
     interested,
     threadId: i.threadId,
   });
@@ -131,11 +155,15 @@ export async function respondToInvite(
     }
     const listing = await liveListing(tx, row);
     if (!listing) throw conflict(INVITE_EXPIRED, { reason: 'expired' });
+    const named = await hostMayReceive(tx, row);
 
     if (i.response === 'not_interested') {
-      await answer(tx, row, listing, { response: 'not_interested', reason: i.reason ?? null, threadId: null }, now);
+      const declined = { response: 'not_interested' as const, reason: i.reason ?? null, threadId: null, named };
+      await answer(tx, row, listing, declined, now);
       return null;
     }
+    // Nothing is written yet, so the invite stays open for when the host may receive answers.
+    if (!named) throw conflict(INVITE_NOT_TAKING_ANSWERS, { reason: 'not_taking_answers' });
 
     const thread = await ensureThread(tx, {
       orgId: row.orgId,
@@ -143,7 +171,7 @@ export async function respondToInvite(
       seekerUserId,
       inviteId: row.id,
     });
-    await answer(tx, row, listing, { response: 'interested', reason: null, threadId: thread.threadId }, now);
+    await answer(tx, row, listing, { response: 'interested', reason: null, threadId: thread.threadId, named }, now);
     await postCard(tx, thread.threadId, { type: 'invite', refId: row.id }, null);
     await postEvent(tx, thread.threadId, { code: 'invite_interested', visibleTo: 'all' });
     await grantReveal(tx, { seekerUserId, orgId: row.orgId, reason: 'invite_interested', sourceId: row.id });
@@ -164,7 +192,10 @@ export async function muteInviteHost(
     await mute(tx, { userId: seekerUserId, orgId: row.orgId });
     if (row.status !== 'sent' || isExpired(row, now)) return;
     const listing = await liveListing(tx, row);
-    if (listing) await answer(tx, row, listing, { response: 'not_interested', reason: null, threadId: null }, now);
+    if (listing) {
+      const named = await hostMayReceive(tx, row);
+      await answer(tx, row, listing, { response: 'not_interested', reason: null, threadId: null, named }, now);
+    }
   });
   return { invite: await seekerItem(db, seekerUserId, inviteId, now) };
 }

@@ -217,6 +217,62 @@ describe('listCandidates', () => {
     expect(stored.every((row) => row.fitScore === null)).toBe(true);
   });
 
+  describe('a seeker who lives in a disabled state (lead decision 2026-11-18, issue 198)', () => {
+    /** A seeker whose card and FitInputs both say where they live. */
+    const living = (region: string | null, countryCode = 'US') =>
+      seeker({ card: { region, countryCode }, inputs: { region, countryCode } });
+
+    it('is not scored on a listing elsewhere and ranks after the scored seekers', async () => {
+      const h = await host();
+      await setSetting(t.db, 'hiring.fit_disabled_states', ['CO'], OPERATOR);
+      const listingId = listingFor(h, { state: 'UT' });
+      const coloradan = await living('CO');
+      const utahn = await living('UT');
+      const r = await list(h, listingId);
+      expect(r.fitAvailable).toBe(true);
+      expect(ids(r)).toEqual([utahn, coloradan]);
+      const fitOf = (id: string) => r.items.find((i) => i.card.seekerUserId === id)?.fit ?? null;
+      expect(fitOf(utahn)?.score).toBeGreaterThan(0);
+      expect(fitOf(coloradan)).toBeNull();
+      const [stored] = await t.db
+        .select()
+        .from(candidatePoolEntries)
+        .where(and(eq(candidatePoolEntries.listingId, listingId), eq(candidatePoolEntries.seekerUserId, coloradan)));
+      expect(stored).toMatchObject({ fitScore: null, fitLines: null });
+    });
+
+    it("clears a score stored before the seeker's state was disabled", async () => {
+      const h = await host();
+      const listingId = listingFor(h, { state: 'UT' });
+      const coloradan = await living('CO');
+      const utahn = await living('UT');
+      const before = await list(h, listingId);
+      expect(before.items.every((i) => i.fit !== null)).toBe(true);
+
+      await setSetting(t.db, 'hiring.fit_disabled_states', ['CO'], OPERATOR);
+      const after = await list(h, listingId);
+      expect(poolQueries()).toBe(1);
+      const fitOf = (id: string) => after.items.find((i) => i.card.seekerUserId === id)?.fit ?? null;
+      expect(fitOf(coloradan)).toBeNull();
+      expect(fitOf(utahn)).not.toBeNull();
+      expect(ids(after)).toEqual([utahn, coloradan]);
+      const stored = await t.db.select().from(candidatePoolEntries).where(eq(candidatePoolEntries.listingId, listingId));
+      expect(stored.find((row) => row.seekerUserId === coloradan)).toMatchObject({ fitScore: null, fitLines: null });
+      expect(stored.find((row) => row.seekerUserId === utahn)?.fitScore).not.toBeNull();
+    });
+
+    it('applies only the listing rule to a seeker with no US home state', async () => {
+      const h = await host();
+      await setSetting(t.db, 'hiring.fit_disabled_states', ['CO'], OPERATOR);
+      const listingId = listingFor(h, { state: 'UT' });
+      await living(null);
+      await living('CO', 'MX');
+      const r = await list(h, listingId);
+      expect(r.items).toHaveLength(2);
+      expect(r.items.every((i) => i.fit !== null)).toBe(true);
+    });
+  });
+
   it('orders by fit, then availability, then id; by availability when fit is off', async () => {
     const h = await host();
     const listingId = listingFor(h, { state: 'UT' });
