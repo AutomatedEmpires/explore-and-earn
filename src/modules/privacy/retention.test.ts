@@ -587,7 +587,7 @@ describe('the privacy module rules and the ledger check', () => {
     );
   });
 
-  it('no rule records a hold coverage gap any more (#216)', () => {
+  it('no rule records a hold coverage gap any more (issue 216)', () => {
     const gaps = Object.entries(RETENTION_HOLD_COVERAGE)
       .filter(([, text]) => /\bnot yet\b|no lookup/i.test(text))
       .map(([key]) => key);

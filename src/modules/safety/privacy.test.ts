@@ -371,7 +371,7 @@ describe('retention', () => {
     expect(left.map((row) => row.id).sort()).toEqual([...held].sort());
   });
 
-  describe('reports about a thread or message (#216)', () => {
+  describe('reports about a thread or message (issue 216)', () => {
     const OLD = '2025-01-01T00:00:00Z';
     let operatorId: string;
 
