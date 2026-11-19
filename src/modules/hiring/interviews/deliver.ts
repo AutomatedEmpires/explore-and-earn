@@ -1,4 +1,11 @@
 // Post an interview card and tell the people the change is for.
+//
+// The name rule for host notices (issue 222, the follow-up to 198 and 212): a host the applicant
+// gate refuses (never verified, running, needs_review, needs_info or failed) is never told the
+// seeker's first name, in any interview or offer notice. The notice still goes out, as #198 does
+// for Not interested: the title says "A candidate", the data has no `firstName`, and the name is
+// not read when only the host is told. Everything else stays, the calendar file included, so a
+// withdrawn or upcoming interview still reaches the host's calendar. Seeker notices are unchanged.
 import { eq } from 'drizzle-orm';
 import type { DbOrTx, Tx } from '@/lib/db';
 import { getEnv } from '@/lib/env';
@@ -7,6 +14,7 @@ import { postCard } from '@/modules/messaging';
 import { notify } from '@/modules/notifications';
 import { getOrgSummaries } from '@/modules/orgs';
 import { getCommunityIdentities } from '@/modules/profiles';
+import { hostApplicantGate } from '@/modules/verification';
 import { interviews, pipelineEntries } from '../schema';
 import { isBlocked } from './blocks';
 import '../notification-types';
@@ -32,6 +40,11 @@ export async function seekerFirstName(db: DbOrTx, userId: string): Promise<strin
   return names.get(userId)?.firstName ?? '';
 }
 
+/** Whether this org's host notices may carry the seeker's first name (the rule above). */
+export async function hostMayKnowName(db: DbOrTx, orgId: string): Promise<boolean> {
+  return (await hostApplicantGate(db, orgId)).ok;
+}
+
 export function scheduleFields(row: Pick<InterviewRow, 'scheduledStart' | 'scheduledEnd'>): Record<string, string> {
   const out: Record<string, string> = {};
   if (row.scheduledStart) out.start = row.scheduledStart.toISOString();
@@ -48,7 +61,10 @@ export async function notifyInterview(
   extra: Record<string, unknown> = {},
 ): Promise<void> {
   const place = await placeOf(db, row.listingId, row.orgId);
-  const firstName = await seekerFirstName(db, seekerUserId);
+  // The gate is read only for a notice a host gets, and the name only when someone may be told it.
+  const hostNamed = recipients.some((r) => r.audience === 'host') && (await hostMayKnowName(db, row.orgId));
+  const named = (r: { audience: 'seeker' | 'host' }) => r.audience === 'seeker' || hostNamed;
+  const firstName = recipients.some(named) ? await seekerFirstName(db, seekerUserId) : '';
   const base = getEnv().APP_URL.replace(/\/+$/, '');
   for (const recipient of recipients) {
     const path = recipient.audience === 'host' ? `/host/messages/${row.threadId}` : `/inbox/${row.threadId}`;
@@ -59,7 +75,7 @@ export async function notifyInterview(
       audience: recipient.audience,
       orgName: place.orgName,
       position: place.title,
-      firstName,
+      ...(named(recipient) ? { firstName } : {}),
       url: `${base}${path}`,
       ...extra,
     });
