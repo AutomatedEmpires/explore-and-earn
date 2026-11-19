@@ -226,7 +226,9 @@ function summary(id: string): OrgSummary {
     websiteUrl: null,
     requireRecruiterApproval: false,
     primaryLocationId: null,
-    verificationStatus: 'unverified',
+    // These orgs list jobs and read applicants, which only a verified host may do (legal review
+    // 7.1). Tests of the gate itself set the status in the database or mock the gate.
+    verificationStatus: 'verified',
     ownerUserId: null,
     createdAt: new Date(0),
   };

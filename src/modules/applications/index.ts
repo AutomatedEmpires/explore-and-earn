@@ -5,6 +5,7 @@
 import 'server-only';
 import type { HandlerMap } from '@/modules/jobs';
 import { eventHandlers } from './events';
+import { silentHostHandlers } from './host-activity';
 // Module-load registrations: notification types, then the SP3 overlay, SP2 stats provider and
 // resume reference checker.
 import './notification-types';
@@ -16,6 +17,14 @@ export { submitApplication } from './submit';
 export { setAdditionalStep, setStatus, withdraw, withdrawOpenForOrg } from './status';
 export { countApplicationsSince, getApplyContext, getReceipt, listMyApplications } from './reads';
 export { authorizeHostApplication, getHostApplication, getHostCards, getSnapshot } from './host';
+export {
+  HOST_OPEN_ACTIONS,
+  SILENT_HOST_TOPIC,
+  checkSilentHost,
+  recordHostOpen,
+  type HostOpenAction,
+} from './host-activity';
 export { privacyHandler, retentionRules } from './privacy';
 
-export const jobHandlers: HandlerMap = { ...eventHandlers };
+/** SP4's event handlers, and `applications.silent_host_check` (legal review 7.3). */
+export const jobHandlers: HandlerMap = { ...eventHandlers, ...silentHostHandlers };

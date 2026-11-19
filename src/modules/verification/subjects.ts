@@ -2,10 +2,16 @@
 // when the module loads. The subject is used only for verification and fraud items:
 // approve -> verified, remove -> failed, ask_info -> needs_info with the note, suspend or ban ->
 // billing.sanctionOrg (a ban also cancels the subscription at once).
+//
+// A ban here is a confirmed fake host (legal review 7 item 6): it also queues
+// `verification.ban_fingerprints`, which bans the card on file once the decision commits.
 import { z } from 'zod';
+import { newId } from '@/lib/ids';
 import { sanctionMetaFrom, suspendOrganization, type Actor } from '@/modules/billing';
+import { enqueue } from '@/modules/jobs';
 import { registerSubjectHandlers } from '@/modules/trust';
 import { askForInfo, operatorApprove, operatorFail } from './decide';
+import { BAN_FINGERPRINTS_TOPIC } from './run';
 
 /** trust.decide passes the decision's data plus the deciding review item. */
 const decisionData = z.looseObject({
@@ -53,6 +59,11 @@ registerSubjectHandlers('business_verification', {
       reason: meta.reason ?? 'Other violation of our terms',
       endsAt: null,
       actor: OPERATOR,
+    });
+    await enqueue(db, {
+      topic: BAN_FINGERPRINTS_TOPIC,
+      payload: { orgId },
+      dedupeKey: `ban-prints:${orgId}:${meta.reviewItemId ?? newId()}`,
     });
   },
 });

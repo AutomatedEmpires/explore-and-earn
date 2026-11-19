@@ -20,7 +20,7 @@ import { getMediaMeta } from '@/modules/media';
 import { getHiringInfoMany, listForOrg } from '@/modules/listings';
 import { getOrgSummaries, listMembers } from '@/modules/orgs';
 import { getCommunityIdentities } from '@/modules/profiles';
-import { getRelationships } from '@/modules/safety';
+import { getRelationships, isBlockedBetween } from '@/modules/safety';
 import type { HostContext } from '@/server/guards';
 import { inScope, listingScope, requireHiringCapability, type ThreadViewer } from './access';
 import { messages, threads } from './schema';
@@ -327,6 +327,28 @@ async function requireThread(
   return thread;
 }
 
+/**
+ * The read-only reason as `viewer` may see it. A thread closed by a block reads `blocked` only
+ * to the side that made a block that still stands; the other side, and both sides after an
+ * unblock, see `unavailable`. So a seeker never learns that a host blocked them, and a host
+ * never learns that a seeker did (SP4 spec 8.7 and 10).
+ */
+async function viewerReason(
+  db: DbOrTx,
+  viewer: ThreadViewer,
+  row: ThreadRow,
+  reason: ReadOnlyReason | null,
+): Promise<ReadOnlyReason | null> {
+  if (reason !== 'blocked') return reason;
+  const seeker = { type: 'user', id: row.seekerUserId } as const;
+  const org = { type: 'org', id: row.orgId } as const;
+  const mine =
+    viewer.kind === 'seeker'
+      ? await isBlockedBetween(db, seeker, org)
+      : await isBlockedBetween(db, org, seeker);
+  return mine.byA ? 'blocked' : 'unavailable';
+}
+
 export async function getThread(
   db: DbOrTx,
   viewer: ThreadViewer,
@@ -381,7 +403,7 @@ export async function getThread(
     },
     messages: await presentMessages(db, viewer, thread, page),
     nextBefore: rows.length > PAGE && last ? encodeCursor(last.createdAt, last.id) : null,
-    readOnly: reason,
+    readOnly: await viewerReason(db, viewer, thread, reason),
     canSend: reason === null,
   };
 }

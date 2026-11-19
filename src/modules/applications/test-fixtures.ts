@@ -105,10 +105,16 @@ export type World = {
   locationId: string;
 };
 
-/** A seeker and an org with one member of each role, registered with the SP2 fake. */
+/**
+ * A seeker and an org with one member of each role, registered with the SP2 fake. The org is
+ * verified, as any org with a live listing is: only a verified host reads applicant data.
+ */
 export async function seedWorld(db: Db): Promise<World> {
   const seeker = await seedUser(db, { accountType: 'seeker' });
   const { orgId } = await seedOrg(db);
+  await db.execute(
+    sql`update app.organizations set verification_status = 'verified' where id = ${orgId}`,
+  );
   const member = async (role: OrgRole) =>
     seedMember(db, orgId, await seedUser(db, { accountType: 'host' }), role);
   const owner = await member('owner');

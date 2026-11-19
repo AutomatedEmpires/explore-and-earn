@@ -12,7 +12,12 @@ export type ThreadEventCode =
   | 'offer_canceled'
   | 'hired'
   | 'withdrawn';
-export type ReadOnlyReason = 'withdrawn' | 'blocked' | 'removed' | 'listing_closed';
+/**
+ * Why a thread is read-only, as its viewer sees it. `unavailable` is shown, never stored: a
+ * thread closed by a block reads `blocked` only to the side that made the block, and
+ * `unavailable` to the other side (SP4 spec 8.7 and 10).
+ */
+export type ReadOnlyReason = 'withdrawn' | 'blocked' | 'removed' | 'listing_closed' | 'unavailable';
 export type MessageState = 'sending' | 'sent' | 'not_delivered' | 'removed';
 export type MessageView = {
   id: string;

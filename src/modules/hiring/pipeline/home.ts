@@ -1,4 +1,6 @@
-// Host Home tiles and the org hiring summary SP2's host page reads.
+// Host Home tiles and the org hiring summary SP2's host page reads. Today's interviews name
+// applicants, so they show only to a verified host (legal review 7.1, the same gate as the
+// applicant reads); the counts carry no applicant data and always show.
 import { and, eq, gte, inArray, lt, ne, sql } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
 import { localDayRange } from '@/lib/hiring';
@@ -6,6 +8,7 @@ import type { HostHome, InterviewItem } from '@/lib/hiring/types';
 import type { HostInterviewsQuery } from '@/lib/hiring';
 import { getHiringInfoMany, listForOrg } from '@/modules/listings';
 import { inScope, listingScope, unreadThreadCount } from '@/modules/messaging';
+import { hostApplicantGate } from '@/modules/verification';
 import type { HostContext } from '@/server/guards';
 import { listHostInterviews } from '../interviews/host';
 import { interviews, invites, pipelineEntries } from '../schema';
@@ -37,10 +40,13 @@ export async function getHostHome(
         )
     : [{ n: 0 }];
 
-  const listed = (await listHostInterviews(db, ctx, {
-    from: range.from.toISOString(),
-    to: range.to.toISOString(),
-  } satisfies HostInterviewsQuery)) as { items: InterviewItem[] };
+  const gate = await hostApplicantGate(db, ctx.orgId);
+  const listed = gate.ok
+    ? ((await listHostInterviews(db, ctx, {
+        from: range.from.toISOString(),
+        to: range.to.toISOString(),
+      } satisfies HostInterviewsQuery)) as { items: InterviewItem[] })
+    : { items: [] };
 
   const openingsFilled = await filledOpenings(db, ctx);
   return {

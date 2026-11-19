@@ -198,6 +198,7 @@ describe('listing wording settings (legal review 2.2, issue 121)', () => {
   const GROUNDS = [
     'age',
     'sex',
+    'race',
     'national_origin',
     'disability',
     'religion',
@@ -214,6 +215,7 @@ describe('listing wording settings (legal review 2.2, issue 121)', () => {
     'religion',
     'national_origin',
     'arrest_record',
+    'sex',
   ];
 
   it('lists a flag-for-review entry for every ground, each with neutral wording', async () => {
@@ -253,6 +255,74 @@ describe('listing wording settings (legal review 2.2, issue 121)', () => {
     expect(Object.keys(topics).sort()).toEqual([...TOPICS].sort());
     for (const topic of TOPICS) {
       expect(topics[topic as keyof typeof topics].length, topic).toBeGreaterThan(0);
+    }
+  });
+
+  // Issue 200: the review of PR 190 found these missing.
+  it('lists the race ground, the protected groups, and the new question phrases', async () => {
+    const flagged = (await getSetting(t.db, 'listings.flagged_phrases')).map((f) => f.phrase);
+    for (const p of [
+      'skin color',
+      'light skinned',
+      'us born',
+      'born in the us',
+      'no pregnant women',
+      'in your #s',
+    ]) {
+      expect(flagged).toContain(p);
+    }
+    const groups = await getSetting(t.db, 'listings.flagged_groups');
+    const byGround = (ground: string) =>
+      groups.filter((g) => g.ground === ground).map((g) => g.term);
+    expect(byGround('sex')).toEqual(
+      expect.arrayContaining(['man', 'woman', 'male', 'female', 'lady']),
+    );
+    expect(byGround('race')).toEqual(expect.arrayContaining(['white', 'black']));
+    expect(byGround('national_origin')).toEqual(expect.arrayContaining(['citizen']));
+    for (const g of groups) expect(g.suggestion.length, g.term).toBeGreaterThan(0);
+
+    const topics = await getSetting(t.db, 'listings.question_topics');
+    expect(topics.sex).toEqual(expect.arrayContaining(['gender', 'male or female']));
+    expect(topics.marital_status).toEqual(
+      expect.arrayContaining(['have any kids', 'have any children']),
+    );
+    expect(topics.age).toEqual(
+      expect.arrayContaining(['when did you finish high school', 'when did you graduate']),
+    );
+  });
+
+  it('lets an operator extend the group list, and validates it (issue 200)', async () => {
+    const groups = await getSetting(t.db, 'listings.flagged_groups');
+    const extended = [
+      ...groups,
+      {
+        term: 'Sikh',
+        ground: 'religion' as const,
+        form: 'noun' as const,
+        suggestion: 'Say "Leads prayers".',
+      },
+    ];
+    await setSetting(t.db, 'listings.flagged_groups', extended, { operatorId });
+    expect(await getSetting(t.db, 'listings.flagged_groups')).toEqual(extended);
+
+    const entry = {
+      term: 'Sikh',
+      ground: 'religion' as const,
+      form: 'noun' as const,
+      suggestion: 'Say "x".',
+    };
+    // An unknown ground or form, no suggestion, a term with digits, a repeated term, an empty list.
+    for (const bad of [
+      [{ ...entry, ground: 'height' }],
+      [{ ...entry, form: 'verb' }],
+      [{ ...entry, suggestion: ' ' }],
+      [{ ...entry, term: 'R2D2' }],
+      [entry, { ...entry, term: 'sikh' }],
+      [],
+    ]) {
+      await expectBadRequest(
+        setSetting(t.db, 'listings.flagged_groups', bad as never, { operatorId }),
+      );
     }
   });
 

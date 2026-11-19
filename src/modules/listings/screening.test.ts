@@ -363,19 +363,114 @@ it('sends a kept photo mismatch to moderation', async () => {
 });
 
 describe('flagged wording (legal review 2.2, issue 121)', () => {
-  it('sends a listing with flagged wording to moderation, never returning it', async () => {
+  it('sends a listing with flagged wording to moderation when the AI checks approve it', async () => {
     const { id, revisionId } = await submittedAcking(['wording_flagged'], (c) => {
       c.job.description += ' Christian camp: staff lead morning devotions.';
     });
     await screen({ revisionId, attempt: 0 });
     const s = await state(id, revisionId);
     expect([s.state, s.status, s.review_stage]).toEqual(['in_review', 'in_review', 'moderation']);
+    expect(s.checks).toMatchObject({ moderation: { decision: 'approved' } });
     expect((await items(revisionId)).map((i) => [i.queue, i.reason])).toEqual([
       ['moderation', 'wording_flagged'],
     ]);
     expect(
       (await notificationsOf(db, 'listings.returned')).some((n) => n.data.listingId === id),
     ).toBe(false);
+  });
+
+  // Issue 200: the moderation check reads the same wording and may score a lawful use (a
+  // religious camp) as discrimination. A rejection then goes to an operator, never back.
+  it('sends a flagged listing that AI moderation rejects to an operator, never returning it', async () => {
+    const real = vi.mocked(runCheck).getMockImplementation();
+    if (!real) throw new Error('runCheck is not wrapped');
+    const scripted: typeof runCheck = async (d, input) =>
+      input.kind === 'listing_moderation'
+        ? {
+            checkId: newId(),
+            decision: 'rejected',
+            score: 0.93,
+            labels: ['discrimination'],
+            reason: 'Prefers applicants by religion.',
+          }
+        : real(d, input);
+
+    const { id, revisionId } = await submittedAcking(['wording_flagged'], (c) => {
+      c.job.description += ' Christian camp: staff lead morning devotions.';
+    });
+    vi.mocked(runCheck).mockImplementationOnce(scripted).mockImplementationOnce(scripted);
+    await screen({ revisionId, attempt: 0 });
+    const s = await state(id, revisionId);
+    expect([s.state, s.status, s.review_stage]).toEqual(['in_review', 'in_review', 'moderation']);
+    expect(s.checks).toMatchObject({
+      moderation: { decision: 'rejected' },
+      fraud: { decision: 'approved' },
+      wordingFlagged: true,
+    });
+    expect((await items(revisionId)).map((i) => `${i.queue}:${i.reason}`).sort()).toEqual([
+      'moderation:listing_moderation_rejected',
+      'moderation:wording_flagged',
+    ]);
+    expect(
+      (await notificationsOf(db, 'listings.returned')).some((n) => n.data.listingId === id),
+    ).toBe(false);
+    expect(
+      (await notificationsOf(db, 'listings.in_review')).map((n) => n.data.listingId),
+    ).toContain(id);
+  });
+
+  it('sends a flagged listing that both AI checks reject to an operator, and still flags the org', async () => {
+    const { id, revisionId } = await submittedAcking(['wording_flagged'], (c) => {
+      c.job.description += ' Christian camp: staff lead morning devotions. __block__';
+    });
+    await screen({ revisionId, attempt: 0 });
+    const s = await state(id, revisionId);
+    expect([s.state, s.status, s.review_stage]).toEqual(['in_review', 'in_review', 'moderation']);
+    expect(s.checks).toMatchObject({
+      moderation: { decision: 'rejected' },
+      fraud: { decision: 'rejected' },
+    });
+    expect((await items(revisionId)).map((i) => `${i.queue}:${i.reason}`).sort()).toEqual([
+      'moderation:listing_fraud_rejected',
+      'moderation:listing_moderation_rejected',
+      'moderation:wording_flagged',
+    ]);
+    expect((await items(org.orgId)).map((i) => [i.queue, i.reason])).toEqual([
+      ['fraud', 'listing_fraud_rejected'],
+    ]);
+    expect(
+      (await notificationsOf(db, 'listings.returned')).some((n) => n.data.listingId === id),
+    ).toBe(false);
+  });
+
+  it('finds the wording again at screening, so a rejection with no kept warning is not returned', async () => {
+    // The host never saw the warning (the phrase was added to the list after the request), and
+    // the AI checks reject the listing: it still goes to an operator.
+    const { id, revisionId } = await submitted((c) => {
+      c.job.description += ' New blood wanted for the lift crew. __block__';
+    });
+    const operator = { operatorId: newId() };
+    await setSetting(
+      db,
+      'listings.flagged_phrases',
+      [
+        ...SETTING_DEFAULTS['listings.flagged_phrases'],
+        { phrase: 'new blood', ground: 'age', suggestion: 'Say "new team members".' },
+      ],
+      operator,
+    );
+    try {
+      await screen({ revisionId, attempt: 0 });
+      expect((await state(id, revisionId)).review_stage).toBe('moderation');
+      expect((await items(revisionId)).map((i) => i.reason)).toContain('wording_flagged');
+    } finally {
+      await setSetting(
+        db,
+        'listings.flagged_phrases',
+        SETTING_DEFAULTS['listings.flagged_phrases'],
+        operator,
+      );
+    }
   });
 
   it('reads the lists again, so a phrase added after the publish request still counts', async () => {

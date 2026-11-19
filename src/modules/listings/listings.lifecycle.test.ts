@@ -82,6 +82,10 @@ beforeEach(async () => {
     f.reset();
   }
   org = await seedHostOrg(db);
+  // A host with live listings is verified; only a verified host takes applications.
+  await db.execute(
+    sql`update app.organizations set verification_status = 'verified' where id = ${org.orgId}`,
+  );
   fx = await seedListingFixture(db, org, { timezone: 'Pacific/Honolulu', state: 'HI' });
 });
 
@@ -226,7 +230,7 @@ describe('canAcceptApplications', () => {
       });
     } finally {
       await db.execute(
-        sql`update app.organizations set verification_status = 'unverified' where id = ${org.orgId}`,
+        sql`update app.organizations set verification_status = 'verified' where id = ${org.orgId}`,
       );
     }
   });

@@ -191,7 +191,8 @@ export const profilesFake = {
   calls: Call[];
 };
 
-const blocked = new Set<string>();
+/** Who made each org-seeker block, by pair key. */
+const blocked = new Map<string, 'org' | 'user'>();
 const muted = new Set<string>();
 const subjects: { type: ReportSubjectType; registration: ReportSubjectRegistration }[] = [];
 const safetyCalls: Call[] = [];
@@ -207,8 +208,9 @@ export function resetSafety(): void {
   safetyCalls.length = 0;
 }
 
-export function setBlocked(orgId: string, userId: string): void {
-  blocked.add(pairKey(orgId, userId));
+/** A block between the org and the seeker, made by the org unless `by` is `'user'`. */
+export function setBlocked(orgId: string, userId: string, by: 'org' | 'user' = 'org'): void {
+  blocked.set(pairKey(orgId, userId), by);
 }
 
 export function setMuted(orgId: string, userId: string): void {
@@ -241,8 +243,10 @@ async function isBlockedBetween(
 ): Promise<{ blocked: boolean; byA: boolean; byB: boolean }> {
   safetyCalls.push({ name: 'isBlockedBetween', args: [a, b] });
   const ids = parties(a, b);
-  const hit = ids !== null && blocked.has(pairKey(ids.orgId, ids.userId));
-  return { blocked: hit, byA: hit && a.type === 'org', byB: hit && b.type === 'org' };
+  const by = ids === null ? undefined : blocked.get(pairKey(ids.orgId, ids.userId));
+  const byA = by !== undefined && a.type === by;
+  const byB = by !== undefined && b.type === by;
+  return { blocked: byA || byB, byA, byB };
 }
 
 async function mute(_db: DbOrTx, i: { userId: string; orgId: string }): Promise<void> {
