@@ -130,6 +130,28 @@ export const DESCRIPTION_MIN = 50;
 const or = <T>(v: T | undefined, fallback: T): T => (v === undefined ? fallback : v);
 const nullable = (v: unknown) => (v === undefined || v === '' ? null : v);
 
+/**
+ * The H-2B job order fields (issue 208; Figma field map 220:24886): the 20 CFR 655.41(b) items
+ * the form does not otherwise ask, each optional, with the `job.h2b` limit the server checks.
+ * `name` is how the line above Next refers to it. (b)(5), (6) and (12) have no field.
+ */
+export const H2B_FIELDS = [
+  { key: 'transportation', limit: 1_000, name: 'travel to the job and home' },
+  { key: 'tools', limit: 1_000, name: 'tools and equipment' },
+  { key: 'threeFourthsGuarantee', limit: 1_000, name: 'hours guarantee' },
+  { key: 'swaContact', limit: 500, name: 'State Workforce Agency office' },
+  { key: 'jobOrderNumber', limit: 60, name: 'job order number' },
+] as const;
+export type H2bKey = (typeof H2B_FIELDS)[number]['key'];
+
+/** Every H-2B answer, an empty one as null. The host's text is otherwise kept as typed. */
+function h2bAnswers(h2b: Json): Record<H2bKey, unknown> {
+  return Object.fromEntries(H2B_FIELDS.map((f) => [f.key, nullable(h2b[f.key])])) as Record<
+    H2bKey,
+    unknown
+  >;
+}
+
 /** One content key with the defaults that make a finished section complete. */
 function normalizeKey(key: string, draft: Json, ctx: BuilderContext): unknown {
   const v = obj(draft[key]);
@@ -221,6 +243,8 @@ function normalizeKey(key: string, draft: Json, ctx: BuilderContext): unknown {
         minAge: or(num(v.minAge), 18),
         perks: strings(v.perks),
         visaSponsorship: or(str(v.visaSponsorship), 'none'),
+        // Kept when the visa changes, so switching back to H-2B brings the answers back.
+        ...(v.h2b !== undefined && v.h2b !== null ? { h2b: h2bAnswers(obj(v.h2b)) } : {}),
       };
     case 'photos':
       return { ...v, galleryMediaIds: strings(v.galleryMediaIds) };
@@ -301,6 +325,11 @@ export const MESSAGES = {
   question: 'Write the question.',
   choices: 'Give 2 to 10 answers, one per line.',
   link: 'Use a secure link that starts with https://.',
+  /** An H-2B answer over its limit (Figma 215:23897). The paste is kept, never cut. */
+  h2bTooLong: (key: H2bKey, limit: number, count: number) =>
+    `Use ${limit.toLocaleString('en-US')} characters or fewer. This has ${count.toLocaleString('en-US')}.${
+      key === 'jobOrderNumber' ? ' Enter just the number, like MT 4417260.' : ''
+    }`,
 } as const;
 
 type Check = (draft: Json, raw: Raw) => Errors;
@@ -481,7 +510,24 @@ function checkJob(d: Json, raw: Raw): Errors {
   const quals =
     required !== undefined ? lines(required) : strings(getPath(d, 'job.requiredQualifications'));
   if (quals.length === 0) e['job.requiredQualifications'] = MESSAGES.required;
+  // The H-2B fields show only for H-2B, so only then can they hold up the step.
+  if (getPath(d, 'job.visaSponsorship') === 'h2b') {
+    const h2b = obj(getPath(d, 'job.h2b'));
+    for (const f of H2B_FIELDS) {
+      // The server counts the answer without its outer spaces (content.ts `text`).
+      const count = (str(h2b[f.key]) ?? '').trim().length;
+      if (count > f.limit) e[`job.h2b.${f.key}`] = MESSAGES.h2bTooLong(f.key, f.limit, count);
+    }
+  }
   return e;
+}
+
+/** The line above Next while an H-2B answer is over its limit (Figma 215:24037), or null. */
+export function h2bFixLine(errors: Errors): string | null {
+  const over = H2B_FIELDS.filter((f) => errors[`job.h2b.${f.key}`]);
+  if (over.length === 0) return null;
+  if (over.length > 1) return 'Fix your H-2B job order answers before you publish.';
+  return `Fix the ${over[0]?.name} before you publish.`;
 }
 
 function checkPhotosStep(d: Json): Errors {
