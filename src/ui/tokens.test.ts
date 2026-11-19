@@ -39,6 +39,49 @@ function hexVars(body: string): Record<string, string> {
   return out;
 }
 
+function requiredHex(vars: Record<string, string>, name: string): string {
+  const value = vars[name];
+  if (!value) throw new Error(`missing --ee-${name} in tokens.css`);
+  return value;
+}
+
+/** Linear sRGB channels, the input to OKLab. */
+function linearSrgb(hex: string): [number, number, number] {
+  const digits = /^#([0-9A-F]{6})$/.exec(hex)?.[1];
+  if (!digits) throw new Error(`expected #RRGGBB, got ${hex}`);
+  return [0, 2, 4].map((offset) => {
+    const channel = parseInt(digits.slice(offset, offset + 2), 16) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  }) as [number, number, number];
+}
+
+/**
+ * OKLab hue in degrees (0–360). The category palette's hue gaps were measured in this space:
+ * the approved solids are all at least ~24° from the nearest status hue.
+ */
+function okLabHue(hex: string): number {
+  const [r, g, b] = linearSrgb(hex);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  const a = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+  const labB = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+  const hue = (Math.atan2(labB, a) * 180) / Math.PI;
+  return hue < 0 ? hue + 360 : hue;
+}
+
+/** Shortest distance between two OKLab hues, in degrees (0–180). */
+function hueDistance(a: string, b: string): number {
+  const gap = Math.abs(okLabHue(a) - okLabHue(b));
+  return Math.min(gap, 360 - gap);
+}
+
+/**
+ * A category solid closer than this to success, warning, danger or focus reads as that
+ * status. The retired palette was inside 14°; the approved one is past 23°.
+ */
+const MIN_STATUS_HUE_GAP = 20;
+
 describe('contrastRatio', () => {
   it('is 21:1 for black on white', () => {
     expect(contrastRatio('#000000', '#FFFFFF')).toBeCloseTo(21, 2);
@@ -91,6 +134,37 @@ describe('tokenPairs', () => {
   });
 });
 
+describe('category palette', () => {
+  const themes = [
+    ['light', "[data-theme='light'] {"],
+    ['dark', "[data-theme='dark'] {"],
+  ] as const;
+  const status = ['success', 'warning', 'danger', 'focus'] as const;
+
+  it.each(themes)(
+    '%s: fg on bg is 4.5:1, solids are 3:1, and solids stay off status hues',
+    (_theme, selector) => {
+      const vars = hexVars(block(css, selector));
+      const card = requiredHex(vars, 'surface');
+      const page = requiredHex(vars, 'bg');
+      for (const category of categories) {
+        const fg = requiredHex(vars, `${category}-fg`);
+        const tint = requiredHex(vars, `${category}-bg`);
+        const solid = requiredHex(vars, `${category}-solid`);
+        expect(contrastRatio(fg, tint)).toBeGreaterThanOrEqual(4.5);
+        for (const markBg of [card, page, tint]) {
+          expect(contrastRatio(solid, markBg)).toBeGreaterThanOrEqual(3);
+        }
+        for (const name of status) {
+          expect(hueDistance(solid, requiredHex(vars, name))).toBeGreaterThanOrEqual(
+            MIN_STATUS_HUE_GAP,
+          );
+        }
+      }
+    },
+  );
+});
+
 describe('light tokens', () => {
   it('match the design board', () => {
     expect(colors.light).toMatchObject({
@@ -103,18 +177,18 @@ describe('light tokens', () => {
       primary: '#1C1B19',
       success: '#1F6B43',
       'success-bg': '#E3F1E8',
-      'maritime-fg': '#1A4F9C',
-      'maritime-bg': '#E6EEFA',
-      'maritime-solid': '#1D5FBF',
-      'seasonal-fg': '#8F4E06',
-      'seasonal-bg': '#FBEEDD',
-      'seasonal-solid': '#B45F06',
-      'farm-fg': '#24622E',
-      'farm-bg': '#E5F2E6',
-      'farm-solid': '#2F7D3B',
-      'remote-fg': '#A12C23',
-      'remote-bg': '#FBE7E5',
-      'remote-solid': '#C8382E',
+      'maritime-fg': '#003949',
+      'maritime-bg': '#DBF3FC',
+      'maritime-solid': '#0E7490',
+      'seasonal-fg': '#4B4300',
+      'seasonal-bg': '#F4EEB8',
+      'seasonal-solid': '#A08318',
+      'farm-fg': '#354316',
+      'farm-bg': '#EAF8D4',
+      'farm-solid': '#74915E',
+      'remote-fg': '#41094C',
+      'remote-bg': '#FBECFE',
+      'remote-solid': '#652A72',
     });
   });
 });
@@ -155,6 +229,12 @@ describe('tokens.css', () => {
     for (const name of shadowNames) {
       expect(inline).toContain(`--shadow-${name}: var(--ee-shadow-${name});`);
     }
+  });
+
+  it('defines pb-safe, which pads a bottom-pinned bar by the safe-area inset', () => {
+    expect(block(css, '@utility pb-safe {').trim()).toBe(
+      'padding-bottom: env(safe-area-inset-bottom);',
+    );
   });
 
   it('only uses colors defined in tokens.ts', () => {

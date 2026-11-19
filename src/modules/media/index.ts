@@ -82,6 +82,19 @@ export {
 
 export { getMediaUrl, SIGNED_URL_TTL_SEC, type MediaViewer } from './urls';
 
+export { getAuthorizedMediaUrl, getPublicMediaUrls } from './authorized-url';
+export { getMediaMeta, type MediaMeta } from './meta';
+
+export {
+  deleteMedia,
+  getMedia,
+  getMediaInfo,
+  readMedia,
+  readMediaVariant,
+  type MediaInfo,
+  type MediaRecord,
+} from './info';
+
 /** `media.scan` (queued by completeUpload) and `media.cleanup` (deletes superseded copies). */
 export const jobHandlers: HandlerMap = mediaJobHandlers;
 
@@ -89,3 +102,8 @@ export const jobHandlers: HandlerMap = mediaJobHandlers;
 // (or a kept rejected one, when an appeal or an accuracy sample overturns the rejection);
 // remove takes a file down and keeps a private copy, or on a blocked file confirms the block.
 registerSubjectHandlers('media', createMediaSubjectHandlers(getStorage));
+
+export { readMediaForExport } from './export';
+export { purgeBlockedMedia } from './purge';
+export { privacyHandler } from './privacy';
+export { retentionRules } from './retention';

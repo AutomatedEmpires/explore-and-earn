@@ -1,0 +1,61 @@
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [-149.4565, 60.1124],
+        [-149.4311, 60.1129],
+        [-149.4302, 60.0999],
+        [-149.4556, 60.0994],
+        [-149.4565, 60.1124]
+      ]
+    ]
+  },
+  "properties": {
+    "units": "us",
+    "forecastGenerator": "HourlyForecastGenerator",
+    "generatedAt": "2026-11-03T16:41:22+00:00",
+    "updateTime": "2026-11-03T14:02:47+00:00",
+    "validTimes": "2026-11-03T08:00:00+00:00/P7DT17H",
+    "elevation": { "unitCode": "wmoUnit:m", "value": 18.9 },
+    "periods": [
+      {
+        "number": 1,
+        "name": "",
+        "startTime": "2026-11-03T08:00:00-09:00",
+        "endTime": "2026-11-03T09:00:00-09:00",
+        "isDaytime": true,
+        "temperature": 38,
+        "temperatureUnit": "F",
+        "temperatureTrend": "",
+        "probabilityOfPrecipitation": { "unitCode": "wmoUnit:percent", "value": 24 },
+        "dewpoint": { "unitCode": "wmoUnit:degC", "value": 1.1 },
+        "relativeHumidity": { "unitCode": "wmoUnit:percent", "value": 86 },
+        "windSpeed": "10 mph",
+        "windDirection": "NE",
+        "icon": "https://api.weather.gov/icons/land/day/rain_showers,20?size=small",
+        "shortForecast": "Slight Chance Rain Showers",
+        "detailedForecast": ""
+      },
+      {
+        "number": 2,
+        "name": "",
+        "startTime": "2026-11-03T09:00:00-09:00",
+        "endTime": "2026-11-03T10:00:00-09:00",
+        "isDaytime": true,
+        "temperature": 39,
+        "temperatureUnit": "F",
+        "temperatureTrend": "",
+        "probabilityOfPrecipitation": { "unitCode": "wmoUnit:percent", "value": 30 },
+        "dewpoint": { "unitCode": "wmoUnit:degC", "value": 1.1 },
+        "relativeHumidity": { "unitCode": "wmoUnit:percent", "value": 83 },
+        "windSpeed": "10 mph",
+        "windDirection": "NE",
+        "icon": "https://api.weather.gov/icons/land/day/rain_showers,30?size=small",
+        "shortForecast": "Chance Rain Showers",
+        "detailedForecast": ""
+      }
+    ]
+  }
+}

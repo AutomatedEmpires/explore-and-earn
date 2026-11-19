@@ -4,11 +4,13 @@
 // fewest items in hand (assigned or escalated), ties to whoever was assigned longest ago, never
 // first. When nobody can take it, the item still opens, unassigned (`open`): the SLA sweep
 // alerts the Owner once it is overdue, so nothing is lost (Review Focus 4).
-import type { DbOrTx } from '@/lib/db';
+import { sql } from 'drizzle-orm';
+import { queryRows, type DbOrTx } from '@/lib/db';
+import { badRequest } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import { record } from '@/modules/audit';
 import { raiseAlert } from './alerts';
-import { leastLoadedOperator, touchOperator, transact } from './internal';
+import { coversQueue, findOperator, leastLoadedOperator, touchOperator, transact } from './internal';
 import { reviewItems } from './schema';
 import type { OpenReviewItemInput, Queue } from './types';
 
@@ -53,7 +55,20 @@ export async function openReviewItem(db: DbOrTx, i: OpenReviewItemInput): Promis
     const id = newId();
     const now = new Date();
     const exclude = i.excludeOperatorIds ?? [];
-    const assignee = await pickAssignee(tx, i.queue, exclude);
+    let assignee: string | null;
+    if (i.assigneeOperatorId) {
+      const chosen = await findOperator(tx, i.assigneeOperatorId);
+      if (
+        !chosen ||
+        !coversQueue(chosen, i.queue) ||
+        exclude.includes(chosen.userId)
+      ) {
+        throw badRequest('That operator cannot take this item');
+      }
+      assignee = chosen.userId;
+    } else {
+      assignee = await pickAssignee(tx, i.queue, exclude);
+    }
 
     await tx.insert(reviewItems).values({
       id,
@@ -99,4 +114,26 @@ export async function openReviewItem(db: DbOrTx, i: OpenReviewItemInput): Promis
     }
     return { id };
   });
+}
+
+/**
+ * The unresolved review items (open, assigned or escalated) for one subject, oldest first.
+ * SP2 uses it so a subject with two items (moderation and fraud) is published only once both
+ * are approved.
+ */
+export async function listOpenReviewItems(
+  db: DbOrTx,
+  subjectType: string,
+  subjectId: string,
+): Promise<{ id: string; queue: Queue; reason: string }[]> {
+  return queryRows<{ id: string; queue: Queue; reason: string }>(
+    db,
+    sql`
+      select id, queue, reason from app.review_items
+      where subject_type = ${subjectType}
+        and subject_id = ${subjectId}
+        and status in ('open', 'assigned', 'escalated')
+      order by created_at, id
+    `,
+  );
 }

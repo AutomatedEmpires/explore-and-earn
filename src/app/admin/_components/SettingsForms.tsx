@@ -163,6 +163,7 @@ export function SettingsForms({ values, canEdit }: { values: SettingValues; canE
             return { error: 'The approve number must not be above the reject number' };
           }
           const value: SettingValues['trust.thresholds'] = {
+            ...values['trust.thresholds'],
             image_safety: { approveBelow: ia ?? 0, rejectAtOrAbove: ir ?? 0 },
             text_safety: { approveBelow: ta ?? 0, rejectAtOrAbove: tr ?? 0 },
           };

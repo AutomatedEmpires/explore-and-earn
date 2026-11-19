@@ -1,0 +1,108 @@
+// Domain events and who listens to them (SP2 spec section 3). `emit()` (@/modules/jobs) writes
+// one outbox row per subscriber topic listed here, inside the emitter's transaction, so reverse
+// flows between modules never need an import. Shared touchpoint: later sub-projects add their
+// events to EventPayloads and append their topics to the lists below.
+import type { ApplicationSource, ApplicationStatus, WithdrawReason } from '@/lib/applications';
+
+export interface EventPayloads {
+  'listing.published': { listingId: string; revisionId: string; orgId: string; first: boolean };
+  'listing.changed': { listingId: string; revisionId: string; orgId: string };
+  'listing.closed': {
+    listingId: string;
+    orgId: string;
+    revisionId?: string;
+    reason: 'host' | 'end_date' | 'downgrade' | 'lapsed' | 'org_suspended';
+  };
+  'listing.removed': { listingId: string; orgId: string; reason?: string };
+  'org.status_changed': {
+    orgId: string;
+    status: 'active' | 'suspended' | 'banned';
+    reviewItemId: string | null;
+    reason: string | null;
+    endsAt: string | null;
+  };
+  'org.member_removed': { orgId: string; userId: string; reassignToUserId: string };
+  'location.updated': { locationId: string; orgId: string };
+  'hostpage.updated': { orgId: string };
+  'subscription.changed': {
+    orgId: string;
+    status: string;
+    plan: 'starter' | 'professional' | 'enterprise' | null;
+  };
+  'verification.decided': {
+    orgId: string;
+    status: 'unverified' | 'running' | 'verified' | 'needs_review' | 'needs_info' | 'failed';
+  };
+  'billing.stripe_event': { eventId: string; type: string; objectId: string | null };
+  'billing.refunded': { orgId: string; invoiceId: string; amountCents: number };
+  // SP4 (spec 3.3). Emitted in the change's transaction; eventId is the application_events row id.
+  'application.submitted': {
+    applicationId: string;
+    listingId: string;
+    orgId: string;
+    seekerUserId: string;
+    submittedAt: string;
+    source: ApplicationSource;
+    inviteId: string | null;
+  };
+  'application.withdrawn': {
+    applicationId: string;
+    listingId: string;
+    orgId: string;
+    seekerUserId: string;
+    withdrawnAt: string;
+    reason: WithdrawReason | null;
+  };
+  'application.status_changed': {
+    applicationId: string;
+    orgId: string;
+    from: ApplicationStatus;
+    to: ApplicationStatus;
+    actorType: 'seeker' | 'host' | 'system';
+    at: string;
+  };
+  'application.additional_step_changed': {
+    applicationId: string;
+    orgId: string;
+    completed: boolean;
+    at: string;
+  };
+}
+
+/** The outbox topics each event fans out to. Every topic needs a handler in job-handlers.ts. */
+export const eventSubscribers: Record<keyof EventPayloads, string[]> = {
+  // Only a first publish notifies; the handler checks `first`. SP3 projects every listing event
+  // into search (discovery.sync_listing) and re-syncs a host's rows when its public facts change
+  // (discovery.sync_host).
+  'listing.published': ['hostpages.notify_followers', 'discovery.sync_listing'],
+  'listing.changed': ['discovery.sync_listing'],
+  'listing.closed': ['discovery.sync_listing'],
+  'listing.removed': ['discovery.sync_listing'],
+  // A suspension, ban or reinstatement re-syncs the host's search rows directly. A suspension or
+  // ban also reaches search through the listing.closed events that listings.close_for_org emits.
+  'org.status_changed': ['listings.close_for_org', 'discovery.sync_host', 'operator.org_sanction'],
+  // SP5 moves the member's threads and interviews.
+  'org.member_removed': ['hiring.member_removed'],
+  'location.updated': ['locations.resolve_nws_grid', 'discovery.sync_host'],
+  'hostpage.updated': ['discovery.sync_host'],
+  'subscription.changed': [
+    'listings.enforce_slot_limit',
+    'hostpages.mark_public',
+    'discovery.sync_host',
+    'support.enterprise_onboarding',
+  ],
+  // SP5 closes a failed host's open interviews and offers (issue 212); the handler acts only on
+  // `failed`.
+  'verification.decided': ['listings.resume_screening', 'hiring.close_for_failed_host'],
+  // SP6 subscribes for one-time payments.
+  'billing.stripe_event': [],
+  // Task 18's refund emits this. W3 cannot edit this file, so the event is registered here.
+  'billing.refunded': [],
+  // SP4 records an `apply` listing event in SP3. SP5 appends hiring.application_submitted and
+  // hiring.application_withdrawn; never add a topic without a handler (the worker retries an
+  // unknown topic until it is dead).
+  'application.submitted': ['applications.listing_event', 'hiring.application_submitted'],
+  'application.withdrawn': ['hiring.application_withdrawn'],
+  'application.status_changed': [],
+  'application.additional_step_changed': ['hiring.additional_step_changed'],
+};

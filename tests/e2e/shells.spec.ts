@@ -267,12 +267,18 @@ test.describe('Sign-in, onboarding and shells', () => {
     await expectAccessible(page);
 
     await page.getByRole('button', { name: /I'm looking for work/ }).click();
-    await expect(page.getByText('Work worth going somewhere for.')).toBeVisible();
+    await expect(page.getByText('What is your date of birth?')).toBeVisible();
+    // The step is in the URL, so Back returns to the choice (tests/e2e/onboarding-return.spec.ts).
+    await expect(page).toHaveURL(`${appURL}/onboarding?step=seeker`);
     const continueButton = page.getByRole('button', { name: 'Continue' });
     await continueButton.click();
-    // The 18+ confirmation is required.
-    await expect(page).toHaveURL(`${appURL}/onboarding`);
-    await page.getByRole('checkbox', { name: "I'm 18 or older" }).check();
+    // The date of birth is required (legal review 2.6).
+    await expect(page).toHaveURL(`${appURL}/onboarding?step=seeker`);
+    await expect(page.getByText('Choose a month.')).toBeVisible();
+    await page.getByRole('combobox', { name: /^Month/ }).click();
+    await page.getByRole('option', { name: 'April' }).click();
+    await page.getByRole('textbox', { name: /^Day/ }).fill('3');
+    await page.getByRole('textbox', { name: /^Year/ }).fill('1990');
     await continueButton.click();
 
     await expect(page).toHaveURL(`${appURL}/`, NAVIGATION);

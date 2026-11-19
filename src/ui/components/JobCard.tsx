@@ -6,6 +6,8 @@ import {
   BedDouble,
   Bookmark,
   CalendarDays,
+  Check,
+  Clock,
   Info,
   Sparkles,
   Utensils,
@@ -20,9 +22,43 @@ import { IconButton } from './IconButton';
 import { Img } from './Img';
 import { OrgLogo } from './OrgLogo';
 
-export type PayPeriod = 'hour' | 'day' | 'week' | 'month' | 'season';
+export type PayPeriod = 'hour' | 'day' | 'week' | 'month' | 'season' | 'year';
 export type Pay = { amountCents: number; maxAmountCents?: number; per: PayPeriod };
 export type JobCardChip = 'housing' | 'meals' | 'pay';
+
+/**
+ * The whole deal under the dates: a 72 px room photo beside housing type, housing cost, meals
+ * and couples. The caller writes every line. Housing and Meals chips are left out while this
+ * is set, so the card does not also say "Provided".
+ */
+export type JobCardDeal = {
+  /** Null when there is no housing: the card says "No housing" and hides the room, type, cost and couples. */
+  housing: {
+    /** e.g. "Cabin". */
+    type?: string;
+    /** e.g. "Free" or "$12 a night, taken from pay". */
+    cost?: string;
+    photo?: { src: string; alt: string } | null;
+    /** e.g. "Couples housed" or "No couples". */
+    couples?: string | null;
+  } | null;
+  /** e.g. "3 meals a day, free" or "No meals". */
+  meals: string;
+};
+
+/**
+ * Pay after housing and meals (legal review section 9), under the chips. Shown only when a
+ * caller passes it (#127 computes it). The card lays the two lines out and does not invent a
+ * number or call it take-home pay.
+ */
+export type JobCardPayEstimate = {
+  /** e.g. "About $796 a week after housing and meals". */
+  line: string;
+  /** e.g. "Before taxes. Based on 40 hours a week at $22 an hour, less $84 a week for ...". */
+  basis: string;
+  /** Opens the "How we work this out" sheet; without it the link is left out. */
+  onExplain?: () => void;
+};
 
 export type JobCardProps = {
   /** The listing detail page; the title links there and the card body opens it. */
@@ -34,14 +70,32 @@ export type JobCardProps = {
   category: Category;
   boosted?: boolean;
   cover?: { src: string; alt: string; srcSet?: string } | null;
-  /** "Starts in N days" or "Begins [date]"; dates arrive formatted for display. */
-  starts: { inDays: number } | { on: string };
+  /**
+   * Collapse the cover, its badges and the host logo, for a job with no cover photo (SE-19).
+   * Off by default, so a card without a photo keeps the neutral cover.
+   */
+  hideCover?: boolean;
+  /**
+   * "Starts in N days" or "Begins [date]"; dates arrive formatted for display. A `label` is
+   * shown as given (discovery writes its own date line, e.g. "Summer 2027").
+   */
+  starts: { inDays: number } | { on: string } | { label: string };
   endsOn?: string;
+  /** The whole end segment, e.g. "Ongoing"; shown as "· {endLabel}" in place of `endsOn`. */
+  endLabel?: string;
+  /** The freshness line under the dates, e.g. "Confirmed active 2 days ago" (P0-11, SE-9). */
+  freshness?: string;
   /** Provided is green whether housing is free or paid; the cost is in the pop-up. */
   housing: { provided: boolean };
   meals: { provided: boolean };
-  pay: Pay;
+  /** A Pay to format, or a preformatted chip label such as "$19–$22/hr" or "$52k/yr". */
+  pay: Pay | { label: string };
+  /** The whole deal under the dates. Without it the Housing and Meals chips stay. */
+  deal?: JobCardDeal;
+  payEstimate?: JobCardPayEstimate;
   saved?: boolean;
+  /** The seeker has applied: the Apply button reads "Applied" and is disabled. */
+  applied?: boolean;
   onOpenChip?: (chip: JobCardChip) => void;
   onOpen?: (event: MouseEvent<HTMLAnchorElement>) => void;
   /** Swipe shows an info button on the photo that also opens the listing. */
@@ -60,6 +114,7 @@ const perLabel: Record<PayPeriod, string> = {
   week: 'wk',
   month: 'mo',
   season: 'season',
+  year: 'yr',
 };
 
 function dollars(cents: number): string {
@@ -69,7 +124,10 @@ function dollars(cents: number): string {
   });
 }
 
-/** `{ amountCents: 1900, per: 'hour' }` -> "$19/hr"; a range -> "$18.50–22/hr". */
+/**
+ * `{ amountCents: 1900, per: 'hour' }` -> "$19/hr"; a range -> "$18.50–22/hr";
+ * `{ amountCents: 4500000, per: 'year' }` -> "$45,000/yr".
+ */
 export function formatPay({ amountCents, maxAmountCents, per }: Pay): string {
   const range =
     maxAmountCents !== undefined && maxAmountCents > amountCents
@@ -78,7 +136,13 @@ export function formatPay({ amountCents, maxAmountCents, per }: Pay): string {
   return `$${dollars(amountCents)}${range}/${perLabel[per]}`;
 }
 
+/** The Pay chip's value: a preformatted label as given, otherwise `formatPay`. */
+export function payLabel(pay: JobCardProps['pay']): string {
+  return 'label' in pay ? pay.label : formatPay(pay);
+}
+
 export function formatStart(starts: JobCardProps['starts']): string {
+  if ('label' in starts) return starts.label;
   if ('on' in starts) return `Begins ${starts.on}`;
   if (starts.inDays <= 0) return 'Starts today';
   return `Starts in ${starts.inDays} ${starts.inDays === 1 ? 'day' : 'days'}`;
@@ -93,12 +157,18 @@ export function JobCard({
   category,
   boosted = false,
   cover,
+  hideCover = false,
   starts,
   endsOn,
+  endLabel,
+  freshness,
   housing,
   meals,
   pay,
+  deal,
+  payEstimate,
   saved = false,
+  applied = false,
   onOpenChip,
   onOpen,
   onInfo,
@@ -110,6 +180,16 @@ export function JobCard({
   className,
 }: JobCardProps) {
   const open = (chip: JobCardChip) => (onOpenChip ? () => onOpenChip(chip) : undefined);
+  const payChip = (
+    <Chip
+      key="pay"
+      label="Pay"
+      icon={Banknote}
+      value={payLabel(pay)}
+      onOpen={open('pay')}
+      className={deal ? 'w-full' : undefined}
+    />
+  );
   const logo = (
     <OrgLogo name={host.name} src={host.logoSrc} size="lg" ring decorative={!!host.href} />
   );
@@ -118,13 +198,15 @@ export function JobCard({
     <Card
       className={className}
       titleAs={titleAs}
+      hideCover={hideCover}
       cover={
         cover ? (
+          // A 4:3 photo as wide as the cover, centred and cropped by it at every width (D3-3).
           <Img
             src={cover.src}
             srcSet={cover.srcSet}
             alt={cover.alt}
-            className="size-full object-cover"
+            className="absolute top-1/2 left-0 aspect-4/3 min-h-full w-full -translate-y-1/2 object-cover object-center"
           />
         ) : null
       }
@@ -173,34 +255,71 @@ export function JobCard({
         <>
           <CalendarDays className="size-3.75" />
           <span className="font-semibold text-ink">{formatStart(starts)}</span>
-          {endsOn ? <span>· Ends {endsOn}</span> : null}
+          {endLabel ? <span>· {endLabel}</span> : endsOn ? <span>· Ends {endsOn}</span> : null}
         </>
       }
-      chips={[
-        <Chip
-          key="housing"
-          label="Housing"
-          icon={BedDouble}
-          value={housing.provided ? 'Provided' : 'No housing'}
-          tone={housing.provided ? 'success' : 'muted'}
-          onOpen={open('housing')}
-        />,
-        <Chip
-          key="meals"
-          label="Meals"
-          icon={Utensils}
-          value={meals.provided ? 'Provided' : 'No meals'}
-          tone={meals.provided ? 'success' : 'muted'}
-          onOpen={open('meals')}
-        />,
-        <Chip key="pay" label="Pay" icon={Banknote} value={formatPay(pay)} onOpen={open('pay')} />,
-      ]}
+      note={
+        freshness ? (
+          <>
+            <Clock className="size-3.75 shrink-0" />
+            <span>{freshness}</span>
+          </>
+        ) : null
+      }
+      deal={deal ? <DealLines deal={deal} /> : null}
+      chips={
+        deal
+          ? [null, null, payChip]
+          : [
+              <Chip
+                key="housing"
+                label="Housing"
+                icon={BedDouble}
+                value={housing.provided ? 'Provided' : 'No housing'}
+                tone={housing.provided ? 'success' : 'muted'}
+                onOpen={open('housing')}
+              />,
+              <Chip
+                key="meals"
+                label="Meals"
+                icon={Utensils}
+                value={meals.provided ? 'Provided' : 'No meals'}
+                tone={meals.provided ? 'success' : 'muted'}
+                onOpen={open('meals')}
+              />,
+              payChip,
+            ]
+      }
+      belowChips={
+        payEstimate ? (
+          <div className="flex flex-col items-start">
+            <p className="text-16 font-semibold wrap-anywhere text-ink">{payEstimate.line}</p>
+            <p className="mt-0.5 text-14 wrap-anywhere text-muted">{payEstimate.basis}</p>
+            {payEstimate.onExplain ? (
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                onClick={payEstimate.onExplain}
+                className="flex min-h-11 items-center rounded-sm text-14 font-semibold text-ink underline underline-offset-2 hover:no-underline"
+              >
+                How we work this out
+              </button>
+            ) : null}
+          </div>
+        ) : null
+      }
       actions={
         hideActions ? null : (
           <>
             <IconButton icon={X} label="Skip" variant="outline" size="lg" onClick={onSkip} />
-            <Button size="lg" className="flex-1" onClick={onApply}>
-              Apply
+            <Button
+              size="lg"
+              className="flex-1"
+              variant={applied ? 'secondary' : 'primary'}
+              icon={applied ? Check : undefined}
+              onClick={applied ? undefined : onApply}
+            >
+              {applied ? 'Applied' : 'Apply'}
             </Button>
             <IconButton
               icon={Bookmark}
@@ -214,5 +333,31 @@ export function JobCard({
         )
       }
     />
+  );
+}
+
+/** Four lines beside a 72 px room photo. No housing drops the photo, the type, the cost and couples. */
+function DealLines({ deal }: { deal: JobCardDeal }) {
+  if (!deal.housing) {
+    return (
+      <div className="flex flex-col">
+        <p className="text-16 text-ink">No housing</p>
+        <p className="text-16 text-ink">{deal.meals}</p>
+      </div>
+    );
+  }
+  const { type, cost, photo, couples } = deal.housing;
+  return (
+    <div className="flex items-start gap-3">
+      {photo ? (
+        <Img src={photo.src} alt={photo.alt} className="size-18 shrink-0 rounded-md object-cover" />
+      ) : null}
+      <div className="flex min-w-0 flex-col">
+        {type ? <p className="text-16 font-semibold text-ink">{type}</p> : null}
+        {cost ? <p className="text-16 text-ink">{cost}</p> : null}
+        <p className="text-16 text-ink">{deal.meals}</p>
+        {couples ? <p className="text-16 text-ink">{couples}</p> : null}
+      </div>
+    </div>
   );
 }

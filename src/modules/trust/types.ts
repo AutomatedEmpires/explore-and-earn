@@ -32,11 +32,21 @@ export type ActionStatus = (typeof ACTION_STATUSES)[number];
 export const CHECK_DECISIONS = ['approved', 'rejected', 'needs_review'] as const;
 export type CheckDecision = (typeof CHECK_DECISIONS)[number];
 
+/** Kinds Foundation and SP2 register. Later sub-projects add more with registerCheckKind. */
+export const CHECK_KINDS = [
+  'image_safety',
+  'text_safety',
+  'listing_moderation',
+  'listing_fraud',
+  'business_verification',
+  'photo_slot',
+  'message_scam',
+] as const;
+
 /**
- * A check kind: Foundation's two, or one a later sub-project registers with registerCheckKind
- * (listing, message scam, business verification, ...).
+ * A check kind: one of CHECK_KINDS, or one a later sub-project registers with registerCheckKind.
  */
-export type CheckKind = 'image_safety' | 'text_safety' | (string & {});
+export type CheckKind = (typeof CHECK_KINDS)[number] | (string & {});
 
 export type OpenReviewItemInput = {
   queue: Queue;
@@ -47,6 +57,8 @@ export type OpenReviewItemInput = {
   aiConfidence?: number;
   priority?: number;
   excludeOperatorIds?: string[];
+  /** Assign this operator and skip pickAssignee. They must cover the queue and not be excluded. */
+  assigneeOperatorId?: string;
   originalItemId?: string;
 };
 
@@ -57,6 +69,8 @@ export type RunCheckInput = {
   text?: string;
   image?: { mime: string; bytes: Uint8Array };
   wantAltText?: boolean;
+  /** Where a needs_review decision opens its item. Default 'moderation'; null opens none. */
+  reviewQueue?: Queue | null;
 };
 
 export type CheckResult = {

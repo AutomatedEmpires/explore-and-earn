@@ -199,6 +199,31 @@ export async function unreadCount(db: DbOrTx, userId: string): Promise<number> {
   return row?.n ?? 0;
 }
 
+/**
+ * Marks the user's unread rows whose type is one of `types` and whose `data` has `key` equal
+ * to `value`. Returns how many were marked.
+ */
+export async function markReadByData(
+  db: DbOrTx,
+  userId: string,
+  m: { types: string[]; key: string; value: string },
+): Promise<number> {
+  if (m.types.length === 0) return 0;
+  const rows = await db
+    .update(notifications)
+    .set({ readAt: new Date() })
+    .where(
+      and(
+        eq(notifications.userId, userId),
+        isNull(notifications.readAt),
+        inArray(notifications.type, m.types),
+        sql`${notifications.data}->>${m.key} = ${m.value}`,
+      ),
+    )
+    .returning({ id: notifications.id });
+  return rows.length;
+}
+
 /** Marks the user's own notifications read: the given ids, or every unread one. */
 export async function markRead(db: DbOrTx, userId: string, ids: string[] | 'all'): Promise<void> {
   if (ids !== 'all' && ids.length === 0) return;

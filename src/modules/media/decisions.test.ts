@@ -40,6 +40,8 @@ vi.mock('@/lib/ai', async (importOriginal) => {
 
 vi.mock('@/modules/notifications', () => ({
   notify: vi.fn(async () => {}),
+  // Modules loaded through identity (orgs) register their notification types at load.
+  defineType: vi.fn(),
   jobHandlers: {},
 }));
 

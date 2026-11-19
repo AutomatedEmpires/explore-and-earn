@@ -31,18 +31,18 @@
   --ee-danger: #b42318;
   --ee-danger-bg: #fce9e7;
   --ee-focus: #2457c5;
-  --ee-maritime-fg: #1a4f9c;
-  --ee-maritime-bg: #e6eefa;
-  --ee-maritime-solid: #1d5fbf;
-  --ee-seasonal-fg: #8f4e06;
-  --ee-seasonal-bg: #fbeedd;
-  --ee-seasonal-solid: #b45f06;
-  --ee-farm-fg: #24622e;
-  --ee-farm-bg: #e5f2e6;
-  --ee-farm-solid: #2f7d3b;
-  --ee-remote-fg: #a12c23;
-  --ee-remote-bg: #fbe7e5;
-  --ee-remote-solid: #c8382e;
+  --ee-maritime-fg: #003949;
+  --ee-maritime-bg: #dbf3fc;
+  --ee-maritime-solid: #0e7490;
+  --ee-seasonal-fg: #4b4300;
+  --ee-seasonal-bg: #f4eeb8;
+  --ee-seasonal-solid: #a08318;
+  --ee-farm-fg: #354316;
+  --ee-farm-bg: #eaf8d4;
+  --ee-farm-solid: #74915e;
+  --ee-remote-fg: #41094c;
+  --ee-remote-bg: #fbecfe;
+  --ee-remote-solid: #652a72;
   --ee-scrim: rgb(20 19 17 / 0.48);
   --ee-shadow-card: 0 1px 2px rgb(28 27 25 / 0.06), 0 8px 24px rgb(28 27 25 / 0.07);
   --ee-shadow-raised: 0 2px 6px rgb(28 27 25 / 0.15);
@@ -69,18 +69,18 @@
     --ee-danger: #f59990;
     --ee-danger-bg: #45201c;
     --ee-focus: #8ab4f8;
-    --ee-maritime-fg: #a9c8f5;
-    --ee-maritime-bg: #16294a;
-    --ee-maritime-solid: #5b95e8;
-    --ee-seasonal-fg: #f5bf7e;
-    --ee-seasonal-bg: #3a2710;
-    --ee-seasonal-solid: #e08a2e;
-    --ee-farm-fg: #9ad6a4;
-    --ee-farm-bg: #183520;
-    --ee-farm-solid: #55ac62;
-    --ee-remote-fg: #f6a8a1;
-    --ee-remote-bg: #451b17;
-    --ee-remote-solid: #e5604f;
+    --ee-maritime-fg: #c9ebf8;
+    --ee-maritime-bg: #011e28;
+    --ee-maritime-solid: #3d859d;
+    --ee-seasonal-fg: #f3efb0;
+    --ee-seasonal-bg: #241f0c;
+    --ee-seasonal-solid: #f3efb0;
+    --ee-farm-fg: #ccf3ae;
+    --ee-farm-bg: #131e0a;
+    --ee-farm-solid: #5f8938;
+    --ee-remote-fg: #f1dcf5;
+    --ee-remote-bg: #251229;
+    --ee-remote-solid: #c282d0;
     --ee-scrim: rgb(0 0 0 / 0.6);
     --ee-shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.3);
     --ee-shadow-raised: 0 2px 6px rgb(0 0 0 / 0.5);
@@ -107,18 +107,18 @@
   --ee-danger: #f59990;
   --ee-danger-bg: #45201c;
   --ee-focus: #8ab4f8;
-  --ee-maritime-fg: #a9c8f5;
-  --ee-maritime-bg: #16294a;
-  --ee-maritime-solid: #5b95e8;
-  --ee-seasonal-fg: #f5bf7e;
-  --ee-seasonal-bg: #3a2710;
-  --ee-seasonal-solid: #e08a2e;
-  --ee-farm-fg: #9ad6a4;
-  --ee-farm-bg: #183520;
-  --ee-farm-solid: #55ac62;
-  --ee-remote-fg: #f6a8a1;
-  --ee-remote-bg: #451b17;
-  --ee-remote-solid: #e5604f;
+  --ee-maritime-fg: #c9ebf8;
+  --ee-maritime-bg: #011e28;
+  --ee-maritime-solid: #3d859d;
+  --ee-seasonal-fg: #f3efb0;
+  --ee-seasonal-bg: #241f0c;
+  --ee-seasonal-solid: #f3efb0;
+  --ee-farm-fg: #ccf3ae;
+  --ee-farm-bg: #131e0a;
+  --ee-farm-solid: #5f8938;
+  --ee-remote-fg: #f1dcf5;
+  --ee-remote-bg: #251229;
+  --ee-remote-solid: #c282d0;
   --ee-scrim: rgb(0 0 0 / 0.6);
   --ee-shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.3);
   --ee-shadow-raised: 0 2px 6px rgb(0 0 0 / 0.5);
@@ -273,6 +273,11 @@
   --shadow-card: var(--ee-shadow-card);
   --shadow-raised: var(--ee-shadow-raised);
   --shadow-overlay: var(--ee-shadow-overlay);
+}
+
+/* Bars pinned to the bottom of the screen clear the phone's home indicator. */
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 @layer base {

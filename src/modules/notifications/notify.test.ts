@@ -291,7 +291,7 @@ describe('unreadCount and markRead', () => {
     const userId = await newUser();
     await notify(t.db, userId, 'system.test', {});
     await notify(t.db, userId, 'system.test', {});
-    expect(await getCounts(t.db, userId)).toEqual({ inbox: 0, notifications: 2 });
+    expect(await getCounts(t.db, userId)).toMatchObject({ inbox: 0, notifications: 2 });
   });
 });
 

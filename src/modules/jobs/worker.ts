@@ -16,6 +16,40 @@ export type DeadEvent = { eventId: string; topic: string; attempts: number; erro
 /** Raises the alert for a dead event. A failure is logged; the event stays dead either way. */
 export type DeadEventHook = (db: Db, dead: DeadEvent) => Promise<void>;
 
+/** A topic's own follow-up once an event is dead. A throw is logged and the event stays dead. */
+export type DeadLetterHandler = (
+  db: Db,
+  e: { eventId: string; payload: unknown; lastError: string },
+) => Promise<void>;
+
+const deadLetterHandlers = new Map<string, DeadLetterHandler>();
+
+export function registerDeadLetterHandler(topic: string, fn: DeadLetterHandler): void {
+  deadLetterHandlers.set(topic, fn);
+}
+
+async function runDeadLetter(
+  db: Db,
+  topic: string,
+  eventId: string,
+  payloadText: string,
+  lastError: string,
+): Promise<void> {
+  const fn = deadLetterHandlers.get(topic);
+  if (!fn) return;
+  let payload: unknown = payloadText;
+  try {
+    payload = JSON.parse(payloadText) as unknown;
+  } catch {
+    payload = payloadText;
+  }
+  try {
+    await fn(db, { eventId, payload, lastError });
+  } catch (err) {
+    logger.error('outbox: dead-letter handler failed', { eventId, topic, error: err });
+  }
+}
+
 export type WorkerOptions = {
   /** Events claimed per round trip. Default 20. */
   batchSize?: number;
@@ -131,7 +165,13 @@ const LOCK_EXPIRED = 'lock expired on the final attempt';
 
 /** Abandoned events that already used their last attempt go straight to `dead`. */
 async function buryExhausted(db: Db, now: Date, hook: DeadEventHook | undefined): Promise<number> {
-  const rows = await queryRows<{ id: string; topic: string; attempts: number }>(
+  const rows = await queryRows<{
+    id: string;
+    topic: string;
+    attempts: number;
+    payload: string;
+    last_error: string | null;
+  }>(
     db,
     sql`
       update app.outbox
@@ -140,7 +180,7 @@ async function buryExhausted(db: Db, now: Date, hook: DeadEventHook | undefined)
       where status = 'processing'
         and locked_at < ${now}::timestamptz - make_interval(mins => ${LOCK_TIMEOUT_MINUTES}::int)
         and attempts >= ${MAX_ATTEMPTS}::int
-      returning id, topic, attempts
+      returning id, topic, attempts, payload::text as payload, last_error
     `,
   );
   for (const row of rows) {
@@ -149,6 +189,7 @@ async function buryExhausted(db: Db, now: Date, hook: DeadEventHook | undefined)
       topic: row.topic,
       attempts: row.attempts,
     });
+    await runDeadLetter(db, row.topic, row.id, row.payload, row.last_error ?? LOCK_EXPIRED);
     const dead = { eventId: row.id, topic: row.topic, attempts: row.attempts, error: LOCK_EXPIRED };
     await reportDead(db, dead, hook);
   }
@@ -196,6 +237,7 @@ async function markFailed(
     logger.error(`outbox event is dead after ${row.attempts} attempts`, fields);
     // Only the worker whose update took raises the alarm (another may have reclaimed it).
     if (buried.length > 0) {
+      await runDeadLetter(db, row.topic, row.id, row.payload, message);
       const dead = { eventId: row.id, topic: row.topic, attempts: row.attempts, error: message };
       await reportDead(db, dead, hook);
     }

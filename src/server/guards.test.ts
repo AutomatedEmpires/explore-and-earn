@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type Db, queryRows } from '@/lib/db';
 import { resetEnvCache } from '@/lib/env';
+import { perfUserHeaderValue } from '@/lib/perf-mode';
 import { AppError } from '@/lib/errors';
 import {
   handleClerkEvent,
@@ -19,6 +20,19 @@ type RawUser = Record<string, unknown>;
 const clerk = vi.hoisted(() => ({
   session: { userId: null } as Session,
   users: new Map<string, RawUser>(),
+}));
+
+const sanctions = vi.hoisted(() => ({
+  getActiveSanction: vi.fn(async (..._args: unknown[]) => null as { kind: string } | null),
+}));
+vi.mock('@/modules/operator', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/modules/operator')>()),
+  getActiveSanction: (...args: unknown[]) => sanctions.getActiveSanction(...args),
+}));
+
+const headerJar = vi.hoisted(() => ({ current: new Headers() }));
+vi.mock('next/headers', () => ({
+  headers: async () => headerJar.current,
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -43,7 +57,8 @@ vi.mock('@/lib/db', async (importOriginal) => ({
   },
 }));
 
-const { requireHost, requireOperator, requireSeeker, requireUser } = await import('./guards');
+const { requireHost, requireOperator, requireRecentAuth, requireSeeker, requireUser } =
+  await import('./guards');
 
 let t: TestDb;
 
@@ -59,6 +74,9 @@ afterAll(async () => {
 beforeEach(async () => {
   clerk.session = { userId: null };
   clerk.users.clear();
+  headerJar.current = new Headers();
+  sanctions.getActiveSanction.mockReset();
+  sanctions.getActiveSanction.mockResolvedValue(null);
   await t.db.execute(
     sql`truncate app.org_memberships, app.organizations, app.operators, app.users, app.webhook_events cascade`,
   );
@@ -145,6 +163,32 @@ describe('requireUser', () => {
     expect((await requireUser()).id).toBe(user.id);
   });
 
+  it('rejects a suspended account', async () => {
+    await signIn(clerkUser('user_1'));
+    sanctions.getActiveSanction.mockResolvedValue({ kind: 'suspend' });
+    await expectDenied(requireUser(), 'unauthorized', { reason: 'account_suspended' });
+  });
+
+  it('selects the perf-mode user from x-perf-user without calling Clerk', async () => {
+    const { auth } = await import('@clerk/nextjs/server');
+    const id = await signIn(clerkUser('user_perf'));
+    clerk.session = { userId: null };
+    vi.mocked(auth).mockClear();
+    const secret = 'p'.repeat(32);
+    vi.stubEnv('PERF_MODE', '1');
+    vi.stubEnv('PERF_SECRET', secret);
+    resetEnvCache();
+    headerJar.current = new Headers({ 'x-perf-user': perfUserHeaderValue(id, secret) });
+    try {
+      const user = await requireUser();
+      expect(user.id).toBe(id);
+      expect(auth).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+      resetEnvCache();
+    }
+  });
+
   it('rejects a deleted user', async () => {
     await signIn(clerkUser('user_1'));
     await handleClerkEvent(t.db, {
@@ -153,6 +197,19 @@ describe('requireUser', () => {
       data: { id: 'user_1', deleted: true },
     });
     await expectDenied(requireUser(), 'unauthorized');
+  });
+});
+
+describe('requireRecentAuth', () => {
+  it('asks Clerk for a first-factor reverification within the rounded window', async () => {
+    await expectDenied(requireRecentAuth(), 'forbidden', {
+      reason: 'reverification_required',
+      reverification: { level: 'first_factor', afterMinutes: 10 },
+    });
+    await expectDenied(requireRecentAuth(1200), 'forbidden', {
+      reason: 'reverification_required',
+      reverification: { level: 'first_factor', afterMinutes: 20 },
+    });
   });
 });
 

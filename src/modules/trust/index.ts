@@ -17,6 +17,15 @@ export {
 } from './actions';
 export { raiseAlert, type Alert } from './alerts';
 export {
+  FRAUD_RULES,
+  matchHostFraud,
+  NEW_ACCOUNT_DAYS,
+  type FraudMatch,
+  type FraudPeer,
+  type FraudRule,
+  type HostFraudInput,
+} from './fraud-rules';
+export {
   CLASSIFIER_ERROR,
   findLatestCheck,
   registerCheckKind,
@@ -24,7 +33,7 @@ export {
   type CheckKindDef,
   type CheckOutput,
 } from './checks';
-export { SLA_HOURS, openReviewItem, pickAssignee } from './routing';
+export { SLA_HOURS, listOpenReviewItems, openReviewItem, pickAssignee } from './routing';
 export { auditSample } from './sampling';
 export { slaSweep } from './sla';
 export {
@@ -34,6 +43,7 @@ export {
   type SubjectHandlers,
 } from './subjects';
 export {
+  CHECK_KINDS,
   QUEUES,
   REVIEW_ACTIONS,
   type ActionStatus,
@@ -55,3 +65,6 @@ export const jobHandlers: HandlerMap = {
     await auditSample(db, now);
   },
 };
+
+export { privacyHandler } from './privacy';
+export { retentionRules } from './retention';

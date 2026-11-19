@@ -28,7 +28,14 @@ export type MediaStatus = (typeof MEDIA_STATUSES)[number];
  * Storage buckets. `quarantine` holds uploads until scanned; `media-public` is the only public
  * one; `evidence` (child-safety originals) is restricted to the service role.
  */
-export const BUCKETS = ['quarantine', 'media-public', 'media-private', 'evidence'] as const;
+export const BUCKETS = [
+  'quarantine',
+  'media-public',
+  'media-private',
+  'evidence',
+  // Privacy export zips. Never the bucket of an app.media row.
+  'privacy-exports',
+] as const;
 export type Bucket = (typeof BUCKETS)[number];
 
 /** Why a file was rejected, stored in `app.media.rejection_reason`. */

@@ -4,12 +4,19 @@ import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import type { Db } from '@/lib/db';
 import { withTx } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { privacyRegistry } from '@/server/privacy-registry';
 import { schedules } from '@/server/schedules';
 import { POST } from '@/app/api/jobs/run/route';
 import { enqueue, kickWorker } from './outbox';
 import { enqueueDueSchedules, lastDueAt } from './schedule';
 import { outbox } from './schema';
-import { MAX_ATTEMPTS, nextDelayMs, runWorker, type HandlerMap } from './worker';
+import {
+  MAX_ATTEMPTS,
+  nextDelayMs,
+  registerDeadLetterHandler,
+  runWorker,
+  type HandlerMap,
+} from './worker';
 
 // The jobs route reads the database through getDb(); point it at this file's PGlite.
 const dbHolder = vi.hoisted(() => ({ current: undefined as Db | undefined }));
@@ -243,6 +250,45 @@ describe('runWorker', () => {
     const after = await runWorker(t.db, { now: at(T0, minutes(60 * 24 * 30)), handlers, onDead });
     expect(after).toEqual({ processed: 0, retried: 0, dead: 0 });
     expect(onDead).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls a dead-letter handler once, and a throwing handler leaves the event dead', async () => {
+    quiet();
+    const seen: { lastError: string }[] = [];
+    registerDeadLetterHandler('lettered', async (_db, event) => {
+      seen.push({ lastError: event.lastError });
+    });
+    registerDeadLetterHandler('lettered-throw', async () => {
+      throw new Error('handler blew up');
+    });
+    const handlers: HandlerMap = {
+      lettered: async () => {
+        throw new Error('provider down');
+      },
+      'lettered-throw': async () => {
+        throw new Error('provider down');
+      },
+    };
+    const exhaust = async (topic: string) => {
+      await enqueue(t.db, { topic, payload: { n: 1 }, availableAt: T0 });
+      await runWorker(t.db, { now: T0, handlers, onDead: async () => {} });
+      for (let attempt = 2; attempt <= MAX_ATTEMPTS; attempt++) {
+        const [row] = await rows(topic);
+        await runWorker(t.db, {
+          now: at(row?.availableAt ?? T0, 1),
+          handlers,
+          onDead: async () => {},
+        });
+      }
+    };
+
+    await exhaust('lettered');
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.lastError).toContain('provider down');
+    expect((await rows('lettered'))[0]?.status).toBe('dead');
+
+    await exhaust('lettered-throw');
+    expect((await rows('lettered-throw'))[0]?.status).toBe('dead');
   });
 
   it('retries an event whose topic has no handler', async () => {
@@ -574,7 +620,10 @@ describe('POST /api/jobs/run', () => {
     // Every registered schedule is due on first sight (no schedule_runs rows yet).
     expect(body.scheduled).toEqual(schedules.map((s) => s.topic));
     expect(body.retried).toBeGreaterThanOrEqual(1);
-    expect(body.processed + body.retried + body.dead).toBe(schedules.length + 1);
+    // The retention sweep queues one job per registered rule, and the same pass runs them.
+    expect(body.processed + body.retried + body.dead).toBe(
+      schedules.length + 1 + privacyRegistry.rules.length,
+    );
     const [row] = await rows('no.handler.here');
     expect(row?.attempts).toBe(1);
     expect(row?.status).toBe('pending');

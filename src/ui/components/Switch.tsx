@@ -32,12 +32,15 @@ export function Switch({
   const switchId = id ?? generated;
   return (
     <div className={cn('flex min-h-11 items-center justify-between gap-4 py-1.5', className)}>
-      <div className="flex flex-col gap-0.5">
-        <label htmlFor={switchId} className="cursor-pointer text-15 font-semibold text-ink">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <label
+          htmlFor={switchId}
+          className="cursor-pointer text-15 font-semibold wrap-anywhere text-ink"
+        >
           {label}
         </label>
         {description ? (
-          <span id={`${switchId}-description`} className="text-13 text-muted">
+          <span id={`${switchId}-description`} className="text-13 wrap-anywhere text-muted">
             {description}
           </span>
         ) : null}

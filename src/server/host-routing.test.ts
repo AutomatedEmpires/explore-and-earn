@@ -1,11 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { onboardingState, routeForHost, shouldRedirectToOnboarding } from './host-routing';
+import {
+  isViewAsWrite,
+  onboardingState,
+  routeForHost,
+  shouldRedirectToOnboarding,
+} from './host-routing';
 
 const adminHost = 'admin.exploreandearn.test';
 const appHost = 'exploreandearn.test';
 
 const route = (host: string, pathname: string, appEnv = 'prod') =>
   routeForHost({ host, pathname, adminHost, appEnv });
+
+describe('isViewAsWrite', () => {
+  it('is true only for a non-read method that carries an actor', () => {
+    expect(isViewAsWrite({ method: 'POST', hasActor: true })).toBe(true);
+    expect(isViewAsWrite({ method: 'GET', hasActor: true })).toBe(false);
+    expect(isViewAsWrite({ method: 'HEAD', hasActor: true })).toBe(false);
+    expect(isViewAsWrite({ method: 'POST', hasActor: false })).toBe(false);
+  });
+});
 
 describe('routeForHost', () => {
   it('rewrites the admin host into /admin', () => {
@@ -113,5 +127,24 @@ describe('shouldRedirectToOnboarding', () => {
       expect(shouldRedirectToOnboarding({ ...base, pathname })).toBe(false);
     }
     expect(shouldRedirectToOnboarding({ ...base, isAdminHost: true })).toBe(false);
+  });
+
+  it('lets an invitee open a team invitation before onboarding', () => {
+    expect(
+      shouldRedirectToOnboarding({
+        pathname: '/join/abc',
+        signedIn: true,
+        state: 'needed',
+        isAdminHost: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRedirectToOnboarding({
+        pathname: '/joined',
+        signedIn: true,
+        state: 'needed',
+        isAdminHost: false,
+      }),
+    ).toBe(true);
   });
 });

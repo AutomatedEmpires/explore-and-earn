@@ -38,7 +38,7 @@ export function Field({
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
       <div className={cn('flex items-baseline justify-between gap-3', hideLabel && 'sr-only')}>
-        <label htmlFor={id} className="text-14 font-semibold text-ink">
+        <label htmlFor={id} className="min-w-0 text-14 font-semibold wrap-anywhere text-ink">
           {label}
           {required ? (
             <span className="text-muted">
@@ -53,11 +53,13 @@ export function Field({
       {error ? (
         <p className="flex items-start gap-1.5 text-13 font-semibold text-danger">
           <CircleAlert className="mt-0.5 size-4 shrink-0" />
-          <span id={`${id}-error`}>{error}</span>
+          <span id={`${id}-error`} className="min-w-0 wrap-anywhere">
+            {error}
+          </span>
         </p>
       ) : null}
       {hint ? (
-        <p id={`${id}-hint`} className="text-13 text-muted">
+        <p id={`${id}-hint`} className="text-13 wrap-anywhere text-muted">
           {hint}
         </p>
       ) : null}
@@ -67,7 +69,7 @@ export function Field({
 
 /** Shared look of text-like controls: 3:1 border, token focus ring, danger border on error. */
 export const controlClass = cn(
-  'w-full rounded-lg border border-line-strong bg-surface px-3.5 text-15 text-ink placeholder:text-muted',
+  'w-full rounded-lg border border-line-strong bg-surface px-3.5 text-16 text-ink placeholder:text-muted',
   'disabled:cursor-not-allowed disabled:bg-surface-2 disabled:opacity-70',
   'aria-[invalid=true]:border-danger motion-safe:transition-colors',
 );

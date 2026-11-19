@@ -18,9 +18,20 @@ export type CardProps = Omit<ComponentProps<'article'>, 'title' | 'children'> & 
   titleAs?: 'h2' | 'h3';
   subtitle?: ReactNode;
   info?: ReactNode;
+  /** A muted line under `info`, e.g. JobCard's freshness line (#152, SE-9). */
+  note?: ReactNode;
+  /** Under the dates, above the chips, e.g. JobCard's whole deal. */
+  deal?: ReactNode;
   chips: CardChips;
+  /** Between the chips and the actions, above the title link, e.g. JobCard's pay estimate. */
+  belowChips?: ReactNode;
   actions?: ReactNode;
   coverSize?: 'md' | 'lg';
+  /**
+   * Collapses the cover area with its badges, action and identity, for a card with no cover
+   * photo (#152, SE-19). The body then starts 16 px from the top.
+   */
+  hideCover?: boolean;
 };
 
 /**
@@ -37,9 +48,13 @@ export function Card({
   titleAs: Title = 'h2',
   subtitle,
   info,
+  note,
+  deal,
   chips,
+  belowChips,
   actions,
   coverSize = 'lg',
+  hideCover = false,
   className,
   ...props
 }: CardProps) {
@@ -48,17 +63,22 @@ export function Card({
       className={cn('relative overflow-hidden rounded-xl bg-surface shadow-card', className)}
       {...props}
     >
-      <div className={cn('relative bg-surface-2', coverSize === 'lg' ? 'h-47' : 'h-42')}>
-        <div className="absolute inset-0 overflow-hidden">{cover}</div>
-        {coverBadge ? (
-          <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5">
-            {coverBadge}
-          </div>
-        ) : null}
-        {coverAction ? <div className="absolute top-3 right-3 z-10">{coverAction}</div> : null}
-        {identity ? <div className="absolute -bottom-7 left-4 z-10 flex">{identity}</div> : null}
-      </div>
-      <div className={cn('px-4 pb-4', identity ? 'pt-9' : 'pt-4')}>
+      {hideCover ? null : (
+        <div
+          data-slot="cover"
+          className={cn('relative bg-surface-2', coverSize === 'lg' ? 'h-47' : 'h-42')}
+        >
+          <div className="absolute inset-0 overflow-hidden">{cover}</div>
+          {coverBadge ? (
+            <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5">
+              {coverBadge}
+            </div>
+          ) : null}
+          {coverAction ? <div className="absolute top-3 right-3 z-10">{coverAction}</div> : null}
+          {identity ? <div className="absolute -bottom-7 left-4 z-10 flex">{identity}</div> : null}
+        </div>
+      )}
+      <div data-slot="body" className={cn('px-4 pb-4', identity && !hideCover ? 'pt-9' : 'pt-4')}>
         <Title className="text-21 font-bold text-ink">{title}</Title>
         {subtitle ? (
           <p className="mt-1 flex flex-wrap items-center gap-x-1 text-14 text-ink-2">{subtitle}</p>
@@ -66,16 +86,35 @@ export function Card({
         {info ? (
           <p className="mt-2 flex flex-wrap items-center gap-x-1.5 text-13 text-muted">{info}</p>
         ) : null}
-        <div className="relative z-10 mt-3.5 grid grid-cols-3 gap-2">
-          {chips[0]}
-          {chips[1]}
-          {chips[2]}
-        </div>
+        {note ? (
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-14 wrap-anywhere text-muted">
+            {note}
+          </p>
+        ) : null}
+        {deal ? <div className="mt-3">{deal}</div> : null}
+        <ChipRow chips={chips} />
+        {belowChips ? <div className="relative z-10 mt-3">{belowChips}</div> : null}
         {actions ? (
           <div className="relative z-10 mt-3.5 flex items-center gap-2.5">{actions}</div>
         ) : null}
       </div>
     </article>
+  );
+}
+
+/** Three chips in a row. A card that fills only the pay chip (the whole deal replaces the others) keeps that chip 140 px wide. */
+function ChipRow({ chips }: { chips: CardChips }) {
+  const visible = chips.filter((chip) => chip != null && chip !== false);
+  if (visible.length === 0) return null;
+  return (
+    <div
+      className={cn(
+        'relative z-10 mt-3.5 grid gap-2',
+        visible.length > 1 ? 'grid-cols-3' : 'w-35',
+      )}
+    >
+      {visible}
+    </div>
   );
 }
 

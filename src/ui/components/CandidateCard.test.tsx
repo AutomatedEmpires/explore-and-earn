@@ -45,7 +45,9 @@ describe('CandidateCard', () => {
       '/host/applicants/1',
     );
     expect(within(card).getByText('Seasonal, Maritime')).toBeInTheDocument();
-    expect(within(card).getByText('Applied 2 days ago')).toBeInTheDocument();
+    const applied = within(card).getByText('Applied 2 days ago');
+    // A status badge always carries its icon (#155 D3-1).
+    expect(applied.querySelector('svg.lucide-clock')).not.toBeNull();
     expect(within(card).getByText('· Applied for Lodge Housekeeper')).toBeInTheDocument();
     expect(within(card).getByText('Available May 10, 2027')).toBeInTheDocument();
     expect(within(card).getByRole('button', { name: /^Resume/ })).toHaveTextContent('3 seasons');
@@ -81,5 +83,43 @@ describe('CandidateCard', () => {
     }
     fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
     expect(onInvite).toHaveBeenCalledOnce();
+  });
+
+  it('shows — in the Fit chip when fit is off, and the chip still opens', () => {
+    const onOpenChip = vi.fn();
+    render(<CandidateCard {...applicant} fit={null} onOpenChip={onOpenChip} />);
+    const chip = screen.getByRole('button', { name: /^Fit/ });
+    expect(chip).toHaveTextContent('—');
+    fireEvent.click(chip);
+    expect(onOpenChip).toHaveBeenCalledWith('fit');
+  });
+
+  it('renders a primary link when the primary action has an href (flow D Reply)', () => {
+    const onInterview = vi.fn();
+    render(
+      <CandidateCard
+        {...applicant}
+        onInterview={onInterview}
+        primaryAction={{ label: 'Reply', href: '/host/messages/t1/reply' }}
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'Reply' })).toHaveAttribute(
+      'href',
+      '/host/messages/t1/reply',
+    );
+    expect(screen.queryByRole('button', { name: 'Interview' })).toBeNull();
+  });
+
+  it('calls onInterview from the primary button without an href', () => {
+    const onInterview = vi.fn();
+    render(
+      <CandidateCard
+        {...applicant}
+        onInterview={onInterview}
+        primaryAction={{ label: 'Reply' }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
+    expect(onInterview).toHaveBeenCalledOnce();
   });
 });

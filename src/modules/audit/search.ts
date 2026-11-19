@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lt, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gte, lt, or, sql, type SQL } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
 import { badRequest } from '@/lib/errors';
 import { auditEvents } from './schema';
@@ -10,10 +10,15 @@ export type AuditSearch = {
   actorId?: string;
   subjectType?: string;
   subjectId?: string;
+  /** Events recorded for this organization. */
+  orgId?: string;
+  /** Events whose action starts with any of these (`'orgs.'`). An empty list matches nothing. */
+  actionPrefixes?: string[];
   /** Inclusive. */
   from?: Date;
   /** Exclusive. */
   to?: Date;
+  actorType?: 'user' | 'operator' | 'system';
   /** Page size, 1 to 200. Default 50. */
   limit?: number;
   /** The previous page's `nextBefore`. */
@@ -37,6 +42,7 @@ export async function searchAudit(
   for (const [name, value] of [
     ['before', f.before],
     ['actorId', f.actorId],
+    ['orgId', f.orgId],
   ] as const) {
     if (value !== undefined && !UUID.test(value)) throw badRequest(`Invalid ${name}`);
   }
@@ -46,8 +52,14 @@ export async function searchAudit(
   if (f.actorId !== undefined) where.push(eq(auditEvents.actorId, f.actorId));
   if (f.subjectType !== undefined) where.push(eq(auditEvents.subjectType, f.subjectType));
   if (f.subjectId !== undefined) where.push(eq(auditEvents.subjectId, f.subjectId));
+  if (f.orgId !== undefined) where.push(eq(auditEvents.orgId, f.orgId));
+  if (f.actionPrefixes !== undefined) {
+    const prefixes = f.actionPrefixes.map((p) => sql`starts_with(${auditEvents.action}, ${p})`);
+    where.push(or(...prefixes) ?? sql`false`);
+  }
   if (f.from !== undefined) where.push(gte(auditEvents.createdAt, f.from));
   if (f.to !== undefined) where.push(lt(auditEvents.createdAt, f.to));
+  if (f.actorType !== undefined) where.push(eq(auditEvents.actorType, f.actorType));
   if (f.before !== undefined) where.push(lt(auditEvents.id, f.before));
 
   const rows = await db

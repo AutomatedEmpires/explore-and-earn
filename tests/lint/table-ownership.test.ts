@@ -24,6 +24,14 @@ const DOCUMENTED_CROSS_MODULE_SQL = new Set([
   'src/modules/operator/operators.ts',
   'src/modules/operator/stats.ts',
   'src/modules/operator/test-items.ts',
+  // SP2 reads another module's table where importing that module would cycle or the public
+  // API does not carry the joined columns. Each file says why.
+  'src/modules/billing/webhook.ts',
+  'src/modules/hostpages/public.ts',
+  'src/modules/hostpages/subjects.ts',
+  'src/modules/locations/jobs.ts',
+  'src/modules/locations/service.ts',
+  'src/modules/orgs/people.ts',
 ]);
 
 function sourceFiles(dir: string): string[] {
@@ -34,14 +42,25 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-/** Table name -> the module whose schema.ts declares it with `app.table('<name>', ...)`. */
+/** A module's schema files: schema.ts, plus schema-<part>.ts when it splits them (profiles). */
+const SCHEMA_FILE = /^schema(-[a-z0-9-]+)?\.ts$/;
+
+/**
+ * Table name -> the module whose schema.ts (or a schema-<part>.ts beside it) declares it with
+ * `app.table('<name>', ...)`.
+ */
 function tableOwners(): Map<string, string> {
   const owners = new Map<string, string>();
   for (const entry of readdirSync(modulesDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const schema = readFileSync(path.join(modulesDir, entry.name, 'schema.ts'), 'utf8');
-    for (const [, table] of schema.matchAll(/app\.table\(\s*'([a-z_][a-z0-9_]*)'/g)) {
-      if (table) owners.set(table, entry.name);
+    const dir = path.join(modulesDir, entry.name);
+    // Every module has a schema.ts (src/db/schema.ts re-exports it), even one with no tables.
+    readFileSync(path.join(dir, 'schema.ts'), 'utf8');
+    for (const file of readdirSync(dir).filter((name) => SCHEMA_FILE.test(name))) {
+      const schema = readFileSync(path.join(dir, file), 'utf8');
+      for (const [, table] of schema.matchAll(/app\.table\(\s*'([a-z_][a-z0-9_]*)'/g)) {
+        if (table) owners.set(table, entry.name);
+      }
     }
   }
   return owners;
@@ -86,7 +105,7 @@ describe('raw SQL table ownership', () => {
   });
 
   it('reads table names in code, not in comments', () => {
-    const sample = code("sql`select 1 from app.users` // app.outbox in a comment is fine");
+    const sample = code('sql`select 1 from app.users` // app.outbox in a comment is fine');
     expect(sample).toContain('app.users');
     expect(sample).not.toContain('app.outbox');
   });

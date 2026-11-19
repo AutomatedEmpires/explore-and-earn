@@ -5,7 +5,7 @@ import { Img } from './Img';
 export type OrgLogoSize = 'sm' | 'md' | 'lg' | 'xl';
 
 const sizes: Record<OrgLogoSize, string> = {
-  sm: 'size-8 rounded-sm text-12',
+  sm: 'size-8 rounded-sm text-14',
   md: 'size-10 rounded-md text-14',
   lg: 'size-13 rounded-lg text-17',
   xl: 'size-16 rounded-xl text-21',

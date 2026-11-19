@@ -1,0 +1,44 @@
+{
+  "@context": [
+    "https://geojson.org/geojson-ld/geojson-context.jsonld",
+    {
+      "@version": "1.1",
+      "wx": "https://api.weather.gov/ontology#",
+      "s": "https://schema.org/",
+      "geo": "http://www.opengis.net/ont/geosparql#",
+      "unit": "http://codes.wmo.int/common/unit/",
+      "@vocab": "https://api.weather.gov/ontology#"
+    }
+  ],
+  "id": "https://api.weather.gov/points/60.1042,-149.4422",
+  "type": "Feature",
+  "geometry": { "type": "Point", "coordinates": [-149.4422, 60.1042] },
+  "properties": {
+    "@id": "https://api.weather.gov/points/60.1042,-149.4422",
+    "@type": "wx:Point",
+    "cwa": "AFC",
+    "forecastOffice": "https://api.weather.gov/offices/AFC",
+    "gridId": "AFC",
+    "gridX": 152,
+    "gridY": 155,
+    "forecast": "https://api.weather.gov/gridpoints/AFC/152,155/forecast",
+    "forecastHourly": "https://api.weather.gov/gridpoints/AFC/152,155/forecast/hourly",
+    "forecastGridData": "https://api.weather.gov/gridpoints/AFC/152,155",
+    "observationStations": "https://api.weather.gov/gridpoints/AFC/152,155/stations",
+    "relativeLocation": {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-149.442667, 60.119056] },
+      "properties": {
+        "city": "Seward",
+        "state": "AK",
+        "distance": { "unitCode": "wmoUnit:m", "value": 1648.2 },
+        "bearing": { "unitCode": "wmoUnit:degree_(angle)", "value": 180 }
+      }
+    },
+    "forecastZone": "https://api.weather.gov/zones/forecast/AKZ121",
+    "county": "https://api.weather.gov/zones/county/AKC122",
+    "fireWeatherZone": "https://api.weather.gov/zones/fire/AKZ121",
+    "timeZone": "America/Anchorage",
+    "radarStation": "PAHG"
+  }
+}

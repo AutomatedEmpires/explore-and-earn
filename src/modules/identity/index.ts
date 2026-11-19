@@ -18,6 +18,7 @@ export {
   evaluateHostAccess,
   evaluateOperatorAccess,
   findUserByClerkId,
+  findUserById,
   getOperator,
   type HostAccess,
   type OperatorAccess,
@@ -35,26 +36,39 @@ export {
 } from './directory';
 
 export {
+  CREATED_VIA_APP,
+  CREATED_VIA_KEY,
   clerkAdmin,
   makeFakeClerkAdmin,
   userHasPasskey,
   userHasStrongAuth,
   type ClerkAdmin,
+  type ClerkOrgRole,
   type FakeClerkAdmin,
   type OperatorInviteRole,
 } from './clerk-admin';
 
+export { getUserContacts, type UserContactFacts } from './contacts';
+
+export { isAnalyticsOptedOut, recordAnalyticsOptOut } from './analytics-opt-out';
+
 export {
   completeOnboarding,
+  isSignupRefusal,
+  isSignupRefusedAccount,
   onboardingRequestSchema,
   setAccountType,
+  signupRefused,
   type AccountTypeInput,
+  type OnboardingOptions,
   type OnboardingRequest,
 } from './onboarding';
 
 export {
   applyClerkUser,
+  clerkIdHash,
   handleClerkEvent,
+  isErasedClerkUser,
   mapClerkRole,
   syncClerkUser,
   type ClerkEvent,
@@ -64,3 +78,6 @@ export {
 export type { AccountType, OperatorRole } from './schema';
 
 export const jobHandlers: HandlerMap = {};
+
+export { privacyHandler } from './privacy';
+export { retentionRules } from './retention';

@@ -36,7 +36,7 @@ Explore&Earn is a US job marketplace for paid work that is worth travelling for.
 | Rule | Decision |
 |---|---|
 | Account model | **One account, one role.** The user chooses Seeker or Host at sign-up. Someone who is both uses two accounts with different emails. |
-| Seeker age | **Seekers must be 18 or older at launch.** This is an assumption made to avoid child-labor and COPPA scope; it needs founder confirmation. |
+| Seeker age | **Seekers must be 18 or older at launch.** Confirmed by the founder on 2026-11-03. It keeps child-labor and COPPA rules out of scope. |
 | Sign-in | Clerk: email magic link or passkey, plus Google. No passwords. |
 | Host organizations | A host account can belong to several organizations, with an organization switcher. |
 | Host roles | **Owner** (one per organization): everything, including deleting the organization and transferring ownership. **Admin**: everything except deleting or transferring; manages the team and buys add-ons. **Recruiter**: listings, applicants, messages, interviews and invites, with access to all listings or only assigned listings or locations. **Billing**: invoices and payment method only, with no applicant or message access. |
@@ -526,7 +526,7 @@ Analytics **never shows who viewed or saved** a listing.
 |---|---|
 | Host verification | Business verification is automated when a host first publishes. A host whose verification is uncertain goes to the fraud queue. |
 | Credentials | Self-reported only. They are never labeled "verified". |
-| Images | Every upload is scanned for child-sexual-abuse material by **hash matching** (the Cloudflare CSAM Scanning Tool or PhotoDNA). A match is blocked and preserved automatically, and a report is prepared for NCMEC. The platform must be registered with NCMEC as a service provider. |
+| Images | Every upload is scanned for child-sexual-abuse material by **hash matching** (Microsoft PhotoDNA; Thorn Safer as the fallback). A match is blocked and preserved automatically, and a report is prepared for NCMEC. The platform must be registered with NCMEC as a service provider. |
 | Files | Every resume and attachment is scanned for malware before anyone can download it |
 | Discrimination | Moderation flags wording such as "US citizens only". Hosts may ask about visa sponsorship. |
 | Scams | Message scanning as described in section 11.6 |
@@ -616,22 +616,26 @@ Analytics **never shows who viewed or saved** a listing.
 | Analytics and errors | PostHog and Sentry |
 | UI kit | shadcn/ui, Radix and Tailwind, with design tokens enforced by lint |
 | Environments | Separate Supabase projects for dev, preview and prod. Migrations reach production only through a gated release in CI. |
+| Secrets | **Doppler.** Project `explore-and-earn` (configs `dev`, `stg`, `prd`) holds the app's secrets and syncs them to Vercel and GitHub Actions. Project `ee-ops` holds the founder's account tokens that automation uses; it is never synced into the app. Locally: `doppler run -- pnpm dev`. |
+| Domain | **exploreandearn.com**, with DNS at GoDaddy and changed through the GoDaddy API. The old site is on Vercel, and the live site's Clerk records (`clerk.`, `accounts.`) must keep working until cut-over. |
 | Targets (from `docs/v1/00`) | Tested against 50,000 synthetic listings: search p95 ≤ 800 ms, writes p95 ≤ 1 s at 50 concurrent users, map and list changes visible within 60 s, a usable first discovery screen within 3 s on a mid-range phone, 99.5% monthly availability, restore point ≤ 24 hours and restore time ≤ 8 hours (proven by a drill) |
 
 ## 24. Integrations
 
 | Service | Purpose | What the founder provides |
 |---|---|---|
-| Clerk | Identity, organizations, roles | Connector already connected. Google sign-in credentials for production. |
-| Supabase | Database, storage, background jobs | Connector authorization. Approval of the Pro plan for production. |
-| Vercel | Hosting, previews, domains | Connector authorization. Approval of the Pro plan (required for commercial use). |
-| Stripe | Subscriptions and add-ons | Connector authorization. Account activation for live mode. |
-| Resend | Email | Connector authorization. DNS records for the sending domain. |
-| PostHog / Sentry | Analytics and errors | Connector authorization |
-| Mapbox | Maps | API token |
+| Doppler | Secrets | Account plus `doppler login` on the dev machine. The account tokens below go into `ee-ops` → `prd`. |
+| Clerk | Identity, organizations, roles | The new application "Explore&Earn v2" (`app_3LbnlaCPThc7gpiYiglLFPsLOtE`), separate from the live site's application. Dev secret key in Doppler. Google sign-in credentials for production. |
+| Supabase | Database, storage, background jobs | `SUPABASE_ACCESS_TOKEN`. Approval of the Pro plan for production. |
+| Vercel | Hosting, previews, domains | `VERCEL_TOKEN`, scoped to the team that hosts the old site. Approval of the Pro plan (required for commercial use). |
+| Stripe | Subscriptions and add-ons | A separate "Explore&Earn" Stripe account. Test secret key now; live key after activation. |
+| Resend | Email | A full-access API key. Automation adds the sending-domain DNS records. |
+| PostHog / Sentry | Analytics and errors | A PostHog personal API key, a Sentry auth token and the org slug |
+| Mapbox | Maps | Public token (sub-project 3) |
 | Anthropic | Claude API | API key |
-| Malware scanning | Resume and attachment scanning | API key (vendor chosen in the Foundation spec) |
-| Cloudflare | DNS and child-safety image scanning | Move DNS to Cloudflare and provide an API token limited to the domain (recommended), plus NCMEC registration |
+| Cloudmersive | Malware scanning of resumes and attachments | API key |
+| PhotoDNA | Child-safety image hash matching | Application approval, plus NCMEC service-provider registration |
+| GoDaddy | DNS for exploreandearn.com | Production API key and secret. If GoDaddy refuses API access (accounts under 10 domains), fall back to moving the nameservers to Vercel. |
 | National Weather Service | Weather | None |
 | GitHub | Code and CI | Already working |
 
@@ -669,9 +673,7 @@ Phased build is how the work is sequenced (FD-9, 2026-11-04). It is not permissi
 | Prices for extra invite packs and extra seats | Founder | Sub-project 6 |
 | Final reaction set | Founder | Sub-project 7 |
 | Final top bar layout (role badge, hamburger) | Founder and design | Design system lock (sub-project 1) |
-| Domain, and where DNS is managed | Founder | Sub-project 1 (staging subdomain) |
-| Confirmation that seekers must be 18 or older | Founder | Sub-project 1 (schema) |
-| Malware-scanning vendor | Engineering | Foundation spec |
+| Account tokens into Doppler `ee-ops` | Founder | Before environments are wired (Foundation Phase C) |
 | Default fit-score weights per category | Engineering, reviewed by the founder | Sub-project 5 |
 | Legal reviews (section 25 gates) | Founder and counsel | Launch |
 

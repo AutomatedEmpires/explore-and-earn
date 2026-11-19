@@ -1,0 +1,578 @@
+// The screening pipeline (spec section 8.3 steps 2-6): verification, media, the link, the AI
+// checks and the decision; plus the photo-slot check and resuming after verification.
+import { sql } from 'drizzle-orm';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { queryRows, type Db } from '@/lib/db';
+import { newId } from '@/lib/ids';
+import { memoryStorage } from '@/modules/media';
+import { SETTING_DEFAULTS, setSetting } from '@/modules/settings';
+import { runCheck } from '@/modules/trust';
+import { createTestDb, type TestDb } from '../../../tests/helpers/db';
+import { billingFake } from '../../../tests/fakes/sp2/billing';
+import { entitlementsFake } from '../../../tests/fakes/sp2/entitlements';
+import { locationsFake } from '../../../tests/fakes/sp2/locations';
+import { orgsFake } from '../../../tests/fakes/sp2/orgs';
+import { verificationFake } from '../../../tests/fakes/sp2/verification';
+import { FIXED_NOW, seedHostOrg, type SeededOrg } from '../../../tests/helpers/sp2';
+import type { ListingContent } from './content';
+import { jobHandlers, requestPublish } from './index';
+import { photoSlotCheck } from './screening';
+import {
+  notificationsOf,
+  outboxRows,
+  seedDraftListing,
+  seedListingFixture,
+  type ListingFixture,
+} from './test-fixtures';
+
+vi.mock('@/modules/orgs', async (orig) => ({
+  ...(await orig<typeof import('@/modules/orgs')>()),
+  ...(await import('../../../tests/fakes/sp2/orgs')).orgsFake,
+}));
+vi.mock('@/modules/locations', async (orig) => ({
+  ...(await orig<typeof import('@/modules/locations')>()),
+  ...(await import('../../../tests/fakes/sp2/locations')).locationsFake,
+}));
+vi.mock('@/modules/billing', async (orig) => ({
+  ...(await orig<typeof import('@/modules/billing')>()),
+  ...(await import('../../../tests/fakes/sp2/billing')).billingFake,
+}));
+vi.mock('@/modules/entitlements', async (orig) => ({
+  ...(await orig<typeof import('@/modules/entitlements')>()),
+  ...(await import('../../../tests/fakes/sp2/entitlements')).entitlementsFake,
+}));
+vi.mock('@/modules/verification', async (orig) => ({
+  ...(await orig<typeof import('@/modules/verification')>()),
+  ...(await import('../../../tests/fakes/sp2/verification')).verificationFake,
+}));
+// The real runCheck, wrapped so one test can script its answer.
+vi.mock('@/modules/trust', async (orig) => {
+  const real = await orig<typeof import('@/modules/trust')>();
+  return { ...real, runCheck: vi.fn(real.runCheck) };
+});
+
+let t: TestDb;
+let db: Db;
+let org: SeededOrg;
+let fx: ListingFixture;
+
+beforeAll(async () => {
+  t = await createTestDb();
+  db = t.db;
+});
+
+afterAll(async () => {
+  await t.close();
+});
+
+beforeEach(async () => {
+  for (const f of [orgsFake, locationsFake, billingFake, entitlementsFake, verificationFake]) {
+    f.reset();
+  }
+  org = await seedHostOrg(db);
+  fx = await seedListingFixture(db, org);
+});
+
+const screen = (payload: Record<string, unknown>, now = FIXED_NOW) =>
+  jobHandlers['listings.screen']?.(payload, { db, now });
+
+// Each test org publishes the same fixture. Without a unique block, the duplicate rule
+// treats the next org's copy as a repost. The words are unique per listing and long enough
+// that the shared fixture stays under the near-copy threshold.
+let marker = 0;
+function distinguish(c: ListingContent) {
+  const n = marker++;
+  c.job.description += ` ${Array.from({ length: 80 }, (_, i) => `screening${n}token${i}`).join(' ')}`;
+}
+
+/** A listing with a publish requested; returns its id and the revision being screened. */
+async function submitted(edit?: (c: ListingContent) => void) {
+  const id = await seedDraftListing(
+    db,
+    org.owner.ctx,
+    fx.content((c) => {
+      edit?.(c);
+      distinguish(c);
+    }),
+  );
+  await requestPublish(db, org.owner.ctx, id, [], FIXED_NOW);
+  const [rev] = await queryRows<{ id: string }>(
+    db,
+    sql`select id from app.listing_revisions where listing_id = ${id} order by revision_number desc`,
+  );
+  if (!rev) throw new Error('no revision');
+  return { id, revisionId: rev.id };
+}
+
+/** A submitted listing whose publish acknowledged `warnings`. */
+async function submittedAcking(warnings: string[], edit?: (c: ListingContent) => void) {
+  const id = await seedDraftListing(
+    db,
+    org.owner.ctx,
+    fx.content((c) => {
+      edit?.(c);
+      distinguish(c);
+    }),
+  );
+  await requestPublish(db, org.owner.ctx, id, warnings, FIXED_NOW);
+  const [rev] = await queryRows<{ id: string }>(
+    db,
+    sql`select id from app.listing_revisions where listing_id = ${id}`,
+  );
+  return { id, revisionId: rev?.id ?? '' };
+}
+
+async function state(listingId: string, revisionId: string) {
+  const [row] = await queryRows<{
+    state: string;
+    review_stage: string | null;
+    status: string;
+    checks: Record<string, unknown> | null;
+    trust_check_ids: string[];
+  }>(
+    db,
+    sql`select l.state, l.review_stage, r.status, r.checks, r.trust_check_ids
+      from app.listings l join app.listing_revisions r on r.listing_id = l.id
+      where l.id = ${listingId} and r.id = ${revisionId}`,
+  );
+  if (!row) throw new Error('no listing');
+  return row;
+}
+
+const items = (subjectId: string) =>
+  queryRows<{ queue: string; reason: string; priority: number; subject_type: string }>(
+    db,
+    sql`select queue, reason, priority, subject_type from app.review_items
+      where subject_id = ${subjectId} order by created_at, id`,
+  );
+
+const setMedia = (id: string, status: string) =>
+  db.execute(sql`update app.media set status = ${status} where id = ${id}`);
+
+describe('AI checks', () => {
+  it('publishes a clean listing', async () => {
+    const { id, revisionId } = await submitted();
+    await screen({ revisionId, attempt: 0 });
+    const s = await state(id, revisionId);
+    expect([s.state, s.status, s.review_stage]).toEqual(['active', 'approved', null]);
+    expect(s.trust_check_ids).toHaveLength(2);
+    expect(s.checks).toMatchObject({ moderation: { decision: 'approved' } });
+  });
+
+  it('sends a flagged listing to moderation', async () => {
+    const { id, revisionId } = await submitted((c) => {
+      c.job.description += ' __flag__';
+    });
+    await screen({ revisionId, attempt: 0 });
+    const s = await state(id, revisionId);
+    expect([s.state, s.status, s.review_stage]).toEqual(['in_review', 'in_review', 'moderation']);
+    expect(
+      (await notificationsOf(db, 'listings.in_review')).map((n) => n.data.listingId),
+    ).toContain(id);
+    expect((await items(revisionId)).map((i) => i.queue).sort()).toEqual(['fraud', 'moderation']);
+  });
+
+  it('returns a blocked listing, and opens a fraud item on the org', async () => {
+    const { id, revisionId } = await submitted((c) => {
+      c.job.description += ' __block__';
+    });
+    await screen({ revisionId, attempt: 0 });
+    const s = await state(id, revisionId);
+    expect([s.state, s.status]).toEqual(['draft', 'rejected']);
+    const returned = await notificationsOf(db, 'listings.returned');
+    expect(returned.find((n) => n.data.listingId === id)?.data.reasons).toEqual(['moderation']);
+    expect(await items(org.orgId)).toEqual([
+      {
+        queue: 'fraud',
+        reason: 'listing_fraud_rejected',
+        priority: 100,
+        subject_type: 'organization',
+      },
+    ]);
+  });
+
+  it('queues a pay-to-apply listing before the classifier and does not publish it', async () => {
+    vi.mocked(runCheck).mockClear();
+    const { id, revisionId } = await submitted((c) => {
+      c.job.description += ' Applicants pay a $50 application fee.';
+    });
+    await screen({ revisionId, attempt: 0 });
+    const s = await state(id, revisionId);
+    expect([s.state, s.status, s.review_stage]).toEqual(['in_review', 'in_review', 'moderation']);
+    expect(await items(revisionId)).toEqual([
+      expect.objectContaining({ queue: 'moderation', reason: 'pay_to_apply' }),
+    ]);
+    expect(runCheck).not.toHaveBeenCalled();
+  });
+
+  it('does nothing for a revision that is no longer screening', async () => {
+    const { id, revisionId } = await submitted();
+    await screen({ revisionId, attempt: 0 });
+    await screen({ revisionId, attempt: 0 });
+    expect((await state(id, revisionId)).status).toBe('approved');
+  });
+});
+
+describe('media', () => {
+  it('waits for a scanning photo, then publishes', async () => {
+    const { id, revisionId } = await submitted();
+    await setMedia(fx.coverMediaId, 'scanning');
+    await screen({ revisionId, attempt: 0 });
+    const retry = (await outboxRows(db, 'listings.screen')).find(
+      (r) => r.dedupe_key === `screen:${revisionId}:1`,
+    );
+    expect(retry?.payload).toEqual({ revisionId, attempt: 1 });
+    expect(new Date(retry?.available_at ?? '').getTime()).toBe(FIXED_NOW.getTime() + 30_000);
+    expect((await state(id, revisionId)).status).toBe('screening');
+
+    await setMedia(fx.coverMediaId, 'approved');
+    await screen({ revisionId, attempt: 1 });
+    expect((await state(id, revisionId)).state).toBe('active');
+  });
+
+  it('gives up on a photo still scanning after 20 tries', async () => {
+    const { id, revisionId } = await submitted();
+    await setMedia(fx.coverMediaId, 'scanning');
+    await screen({ revisionId, attempt: 20 });
+    const s = await state(id, revisionId);
+    expect([s.status, s.review_stage]).toEqual(['in_review', 'moderation']);
+    expect((await items(revisionId)).map((i) => i.reason)).toEqual(['media_timeout']);
+  });
+
+  it('waits for a photo held for an operator without timing out', async () => {
+    const { id, revisionId } = await submitted();
+    await setMedia(fx.housingPhotos.kitchen, 'in_review');
+    await screen({ revisionId, attempt: 20 });
+    const wait = (await outboxRows(db, 'listings.screen')).find(
+      (r) => r.dedupe_key === `screen:${revisionId}:20:w1`,
+    );
+    expect(wait?.payload).toEqual({ revisionId, attempt: 20, wait: 1 });
+    expect(new Date(wait?.available_at ?? '').getTime()).toBe(FIXED_NOW.getTime() + 300_000);
+    expect((await state(id, revisionId)).status).toBe('screening');
+    expect(await items(revisionId)).toEqual([]);
+
+    await setMedia(fx.housingPhotos.kitchen, 'approved');
+    await screen({ revisionId, attempt: 20, wait: 1 });
+    expect((await state(id, revisionId)).state).toBe('active');
+  });
+
+  it('returns a listing whose photo was rejected', async () => {
+    const { id, revisionId } = await submitted();
+    await db.execute(
+      sql`update app.media set status = 'rejected', rejection_reason = 'unsafe_content'
+        where id = ${fx.housingPhotos.bedroom}`,
+    );
+    await screen({ revisionId, attempt: 0 });
+    expect((await state(id, revisionId)).state).toBe('draft');
+    const returned = await notificationsOf(db, 'listings.returned');
+    expect(returned.find((n) => n.data.listingId === id)?.data.reasons).toEqual(['photo_rejected']);
+  });
+});
+
+describe('the Additional step link', () => {
+  it('sends an unreachable domain to moderation', async () => {
+    const { id, revisionId } = await submitted((c) => {
+      c.applying.additionalStep = { url: 'https://down.example/__down__', note: '' };
+    });
+    await screen({ revisionId, attempt: 0 });
+    const [domain] = await queryRows<{ status: string }>(
+      db,
+      sql`select status from app.link_domains where domain = 'down.example'`,
+    );
+    expect(domain?.status).toBe('unknown');
+    expect((await state(id, revisionId)).review_stage).toBe('moderation');
+    expect((await items(revisionId)).map((i) => i.reason)).toEqual(['link_unknown']);
+  });
+
+  it('returns a flagged domain', async () => {
+    const { id, revisionId } = await submitted((c) => {
+      c.applying.additionalStep = { url: 'https://phish.example/__flag__', note: '' };
+    });
+    await screen({ revisionId, attempt: 0 });
+    expect((await state(id, revisionId)).state).toBe('draft');
+    const returned = await notificationsOf(db, 'listings.returned');
+    expect(returned.find((n) => n.data.listingId === id)?.data.reasons).toEqual(['link_unsafe']);
+  });
+});
+
+describe('verification', () => {
+  it('starts verification for an unverified org and waits for it', async () => {
+    verificationFake.setStatus(org.orgId, 'unverified');
+    const { id, revisionId } = await submitted();
+    await screen({ revisionId, attempt: 0 });
+    expect(verificationFake.calls.find((c) => c.name === 'startVerification')?.args).toEqual([
+      org.orgId,
+      id,
+    ]);
+    const s = await state(id, revisionId);
+    expect([s.state, s.review_stage, s.status]).toEqual(['in_review', 'verification', 'screening']);
+  });
+
+  it('resumes screening once verified', async () => {
+    verificationFake.setStatus(org.orgId, 'running');
+    const { id, revisionId } = await submitted();
+    await screen({ revisionId, attempt: 0 });
+    expect((await state(id, revisionId)).review_stage).toBe('verification');
+
+    verificationFake.setStatus(org.orgId, 'verified');
+    await jobHandlers['listings.resume_screening']?.(
+      {
+        event: 'verification.decided',
+        eventId: 'ev-1',
+        data: { orgId: org.orgId, status: 'verified' },
+      },
+      { db, now: FIXED_NOW },
+    );
+    const resumed = (await outboxRows(db, 'listings.screen')).find(
+      (r) => r.dedupe_key === `screen:${revisionId}:ev-1`,
+    );
+    expect(resumed?.payload).toEqual({ revisionId, attempt: 0 });
+    expect((await state(id, revisionId)).review_stage).toBe('screening');
+  });
+
+  it('returns the listing when verification failed', async () => {
+    verificationFake.setStatus(org.orgId, 'running');
+    const { id, revisionId } = await submitted();
+    await screen({ revisionId, attempt: 0 });
+    await jobHandlers['listings.resume_screening']?.(
+      {
+        event: 'verification.decided',
+        eventId: 'ev-2',
+        data: { orgId: org.orgId, status: 'failed' },
+      },
+      { db, now: FIXED_NOW },
+    );
+    expect((await state(id, revisionId)).state).toBe('draft');
+    const returned = await notificationsOf(db, 'listings.returned');
+    expect(returned.find((n) => n.data.listingId === id)?.data.reasons).toEqual([
+      'verification_failed',
+    ]);
+  });
+});
+
+it('sends a kept photo mismatch to moderation', async () => {
+  await db.execute(sql`
+    insert into app.photo_slot_checks (media_id, slot, result)
+    values (${fx.housingPhotos.bathroom}, 'bathroom', 'mismatch')
+  `);
+  const { id, revisionId } = await submittedAcking(['photo_slot_mismatch:bathroom']);
+  await screen({ revisionId, attempt: 0 });
+  const s = await state(id, revisionId);
+  expect([s.status, s.review_stage]).toEqual(['in_review', 'moderation']);
+  expect((await items(revisionId)).map((i) => i.reason)).toEqual(['photo_slot_mismatch_kept']);
+});
+
+describe('flagged wording (legal review 2.2, issue 121)', () => {
+  it('sends a listing with flagged wording to moderation when the AI checks approve it', async () => {
+    const { id, revisionId } = await submittedAcking(['wording_flagged'], (c) => {
+      c.job.description += ' Christian camp: staff lead morning devotions.';
+    });
+    await screen({ revisionId, attempt: 0 });
+    const s = await state(id, revisionId);
+    expect([s.state, s.status, s.review_stage]).toEqual(['in_review', 'in_review', 'moderation']);
+    expect(s.checks).toMatchObject({ moderation: { decision: 'approved' } });
+    expect((await items(revisionId)).map((i) => [i.queue, i.reason])).toEqual([
+      ['moderation', 'wording_flagged'],
+    ]);
+    expect(
+      (await notificationsOf(db, 'listings.returned')).some((n) => n.data.listingId === id),
+    ).toBe(false);
+  });
+
+  // Issue 200: the moderation check reads the same wording and may score a lawful use (a
+  // religious camp) as discrimination. A rejection then goes to an operator, never back.
+  it('sends a flagged listing that AI moderation rejects to an operator, never returning it', async () => {
+    const real = vi.mocked(runCheck).getMockImplementation();
+    if (!real) throw new Error('runCheck is not wrapped');
+    const scripted: typeof runCheck = async (d, input) =>
+      input.kind === 'listing_moderation'
+        ? {
+            checkId: newId(),
+            decision: 'rejected',
+            score: 0.93,
+            labels: ['discrimination'],
+            reason: 'Prefers applicants by religion.',
+          }
+        : real(d, input);
+
+    const { id, revisionId } = await submittedAcking(['wording_flagged'], (c) => {
+      c.job.description += ' Christian camp: staff lead morning devotions.';
+    });
+    vi.mocked(runCheck).mockImplementationOnce(scripted).mockImplementationOnce(scripted);
+    await screen({ revisionId, attempt: 0 });
+    const s = await state(id, revisionId);
+    expect([s.state, s.status, s.review_stage]).toEqual(['in_review', 'in_review', 'moderation']);
+    expect(s.checks).toMatchObject({
+      moderation: { decision: 'rejected' },
+      fraud: { decision: 'approved' },
+      wordingFlagged: true,
+    });
+    expect((await items(revisionId)).map((i) => `${i.queue}:${i.reason}`).sort()).toEqual([
+      'moderation:listing_moderation_rejected',
+      'moderation:wording_flagged',
+    ]);
+    expect(
+      (await notificationsOf(db, 'listings.returned')).some((n) => n.data.listingId === id),
+    ).toBe(false);
+    expect(
+      (await notificationsOf(db, 'listings.in_review')).map((n) => n.data.listingId),
+    ).toContain(id);
+  });
+
+  it('sends a flagged listing that both AI checks reject to an operator, and still flags the org', async () => {
+    const { id, revisionId } = await submittedAcking(['wording_flagged'], (c) => {
+      c.job.description += ' Christian camp: staff lead morning devotions. __block__';
+    });
+    await screen({ revisionId, attempt: 0 });
+    const s = await state(id, revisionId);
+    expect([s.state, s.status, s.review_stage]).toEqual(['in_review', 'in_review', 'moderation']);
+    expect(s.checks).toMatchObject({
+      moderation: { decision: 'rejected' },
+      fraud: { decision: 'rejected' },
+    });
+    expect((await items(revisionId)).map((i) => `${i.queue}:${i.reason}`).sort()).toEqual([
+      'moderation:listing_fraud_rejected',
+      'moderation:listing_moderation_rejected',
+      'moderation:wording_flagged',
+    ]);
+    expect((await items(org.orgId)).map((i) => [i.queue, i.reason])).toEqual([
+      ['fraud', 'listing_fraud_rejected'],
+    ]);
+    expect(
+      (await notificationsOf(db, 'listings.returned')).some((n) => n.data.listingId === id),
+    ).toBe(false);
+  });
+
+  it('finds the wording again at screening, so a rejection with no kept warning is not returned', async () => {
+    // The host never saw the warning (the phrase was added to the list after the request), and
+    // the AI checks reject the listing: it still goes to an operator.
+    const { id, revisionId } = await submitted((c) => {
+      c.job.description += ' New blood wanted for the lift crew. __block__';
+    });
+    const operator = { operatorId: newId() };
+    await setSetting(
+      db,
+      'listings.flagged_phrases',
+      [
+        ...SETTING_DEFAULTS['listings.flagged_phrases'],
+        { phrase: 'new blood', ground: 'age', suggestion: 'Say "new team members".' },
+      ],
+      operator,
+    );
+    try {
+      await screen({ revisionId, attempt: 0 });
+      expect((await state(id, revisionId)).review_stage).toBe('moderation');
+      expect((await items(revisionId)).map((i) => i.reason)).toContain('wording_flagged');
+    } finally {
+      await setSetting(
+        db,
+        'listings.flagged_phrases',
+        SETTING_DEFAULTS['listings.flagged_phrases'],
+        operator,
+      );
+    }
+  });
+
+  it('reads the lists again, so a phrase added after the publish request still counts', async () => {
+    const { id, revisionId } = await submitted((c) => {
+      c.job.description += ' Fresh blood wanted for the lift crew.';
+    });
+    await setSetting(
+      db,
+      'listings.flagged_phrases',
+      [
+        ...SETTING_DEFAULTS['listings.flagged_phrases'],
+        { phrase: 'fresh blood', ground: 'age', suggestion: 'Say "new team members".' },
+      ],
+      { operatorId: newId() },
+    );
+    await screen({ revisionId, attempt: 0 });
+    expect((await state(id, revisionId)).review_stage).toBe('moderation');
+    expect((await items(revisionId)).map((i) => i.reason)).toEqual(['wording_flagged']);
+  });
+
+  it('keeps the wording reason beside a fraud rule match', async () => {
+    const { revisionId } = await submittedAcking(['wording_flagged'], (c) => {
+      c.job.description += ' Young team. Applicants pay a $50 application fee.';
+    });
+    await screen({ revisionId, attempt: 0 });
+    expect((await items(revisionId)).map((i) => i.reason).sort()).toEqual([
+      'pay_to_apply',
+      'wording_flagged',
+    ]);
+  });
+
+  it('publishes an H-2B listing whose host confirmed the job order', async () => {
+    const { id, revisionId } = await submittedAcking(['h2b_job_order'], (c) => {
+      c.job.visaSponsorship = 'h2b';
+    });
+    await screen({ revisionId, attempt: 0 });
+    expect((await state(id, revisionId)).state).toBe('active');
+  });
+});
+
+describe('photoSlotCheck', () => {
+  async function stored(mediaId: string) {
+    const storage = memoryStorage();
+    await storage.write(
+      'media-public',
+      `${mediaId}/640.webp`,
+      new Uint8Array([1, 2, 3]),
+      'image/webp',
+    );
+    return storage;
+  }
+
+  const slotRow = async (mediaId: string) =>
+    (
+      await queryRows<{ result: string }>(
+        db,
+        sql`select result from app.photo_slot_checks where media_id = ${mediaId}`,
+      )
+    )[0]?.result;
+
+  it('records a mismatch, a match and an error', async () => {
+    const mediaId = fx.housingPhotos.bathroom;
+    const storage = await stored(mediaId);
+    const answer = (decision: 'approved' | 'rejected' | 'needs_review', reason = 'stub') => ({
+      checkId: '00000000-0000-7000-8000-000000000001',
+      decision,
+      score: decision === 'rejected' ? 0.9 : 0.1,
+      labels: [],
+      reason,
+    });
+
+    vi.mocked(runCheck).mockResolvedValueOnce(answer('rejected'));
+    await photoSlotCheck(db, { mediaId, slot: 'bathroom', listingId: 'x' }, FIXED_NOW, { storage });
+    expect(await slotRow(mediaId)).toBe('mismatch');
+    expect(vi.mocked(runCheck).mock.lastCall?.[1]).toMatchObject({
+      kind: 'photo_slot',
+      reviewQueue: null,
+      subjectType: 'media',
+      subjectId: mediaId,
+      text: 'Bathroom',
+    });
+
+    vi.mocked(runCheck).mockResolvedValueOnce(answer('approved'));
+    await photoSlotCheck(db, { mediaId, slot: 'bathroom', listingId: 'x' }, FIXED_NOW, { storage });
+    expect(await slotRow(mediaId)).toBe('match');
+
+    vi.mocked(runCheck).mockResolvedValueOnce(answer('needs_review', 'classifier_error'));
+    await photoSlotCheck(db, { mediaId, slot: 'bathroom', listingId: 'x' }, FIXED_NOW, { storage });
+    expect(await slotRow(mediaId)).toBe('error');
+  });
+
+  it('waits for a photo that is still scanning', async () => {
+    const mediaId = fx.housingPhotos.exterior;
+    await setMedia(mediaId, 'scanning');
+    await photoSlotCheck(db, { mediaId, slot: 'exterior', listingId: 'x' }, FIXED_NOW, {
+      storage: memoryStorage(),
+    });
+    expect(
+      (await outboxRows(db, 'listings.photo_slot_check')).find(
+        (r) => r.dedupe_key === `slot:${mediaId}:exterior:1`,
+      )?.payload,
+    ).toEqual({ mediaId, slot: 'exterior', listingId: 'x', attempt: 1 });
+    expect(await slotRow(mediaId)).toBeUndefined();
+  });
+});

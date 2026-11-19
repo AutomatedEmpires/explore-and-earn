@@ -4,6 +4,8 @@ import { createHmac, randomBytes } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryRows, type Db } from '@/lib/db';
+import { newId } from '@/lib/ids';
+import { clerkIdHash } from '@/modules/identity';
 import { resetEnvCache } from '@/lib/env';
 import { createTestDb, type TestDb } from '../../../../../tests/helpers/db';
 
@@ -104,9 +106,9 @@ type Envelope = { error: { code: string; message: string; requestId: string } };
 describe('POST /api/webhooks/clerk', () => {
   let POST: (typeof import('./route'))['POST'];
 
-  // Loading the route compiles its whole module graph; under the full suite's parallel load
-  // that can outlast a test's 30 s, so it happens here, within the 60 s hook timeout (after
-  // the file's beforeAll has set the webhook secret).
+  // Loading the route compiles its whole module graph, including SP2 wiring. Under the full
+  // suite's parallel load that can outlast a test's 30 s, so it happens here, within the hook
+  // timeout (after the file's beforeAll has set the webhook secret).
   beforeAll(async () => {
     ({ POST } = await import('./route'));
   });
@@ -198,5 +200,22 @@ describe('POST /api/webhooks/clerk', () => {
     expect(again.status).toBe(200);
     expect(await again.json()).toEqual({ ok: true, result: 'duplicate' });
     expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers 200 for an erased user and writes no clerk_webhook audit row', async () => {
+    await t.db.execute(sql`
+      insert into app.users (id, clerk_user_id, erased_clerk_id_sha256)
+      values (${newId()}, 'deleted:route', ${clerkIdHash('user_webhook_route')})
+    `);
+    const res = await POST(delivery('msg_route_erased', userCreated));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, result: 'ignored_erased' });
+    expect((await auditRows()).filter((row) => row.subject_id === 'msg_route_erased')).toEqual([]);
+    expect(
+      await queryRows(
+        t.db,
+        sql`select id from app.users where clerk_user_id = 'user_webhook_route' or email = 'maya@example.test'`,
+      ),
+    ).toEqual([]);
   });
 });

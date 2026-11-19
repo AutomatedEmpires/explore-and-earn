@@ -1,0 +1,69 @@
+// Review decisions on subject `organization` (SP2 spec section 6; Plan decision 11), registered
+// when the module loads. The subject is used only for verification and fraud items:
+// approve -> verified, remove -> failed, ask_info -> needs_info with the note, suspend or ban ->
+// billing.sanctionOrg (a ban also cancels the subscription at once).
+//
+// A ban here is a confirmed fake host (legal review 7 item 6): it also queues
+// `verification.ban_fingerprints`, which bans the card on file once the decision commits.
+import { z } from 'zod';
+import { newId } from '@/lib/ids';
+import { sanctionMetaFrom, suspendOrganization, type Actor } from '@/modules/billing';
+import { enqueue } from '@/modules/jobs';
+import { registerSubjectHandlers } from '@/modules/trust';
+import { askForInfo, operatorApprove, operatorFail } from './decide';
+import { BAN_FINGERPRINTS_TOPIC } from './run';
+
+/** trust.decide passes the decision's data plus the deciding review item. */
+const decisionData = z.looseObject({
+  note: z.string().optional(),
+  reviewItemId: z.uuid().optional(),
+});
+
+function readData(data: unknown): { note?: string; reviewItemId: string | null } {
+  const parsed = decisionData.safeParse(data ?? {});
+  if (!parsed.success) return { reviewItemId: null };
+  return { note: parsed.data.note, reviewItemId: parsed.data.reviewItemId ?? null };
+}
+
+/** The handlers don't learn which operator decided; trust.decided records that. */
+const OPERATOR: Actor = { type: 'operator', id: null };
+
+registerSubjectHandlers('business_verification', {
+  approve: async (db, orgId, data) => {
+    await operatorApprove(db, orgId, readData(data).reviewItemId);
+  },
+  remove: async (db, orgId, data) => {
+    await operatorFail(db, orgId, readData(data).reviewItemId);
+  },
+  ask_info: async (db, orgId, data) => {
+    const d = readData(data);
+    await askForInfo(db, orgId, d.note, d.reviewItemId);
+  },
+  suspend: async (db, orgId, data) => {
+    const meta = sanctionMetaFrom(data);
+    await suspendOrganization(db, {
+      orgId,
+      action: 'suspend',
+      reviewItemId: meta.reviewItemId ?? '',
+      reason: meta.reason ?? 'Other violation of our terms',
+      endsAt: meta.endsAt ?? null,
+      actor: OPERATOR,
+    });
+  },
+  ban: async (db, orgId, data) => {
+    const meta = sanctionMetaFrom(data);
+    await suspendOrganization(db, {
+      orgId,
+      action: 'ban',
+      reviewItemId: meta.reviewItemId ?? '',
+      reason: meta.reason ?? 'Other violation of our terms',
+      endsAt: null,
+      actor: OPERATOR,
+    });
+    await enqueue(db, {
+      topic: BAN_FINGERPRINTS_TOPIC,
+      payload: { orgId },
+      dedupeKey: `ban-prints:${orgId}:${meta.reviewItemId ?? newId()}`,
+    });
+  },
+});

@@ -280,6 +280,34 @@ describe('searchAudit', () => {
     expect(result.items.map((e) => e.subjectId)).toEqual(['2026-01-02T00:00:00Z']);
   });
 
+  it('filters by org and by action prefixes', async () => {
+    const orgA = newId();
+    const orgB = newId();
+    const at = (action: string, orgId: string) =>
+      record(t.db, event({ action, orgId, subjectId: `${action}:${orgId}` }));
+    await at('orgs.updated', orgA);
+    await at('billing.plan_changed', orgA);
+    await at('billing.checkout_started', orgA);
+    await at('orgs.updated', orgB);
+
+    const result = await searchAudit(t.db, {
+      orgId: orgA,
+      actionPrefixes: ['orgs.', 'billing.plan_changed'],
+    });
+    expect(result.items.map((e) => e.action).sort()).toEqual([
+      'billing.plan_changed',
+      'orgs.updated',
+    ]);
+    expect(result.items.every((e) => e.orgId === orgA)).toBe(true);
+
+    expect((await searchAudit(t.db, { orgId: orgB })).items.map((e) => e.action)).toEqual([
+      'orgs.updated',
+    ]);
+    await expect(searchAudit(t.db, { orgId: 'not-a-uuid' })).rejects.toMatchObject({
+      code: 'bad_request',
+    });
+  });
+
   it('caps the page size', async () => {
     const action = uniqueAction('cap');
     await record(t.db, event({ action }));
@@ -294,6 +322,16 @@ describe('searchAudit', () => {
     const err = await searchAudit(t.db, { before: 'not-a-uuid' }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(AppError);
     expect((err as AppError).code).toBe('bad_request');
+  });
+
+  it('returns only operator rows when actorType is operator', async () => {
+    const action = uniqueAction('actor-type');
+    await record(t.db, event({ action, actorType: 'user', actorId: newId() }));
+    await record(t.db, event({ action, actorType: 'operator', actorId: newId() }));
+    await record(t.db, event({ action, actorType: 'system' }));
+    const { items } = await searchAudit(t.db, { action, actorType: 'operator' });
+    expect(items).toHaveLength(1);
+    expect(items[0]?.actorType).toBe('operator');
   });
 });
 

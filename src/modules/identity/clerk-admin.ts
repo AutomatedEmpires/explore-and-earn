@@ -1,8 +1,18 @@
 // The Clerk Backend API calls our domain code makes, behind an interface so tests use a fake.
+// These two constants live here, not in the orgs barrel: orgs loads notifications, and
+// notifications loads identity. Importing orgs from this file made that a cycle and left
+// defineType uninitialized.
 import type { UserJSON } from '@clerk/nextjs/server';
-import { CREATED_VIA_APP, CREATED_VIA_KEY } from '@/modules/orgs';
+import { getEnv } from '@/lib/env';
+
+/** Clerk public-metadata mark on every organization this server creates. */
+export const CREATED_VIA_KEY = 'created_via';
+export const CREATED_VIA_APP = 'app';
 
 export type OperatorInviteRole = 'owner' | 'operator';
+
+/** Clerk organization roles for host members (the Owner is Clerk's `org:admin` too). */
+export type ClerkOrgRole = 'org:admin' | 'org:recruiter' | 'org:billing';
 
 export interface ClerkAdmin {
   /** Deep-merges `md` into the user's public metadata. */
@@ -17,6 +27,43 @@ export interface ClerkAdmin {
   hasStrongAuth(clerkUserId: string): Promise<boolean>;
   /** Emails a sign-up invitation that makes the new user an operator with `role`. */
   inviteOperator(email: string, role: OperatorInviteRole): Promise<void>;
+  /** Adds a user to an organization with `clerkRole` (SP2 team invitations). */
+  addMembership(clerkOrgId: string, clerkUserId: string, clerkRole: ClerkOrgRole): Promise<void>;
+  removeMembership(clerkOrgId: string, clerkUserId: string): Promise<void>;
+  updateMembershipRole(
+    clerkOrgId: string,
+    clerkUserId: string,
+    clerkRole: ClerkOrgRole,
+  ): Promise<void>;
+  deleteOrganization(clerkOrgId: string): Promise<void>;
+  /** Renames the organization in Clerk, so Clerk's next snapshot doesn't undo a rename here. */
+  updateOrganization(clerkOrgId: string, patch: { name: string }): Promise<void>;
+  banUser(clerkUserId: string): Promise<void>;
+  unbanUser(clerkUserId: string): Promise<void>;
+  /** A 404 (already gone) resolves. */
+  deleteUser(clerkUserId: string): Promise<void>;
+  createActorToken(input: {
+    operatorClerkUserId: string;
+    targetClerkUserId: string;
+    expiresInSeconds: number;
+  }): Promise<{ url: string; tokenId: string }>;
+  /** Deletes every passkey on the user. Returns how many were removed. */
+  deletePasskeys(clerkUserId: string): Promise<number>;
+  createSignInToken(input: {
+    clerkUserId: string;
+    expiresInSeconds: number;
+  }): Promise<{ url: string }>;
+}
+
+function isClerkNotFound(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && 'status' in err && err.status === 404;
+}
+
+/** The 8.12 re-enrollment URL. `http` only in dev. */
+function passkeySignInUrl(token: string): string {
+  const env = getEnv();
+  const scheme = env.APP_ENV === 'dev' ? 'http' : 'https';
+  return `${scheme}://${env.ADMIN_HOST}/sign-in?__clerk_ticket=${encodeURIComponent(token)}&redirect_url=%2Fadmin%2Fpasskey`;
 }
 
 /**
@@ -59,7 +106,9 @@ export function clerkAdmin(): ClerkAdmin {
       await (await client()).users.updateUserMetadata(clerkUserId, { publicMetadata: md });
     },
     async createOrganization({ name, createdBy }) {
-      const org = await (await client()).organizations.createOrganization({
+      const org = await (
+        await client()
+      ).organizations.createOrganization({
         name,
         createdBy,
         // Marks it as ours: the webhook only adopts the creator of such an organization as its
@@ -85,10 +134,86 @@ export function clerkAdmin(): ClerkAdmin {
         ...(appUrl ? { redirectUrl: new URL('/sign-up', appUrl).toString() } : {}),
       });
     },
+    async addMembership(clerkOrgId, clerkUserId, clerkRole) {
+      await (
+        await client()
+      ).organizations.createOrganizationMembership({
+        organizationId: clerkOrgId,
+        userId: clerkUserId,
+        role: clerkRole,
+      });
+    },
+    async removeMembership(clerkOrgId, clerkUserId) {
+      await (
+        await client()
+      ).organizations.deleteOrganizationMembership({
+        organizationId: clerkOrgId,
+        userId: clerkUserId,
+      });
+    },
+    async updateMembershipRole(clerkOrgId, clerkUserId, clerkRole) {
+      await (
+        await client()
+      ).organizations.updateOrganizationMembership({
+        organizationId: clerkOrgId,
+        userId: clerkUserId,
+        role: clerkRole,
+      });
+    },
+    async deleteOrganization(clerkOrgId) {
+      await (await client()).organizations.deleteOrganization(clerkOrgId);
+    },
+    async updateOrganization(clerkOrgId, patch) {
+      await (await client()).organizations.updateOrganization(clerkOrgId, { name: patch.name });
+    },
+    async banUser(clerkUserId) {
+      await (await client()).users.banUser(clerkUserId);
+    },
+    async unbanUser(clerkUserId) {
+      await (await client()).users.unbanUser(clerkUserId);
+    },
+    async deleteUser(clerkUserId) {
+      try {
+        await (await client()).users.deleteUser(clerkUserId);
+      } catch (err) {
+        if (!isClerkNotFound(err)) throw err;
+      }
+    },
+    async createActorToken({ operatorClerkUserId, targetClerkUserId, expiresInSeconds }) {
+      const created = await (
+        await client()
+      ).actorTokens.create({
+        userId: targetClerkUserId,
+        actor: { sub: operatorClerkUserId },
+        expiresInSeconds,
+      });
+      return { url: created.url ?? '', tokenId: created.id };
+    },
+    async deletePasskeys(clerkUserId) {
+      const raw = (await rawUser(clerkUserId)) as { passkeys?: { id?: string }[] } | null;
+      const ids = (raw?.passkeys ?? [])
+        .map((passkey) => passkey.id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0);
+      const api = await client();
+      for (const passkeyIdentificationId of ids) {
+        await api.users.deleteUserPasskey({ userId: clerkUserId, passkeyIdentificationId });
+      }
+      return ids.length;
+    },
+    async createSignInToken({ clerkUserId, expiresInSeconds }) {
+      const created = await (
+        await client()
+      ).signInTokens.createSignInToken({
+        userId: clerkUserId,
+        expiresInSeconds,
+      });
+      return { url: passkeySignInUrl(created.token) };
+    },
   };
 }
 
 type FakeOrg = { clerkOrgId: string; name: string; createdBy: string };
+type FakeMembership = { clerkOrgId: string; clerkUserId: string; role: ClerkOrgRole };
 
 export type FakeClerkAdmin = ClerkAdmin & {
   /** Every call, in order. */
@@ -96,11 +221,25 @@ export type FakeClerkAdmin = ClerkAdmin & {
   /** Public metadata per Clerk user ID, merged as Clerk merges it. */
   metadata: Map<string, Record<string, unknown>>;
   organizations: FakeOrg[];
+  /** Memberships added through addMembership (not the creator's own). */
+  memberships: FakeMembership[];
   invitations: { email: string; role: OperatorInviteRole }[];
   /** Clerk user IDs that have a passkey. */
   passkeys: Set<string>;
   /** Clerk user IDs that have two-step sign-in (a passkey also counts as strong). */
   twoStep: Set<string>;
+  /** Clerk user IDs currently banned. */
+  banned: Set<string>;
+  /** Clerk user IDs passed to deleteUser. */
+  deleted: Set<string>;
+  actorTokens: {
+    operatorClerkUserId: string;
+    targetClerkUserId: string;
+    expiresInSeconds: number;
+    url: string;
+    tokenId: string;
+  }[];
+  signInTokens: { clerkUserId: string; expiresInSeconds: number; url: string }[];
   /** Makes the next call to `method` reject. */
   failNext(method: keyof ClerkAdmin, error?: Error): void;
 };
@@ -121,9 +260,14 @@ export function makeFakeClerkAdmin(
     calls: [],
     metadata: new Map(),
     organizations: [],
+    memberships: [],
     invitations: [],
     passkeys: new Set(opts.passkeys),
     twoStep: new Set(opts.twoStep),
+    banned: new Set(),
+    deleted: new Set(),
+    actorTokens: [],
+    signInTokens: [],
     failNext(method, error = new Error(`fake Clerk: ${method} failed`)) {
       failures.set(method, error);
     },
@@ -151,6 +295,66 @@ export function makeFakeClerkAdmin(
     async inviteOperator(email, role) {
       call('inviteOperator', [email, role]);
       fake.invitations.push({ email, role });
+    },
+    async addMembership(clerkOrgId, clerkUserId, clerkRole) {
+      call('addMembership', [clerkOrgId, clerkUserId, clerkRole]);
+      fake.memberships = fake.memberships.filter(
+        (m) => !(m.clerkOrgId === clerkOrgId && m.clerkUserId === clerkUserId),
+      );
+      fake.memberships.push({ clerkOrgId, clerkUserId, role: clerkRole });
+    },
+    async removeMembership(clerkOrgId, clerkUserId) {
+      call('removeMembership', [clerkOrgId, clerkUserId]);
+      fake.memberships = fake.memberships.filter(
+        (m) => !(m.clerkOrgId === clerkOrgId && m.clerkUserId === clerkUserId),
+      );
+    },
+    async updateMembershipRole(clerkOrgId, clerkUserId, clerkRole) {
+      call('updateMembershipRole', [clerkOrgId, clerkUserId, clerkRole]);
+      for (const m of fake.memberships) {
+        if (m.clerkOrgId === clerkOrgId && m.clerkUserId === clerkUserId) m.role = clerkRole;
+      }
+    },
+    async deleteOrganization(clerkOrgId) {
+      call('deleteOrganization', [clerkOrgId]);
+      fake.organizations = fake.organizations.filter((o) => o.clerkOrgId !== clerkOrgId);
+      fake.memberships = fake.memberships.filter((m) => m.clerkOrgId !== clerkOrgId);
+    },
+    async updateOrganization(clerkOrgId, patch) {
+      call('updateOrganization', [clerkOrgId, patch]);
+      for (const o of fake.organizations) if (o.clerkOrgId === clerkOrgId) o.name = patch.name;
+    },
+    async banUser(clerkUserId) {
+      call('banUser', [clerkUserId]);
+      fake.banned.add(clerkUserId);
+    },
+    async unbanUser(clerkUserId) {
+      call('unbanUser', [clerkUserId]);
+      fake.banned.delete(clerkUserId);
+    },
+    async deleteUser(clerkUserId) {
+      call('deleteUser', [clerkUserId]);
+      fake.deleted.add(clerkUserId);
+    },
+    async createActorToken(input) {
+      call('createActorToken', [input]);
+      const tokenId = `act_fake_${fake.actorTokens.length + 1}`;
+      const url = `https://example.test/actor/${tokenId}`;
+      const row = { ...input, url, tokenId };
+      fake.actorTokens.push(row);
+      return { url, tokenId };
+    },
+    async deletePasskeys(clerkUserId) {
+      call('deletePasskeys', [clerkUserId]);
+      if (!fake.passkeys.has(clerkUserId)) return 0;
+      fake.passkeys.delete(clerkUserId);
+      return 1;
+    },
+    async createSignInToken(input) {
+      call('createSignInToken', [input]);
+      const url = `https://admin.example.test/sign-in?__clerk_ticket=fake&redirect_url=%2Fadmin%2Fpasskey`;
+      fake.signInTokens.push({ ...input, url });
+      return { url };
     },
   };
 
