@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // The onboarding page (C-1 in design audit 1): it reads `returnTo`, passes the checked path to
 // the form, and sends a finished user on to it, so the guest's action survives onboarding.
-// A session whose sign-up was refused (legal review 2.6) opens on the refusal.
+// An account or a session whose sign-up was refused (legal review 2.6) opens on the refusal.
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CurrentUser } from '@/server/guards';
@@ -11,6 +11,8 @@ const session = vi.hoisted(() => ({
   user: null as CurrentUser | null,
   hasOrg: true,
   cookies: new Map<string, string>(),
+  /** app.users ids whose sign-up the age screen refused. */
+  refusedAccounts: new Set<string>(),
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({ auth: async () => ({ userId: session.userId }) }));
@@ -29,6 +31,10 @@ vi.mock('@/server/guards', () => ({
   },
 }));
 vi.mock('@/lib/db', () => ({ getDb: () => ({}) }));
+vi.mock('@/modules/identity', () => ({
+  isSignupRefusedAccount: async (_db: unknown, userId: string) =>
+    session.refusedAccounts.has(userId),
+}));
 vi.mock('@/modules/orgs', () => ({
   findHostMembership: async () => (session.hasOrg ? { clerkOrgId: 'org_1' } : null),
 }));
@@ -62,6 +68,7 @@ beforeEach(() => {
   session.user = user(null);
   session.hasOrg = true;
   session.cookies = new Map();
+  session.refusedAccounts = new Set();
 });
 
 describe('OnboardingPage', () => {
@@ -177,6 +184,21 @@ describe('OnboardingPage', () => {
 
   it('ignores any other value of the refusal cookie', async () => {
     session.cookies.set('ee_signup_refused', 'yes');
+    await expect(open({})).resolves.toMatchObject({ refused: false });
+  });
+
+  // Lead decision 2026-11-18: the refusal holds on the account, in any browser.
+  it('opens on the refusal for a refused account in a browser without the cookie', async () => {
+    session.refusedAccounts.add('u-1');
+    await expect(open({ returnTo: JOB })).resolves.toEqual({
+      hostOnly: false,
+      refused: true,
+      returnTo: JOB,
+    });
+  });
+
+  it('opens on the form for another account, refused or not', async () => {
+    session.refusedAccounts.add('u-2');
     await expect(open({})).resolves.toMatchObject({ refused: false });
   });
 

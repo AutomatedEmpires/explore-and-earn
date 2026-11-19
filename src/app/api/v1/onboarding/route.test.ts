@@ -1,7 +1,8 @@
 // POST /api/v1/onboarding returns `returnTo` (C-1 in design audit 1): after onboarding, the
 // guest's action is where the API sends them, and a path off this site is never returned. It
-// also runs the age screen (legal review 2.6): a refused sign-up closes onboarding for the rest
-// of the browser session. On PGlite, with the session guard mocked and a fake Clerk admin.
+// also runs the age screen (legal review 2.6): a refused sign-up closes onboarding for that
+// account, and for the rest of the browser session. On PGlite, with the session guard mocked
+// and a fake Clerk admin.
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryRows, type Db } from '@/lib/db';
@@ -213,5 +214,88 @@ describe('POST /api/v1/onboarding: the age screen (legal review 2.6)', () => {
     const res = await send({ accountType: 'seeker', dateOfBirth: '2001-02-30' });
     expect(res.status).toBe(400);
     expect(res.headers.get('set-cookie')).toBeNull();
+  });
+});
+
+// Lead decision 2026-11-18 (explore-and-earn#45): the refusal holds on the account, so a new
+// browser, a private window, cleared cookies or a script calling the API cannot get past it.
+describe('POST /api/v1/onboarding: a refusal holds on the account', () => {
+  const REFUSAL = {
+    error: {
+      code: 'forbidden',
+      message: 'We can’t make you an account',
+      details: { reason: 'signup_refused' },
+    },
+  };
+
+  async function refusedAt(): Promise<string | null | undefined> {
+    const [row] = await queryRows<{ refused_at: string | null }>(
+      t.db,
+      sql`select signup_refused_at::text as refused_at from app.users
+          where id = ${session.user?.id ?? ''}`,
+    );
+    return row?.refused_at;
+  }
+
+  it('refuses a retry with an adult date once the cookie is cleared', async () => {
+    await expect(send(CHILD)).resolves.toMatchObject({ status: 403, json: REFUSAL });
+    const stamped = await refusedAt();
+    expect(stamped).not.toBeNull();
+
+    // The same account, signed in again in a private window: other cookies, no refusal cookie.
+    const retry = await send(SEEKER, { cookie: 'theme=dark' });
+    expect(retry).toMatchObject({ status: 403, json: REFUSAL });
+    // The cookie is set again, so this browser's page opens on the refusal as well.
+    expect(retry.headers.get('set-cookie')).toMatch(/^ee_signup_refused=1; /);
+    expect(await accountType()).toBeNull();
+    expect(await refusedAt()).toBe(stamped);
+  });
+
+  it('refuses the same account as a host, without the cookie', async () => {
+    await send(CHILD);
+    await expect(send(HOST, { cookie: 'theme=dark' })).resolves.toMatchObject({
+      status: 403,
+      json: REFUSAL,
+    });
+    expect(await accountType()).toBeNull();
+    expect(await queryRows(t.db, sql`select id from app.organizations`)).toEqual([]);
+  });
+
+  it('refuses a direct API call that sends no cookie at all', async () => {
+    await send(CHILD);
+    // A script with the session token and no Cookie header.
+    for (const body of [SEEKER, HOST, { ...SEEKER, returnTo: JOB }]) {
+      await expect(send(body)).resolves.toMatchObject({ status: 403, json: REFUSAL });
+    }
+    expect(await accountType()).toBeNull();
+  });
+
+  it('keeps only the time of the refusal on the account, never the date or the year', async () => {
+    await send(CHILD);
+    const [row] = await queryRows<{
+      birth_year: number | null;
+      adult: boolean;
+      refused: boolean;
+      whole: string;
+    }>(
+      t.db,
+      sql`select birth_year, adult_attested_at is not null as adult,
+                 signup_refused_at is not null as refused, to_jsonb(u)::text as whole
+          from app.users u where id = ${session.user?.id ?? ''}`,
+    );
+    expect(row).toMatchObject({ birth_year: null, adult: false, refused: true });
+    expect(row?.whole).not.toContain(CHILD.dateOfBirth);
+  });
+
+  it('still lets another account through in a browser that never saw a refusal', async () => {
+    await send(CHILD);
+    const id = await syncClerkUser(t.db, {
+      id: 'user_other_adult',
+      public_metadata: {},
+      updated_at: Date.parse('2026-11-01T00:00:00Z'),
+    });
+    session.user = { id, clerkUserId: 'user_other_adult', accountType: null, email: null };
+    await expect(send(SEEKER)).resolves.toMatchObject({ status: 200 });
+    expect(await accountType()).toBe('seeker');
   });
 });
