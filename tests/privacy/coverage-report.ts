@@ -55,12 +55,10 @@ export const PRIVACY_EXEMPT_MODULE_DIRS: Readonly<Record<string, string>> = {
  * claim with no table is not a privacy gap (nothing is stored), so these are the only entries
  * the enforcing test tolerates in `claimedButMissing`. A media column is declared only once its
  * table exists.
- * Remove an entry when its table lands; never add a table that exists.
+ * Remove an entry when its table lands; never add a table that exists (coverage.test.ts
+ * checks both).
  */
 export const PENDING_CLAIMED_TABLES: Readonly<Record<string, string>> = {
-  reports: 'SP4 W5 safety (drizzle/3300_safety.sql is still a shell)',
-  blocks: 'SP4 W5 safety (drizzle/3300_safety.sql is still a shell)',
-  mutes: 'SP4 W5 safety (drizzle/3300_safety.sql is still a shell)',
   resume_imports: 'SP4 profiles, AI import staging',
 };
 
