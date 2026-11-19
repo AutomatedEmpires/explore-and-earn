@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 // The reply step of flow D in jsdom, against a fetch stub that answers like the SP5 API: the
 // ready note, Send reply in one tap, Reply sent, and the states (didn't send and the retry,
-// offline, an empty reply, read-only, a thread that isn't there). axe runs over each state; jsdom
+// offline, an empty reply, read-only, a thread that isn't there, and a host the verification gate
+// refuses). axe runs over each state; jsdom
 // has no layout, so color contrast is left to src/ui/tokens.test.ts and the Playwright run.
 import { createRequire } from 'node:module';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { READ_ONLY, sendMessageSchema, type ReadOnlyReason } from '@/lib/messaging';
 import {
@@ -43,6 +44,33 @@ function json(body: unknown, status = 200): Response {
 
 function failure(status: number, code: string, reason?: string): Response {
   return json({ error: { code, message: 'No', details: reason ? { reason } : undefined } }, status);
+}
+
+// The verified-host gate's refusal (#199): the applicant list's 409 and its copy, word for word
+// (hiring/pipeline/gate.ts; messaging/gate.ts repeats it for the thread routes).
+const VERIFYING = "We're verifying your business. This usually takes a few hours.";
+const REFUSAL_COPY = {
+  unverified: 'Publish your first listing to verify your business, then you can see applicants.',
+  running: VERIFYING,
+  needs_review: VERIFYING,
+  needs_info: 'Answer our verification question to see your applicants.',
+  failed: "We couldn't verify your business. Ask for a review to see your applicants.",
+} as const;
+type Refused = keyof typeof REFUSAL_COPY;
+const REFUSED = Object.keys(REFUSAL_COPY) as Refused[];
+const REFUSED_TITLE = 'You can message applicants once your business is verified';
+
+function refusal(status: Refused): Response {
+  return json(
+    {
+      error: {
+        code: 'conflict',
+        message: REFUSAL_COPY[status],
+        details: { reason: `verification_${status}` },
+      },
+    },
+    409,
+  );
 }
 
 function install(o: {
@@ -245,6 +273,24 @@ describe('Reply: when it doesn’t go', () => {
     ).toBeInTheDocument();
   });
 
+  it('a 409 that isn’t the verification gate keeps the generic words', async () => {
+    install({ thread: () => failure(409, 'conflict', 'stale_status') });
+    const { unmount } = renderScreen();
+    expect(
+      await screen.findByRole('heading', { name: 'We couldn’t open this conversation' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(REFUSED_TITLE)).toBeNull();
+    unmount();
+
+    install({ thread: () => failure(409, 'conflict') });
+    renderScreen();
+    expect(
+      await screen.findByRole('heading', { name: 'We couldn’t open this conversation' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    expect(screen.queryByText(REFUSED_TITLE)).toBeNull();
+  });
+
   it('offline before the conversation loads', async () => {
     install({
       thread: () => {
@@ -255,5 +301,63 @@ describe('Reply: when it doesn’t go', () => {
     expect(await screen.findByRole('heading', { name: 'You are offline' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
     expect(await seriousOrCritical(container)).toEqual([]);
+  });
+});
+
+describe('Reply: a host the verification gate refuses (#199)', () => {
+  it.each(REFUSED)(
+    '%s: the thread read shows the applicant list’s refusal, announced, with a way back',
+    async (status) => {
+      install({ thread: () => refusal(status) });
+      const { container } = renderScreen();
+
+      const alert = await screen.findByRole('alert');
+      expect(
+        within(alert).getByRole('heading', { level: 1, name: REFUSED_TITLE }),
+      ).toBeInTheDocument();
+      expect(within(alert).getByText(REFUSAL_COPY[status])).toBeInTheDocument();
+      // An icon and words, never color alone.
+      expect(alert.querySelector('svg')).not.toBeNull();
+      expect(within(alert).getByRole('link', { name: 'Back to applicants' })).toHaveAttribute(
+        'href',
+        '/host/applicants',
+      );
+      // Trying again changes nothing until the business is verified.
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+      expect(screen.queryByText('We couldn’t open this conversation')).toBeNull();
+      expect(screen.queryByRole('textbox', { name: /Your reply/ })).toBeNull();
+      expect(await seriousOrCritical(container)).toEqual([]);
+    },
+  );
+
+  it.each(REFUSED)(
+    '%s: a send the gate refuses shows the refusal in place of the composer',
+    async (status) => {
+      const sent = install({ send: () => refusal(status) });
+      const { container } = renderScreen();
+      await screen.findByRole('heading', { level: 1, name: 'Reply to Maya Chen' });
+      fireEvent.click(screen.getByRole('button', { name: 'Send reply' }));
+
+      const alert = await screen.findByRole('alert');
+      expect(
+        within(alert).getByRole('heading', { level: 1, name: REFUSED_TITLE }),
+      ).toBeInTheDocument();
+      expect(within(alert).getByText(REFUSAL_COPY[status])).toBeInTheDocument();
+      expect(screen.queryByText('Your reply didn’t send')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Send reply' })).toBeNull();
+      expect(screen.getByRole('link', { name: 'Back to applicants' })).toBeInTheDocument();
+      expect(sent).toHaveLength(1);
+      expect(await seriousOrCritical(container)).toEqual([]);
+    },
+  );
+
+  it('a send refused for another reason keeps the usual failure', async () => {
+    install({ send: () => failure(409, 'conflict', 'stale_status') });
+    renderScreen();
+    await screen.findByRole('heading', { level: 1, name: 'Reply to Maya Chen' });
+    fireEvent.click(screen.getByRole('button', { name: 'Send reply' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your reply didn’t send');
+    expect(screen.queryByText(REFUSED_TITLE)).toBeNull();
+    expect(replyBox()).toHaveValue(DEFAULT_NOTE);
   });
 });
