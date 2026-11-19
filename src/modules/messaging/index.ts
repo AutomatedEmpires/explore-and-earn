@@ -1,6 +1,7 @@
 // Public API of the messaging module. Importing it registers the message notification.
 import { getAttachmentUrl } from './attachments';
 import { createBulkMessage } from './bulk';
+import { requireMessagingAccess } from './gate';
 import { jobHandlers } from './jobs';
 import { privacyHandler, retentionRules } from './privacy';
 import { markThreadRead, unreadThreadCount } from './reads';
@@ -19,6 +20,7 @@ import { getReplyStats } from './stats';
 import {
   ensureThread,
   getThread,
+  hostRepliesByApplication,
   listThreads,
   markThreadHired,
   postCard,
@@ -48,6 +50,7 @@ export {
   getNotSelectedMessage,
   getReplyStats,
   getThread,
+  hostRepliesByApplication,
   inScope,
   jobHandlers,
   listSavedReplies,
@@ -60,6 +63,7 @@ export {
   postEvent,
   privacyHandler,
   requireHiringCapability,
+  requireMessagingAccess,
   retentionRules,
   scanHostText,
   sendHostMessage,

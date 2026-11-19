@@ -18,9 +18,14 @@ export const SAMPLE_IDS = {
 
 const LISTING_TITLE = 'Lodge Cook';
 
-/** Maya Chen applied an hour before `now`, so her card reads "Applied today". */
+/**
+ * Maya Chen applied an hour before `now`, but never before that day's midnight on this device's
+ * clock, so her card reads "Applied today" at any hour: appliedDaysAgo counts calendar days, and
+ * an hour before 00:30 is yesterday.
+ */
 export function sampleApplicant(now: Date = new Date()): ApplicantCardData {
-  const appliedAt = new Date(now.getTime() - 60 * 60_000).toISOString();
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const appliedAt = new Date(Math.max(now.getTime() - 60 * 60_000, midnight)).toISOString();
   return {
     applicationId: SAMPLE_IDS.application,
     listingId: SAMPLE_IDS.listing,

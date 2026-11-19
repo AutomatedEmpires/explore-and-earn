@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ListingContent } from '@/modules/listings';
 import {
   buildListingView,
   dateRange,
@@ -188,6 +189,111 @@ describe('fact lines for other listings', () => {
       NO_ALTS,
     );
     expect(view.details).toEqual([{ label: 'Vessel type', value: 'Seiner' }]);
+  });
+});
+
+// Issue 208 (Figma 02 Seeker, "H-2B fields" 223:20362): the employer's H-2B job order terms after
+// Perks, in its own words, only while the listing is H-2B.
+describe('H-2B job terms (Detail · guest · 390, 223:20363)', () => {
+  const TERMS = {
+    transportation:
+      'We repay your fare here and meals on the way once you finish half the season. We pay your trip home when you finish or if we end the job early.',
+    tools: 'Uniforms, cleaning supplies and carts, at no charge.',
+    threeFourthsGuarantee:
+      'We offer at least three-fourths of the job order hours in each 12-week period. If we offer fewer, we pay what you would have earned.',
+    swaContact: 'Kalispell Job Service · (406) 555-0187',
+    jobOrderNumber: 'MT 4419025',
+  };
+  type H2b = NonNullable<ListingContent['job']['h2b']>;
+  const NONE: H2b = {
+    transportation: null,
+    tools: null,
+    threeFourthsGuarantee: null,
+    swaContact: null,
+    jobOrderNumber: null,
+  };
+  const viewWith = (h2b: H2b | null | undefined, visa: ListingContent['job']['visaSponsorship']) =>
+    buildListingView(
+      detailOf(
+        lodgeHousekeeper((c) => {
+          c.job.visaSponsorship = visa;
+          if (h2b !== undefined) c.job.h2b = h2b;
+        }),
+      ),
+      NO_ALTS,
+    );
+
+  it('shows one row per filled field, in the frame order, in the employer’s words', () => {
+    expect(viewWith(TERMS, 'h2b').h2b).toEqual({
+      intro:
+        'Kettle Ridge Lodge also hires through the H-2B visa program. It gave us these terms from its job order.',
+      terms: [
+        { kind: 'travel', label: 'Travel to the job and home', value: TERMS.transportation },
+        { kind: 'tools', label: 'Tools and equipment', value: TERMS.tools },
+        { kind: 'guarantee', label: 'Hours guarantee', value: TERMS.threeFourthsGuarantee },
+        {
+          kind: 'state',
+          label: 'Apply through the state',
+          value:
+            'You can also apply at the state job office: Kalispell Job Service · (406) 555-0187. Job order MT 4419025.',
+        },
+      ],
+      closing:
+        'These are the employer’s words. Ask Kettle Ridge Lodge to confirm them in writing before you accept.',
+    });
+  });
+
+  it('leaves out the fields the host left empty', () => {
+    const view = viewWith({ ...NONE, tools: TERMS.tools, swaContact: TERMS.swaContact }, 'h2b');
+    expect(view.h2b?.terms).toEqual([
+      { kind: 'tools', label: 'Tools and equipment', value: TERMS.tools },
+      {
+        kind: 'state',
+        label: 'Apply through the state',
+        value: 'You can also apply at the state job office: Kalispell Job Service · (406) 555-0187.',
+      },
+    ]);
+    expect(viewWith({ ...NONE, jobOrderNumber: 'MT 4419025' }, 'h2b').h2b?.terms).toEqual([
+      { kind: 'state', label: 'Apply through the state', value: 'Job order MT 4419025.' },
+    ]);
+  });
+
+  it('keeps the host’s own line breaks and full stops', () => {
+    const view = viewWith(
+      { ...NONE, tools: 'Uniforms.\nCarts at no charge', swaContact: 'Kalispell Job Service.' },
+      'h2b',
+    );
+    expect(view.h2b?.terms.map((t) => t.value)).toEqual([
+      'Uniforms.\nCarts at no charge',
+      'You can also apply at the state job office: Kalispell Job Service.',
+    ]);
+  });
+
+  it('says so in one line when the host filled none in (223:20530)', () => {
+    const none = {
+      intro:
+        'Kettle Ridge Lodge also hires through the H-2B visa program. It hasn’t added terms from its job order. Ask it about travel, tools and guaranteed hours before you accept.',
+      terms: [],
+      closing: null,
+    };
+    expect(viewWith(NONE, 'h2b').h2b).toEqual(none);
+    // A listing saved before #121 has no h2b at all.
+    expect(viewWith(undefined, 'h2b').h2b).toEqual(none);
+    expect(viewWith(null, 'h2b').h2b).toEqual(none);
+  });
+
+  it('shows nothing H-2B unless the listing is H-2B, even with answers kept', () => {
+    for (const visa of ['none', 'j1', 'h2a'] as const) {
+      expect(viewWith(TERMS, visa).h2b).toBeNull();
+    }
+    expect(buildListingView(detailOf(lodgeHousekeeper()), NO_ALTS).h2b).toBeNull();
+  });
+
+  it('never says the listing counts as H-2B recruitment', () => {
+    const text = JSON.stringify(viewWith(TERMS, 'h2b').h2b).toLowerCase();
+    for (const banned of ['recruit', 'approved', 'certified', 'department of labor']) {
+      expect(text).not.toContain(banned);
+    }
   });
 });
 

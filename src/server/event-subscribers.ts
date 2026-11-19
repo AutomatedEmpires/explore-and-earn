@@ -91,7 +91,9 @@ export const eventSubscribers: Record<keyof EventPayloads, string[]> = {
     'discovery.sync_host',
     'support.enterprise_onboarding',
   ],
-  'verification.decided': ['listings.resume_screening'],
+  // SP5 closes a failed host's open interviews and offers (issue 212); the handler acts only on
+  // `failed`.
+  'verification.decided': ['listings.resume_screening', 'hiring.close_for_failed_host'],
   // SP6 subscribes for one-time payments.
   'billing.stripe_event': [],
   // Task 18's refund emits this. W3 cannot edit this file, so the event is registered here.

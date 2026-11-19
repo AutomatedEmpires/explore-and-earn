@@ -5,10 +5,14 @@
 // audits it (`applications.snapshot_viewed` or `applications.resume_downloaded`) and, for a host
 // in its first 30 days, queues `applications.silent_host_check` once per application. The check
 // counts the distinct applications the host has opened (from those audit rows) and whether it
-// has answered any applicant (a status change by the host: shortlisting, an interview, an
-// offer, not selected, a hire). At SILENT_HOST_OPENED opened and none answered, the
-// verification module opens one `silent_host` fraud item (`alertSilentHost`). Messages do not
-// count as answers yet: the messaging module exposes no reply count.
+// has answered any applicant: a status change by the host (shortlisting, an interview, an
+// offer, not selected, a hire) or a message the host sent an applicant. At SILENT_HOST_OPENED
+// opened and none answered, the verification module opens one `silent_host` fraud item
+// (`alertSilentHost`).
+//
+// Replies come from SP5 messaging, which registers its per-application count here at module
+// load (`registerHostReplyCounter`), so applications never imports messaging. With no counter
+// registered, only status changes count.
 import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { queryRows, type DbOrTx } from '@/lib/db';
@@ -61,6 +65,32 @@ export async function recordHostOpen(
   });
 }
 
+/**
+ * Host replies per application for one org: what its team sent each applicant. SP5 messaging
+ * registers `hostRepliesByApplication`.
+ */
+export type HostReplyCounter = (db: DbOrTx, orgId: string) => Promise<Map<string, number>>;
+
+let replyCounter: HostReplyCounter | null = null;
+
+/**
+ * Sets the host-reply count the check reads (messaging does at module load). Returns the one it
+ * replaced, so a test can put it back; null clears it.
+ */
+export function registerHostReplyCounter(fn: HostReplyCounter | null): HostReplyCounter | null {
+  const previous = replyCounter;
+  replyCounter = fn;
+  return previous;
+}
+
+/** How many replies the org's team has sent its applicants, 0 with no counter registered. */
+async function hostReplies(db: DbOrTx, orgId: string): Promise<number> {
+  if (!replyCounter) return 0;
+  let total = 0;
+  for (const n of (await replyCounter(db, orgId)).values()) total += n;
+  return total;
+}
+
 /** True when a member of the org has changed the status of any of its applications. */
 async function hostAnswered(db: DbOrTx, orgId: string): Promise<boolean> {
   const rows = await queryRows<{ one: number }>(
@@ -100,7 +130,8 @@ async function openedApplications(
 
 /**
  * The silent-host check for one org: nothing past its first 30 days or once it has answered an
- * applicant; otherwise `alertSilentHost` with the applications it has opened.
+ * applicant, by a status change or a message; otherwise `alertSilentHost` with the
+ * applications it has opened.
  */
 export async function checkSilentHost(
   db: DbOrTx,
@@ -110,8 +141,10 @@ export async function checkSilentHost(
   const org = (await getOrgSummaries(db, [orgId])).get(orgId);
   if (!org || !newHostWindowOpen(org.createdAt, now)) return;
   if (await hostAnswered(db, orgId)) return;
+  const replies = await hostReplies(db, orgId);
+  if (replies > 0) return;
   const opened = await openedApplications(db, orgId, org.createdAt, SILENT_HOST_OPENED);
-  await alertSilentHost(db, orgId, opened, 0);
+  await alertSilentHost(db, orgId, opened, replies);
 }
 
 const checkPayload = z.object({ orgId: z.uuid() });
