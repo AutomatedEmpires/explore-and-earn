@@ -9,10 +9,12 @@ import {
   checklist,
 } from '@/modules/listings';
 import {
+  H2B_FIELDS,
   MESSAGES,
   SECTION_CONTENT,
   STEP_KEYS,
   fieldKeyFor,
+  h2bFixLine,
   normalizedDraft,
   sectionOfPath,
   sectionPayload,
@@ -181,5 +183,133 @@ describe('inline validation', () => {
       note: '',
     });
     expect(validateStep('applying', draft, {})['applying.additionalStep.url']).toBe(MESSAGES.link);
+  });
+});
+
+// Issue 208 (Figma 01 Host, "H-2B fields" 215:23546; field map 220:24886): the five optional
+// job order fields write job.h2b, a paste over a limit is kept whole and shown with an error.
+describe('the H-2B job order fields', () => {
+  const FILLED = {
+    transportation:
+      'We repay your fare here and meals on the way once you finish half the season. We pay your trip home when you finish or if we end the job early.',
+    tools: 'Uniforms, cleaning supplies and carts, at no charge.',
+    threeFourthsGuarantee:
+      'We offer at least three-fourths of the job order hours in each 6-week period. If we offer fewer, we pay what you would have earned.',
+    swaContact: 'Bozeman Job Service · (406) 555-0142',
+    jobOrderNumber: 'MT 4417260',
+  };
+  /** The sample as an H-2B listing; 'absent' leaves job.h2b out, as before #121. */
+  const h2bDraft = (h2b: Json | 'absent' = FILLED, visa = 'h2b') =>
+    setPath(
+      setPath(sampleDraft(), 'job.visaSponsorship', visa),
+      'job.h2b',
+      h2b === 'absent' ? undefined : h2b,
+    );
+  /** The 74-character paste of the error frame (215:23897). */
+  const PASTED = `Job order MT 4417260, posted Nov 2, ${'x'.repeat(38)}`;
+
+  it('lists the five schema fields with their limits, in the order of the frames', () => {
+    expect(H2B_FIELDS.map((f) => [f.key, f.limit])).toEqual([
+      ['transportation', 1000],
+      ['tools', 1000],
+      ['threeFourthsGuarantee', 1000],
+      ['swaContact', 500],
+      ['jobOrderNumber', 60],
+    ]);
+  });
+
+  it('saves job.h2b with the job section, which the strict draft schema accepts', () => {
+    const data = sectionPayload('job', h2bDraft(), ctx);
+    expect(data.job).toMatchObject({ visaSponsorship: 'h2b', h2b: FILLED });
+    expect(serverSectionSchema('job').safeParse(data).success).toBe(true);
+    const finished = normalizedDraft(h2bDraft(), ctx);
+    const parsed = ListingContentSchema.safeParse(finished);
+    expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
+    expect(parsed.data?.job.h2b).toEqual(FILLED);
+  });
+
+  it('saves an empty or missing answer as null, so each field stays optional', () => {
+    const data = sectionPayload('job', h2bDraft({ tools: '', jobOrderNumber: 'MT 4417260' }), ctx);
+    expect(data.job).toMatchObject({
+      h2b: {
+        transportation: null,
+        tools: null,
+        threeFourthsGuarantee: null,
+        swaContact: null,
+        jobOrderNumber: 'MT 4417260',
+      },
+    });
+    expect(ListingContentSchema.safeParse(normalizedDraft(h2bDraft({}), ctx)).success).toBe(true);
+    // An H-2B listing saved before #121 has no h2b at all, and is still complete.
+    expect(sectionPayload('job', h2bDraft('absent'), ctx).job).not.toHaveProperty('h2b');
+    expect(validateAll(h2bDraft('absent'), {})).toEqual({});
+  });
+
+  it('finds nothing wrong with answers at their limits', () => {
+    const atLimit = Object.fromEntries(H2B_FIELDS.map((f) => [f.key, 'a'.repeat(f.limit)]));
+    expect(validateStep('job', h2bDraft(atLimit), {})).toEqual({});
+    expect(ListingContentSchema.safeParse(normalizedDraft(h2bDraft(atLimit), ctx)).success).toBe(
+      true,
+    );
+  });
+
+  it('keeps a pasted job order number over 60 characters whole, with the frame error', () => {
+    expect(PASTED).toHaveLength(74);
+    const draft = h2bDraft({ ...FILLED, jobOrderNumber: PASTED });
+    expect(validateStep('job', draft, {})).toEqual({
+      'job.h2b.jobOrderNumber':
+        'Use 60 characters or fewer. This has 74. Enter just the number, like MT 4417260.',
+    });
+    // Nothing is cut: the draft saves all 74 characters, and the server's strict draft schema
+    // takes them (it has no limits), while the published content is refused until it is fixed.
+    const data = sectionPayload('job', draft, ctx);
+    expect((data.job as Json).h2b).toMatchObject({ jobOrderNumber: PASTED });
+    expect(serverSectionSchema('job').safeParse(data).success).toBe(true);
+    expect(ListingContentSchema.safeParse(normalizedDraft(draft, ctx)).success).toBe(false);
+    expect(validateAll(draft, {}).job).toHaveProperty('job.h2b.jobOrderNumber');
+  });
+
+  it.each([
+    ['transportation', 1000, 'Use 1,000 characters or fewer. This has 1,001.'],
+    ['tools', 1000, 'Use 1,000 characters or fewer. This has 1,001.'],
+    ['threeFourthsGuarantee', 1000, 'Use 1,000 characters or fewer. This has 1,001.'],
+    ['swaContact', 500, 'Use 500 characters or fewer. This has 501.'],
+  ])('shows the same over-limit error on %s', (key, limit, message) => {
+    const draft = h2bDraft({ ...FILLED, [key]: 'a'.repeat(limit + 1) });
+    expect(validateStep('job', draft, {})).toEqual({ [`job.h2b.${key}`]: message });
+  });
+
+  it('counts what the server counts: the answer without its outer spaces', () => {
+    const padded = `   ${'a'.repeat(60)}   `;
+    expect(validateStep('job', h2bDraft({ jobOrderNumber: padded }), {})).toEqual({});
+  });
+
+  it('hides the group when the visa is not H-2B, and keeps the answers', () => {
+    const draft = h2bDraft({ ...FILLED, jobOrderNumber: PASTED }, 'none');
+    // The hidden fields never block Next.
+    expect(validateStep('job', draft, {})).toEqual({});
+    expect((sectionPayload('job', draft, ctx).job as Json).h2b).toEqual({
+      ...FILLED,
+      jobOrderNumber: PASTED,
+    });
+  });
+
+  it('says what to fix above Next, by field', () => {
+    expect(h2bFixLine({ 'job.h2b.jobOrderNumber': 'x' })).toBe(
+      'Fix the job order number before you publish.',
+    );
+    expect(h2bFixLine({ 'job.h2b.tools': 'x' })).toBe(
+      'Fix the tools and equipment before you publish.',
+    );
+    expect(h2bFixLine({ 'job.h2b.transportation': 'x', 'job.h2b.jobOrderNumber': 'x' })).toBe(
+      'Fix your H-2B job order answers before you publish.',
+    );
+    expect(h2bFixLine({ 'job.description': 'x' })).toBeNull();
+    expect(h2bFixLine({})).toBeNull();
+  });
+
+  it('focuses each field from a server issue on its own path', () => {
+    for (const f of H2B_FIELDS) expect(fieldKeyFor(`job.h2b.${f.key}`)).toBe(`job.h2b.${f.key}`);
+    expect(sectionOfPath('job.h2b.tools')).toBe('job');
   });
 });
