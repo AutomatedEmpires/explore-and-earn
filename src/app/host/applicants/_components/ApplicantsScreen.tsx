@@ -4,7 +4,9 @@
 // 45:13954 at 1440; Passed 45:14771 and 45:14862; offline 45:15000). Each applicant waiting on a
 // reply is the system CandidateCard with Pass, Reply and Shortlist. Reply is a link to the reply
 // step in Messages, so answering takes 2 taps (Reply, Send reply). Pass is 1 tap: the card leaves
-// the list and a toast offers Undo for the 10 seconds the server holds the pass.
+// the list and a toast offers Undo for the 10 seconds the server holds the pass. A host the
+// verified-host gate refuses (issue 199) sees the gate's refusal for its status in place of the
+// list, as the reply step does.
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ApplicantCardData } from '@/lib/hiring';
@@ -19,6 +21,7 @@ import {
   type ToastTone,
 } from '@/ui/components';
 import { Cloud, Lock, MessageSquare, Share } from '@/ui/icons';
+import { verificationRefusal, type VerificationRefusal } from '../../messages/_lib/reply';
 import { hiringApi, isOffline, isStatus, reasonOf } from '../_lib/api';
 import {
   appliedDaysAgo,
@@ -38,7 +41,8 @@ type Loaded = { items: ApplicantCardData[]; nextCursor: string | null; at: numbe
 type ScreenState =
   | { kind: 'loading' }
   | { kind: 'ready'; data: Loaded }
-  | { kind: 'error'; problem: 'offline' | 'denied' | 'failed' };
+  | { kind: 'error'; problem: 'offline' | 'denied' | 'failed' }
+  | { kind: 'refused'; refusal: VerificationRefusal };
 
 type PassToast = {
   id: number;
@@ -58,6 +62,8 @@ async function load(cursor?: string | null): Promise<Loaded | ScreenState> {
     const page = await hiringApi.listWaiting(cursor);
     return { items: waiting(page.items), nextCursor: page.nextCursor, at: Date.now() };
   } catch (err) {
+    const refusal = verificationRefusal(err);
+    if (refusal) return { kind: 'refused', refusal };
     if (isOffline(err)) return { kind: 'error', problem: 'offline' };
     if (isStatus(err, 403)) return { kind: 'error', problem: 'denied' };
     return { kind: 'error', problem: 'failed' };
@@ -140,6 +146,11 @@ export function ApplicantsScreen({ orgName, replyBase }: { orgName: string; repl
     const next = await load(cursor);
     setLoadingMore(false);
     if (!isLoaded(next)) {
+      // The gate refused the host since the list loaded: no page loads until it is verified.
+      if (next.kind === 'refused') {
+        setState(next);
+        return;
+      }
       note('We couldn’t load more applicants', 'danger', 'Check your connection, then try again.');
       return;
     }
@@ -230,7 +241,9 @@ export function ApplicantsScreen({ orgName, replyBase }: { orgName: string; repl
     }
   };
 
-  const offline = state.kind === 'error' && state.problem === 'offline';
+  // Offline and the gate's refusal bring their own h1, so the page title steps aside.
+  const ownHeading =
+    state.kind === 'refused' || (state.kind === 'error' && state.problem === 'offline');
   const shareListing = (
     <Button asChild variant="secondary">
       <Link href="/host/listings">
@@ -251,6 +264,27 @@ export function ApplicantsScreen({ orgName, replyBase }: { orgName: string; repl
         <CardSkeleton className="md:w-sm" />
         <CardSkeleton className="hidden md:block md:w-sm" />
       </div>
+    );
+  } else if (state.kind === 'refused') {
+    // The access refusal (ErrorState with Lock) the reply step shows, announced: it replaces the
+    // loading status or the list. Its copy is the 409's own, which names the next step. Trying
+    // again changes nothing until the business is verified. Only an unverified host's next step,
+    // publishing a listing, has a screen today, so only it gets a link.
+    body = (
+      <ErrorState
+        icon={Lock}
+        titleAs="h1"
+        title="You can see applicants once your business is verified"
+        description={state.refusal.copy}
+        action={
+          state.refusal.status === 'unverified' ? (
+            <Button asChild>
+              <Link href="/host/listings">Go to listings</Link>
+            </Button>
+          ) : undefined
+        }
+        announce="alert"
+      />
     );
   } else if (state.kind === 'error') {
     body =
@@ -359,7 +393,7 @@ export function ApplicantsScreen({ orgName, replyBase }: { orgName: string; repl
   return (
     <div className="flex flex-col gap-4">
       <p className="text-16 font-semibold text-ink-2 md:hidden">{orgName}</p>
-      {offline ? null : (
+      {ownHeading ? null : (
         <header className="flex flex-col gap-4">
           <h1 className="text-24 font-extrabold text-ink">Applicants</h1>
           <p className="text-16 text-ink-2">Answer within a day to keep your reply time short.</p>

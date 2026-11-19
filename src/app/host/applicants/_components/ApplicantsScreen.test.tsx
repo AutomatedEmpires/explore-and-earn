@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 // Flow D's Applicants in jsdom, against a fetch stub that answers like the SP5 API: the Reply link,
 // Pass in one tap with its Undo, Shortlist, and every state (loading, couldn't load, offline,
-// none yet, caught up, no access). axe runs over each state; jsdom has no layout, so color
-// contrast is left to src/ui/tokens.test.ts and the Playwright run (tests/e2e/flow-d-*).
+// none yet, caught up, no access, and a host the verification gate refuses). axe runs over each
+// state; jsdom has no layout, so color contrast is left to src/ui/tokens.test.ts and the
+// Playwright run (tests/e2e/flow-d-*).
 import { createRequire } from 'node:module';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -45,7 +46,34 @@ function failure(status: number, code: string, reason?: string): Response {
   return json({ error: { code, message: 'No', details: reason ? { reason } : undefined } }, status);
 }
 
-type Call = { method: string; path: string; query: URLSearchParams; body: unknown };
+// The verified-host gate's refusal (issues 182 and 199): the applicant list's 409 and its copy,
+// word for word (src/modules/hiring/pipeline/gate.ts).
+const VERIFYING = "We're verifying your business. This usually takes a few hours.";
+const REFUSAL_COPY = {
+  unverified: 'Publish your first listing to verify your business, then you can see applicants.',
+  running: VERIFYING,
+  needs_review: VERIFYING,
+  needs_info: 'Answer our verification question to see your applicants.',
+  failed: "We couldn't verify your business. Ask for a review to see your applicants.",
+} as const;
+type Refused = keyof typeof REFUSAL_COPY;
+const REFUSED = Object.keys(REFUSAL_COPY) as Refused[];
+const REFUSED_TITLE = 'You can see applicants once your business is verified';
+
+function refusal(status: Refused): Response {
+  return json(
+    {
+      error: {
+        code: 'conflict',
+        message: REFUSAL_COPY[status],
+        details: { reason: `verification_${status}` },
+      },
+    },
+    409,
+  );
+}
+
+type Call ={ method: string; path: string; query: URLSearchParams; body: unknown };
 
 /** A fetch stub with the applicants API; `routes` overrides one answer. */
 function install(o: {
@@ -297,6 +325,124 @@ describe('Applicants: states', () => {
     renderScreen();
     await screen.findByRole('link', { name: 'Maya Chen' });
     expect(screen.queryByRole('link', { name: 'Jordan Reyes' })).toBeNull();
+  });
+});
+
+describe('Applicants: a host the verification gate refuses (issue 199)', () => {
+  it.each(REFUSED)(
+    '%s: shows the gate’s refusal for the status, announced, in place of the list',
+    async (status) => {
+      install({ list: () => refusal(status) });
+      const { container } = renderScreen();
+
+      const alert = await screen.findByRole('alert');
+      expect(
+        within(alert).getByRole('heading', { level: 1, name: REFUSED_TITLE }),
+      ).toBeInTheDocument();
+      expect(within(alert).getByText(REFUSAL_COPY[status])).toBeInTheDocument();
+      // An icon and words, never color alone.
+      expect(alert.querySelector('svg')).not.toBeNull();
+      // The refusal is the page's one heading, as offline is; the org name stays.
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+      expect(screen.queryByRole('heading', { name: 'Applicants' })).toBeNull();
+      expect(screen.getByText(SAMPLE_ORG)).toBeInTheDocument();
+      // Trying again changes nothing until the business is verified.
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+      expect(screen.queryByText('We couldn’t load applicants')).toBeNull();
+      expect(screen.queryByRole('status', { name: 'Loading applicants' })).toBeNull();
+      expect(await seriousOrCritical(container)).toEqual([]);
+    },
+  );
+
+  it('unverified: the next step, publishing a listing, is one tap away', async () => {
+    install({ list: () => refusal('unverified') });
+    renderScreen();
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByRole('link', { name: 'Go to listings' })).toHaveAttribute(
+      'href',
+      '/host/listings',
+    );
+  });
+
+  it.each(REFUSED.filter((s) => s !== 'unverified'))(
+    '%s: no link, because the next step has no screen yet',
+    async (status) => {
+      install({ list: () => refusal(status) });
+      renderScreen();
+      const alert = await screen.findByRole('alert');
+      expect(within(alert).queryByRole('link')).toBeNull();
+      expect(within(alert).queryByRole('button')).toBeNull();
+    },
+  );
+
+  it('a later page the gate refuses shows the refusal in place of the list', async () => {
+    let page = 0;
+    install({
+      list: () => {
+        page += 1;
+        return page === 1
+          ? json({ items: [sampleApplicant()], counts: {}, nextCursor: 'next' })
+          : refusal('needs_info');
+      },
+    });
+    const { container } = renderScreen();
+    await screen.findByRole('link', { name: 'Maya Chen' });
+    fireEvent.click(screen.getByRole('button', { name: 'Show more applicants' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(
+      within(alert).getByRole('heading', { level: 1, name: REFUSED_TITLE }),
+    ).toBeInTheDocument();
+    expect(within(alert).getByText(REFUSAL_COPY.needs_info)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Maya Chen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Show more applicants' })).toBeNull();
+    expect(screen.queryByText('We couldn’t load more applicants')).toBeNull();
+    expect(await seriousOrCritical(container)).toEqual([]);
+  });
+
+  it('a later page that fails for another reason keeps the list and says so', async () => {
+    let page = 0;
+    install({
+      list: () => {
+        page += 1;
+        return page === 1
+          ? json({ items: [sampleApplicant()], counts: {}, nextCursor: 'next' })
+          : failure(409, 'conflict', 'stale_status');
+      },
+    });
+    renderScreen();
+    await screen.findByRole('link', { name: 'Maya Chen' });
+    fireEvent.click(screen.getByRole('button', { name: 'Show more applicants' }));
+    expect(await screen.findByText('We couldn’t load more applicants')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Maya Chen' })).toBeInTheDocument();
+    expect(screen.queryByText(REFUSED_TITLE)).toBeNull();
+  });
+
+  it.each([
+    ['a 409 with another reason', () => failure(409, 'conflict', 'stale_status')],
+    ['a 409 with no reason', () => failure(409, 'conflict')],
+    ['a 409 for a verified host', () => failure(409, 'conflict', 'verification_verified')],
+    ['a 500', () => failure(500, 'internal')],
+  ])('%s keeps the generic words and Try again', async (_name, answer) => {
+    install({ list: answer });
+    const { container } = renderScreen();
+    expect(
+      await screen.findByRole('heading', { name: 'We couldn’t load applicants' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Applicants' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    expect(screen.queryByText(REFUSED_TITLE)).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(await seriousOrCritical(container)).toEqual([]);
+  });
+
+  it('a 403 that carries a verification reason is still the role refusal', async () => {
+    install({ list: () => failure(403, 'forbidden', 'verification_failed') });
+    renderScreen();
+    expect(
+      await screen.findByRole('heading', { name: 'Applicants are hidden for your role' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(REFUSED_TITLE)).toBeNull();
   });
 });
 
