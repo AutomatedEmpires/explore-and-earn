@@ -1,4 +1,8 @@
 // Interview lists and the views thread cards hydrate.
+//
+// The host list names applicants, so it is refused, before anything is read, unless the host is
+// verified (legal review 7.1, issue 198): the same gate and 409 as the applicant list. That
+// covers GET /host/interviews and Host Home's tile, which both call `listHostInterviews`.
 import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
 import { badRequest } from '@/lib/errors';
@@ -18,6 +22,7 @@ import { getHostCards } from '@/modules/applications';
 import { getHiringInfoMany } from '@/modules/listings';
 import { listingScope } from '@/modules/messaging';
 import { getOrgSummaries } from '@/modules/orgs';
+import { requireApplicantReads } from '../pipeline/gate';
 import { interviewSlots, interviews, pipelineEntries } from '../schema';
 
 type InterviewRow = typeof interviews.$inferSelect;
@@ -186,6 +191,32 @@ export async function hostInterviewViews(
   return new Map([...bundles].map(([id, bundle]) => [id, bundle.view]));
 }
 
+/**
+ * Each application's latest interview, keyed by application id (the applicant detail). A new
+ * interview starts only once the last one closed, so the latest is the open one when any is.
+ */
+export async function hostInterviewViewsByApplication(
+  db: DbOrTx,
+  applicationIds: string[],
+  now = new Date(),
+): Promise<Map<string, HostInterviewView>> {
+  if (applicationIds.length === 0) return new Map();
+  const rows = await db
+    .select({ id: interviews.id, applicationId: interviews.applicationId })
+    .from(interviews)
+    .where(inArray(interviews.applicationId, applicationIds))
+    .orderBy(desc(interviews.createdAt), desc(interviews.id));
+  const latest = new Map<string, string>();
+  for (const row of rows) if (!latest.has(row.applicationId)) latest.set(row.applicationId, row.id);
+  const views = await hostInterviewViews(db, [...latest.values()], now);
+  const out = new Map<string, HostInterviewView>();
+  for (const [applicationId, id] of latest) {
+    const view = views.get(id);
+    if (view) out.set(applicationId, view);
+  }
+  return out;
+}
+
 export async function seekerInterviewViews(
   db: DbOrTx,
   seekerUserId: string,
@@ -263,6 +294,7 @@ export async function listHostInterviews(
   q: { from: string; to: string; listingId?: string; needsAction?: boolean },
   now = new Date(),
 ): Promise<{ items: InterviewItem[] }> {
+  await requireApplicantReads(db, ctx.orgId);
   const from = new Date(q.from);
   const to = new Date(q.to);
   const scope = await listingScope(db, ctx);

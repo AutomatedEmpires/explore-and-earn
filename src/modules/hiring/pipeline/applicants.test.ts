@@ -2,10 +2,11 @@ import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApplicationSnapshotV1, ApplicationStatus, HostApplicationCard } from '@/lib/applications';
 import { newId } from '@/lib/ids';
-import { pipelineEntries, pipelineEvents } from '../schema';
+import type { FitInputs } from '@/lib/profiles';
+import { interviews, offers, pipelineEntries, pipelineEvents } from '../schema';
 import * as applications from '@/modules/applications';
 import { setSetting } from '@/modules/settings';
-import { applicationsFake } from '@tests/fakes/sp5/sp4';
+import { applicationsFake, profilesFake } from '@tests/fakes/sp5/sp4';
 import { listingsFake } from '@tests/fakes/sp5/sp2';
 import { messagingFake } from '@tests/fakes/sp5/messaging';
 import { createTestDb, type TestDb } from '@tests/helpers/db';
@@ -16,7 +17,9 @@ import {
   FIXED_NOW,
   seedEntry,
   seedHostOrg as seedUnverifiedHostOrg,
+  seedInterview,
   seedMember,
+  seedOffer,
   seedSeeker,
 } from '@tests/helpers/sp5';
 import { getApplicantDetail, listApplicants, listApplicationIdsByStatus } from './applicants';
@@ -40,6 +43,12 @@ vi.mock('@/modules/messaging', async (orig) => ({
   ...(await orig<typeof import('@/modules/messaging')>()),
   ...(await import('@tests/fakes/sp5/messaging')).messagingFake,
 }));
+// Only SP4's FitInputs: where a seeker lives decides the fit switch (issue 198). A seeker the
+// fake has no inputs for has no profile, so no known home state.
+vi.mock('@/modules/profiles', async (orig) => ({
+  ...(await orig<typeof import('@/modules/profiles')>()),
+  getFitInputs: (await import('@tests/fakes/sp5/sp4')).profilesFake.getFitInputs,
+}));
 
 const OPERATOR = { operatorId: '019a4a3c-0000-7000-8000-00000000f001' };
 const HOUR = 60 * 60 * 1000;
@@ -60,6 +69,7 @@ beforeEach(async () => {
   applicationsFake.reset();
   listingsFake.reset();
   messagingFake.reset();
+  profilesFake.reset();
   vi.spyOn(applications, 'getHostCards').mockImplementation(async (_db, input) =>
     input.applicationIds.map((applicationId) => card(applicationId, null)),
   );
@@ -434,6 +444,185 @@ describe('applicants', () => {
         expect(page.items.map((item) => item.fitScore)).toEqual(finished.map(() => null));
       },
     );
+  });
+
+  describe("the detail's interview and offer (issue 198)", () => {
+    async function oneApplicant() {
+      const org = await seedHostOrg(t.db);
+      const listingId = newId();
+      listingsFake.setListing({ id: listingId, orgId: org.orgId });
+      const seeker = await seedSeeker(t.db);
+      const applicationId = await seedEntry(t.db, {
+        orgId: org.orgId,
+        listingId,
+        seekerUserId: seeker.userId,
+        status: 'offered',
+      });
+      vi.mocked(applications.getSnapshot).mockResolvedValue({ v: 1 } as ApplicationSnapshotV1);
+      return { org, listingId, seekerUserId: seeker.userId, applicationId, threadId: newId() };
+    }
+
+    it("returns the application's latest interview and offer", async () => {
+      const s = await oneApplicant();
+      const row = {
+        orgId: s.org.orgId,
+        listingId: s.listingId,
+        applicationId: s.applicationId,
+        threadId: s.threadId,
+      };
+      const earlier = await seedInterview(t.db, { ...row, organizerUserId: s.org.owner.userId, status: 'canceled' });
+      const current = await seedInterview(t.db, { ...row, organizerUserId: s.org.owner.userId, status: 'scheduled' });
+      const before = new Date(FIXED_NOW.getTime() - 24 * HOUR);
+      await t.db.update(interviews).set({ createdAt: before }).where(eq(interviews.id, earlier));
+      // One offer is open at a time, so the earlier one is canceled before the next is sent.
+      const canceledOffer = await seedOffer(t.db, { ...row, createdBy: s.org.owner.userId, position: 'Deckhand' });
+      await t.db.update(offers).set({ status: 'canceled', createdAt: before }).where(eq(offers.id, canceledOffer));
+      const offer = await seedOffer(t.db, { ...row, createdBy: s.org.owner.userId, position: 'Lead deckhand' });
+      // Another applicant's interview and offer are not this one's.
+      const other = await oneApplicant();
+      const otherRow = { orgId: other.org.orgId, listingId: other.listingId, applicationId: other.applicationId };
+      await seedInterview(t.db, { ...otherRow, threadId: other.threadId, organizerUserId: other.org.owner.userId });
+      await seedOffer(t.db, { ...otherRow, threadId: other.threadId, createdBy: other.org.owner.userId });
+
+      const detail = await getApplicantDetail(t.db, s.org.owner.ctx, s.applicationId);
+      expect(detail.interview).toMatchObject({ id: current, applicationId: s.applicationId, status: 'scheduled' });
+      expect(detail.interview?.slots).toHaveLength(1);
+      expect(detail.offer).toMatchObject({
+        id: offer,
+        applicationId: s.applicationId,
+        status: 'sent',
+        position: 'Lead deckhand',
+      });
+    });
+
+    it('returns null for each when the application has neither', async () => {
+      const s = await oneApplicant();
+      const detail = await getApplicantDetail(t.db, s.org.owner.ctx, s.applicationId);
+      expect(detail.interview).toBeNull();
+      expect(detail.offer).toBeNull();
+    });
+  });
+
+  describe('stored fit for a seeker who lives in a disabled state (lead decision 2026-11-18, issue 198)', () => {
+    /** The seeker's home as SP4's FitInputs carries it. */
+    function home(seekerUserId: string, region: string | null, countryCode = 'US'): void {
+      const inputs: FitInputs = {
+        seekerUserId,
+        categories: [],
+        occupationCodes: [],
+        availabilityDate: null,
+        skillKeys: [],
+        certifications: [],
+        workAuthorization: null,
+        minPay: null,
+        willingToRelocate: false,
+        preferredStates: [],
+        region,
+        countryCode,
+      };
+      profilesFake.setPoolSeeker(
+        {
+          seekerUserId,
+          firstName: 'Maya',
+          lastInitial: 'C',
+          city: 'Denver',
+          region,
+          countryCode,
+          availabilityDate: '2026-12-01',
+          skills: [],
+          avatarMediaId: null,
+          coverMediaId: null,
+          categories: [],
+        },
+        inputs,
+      );
+    }
+
+    /** An on-site Montana listing with a Coloradan, a Montanan and a seeker with no known home. */
+    async function montanaListing() {
+      const org = await seedHostOrg(t.db);
+      const listingId = newId();
+      listingsFake.setListing({ id: listingId, orgId: org.orgId, state: 'MT' });
+      const seed = async (fitScore: number, hours: number, where: string | null) => {
+        const { userId } = await seedSeeker(t.db);
+        if (where) home(userId, where);
+        const applicationId = await seedEntry(t.db, {
+          orgId: org.orgId,
+          listingId,
+          seekerUserId: userId,
+          fitScore,
+          appliedAt: new Date(FIXED_NOW.getTime() + hours * HOUR),
+        });
+        return applicationId;
+      };
+      // Fit order is coloradan, montanan, unknown; newest first is unknown, montanan, coloradan.
+      const coloradan = await seed(95, 1, 'CO');
+      const montanan = await seed(80, 2, 'MT');
+      const unknown = await seed(70, 3, null);
+      await setSetting(t.db, 'hiring.fit_disabled_states', ['CO'], OPERATOR);
+      return { org, listingId, coloradan, montanan, unknown };
+    }
+
+    it('hides that score on a listing elsewhere and ranks the seeker as unscored', async () => {
+      const s = await montanaListing();
+      const fit = await listApplicants(t.db, s.org.owner.ctx, { listingId: s.listingId, sort: 'fit', limit: 25 });
+      expect(fit.items.map((item) => item.applicationId)).toEqual([s.montanan, s.unknown, s.coloradan]);
+      expect(fit.items.map((item) => item.fitScore)).toEqual([80, 70, null]);
+
+      const newest = await listApplicants(t.db, s.org.owner.ctx, { listingId: s.listingId, sort: 'newest', limit: 25 });
+      expect(newest.items.map((item) => item.fitScore)).toEqual([70, 80, null]);
+
+      vi.mocked(applications.getSnapshot).mockResolvedValue({ v: 1 } as ApplicationSnapshotV1);
+      await t.db
+        .update(pipelineEntries)
+        .set({ fitLines: [], fitWeightsVersion: 'fit_weights@test' })
+        .where(eq(pipelineEntries.listingId, s.listingId));
+      const hidden = await getApplicantDetail(t.db, s.org.owner.ctx, s.coloradan);
+      expect(hidden.card.fitScore).toBeNull();
+      expect(hidden.fit).toBeNull();
+      const shown = await getApplicantDetail(t.db, s.org.owner.ctx, s.montanan);
+      expect(shown.fit).toMatchObject({ score: 80 });
+    });
+
+    it('pages sort=fit with a cursor that carries no hidden score', async () => {
+      const s = await montanaListing();
+      const first = await listApplicants(t.db, s.org.owner.ctx, { listingId: s.listingId, sort: 'fit', limit: 2 });
+      expect(first.items.map((item) => item.applicationId)).toEqual([s.montanan, s.unknown]);
+      const rest = await listApplicants(t.db, s.org.owner.ctx, {
+        listingId: s.listingId,
+        sort: 'fit',
+        limit: 2,
+        cursor: first.nextCursor ?? undefined,
+      });
+      expect(rest.items.map((item) => item.applicationId)).toEqual([s.coloradan]);
+      expect(rest.items[0]?.fitScore).toBeNull();
+      expect(rest.nextCursor).toBeNull();
+    });
+
+    it('applies only the listing rule to a seeker with no US home state', async () => {
+      const org = await seedHostOrg(t.db);
+      const listingId = newId();
+      listingsFake.setListing({ id: listingId, orgId: org.orgId, state: 'MT' });
+      const abroad = (await seedSeeker(t.db)).userId;
+      home(abroad, 'CO', 'MX');
+      const noState = (await seedSeeker(t.db)).userId;
+      home(noState, null);
+      for (const seekerUserId of [abroad, noState]) {
+        await seedEntry(t.db, { orgId: org.orgId, listingId, seekerUserId, fitScore: 60 });
+      }
+      await setSetting(t.db, 'hiring.fit_disabled_states', ['CO'], OPERATOR);
+      const page = await listApplicants(t.db, org.owner.ctx, { listingId, sort: 'fit', limit: 25 });
+      expect(page.items.map((item) => item.fitScore)).toEqual([60, 60]);
+    });
+
+    it('reads no home state while no state is disabled', async () => {
+      const s = await montanaListing();
+      await setSetting(t.db, 'hiring.fit_disabled_states', [], OPERATOR);
+      profilesFake.calls.length = 0;
+      const page = await listApplicants(t.db, s.org.owner.ctx, { listingId: s.listingId, sort: 'fit', limit: 25 });
+      expect(page.items.map((item) => item.fitScore)).toEqual([95, 80, 70]);
+      expect(profilesFake.calls.filter((c) => c.name === 'getFitInputs')).toEqual([]);
+    });
   });
 
   it('never returns a withdrawn application id', async () => {
