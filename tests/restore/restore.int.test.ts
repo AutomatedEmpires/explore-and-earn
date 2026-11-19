@@ -4,12 +4,17 @@
 //
 // Needs DATABASE_URL (the restored database), RESTORE_TAKEN_AT (the manifest's `takenAt`) and
 // the backup project keys, to read the deletion ledger mirror.
+//
+// The check reads the ledger from replayFrom(takenAt), an hour before the restore point, the
+// same window the replay must cover. An erasure that committed just after the snapshot carries
+// a ledger time just before takenAt and is missing from the dump; reading only from takenAt
+// would never see it, so a replay that skipped it would still pass.
 import { readdirSync } from 'node:fs';
 import path from 'node:path';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { closeClient, createDb, queryRows, type Db } from '@/lib/db';
-import { engineLedgerMirror } from '@/server/ops/replay-deletions';
+import { engineLedgerMirror, REPLAY_MARGIN_MS, replayFrom } from '@/server/ops/replay-deletions';
 
 const drill = process.env.RESTORE_DRILL === '1';
 
@@ -31,9 +36,13 @@ describe.skipIf(!drill)('restore drill', () => {
     if (db) await closeClient(db);
   });
 
-  it('every user erased since the backup is erased in the restored database', async () => {
+  it('every user erased since an hour before the backup is erased in the restored database', async () => {
+    const from = replayFrom(takenAt);
+    expect(takenAt.getTime() - from.getTime()).toBe(REPLAY_MARGIN_MS);
     const mirror = await engineLedgerMirror();
-    const entries = await mirror.listSince(takenAt);
+    const entries = (await mirror.listSince(from)).filter(
+      (entry) => new Date(entry.erasedAt).getTime() >= from.getTime(),
+    );
 
     const stillThere: string[] = [];
     for (const entry of entries) {

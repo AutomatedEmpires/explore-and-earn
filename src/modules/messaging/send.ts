@@ -14,6 +14,7 @@ import { getCommunityIdentities } from '@/modules/profiles';
 import { getRelationships } from '@/modules/safety';
 import type { ThreadViewer } from './access';
 import { listingTeam } from './access';
+import { requireMessagingAccess } from './gate';
 import { bulkMessages, messages, threads } from './schema';
 import {
   blockingReason,
@@ -156,6 +157,11 @@ export async function deliverMessage(
   });
 }
 
+/**
+ * A host message from a route, a bulk copy or the not-selected message. Null, storing nothing,
+ * when the thread can't take it: a block, a read-only reason, or a host the applicant
+ * verification gate refuses (`blockingReason`).
+ */
 export async function sendHostMessage(
   tx: Tx,
   i: {
@@ -251,12 +257,18 @@ async function assertAttachments(
   }
 }
 
+/**
+ * A send from either side. A host the applicant verification gate refuses gets the applicant
+ * list's 409 before anything is read; its applicant gets the plain read-only 409, which names no
+ * reason (`blockingReason`).
+ */
 export async function sendMessage(
   db: Db,
   viewer: ThreadViewer,
   threadId: string,
   input: SendMessageInput,
 ): Promise<{ message: MessageView }> {
+  if (viewer.kind === 'host') await requireMessagingAccess(db, viewer.ctx.orgId);
   const thread = await loadThread(db, threadId);
   if (!thread || !(await canParticipate(db, viewer, thread))) throw notFound();
   const [rel] = await getRelationships(db, {
@@ -376,7 +388,8 @@ async function insertMessage(
  * Releases a message that is `from` pending (the scan) or held (an operator) to `set.scanState`
  * and delivers it. The one release path: both callers get the same block check, unread stamps,
  * notification and thread card. A thread that became read-only meanwhile (a block, a withdrawal,
- * a removal or a long-closed listing) gets nothing (plan decision 11): the message is held, so
+ * a removal, a long-closed listing, or a host the applicant verification gate now refuses) gets
+ * nothing (plan decision 11): the message is held, so
  * the host sees it as not delivered. A message that already left `from` is left alone, so a
  * release never delivers twice. Call it inside a transaction: state and delivery commit together.
  */

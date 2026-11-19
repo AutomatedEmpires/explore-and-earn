@@ -166,7 +166,7 @@ export type OnboardingFormProps = {
    * halfway): naming it is the only step, with no way back to the choice.
    */
   hostOnly?: boolean;
-  /** This browser session's sign-up was refused earlier: show only the refusal. */
+  /** The account's or this browser session's sign-up was refused: show only the refusal. */
   refused?: boolean;
   /** Where to finish: the checked same-site path the guest started from, or `/` for none. */
   returnTo?: string;

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
@@ -10,8 +10,10 @@ import {
   compareManifest,
   parseManifest,
   pgEnvFromUrl,
+  takeConsistentBackup,
   verifyRestore,
   type BackupManifest,
+  type BackupSession,
 } from './backup-manifest';
 
 const NOW = new Date('2026-11-03T02:00:00.000Z');
@@ -147,6 +149,77 @@ describe('parseManifest', () => {
   });
 });
 
+describe('takeConsistentBackup', () => {
+  /** A session that records the order of events and holds no tables. */
+  function fakeSession(events: string[]): BackupSession {
+    return {
+      async begin(mode, fn) {
+        events.push(`begin ${mode}`);
+        return fn({
+          async unsafe(text: string) {
+            if (text.includes('pg_export_snapshot()')) {
+              events.push('snapshot');
+              return [{ id: '00000003-0000001B-1' }];
+            }
+            events.push('manifest query');
+            return [];
+          },
+        });
+      },
+      async end() {
+        events.push('end');
+      },
+    };
+  }
+
+  it('reads the clock before the snapshot begins, so takenAt is never later than the snapshot', async () => {
+    // An erasure that commits after the snapshot is not in the dump. The restore replays every
+    // ledger entry from takenAt (less a margin), so takenAt must not be later than the snapshot.
+    const events: string[] = [];
+    const manifest = await takeConsistentBackup({
+      databaseUrl: 'postgresql://backup_reader:secret@db.example.test:5432/postgres',
+      dumpPath: '/tmp/never-written.pgcustom',
+      session: fakeSession(events),
+      clock: () => {
+        events.push('clock');
+        return NOW;
+      },
+      runDump: async (args) => {
+        events.push(`dump ${args.find((arg) => arg.startsWith('--snapshot=')) ?? ''}`);
+      },
+    });
+
+    expect(events).toEqual([
+      'clock',
+      'begin isolation level repeatable read read only',
+      'snapshot',
+      'manifest query',
+      'dump --snapshot=00000003-0000001B-1',
+      'end',
+    ]);
+    expect(manifest).toEqual({ takenAt: NOW.toISOString(), migrations: [], tables: {} });
+  });
+
+  it('reads the clock once, and ends the session when the dump fails', async () => {
+    const events: string[] = [];
+    const clock = vi.fn(() => NOW);
+
+    await expect(
+      takeConsistentBackup({
+        databaseUrl: 'postgresql://backup_reader:secret@db.example.test:5432/postgres',
+        dumpPath: '/tmp/never-written.pgcustom',
+        session: fakeSession(events),
+        clock,
+        runDump: async () => {
+          throw new Error('pg_dump exited with code 1');
+        },
+      }),
+    ).rejects.toThrow('pg_dump exited with code 1');
+    expect(clock).toHaveBeenCalledTimes(1);
+    expect(events.at(-1)).toBe('end');
+  });
+});
+
 describe('pgEnvFromUrl', () => {
   it('turns a connection URL into libpq variables, so the password is never an argument', () => {
     expect(
@@ -166,8 +239,22 @@ describe('pgEnvFromUrl', () => {
   });
 });
 
-const workflow = (name: string) =>
-  readFileSync(path.resolve('.github/workflows', name), 'utf8');
+/** A file of this checkout with `\n` line endings, so a Windows checkout (CRLF) reads the same. */
+const text = (file: string) => readFileSync(path.resolve(file), 'utf8').replace(/\r\n/g, '\n');
+
+const workflow = (name: string) => text(`.github/workflows/${name}`);
+
+/** The `run:` block of the step called `name`. */
+function stepRun(yml: string, name: string): string {
+  const at = yml.indexOf(`- name: ${name}\n`);
+  if (at === -1) throw new Error(`no step named ${name}`);
+  const rest = yml.slice(at + 1);
+  const next = rest.search(/\n {6}- (name|uses|run):/);
+  const step = next === -1 ? rest : rest.slice(0, next);
+  const match = /\n {8}run: \|\n((?: {10}.*\n|\n)*)/.exec(`${step}\n`);
+  if (!match) throw new Error(`step ${name} has no run block`);
+  return match[1] ?? '';
+}
 
 /** The `on:` block: everything from `on:` to the next top-level key. */
 function triggers(yml: string): string {
@@ -218,14 +305,30 @@ describe('backup.yml', () => {
       'PROD_S3_ENDPOINT',
       'PROD_S3_SECRET_ACCESS_KEY',
     ]);
-    const runbook = readFileSync(path.resolve('docs/runbooks/backups.md'), 'utf8');
+    const runbook = text('docs/runbooks/backups.md');
     for (const name of names) expect(runbook).toContain(`\`${name}\``);
     // No connection string or key is written into the file.
     expect(yml).not.toMatch(/postgres(ql)?:\/\/|supabase\.co|eyJ[A-Za-z0-9_-]{10,}/);
   });
 
-  it('keeps 35 days of dumps and of deleted files', () => {
-    expect(code(yml)).toMatch(/rclone delete --min-age 35d backupcrypt:pg\n/);
-    expect(code(yml)).toMatch(/rclone delete --min-age 35d backupcrypt:files-deleted\n/);
+  it('keeps deleted files for 35 days from the day they were deleted, not from their own age', () => {
+    // How long is decided by planPrune (backup-prune.test.ts tests it): a dated folder goes
+    // only when its date is more than 35 days before the run's date. This checks the workflow
+    // hands every dated folder of both areas to it, and deletes nothing any other way.
+    expect(stepRun(yml, 'Sync the media buckets')).toMatch(
+      /--backup-dir "backupcrypt:files-deleted\/\$BACKUP_DATE\/\$bucket"/,
+    );
+    const prune = code(stepRun(yml, 'Delete dumps and kept files older than 35 days'));
+    expect(prune).toMatch(/^ *set -euo pipefail\n/);
+    expect(prune).toMatch(/for area in pg files-deleted; do\n/);
+    expect(prune).toMatch(/rclone lsf --dirs-only "backupcrypt:\$area\/" > "\$listing"/);
+    expect(prune).toMatch(
+      /pnpm --silent exec tsx scripts\/backup-prune\.ts --today "\$BACKUP_DATE" --keep-days 35 \\\n\s+< "\$listing" > "\$due"\n/,
+    );
+    expect(prune).toMatch(/rclone purge "backupcrypt:\$area\/\$folder"\n/);
+    // rclone keeps a file's modification time when --backup-dir moves it, so any age filter
+    // would delete an old file the night it was deleted.
+    expect(code(yml)).not.toMatch(/--min-age|--max-age|rclone delete\b/);
+    expect(code(yml).match(/rclone purge/g)).toHaveLength(1);
   });
 });

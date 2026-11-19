@@ -4,10 +4,12 @@ import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
-import { seedOperator } from '../../../tests/helpers/sp8';
+import { seedOperator, seedSeeker } from '../../../tests/helpers/sp8';
+import { releaseLegalHold, setLegalHold } from './holds';
 import {
   isErasureRecorded,
   RETENTION_BATCH,
+  RETENTION_HOLD_COVERAGE,
   retentionJobHandlers,
   retentionRules,
   runRetentionRule,
@@ -18,6 +20,7 @@ import type { RetentionRule } from './types';
 
 const NOW = new Date('2026-11-03T03:30:00.000Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 let t: TestDb;
 let userId: string;
@@ -280,7 +283,15 @@ describe('runRetentionRule', () => {
   });
 
   it('a rule that runs past the timeout is failed and never rethrows', async () => {
-    const rules = [fakeRule('test.slow', () => new Promise(() => {}))];
+    // A rule that never settles at all is covered on a real Postgres (retention.int.test.ts):
+    // there the database ends its transaction. PGlite has one connection, which the rule's
+    // open transaction holds until the rule settles.
+    const rules = [
+      fakeRule('test.slow', async () => {
+        await sleep(150);
+        return { deleted: 3 };
+      }),
+    ];
     const runId = await openRun('test.slow');
 
     const result = await runRetentionRule(
@@ -290,7 +301,98 @@ describe('runRetentionRule', () => {
     );
 
     expect(result).toEqual({ deleted: 0, status: 'failed' });
+    expect((await runs())[0]).toMatchObject({ status: 'failed', deleted: 0 });
     expect((await runs())[0]?.error).toMatch(/^Timed out/);
+  });
+
+  it('a rule that times out keeps nothing it deleted, so "failed, 0 deleted" is the truth', async () => {
+    for (const key of ['a', 'b', 'c']) {
+      await t.db.execute(sql`
+        insert into app.rate_limits (key, window_start, count)
+        values (${key}, ${new Date(NOW.getTime() - 10 * DAY_MS).toISOString()}::timestamptz, 1)
+      `);
+    }
+    const rules = [
+      fakeRule('test.slow', async (db) => {
+        const gone = await queryRows(db, sql`delete from app.rate_limits returning key`);
+        await sleep(150);
+        return { deleted: gone.length };
+      }),
+    ];
+    const runId = await openRun('test.slow');
+
+    const result = await runRetentionRule(
+      t.db,
+      { key: 'test.slow', runId, now: NOW },
+      { rules, timeoutMs: 20 },
+    );
+
+    expect(result).toEqual({ deleted: 0, status: 'failed' });
+    const kept = await queryRows<{ key: string }>(t.db, sql`select key from app.rate_limits`);
+    expect(kept.map((row) => row.key).sort()).toEqual(['a', 'b', 'c']);
+    const audit = await queryRows<{ data: unknown }>(
+      t.db,
+      sql`select data from app.audit_events
+          where action = 'privacy.retention_run' and subject_id = ${runId}`,
+    );
+    expect(audit).toEqual([{ data: { key: 'test.slow', deleted: 0, status: 'failed' } }]);
+  });
+
+  it('a rule that throws keeps nothing it deleted before throwing', async () => {
+    await t.db.execute(sql`
+      insert into app.rate_limits (key, window_start, count)
+      values ('kept', ${new Date(NOW.getTime() - 10 * DAY_MS).toISOString()}::timestamptz, 1)
+    `);
+    const rules = [
+      fakeRule('test.broken', async (db) => {
+        await db.execute(sql`delete from app.rate_limits`);
+        throw new Error('storage is down');
+      }),
+    ];
+    const runId = await openRun('test.broken');
+
+    expect(
+      await runRetentionRule(t.db, { key: 'test.broken', runId, now: NOW }, { rules }),
+    ).toEqual({ deleted: 0, status: 'failed' });
+    expect(await queryRows(t.db, sql`select key from app.rate_limits`)).toEqual([{ key: 'kept' }]);
+  });
+
+  it('runs the rule in one transaction the database also limits, and commits it in time', async () => {
+    await t.db.execute(sql`
+      insert into app.rate_limits (key, window_start, count)
+      values ('old', ${new Date(NOW.getTime() - 10 * DAY_MS).toISOString()}::timestamptz, 1)
+    `);
+    let limits: unknown;
+    const rules = [
+      fakeRule('test.fine', async (db) => {
+        limits = (
+          await queryRows(
+            db,
+            sql`select current_setting('statement_timeout') as statement,
+                  current_setting('idle_in_transaction_session_timeout') as idle`,
+          )
+        )[0];
+        const gone = await queryRows(db, sql`delete from app.rate_limits returning key`);
+        return { deleted: gone.length };
+      }),
+    ];
+    const runId = await openRun('test.fine');
+
+    expect(
+      await runRetentionRule(
+        t.db,
+        { key: 'test.fine', runId, now: NOW },
+        { rules, timeoutMs: 45_000 },
+      ),
+    ).toEqual({ deleted: 1, status: 'ok' });
+    // Each statement, and each wait between statements, is stopped by the database shortly
+    // after the limit (RETENTION_DB_GRACE_MS, 5 s).
+    expect(limits).toEqual({ statement: '50s', idle: '50s' });
+    expect(await queryRows(t.db, sql`select key from app.rate_limits`)).toEqual([]);
+    // The limits were local to the rule's transaction.
+    expect(
+      await queryRows(t.db, sql`select current_setting('statement_timeout') as statement`),
+    ).toEqual([{ statement: '0' }]);
   });
 
   it('an unknown rule key is failed, not thrown', async () => {
@@ -375,17 +477,45 @@ describe('privacy.exports_7d', () => {
     };
   }
 
-  async function seedExport(expiresAt: Date): Promise<{ id: string; path: string }> {
+  async function seedExport(
+    expiresAt: Date,
+    owner: string = userId,
+  ): Promise<{ id: string; path: string }> {
     const id = newId();
     const path = `${id}.zip`;
     await t.db.execute(sql`
       insert into app.privacy_requests (id, user_id, kind, status, export_path,
         export_size_bytes, export_expires_at, completed_at)
-      values (${id}, ${userId}, 'export', 'completed', ${path}, 10,
+      values (${id}, ${owner}, 'export', 'completed', ${path}, 10,
         ${expiresAt.toISOString()}::timestamptz, ${expiresAt.toISOString()}::timestamptz)
     `);
     return { id, path };
   }
+
+  it('keeps the download of a person with a hold on all, until the hold is released', async () => {
+    const store = memoryStore();
+    const heldUser = (await seedSeeker(t.db)).userId;
+    const otherScope = (await seedSeeker(t.db)).userId;
+    const hold = (owner: string, scope: 'all' | 'messages') =>
+      setLegalHold(
+        t.db,
+        { userId: owner, scope, reason: 'Court order 26-0042 for this account', reviewAt: '2026-12-01', operatorId: userId },
+        NOW,
+      );
+    const { holdId } = await hold(heldUser, 'all');
+    await hold(otherScope, 'messages');
+    const kept = await seedExport(new Date(NOW.getTime() - 1), heldUser);
+    const gone = await seedExport(new Date(NOW.getTime() - 1), otherScope);
+    const rule = createExportsRule(async () => store);
+
+    expect(await rule.run(t.db, NOW, 100)).toEqual({ deleted: 1 });
+    expect(store.removed).toEqual([`privacy-exports/${gone.path}`]);
+    expect(await paths()).toEqual({ [kept.id]: kept.path, [gone.id]: null });
+
+    await releaseLegalHold(t.db, { holdId, operatorId: userId }, NOW);
+    expect(await rule.run(t.db, NOW, 100)).toEqual({ deleted: 1 });
+    expect(await paths()).toEqual({ [kept.id]: null, [gone.id]: null });
+  });
 
   async function paths(): Promise<Record<string, string | null>> {
     const rows = await queryRows<{ id: string; export_path: string | null }>(
@@ -447,6 +577,14 @@ describe('the privacy module rules and the ledger check', () => {
       'privacy.rate_limit_windows_2d',
       'privacy.exports_7d',
     ]);
+  });
+
+  it('every registered rule says how it honours legal holds (lead decision 2026-11-18)', async () => {
+    const { privacyRegistry } = await import('@/server/privacy-registry');
+
+    expect(privacyRegistry.rules.map((rule) => rule.key).sort()).toEqual(
+      Object.keys(RETENTION_HOLD_COVERAGE).sort(),
+    );
   });
 
   it('isErasureRecorded is true only for a user in the deletion ledger', async () => {

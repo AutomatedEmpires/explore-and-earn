@@ -1,4 +1,5 @@
-// A refused sign-up closes onboarding for the rest of the browser session (legal review 2.6;
+// A refused sign-up closes onboarding for the account (identity's signup_refused_at, from any
+// browser) and, as a second check, for the rest of the browser session (legal review 2.6;
 // #128 gap 10: the refusal must not invite another try with a different year). The API sets
 // this session cookie on a refusal and refuses every later attempt while it is present; the
 // page then opens on the refusal. It holds no date and no age, only that this browser session

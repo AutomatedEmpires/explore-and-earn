@@ -2,7 +2,10 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
+import { releaseLegalHold, setLegalHold, type HoldScope } from '@/modules/privacy';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
+import { seedMedia } from '../../../tests/helpers/sp2';
+import { seedHostOrg, seedOperator, seedSeeker } from '../../../tests/helpers/sp8';
 import { retentionRules } from './index';
 
 const NOW = new Date('2026-11-03T17:00:00.000Z');
@@ -26,23 +29,30 @@ beforeEach(async () => {
   await t.db.execute(sql`delete from app.trust_checks`);
 });
 
-async function seedCheck(createdAt: Date): Promise<string> {
+async function seedCheck(
+  createdAt: Date,
+  subject: { type: string; id: string } = { type: 'listing', id: newId() },
+): Promise<string> {
   const id = newId();
   await t.db.execute(sql`
     insert into app.trust_checks (id, kind, subject_type, subject_id, provider, model,
       prompt_version, reason, decision, latency_ms, created_at)
-    values (${id}, 'text_safety', 'listing', ${newId()}, 'stub', 'stub', 'v1', 'ok', 'approved',
-      5, ${createdAt.toISOString()}::timestamptz)
+    values (${id}, 'text_safety', ${subject.type}, ${subject.id}, 'stub', 'stub', 'v1', 'ok',
+      'approved', 5, ${createdAt.toISOString()}::timestamptz)
   `);
   return id;
 }
 
-async function seedItem(checkId: string, status: 'open' | 'resolved'): Promise<string> {
+async function seedItem(
+  checkId: string,
+  status: 'open' | 'resolved',
+  subject: { type: string; id: string } = { type: 'listing', id: newId() },
+): Promise<string> {
   const id = newId();
   await t.db.execute(sql`
     insert into app.review_items (id, queue, status, subject_type, subject_id, check_id, reason,
       sla_due_at, resolution, resolved_at)
-    values (${id}, 'moderation', ${status}, 'listing', ${newId()}, ${checkId}, 'flagged',
+    values (${id}, 'moderation', ${status}, ${subject.type}, ${subject.id}, ${checkId}, 'flagged',
       ${NOW.toISOString()}::timestamptz,
       ${status === 'resolved' ? 'approve' : null},
       ${status === 'resolved' ? NOW.toISOString() : null}::timestamptz)
@@ -118,5 +128,109 @@ describe('trust.checks_12m', () => {
     expect(await rule.run(t.db, NOW, 100)).toEqual({ deleted: 1 });
     expect(await checks()).toEqual([referenced]);
     expect(await checks()).not.toContain(unreferenced);
+  });
+
+  describe('legal holds (lead decision 2026-11-18)', () => {
+    let operatorId: string;
+
+    beforeAll(async () => {
+      operatorId = (await seedOperator(t.db, { role: 'owner' })).userId;
+    });
+
+    const hold = async (subject: { userId: string } | { orgId: string }, scope: HoldScope) =>
+      (
+        await setLegalHold(
+          t.db,
+          {
+            ...subject,
+            scope,
+            reason: 'Fraud investigation 26-311',
+            reviewAt: '2026-12-01',
+            operatorId,
+          },
+          NOW,
+        )
+      ).holdId;
+
+    it('keeps a check about a held person or organization, or about what they own, and deletes the rest', async () => {
+      const old = before(5000);
+      const heldOrg = await seedHostOrg(t.db);
+      await hold({ orgId: heldOrg.orgId }, 'reports');
+      const heldSeeker = (await seedSeeker(t.db)).userId;
+      await hold({ userId: heldSeeker }, 'messages');
+      const freeOrg = await seedHostOrg(t.db);
+      const freeSeeker = (await seedSeeker(t.db)).userId;
+
+      const kept = [
+        await seedCheck(old, { type: 'seeker_profile', id: heldSeeker }),
+        await seedCheck(old, { type: 'user', id: heldSeeker }),
+        await seedCheck(old, { type: 'organization', id: heldOrg.orgId }),
+        await seedCheck(old, { type: 'host_page', id: heldOrg.orgId }),
+        await seedCheck(old, { type: 'business_verification', id: heldOrg.orgId }),
+        await seedCheck(old, {
+          type: 'media',
+          id: await seedMedia(t.db, heldOrg.orgId, 'listing_photo'),
+        }),
+      ];
+      // The review's case: the check behind a resolved review item about a held host.
+      const behindItem = await seedCheck(old);
+      const itemId = await seedItem(behindItem, 'resolved', {
+        type: 'organization',
+        id: heldOrg.orgId,
+      });
+
+      const gone = [
+        await seedCheck(old, { type: 'seeker_profile', id: freeSeeker }),
+        await seedCheck(old, { type: 'host_page', id: freeOrg.orgId }),
+        await seedCheck(old, {
+          type: 'media',
+          id: await seedMedia(t.db, freeOrg.orgId, 'listing_photo'),
+        }),
+        await seedCheck(old),
+      ];
+
+      expect(await rule.run(t.db, NOW, 100)).toEqual({ deleted: gone.length });
+      expect(await checks()).toEqual([...kept, behindItem].sort());
+      const [item] = await queryRows<{ check_id: string | null }>(
+        t.db,
+        sql`select check_id from app.review_items where id = ${itemId}`,
+      );
+      expect(item?.check_id).toBe(behindItem);
+    });
+
+    it('reaches the checks behind more held ones than one batch holds', async () => {
+      const held = await seedHostOrg(t.db);
+      await hold({ orgId: held.orgId }, 'all');
+      const free = await seedHostOrg(t.db);
+      const heldFiles = [];
+      for (let i = 0; i < 3; i++) {
+        heldFiles.push(
+          await seedCheck(before(9000 - i), {
+            type: 'media',
+            id: await seedMedia(t.db, held.orgId, 'listing_photo'),
+          }),
+        );
+      }
+      // Newer than every held check, so a single batch of 2 would only see held ones.
+      const behind = await seedCheck(before(1000), {
+        type: 'media',
+        id: await seedMedia(t.db, free.orgId, 'listing_photo'),
+      });
+
+      expect(await rule.run(t.db, NOW, 2)).toEqual({ deleted: 1 });
+      expect(await checks()).toEqual([...heldFiles].sort());
+      expect(await checks()).not.toContain(behind);
+    });
+
+    it('deletes the held checks on the next run once the hold is released', async () => {
+      const seeker = (await seedSeeker(t.db)).userId;
+      const holdId = await hold({ userId: seeker }, 'all');
+      await seedCheck(before(5000), { type: 'user', id: seeker });
+
+      expect(await rule.run(t.db, NOW, 100)).toEqual({ deleted: 0 });
+      await releaseLegalHold(t.db, { holdId, operatorId }, NOW);
+      expect(await rule.run(t.db, NOW, 100)).toEqual({ deleted: 1 });
+      expect(await checks()).toEqual([]);
+    });
   });
 });

@@ -75,13 +75,23 @@ export function parseConsentCookie(
   return { consentId, analytics: flag === 'a', at };
 }
 
+/**
+ * The first cookie called `name`, decoded. A value that is not valid percent-encoding is null:
+ * the browser sent something we never wrote, and it counts as no choice. decodeURIComponent
+ * throws on it, and apiRoute reads consent on every request, so a throw here would answer 500
+ * on every API route for that browser.
+ */
 function cookieValue(header: string | null, name: string): string | null {
   if (!header) return null;
   for (const part of header.split(';')) {
     const eq = part.indexOf('=');
     if (eq === -1) continue;
     if (part.slice(0, eq).trim() !== name) continue;
-    return decodeURIComponent(part.slice(eq + 1).trim());
+    try {
+      return decodeURIComponent(part.slice(eq + 1).trim());
+    } catch {
+      return null;
+    }
   }
   return null;
 }

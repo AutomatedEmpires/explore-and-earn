@@ -5,10 +5,12 @@
 // The age screen (legal review 2.6, P0 item 17): a seeker gives their date of birth as a neutral
 // question. The server checks it and keeps only "18 or older: yes" (adult_attested_at) and the
 // year. The full date is never stored, logged or sent anywhere. Someone under the cut-off is
-// refused with a message that names no age, and nothing about them is saved.
+// refused with a message that names no age. The refusal holds on the account (lead decision
+// 2026-11-18): the row keeps only the time of it (signup_refused_at), and while that is set every
+// later try for the account is refused the same way, as seeker or host, from any browser.
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { type Db, type Tx, withTx } from '@/lib/db';
+import { type Db, type DbOrTx, type Tx, withTx } from '@/lib/db';
 import { AppError, badRequest, conflict, forbidden, notFound } from '@/lib/errors';
 import { record } from '@/modules/audit';
 // The orgs barrel imports identity while it is still evaluating, so reading the name schema
@@ -143,8 +145,9 @@ export type OnboardingOptions = {
 /**
  * Sets the user's account type, once. A seeker's age-screen result is stored with its time,
  * and the birth year when given. Throws bad_request for invalid input (including `operator`),
- * not_found for an unknown or deleted user and conflict if the type is already set. Records
- * `identity.account_type_set`, whose data is the account type only.
+ * not_found for an unknown or deleted user, `signupRefused()` for an account the age screen
+ * refused (so no path, a team invitation included, gives it a type) and conflict if the type is
+ * already set. Records `identity.account_type_set`, whose data is the account type only.
  *
  * The Clerk call runs inside the transaction, so if Clerk fails nothing is saved and the user
  * can simply retry.
@@ -169,15 +172,23 @@ export async function setAccountType(
         adultAttestedAt: accountType === 'seeker' ? sql`now()` : null,
         birthYear,
       })
-      .where(and(eq(users.id, userId), isNull(users.accountType), isNull(users.deletedAt)))
+      .where(
+        and(
+          eq(users.id, userId),
+          isNull(users.accountType),
+          isNull(users.deletedAt),
+          isNull(users.signupRefusedAt),
+        ),
+      )
       .returning({ clerkUserId: users.clerkUserId });
 
     if (!updated) {
       const [existing] = await tx
-        .select({ deletedAt: users.deletedAt })
+        .select({ deletedAt: users.deletedAt, signupRefusedAt: users.signupRefusedAt })
         .from(users)
         .where(eq(users.id, userId));
       if (!existing || existing.deletedAt) throw notFound('User not found');
+      if (existing.signupRefusedAt) throw signupRefused();
       throw conflict('Account type is already set');
     }
 
@@ -195,24 +206,56 @@ export async function setAccountType(
 }
 
 /**
- * The age screen: the birth year of an adult, or `signupRefused()` for anyone under the
- * cut-off. A date after today is a typing mistake (bad_request), not a refusal.
+ * The age screen: the birth year of an adult, or null for anyone under the cut-off. A date
+ * after today is a typing mistake (bad_request), not a refusal.
  */
-function screenAge(dateOfBirth: string, now: Date): number {
+function screenAge(dateOfBirth: string, now: Date): number | null {
   const dob = parseCalendarDate(dateOfBirth);
   if (!dob || dob.year < MIN_BIRTH_YEAR) throw badRequest('Enter a real date of birth');
   const today = calendarDateAnywhereOnEarth(now);
   if (compareDates(dob, today) > 0) throw badRequest('Enter a date before today');
-  if (!isAdultOn(dob, today)) throw signupRefused();
-  return dob.year;
+  return isAdultOn(dob, today) ? dob.year : null;
+}
+
+/**
+ * Holds an under-age refusal on the account: the row gets the time of the refusal and nothing
+ * else, never the date or the year, and no audit event or Clerk call is made. Only an account
+ * with no type yet is stamped (drizzle/0103), and the first refusal's time stays. It commits on
+ * its own, so the refusal holds although the request fails.
+ */
+async function holdSignupRefusal(db: Db, userId: string): Promise<void> {
+  await db
+    .update(users)
+    .set({ signupRefusedAt: sql`now()` })
+    .where(
+      and(
+        eq(users.id, userId),
+        isNull(users.accountType),
+        isNull(users.deletedAt),
+        isNull(users.signupRefusedAt),
+      ),
+    );
+}
+
+/**
+ * Whether the age screen refused this account. Onboarding stays closed for it, and the
+ * onboarding page opens on the refusal in any browser.
+ */
+export async function isSignupRefusedAccount(db: DbOrTx, userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ refusedAt: users.signupRefusedAt })
+    .from(users)
+    .where(eq(users.id, userId));
+  return Boolean(row?.refusedAt);
 }
 
 /**
  * Runs onboarding for POST /api/v1/onboarding and returns where to send the user.
- * A seeker passes the age screen first; a refused one gets `signupRefused()` and nothing is
- * saved. A host also creates their first organization. If that failed after the account type
- * was saved, calling this again finishes it; once the host has an organization it throws
- * conflict.
+ * A seeker passes the age screen first; a refused one gets `signupRefused()`, and the account
+ * keeps the time of the refusal. From then on every call for that account, as seeker or host
+ * and whatever it sends, gets the same refusal. A host also creates their first organization.
+ * If that failed after the account type was saved, calling this again finishes it; once the
+ * host has an organization it throws conflict.
  *
  * Creating the organization holds a lock on the user's row from the membership check until the
  * organization is recorded, Clerk call included. So a form submitted twice at once creates one
@@ -225,8 +268,23 @@ export async function completeOnboarding(
   input: OnboardingRequest,
   opts?: OnboardingOptions,
 ): Promise<{ redirectTo: '/' | '/host' }> {
+  const [user] = await db
+    .select({
+      accountType: users.accountType,
+      deletedAt: users.deletedAt,
+      signupRefusedAt: users.signupRefusedAt,
+    })
+    .from(users)
+    .where(eq(users.id, userId));
+  if (!user || user.deletedAt) throw notFound('User not found');
+  if (user.signupRefusedAt) throw signupRefused();
+
   if (input.accountType === 'seeker') {
     const birthYear = screenAge(input.dateOfBirth, opts?.now ?? new Date());
+    if (birthYear === null) {
+      await holdSignupRefusal(db, userId);
+      throw signupRefused();
+    }
     await setAccountType(
       db,
       clerk,
@@ -236,12 +294,6 @@ export async function completeOnboarding(
     );
     return { redirectTo: '/' };
   }
-
-  const [user] = await db
-    .select({ accountType: users.accountType, deletedAt: users.deletedAt })
-    .from(users)
-    .where(eq(users.id, userId));
-  if (!user || user.deletedAt) throw notFound('User not found');
 
   if (user.accountType === null) {
     await setAccountType(db, clerk, userId, { accountType: 'host' });

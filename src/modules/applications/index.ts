@@ -22,7 +22,9 @@ export {
   SILENT_HOST_TOPIC,
   checkSilentHost,
   recordHostOpen,
+  registerHostReplyCounter,
   type HostOpenAction,
+  type HostReplyCounter,
 } from './host-activity';
 export { privacyHandler, retentionRules } from './privacy';
 

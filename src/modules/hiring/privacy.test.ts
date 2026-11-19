@@ -10,7 +10,9 @@ import {
   pendingPasses,
   pipelineEntries,
 } from './schema';
+import { setLegalHold, type HoldScope } from '@/modules/privacy';
 import { createTestDb, type TestDb } from '@tests/helpers/db';
+import { seedOperator } from '@tests/helpers/sp8';
 import { FIXED_NOW, seedEntry, seedHostOrg, seedInvite, seedMedia, seedOffer, seedSeeker } from '@tests/helpers/sp5';
 import { privacyHandler, retentionRules } from './privacy';
 
@@ -178,6 +180,76 @@ describe('hiring privacy', () => {
     const [recentRow] = await t.db.select().from(invites).where(eq(invites.id, recentId));
     expect(oldRow?.note).toBeNull();
     expect(recentRow?.note).toBe('recent');
+  });
+
+  it('keeps old notes whose organization or candidate is under a hold on applications or all', async () => {
+    const operatorId = (await seedOperator(t.db, { role: 'owner' })).userId;
+    const hold = (subject: { userId: string } | { orgId: string }, scope: HoldScope) =>
+      setLegalHold(t.db, {
+        ...subject,
+        scope,
+        reason: 'Discrimination complaint 26-77',
+        reviewAt: '2099-01-01',
+        operatorId,
+      });
+    const now = new Date('2027-06-15T00:00:00.000Z');
+    const old = new Date('2026-05-01T00:00:00.000Z');
+    const heldOrg = await seedHostOrg(t.db);
+    await hold({ orgId: heldOrg.orgId }, 'applications');
+    const org = await seedHostOrg(t.db);
+    const heldSeeker = await seedSeeker(t.db);
+    await hold({ userId: heldSeeker.userId }, 'all');
+    const otherScope = await seedSeeker(t.db);
+    await hold({ userId: otherScope.userId }, 'messages');
+    const free = await seedSeeker(t.db);
+
+    const invite = (orgId: string, sentBy: string, seekerUserId: string) =>
+      seedInvite(t.db, { orgId, listingId: newId(), seekerUserId, sentBy, note: 'held?', expiresAt: old });
+    /** An offer with a note on an application that closed 13 months before `now`. */
+    async function offer(orgId: string, createdBy: string, seekerUserId: string): Promise<string> {
+      const listingId = newId();
+      const applicationId = await seedEntry(t.db, {
+        orgId,
+        listingId,
+        seekerUserId,
+        status: 'hired',
+        appliedAt: old,
+      });
+      const id = await seedOffer(t.db, {
+        orgId,
+        listingId,
+        applicationId,
+        threadId: newId(),
+        createdBy,
+      });
+      await t.db.update(offers).set({ note: 'held?' }).where(eq(offers.id, id));
+      return id;
+    }
+
+    const keptInvites = [
+      await invite(heldOrg.orgId, heldOrg.owner.userId, free.userId),
+      await invite(org.orgId, org.owner.userId, heldSeeker.userId),
+    ];
+    const clearedInvites = [
+      await invite(org.orgId, org.owner.userId, otherScope.userId),
+      await invite(org.orgId, org.owner.userId, free.userId),
+    ];
+    const keptOffers = [
+      await offer(heldOrg.orgId, heldOrg.owner.userId, free.userId),
+      await offer(org.orgId, org.owner.userId, heldSeeker.userId),
+    ];
+    const clearedOffers = [await offer(org.orgId, org.owner.userId, free.userId)];
+
+    const rule = retentionRules.find((item) => item.key === 'hiring.notes_12m');
+    if (!rule) throw new Error('missing hiring.notes_12m');
+    await rule.run(t.db, now, 100);
+
+    const noteOf = async (table: typeof invites | typeof offers, id: string) =>
+      (await t.db.select({ note: table.note }).from(table).where(eq(table.id, id)))[0]?.note;
+    for (const id of keptInvites) expect(await noteOf(invites, id)).toBe('held?');
+    for (const id of clearedInvites) expect(await noteOf(invites, id)).toBeNull();
+    for (const id of keptOffers) expect(await noteOf(offers, id)).toBe('held?');
+    for (const id of clearedOffers) expect(await noteOf(offers, id)).toBeNull();
   });
 
   it('erases an org pool and pending passes', async () => {

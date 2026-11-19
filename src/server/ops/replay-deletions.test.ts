@@ -7,7 +7,13 @@ import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { makeFakeLedgerMirror } from '../../../tests/fakes/sp8/ledger-mirror';
-import { engineLedgerMirror, replayDeletions, type LedgerEntry } from './replay-deletions';
+import {
+  engineLedgerMirror,
+  REPLAY_MARGIN_MS,
+  replayDeletions,
+  replayFrom,
+  type LedgerEntry,
+} from './replay-deletions';
 
 // The engine's replayErasure belongs to the privacy engine workstream; here it is a mock that
 // does what the real one ends with: the user row marked deleted and the ledger row written.
@@ -87,28 +93,71 @@ describe('replayDeletions', () => {
     expect(await emailOf(userId)).toBe(`${userId}@example.test`);
   });
 
-  it('with apply, replays only entries since the restore point, then skips them on a second run', async () => {
+  it('with apply, replays entries from one hour before the restore point, then skips them on a second run', async () => {
     const before = await seedUser();
+    const inMargin = await seedUser();
     const after = await seedUser();
     const mirror = makeFakeLedgerMirror();
-    const old = entry(before, '2026-11-03T01:59:59.999Z');
+    const old = entry(before, '2026-11-03T00:59:59.999Z');
+    const margin = entry(inMargin, '2026-11-03T01:00:00.000Z');
     const fresh = entry(after, '2026-11-03T02:00:00.000Z');
-    await mirror.put(old);
     await mirror.put(fresh);
+    await mirror.put(old);
+    await mirror.put(margin);
     const replay = vi.fn(erase);
 
     const first = await replayDeletions(t.db, mirror, SINCE, { apply: true, replay });
 
-    expect(first).toEqual({ replayed: 1, skipped: 0, pending: 0, failed: [] });
-    expect(replay).toHaveBeenCalledTimes(1);
-    expect(replay).toHaveBeenCalledWith(t.db, { userId: after, requestId: fresh.requestId });
+    expect(first).toEqual({ replayed: 2, skipped: 0, pending: 0, failed: [] });
+    // Oldest first.
+    expect(replay.mock.calls.map(([, i]) => i)).toEqual([
+      { userId: inMargin, requestId: margin.requestId },
+      { userId: after, requestId: fresh.requestId },
+    ]);
+    expect(await emailOf(inMargin)).toBeNull();
     expect(await emailOf(after)).toBeNull();
     expect(await emailOf(before)).toBe(`${before}@example.test`);
 
     const second = await replayDeletions(t.db, mirror, SINCE, { apply: true, replay });
 
-    expect(second).toEqual({ replayed: 0, skipped: 1, pending: 0, failed: [] });
-    expect(replay).toHaveBeenCalledTimes(1);
+    expect(second).toEqual({ replayed: 0, skipped: 2, pending: 0, failed: [] });
+    expect(replay).toHaveBeenCalledTimes(2);
+  });
+
+  it('replays an erasure that committed after the snapshot with a ledger time before takenAt', async () => {
+    // The race the margin is for: the erasure job reads its clock when the step starts, then
+    // commits after the snapshot. The dump still holds the person, and the ledger entry is a
+    // little older than the manifest's takenAt. Replaying from takenAt alone would skip it, and
+    // the restore would bring the person back for good.
+    const userId = await seedUser();
+    const mirror = makeFakeLedgerMirror();
+    await mirror.put(entry(userId, new Date(SINCE.getTime() - 5 * 60 * 1000).toISOString()));
+    const replay = vi.fn(erase);
+
+    expect(await replayDeletions(t.db, mirror, SINCE, { replay })).toEqual({
+      replayed: 0,
+      skipped: 0,
+      pending: 1,
+      failed: [],
+    });
+    expect(await replayDeletions(t.db, mirror, SINCE, { apply: true, replay })).toEqual({
+      replayed: 1,
+      skipped: 0,
+      pending: 0,
+      failed: [],
+    });
+    expect(await emailOf(userId)).toBeNull();
+  });
+
+  it('starts one hour before the restore point, and asks the mirror from there', async () => {
+    expect(REPLAY_MARGIN_MS).toBe(60 * 60 * 1000);
+    expect(replayFrom(SINCE).toISOString()).toBe('2026-11-03T01:00:00.000Z');
+    const mirror = makeFakeLedgerMirror();
+    const listSince = vi.spyOn(mirror, 'listSince');
+
+    await replayDeletions(t.db, mirror, SINCE);
+
+    expect(listSince).toHaveBeenCalledWith(replayFrom(SINCE));
   });
 
   it('uses the privacy engine replayErasure when none is passed', async () => {
@@ -184,7 +233,10 @@ describe('replayDeletions', () => {
   });
 });
 
-const workflow = readFileSync(path.resolve('.github/workflows/restore-drill.yml'), 'utf8');
+/** With `\n` line endings, so a Windows checkout (CRLF) reads the same. */
+const text = (file: string) => readFileSync(path.resolve(file), 'utf8').replace(/\r\n/g, '\n');
+
+const workflow = text('.github/workflows/restore-drill.yml');
 const code = workflow
   .split('\n')
   .filter((line) => !line.trim().startsWith('#'))
@@ -214,7 +266,7 @@ describe('restore-drill.yml', () => {
       'BACKUP_SUPABASE_URL',
     ]);
     expect(workflow).not.toMatch(/PROD_|evidence/i);
-    const runbook = readFileSync(path.resolve('docs/runbooks/restore.md'), 'utf8');
+    const runbook = text('docs/runbooks/restore.md');
     for (const name of names) expect(runbook).toContain(`\`${name}\``);
   });
 

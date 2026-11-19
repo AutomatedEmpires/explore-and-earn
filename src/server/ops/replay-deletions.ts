@@ -1,7 +1,13 @@
 // Replays deletions after a restore (SP8 spec 8.11). A restored database is as old as its
 // backup, so everyone erased since then is back in it. Within a minute of each erasure the
 // privacy engine writes a ledger entry to the backup project (the "ledger mirror"); this reads
-// the entries since the restore point and erases those users again.
+// the entries from an hour before the restore point and erases those users again.
+//
+// Why an hour before: an entry's `erasedAt` comes from the erasing job's clock, read before
+// the erasure commits, and the restore point comes from another machine's clock. An erasure
+// that commits just after the snapshot is missing from the dump but can carry an `erasedAt` a
+// little before the restore point. Starting early is safe: a user the restored database already
+// shows as erased is skipped, so the only cost is a few entries read twice.
 //
 // It is a dry run unless `apply` is true: by default it only reports what it would replay.
 import type { Db } from '@/lib/db';
@@ -68,10 +74,19 @@ async function alreadyErased(db: Db, userId: string): Promise<boolean> {
   return user.deletedAt !== null && (await isErasureRecorded(db, userId));
 }
 
+/** How far before the restore point the replay starts (see the header). */
+export const REPLAY_MARGIN_MS = 60 * 60 * 1000;
+
+/** The oldest `erasedAt` a replay after restoring to `restorePoint` must cover. */
+export function replayFrom(restorePoint: Date): Date {
+  return new Date(restorePoint.getTime() - REPLAY_MARGIN_MS);
+}
+
 /**
- * Replays every mirrored erasure with `erasedAt >= since`, oldest first. One failing entry
- * does not stop the rest: its ledger ID is returned in `failed`, and the caller must treat a
- * non-empty `failed` as an unfinished restore.
+ * Replays every mirrored erasure with `erasedAt >= replayFrom(since)`, oldest first. `since`
+ * is the restore point: a backup manifest's `takenAt`. One failing entry does not stop the
+ * rest: its ledger ID is returned in `failed`, and the caller must treat a non-empty `failed`
+ * as an unfinished restore.
  */
 export async function replayDeletions(
   db: Db,
@@ -79,11 +94,12 @@ export async function replayDeletions(
   since: Date,
   o: { apply?: boolean; replay?: ReplayErasure } = {},
 ): Promise<ReplayResult> {
-  const sinceMs = since.getTime();
-  if (Number.isNaN(sinceMs)) throw new Error('replayDeletions: `since` is not a date');
+  if (Number.isNaN(since.getTime())) throw new Error('replayDeletions: `since` is not a date');
+  const from = replayFrom(since);
+  const fromMs = from.getTime();
 
-  const entries = (await mirror.listSince(since))
-    .filter((entry) => new Date(entry.erasedAt).getTime() >= sinceMs)
+  const entries = (await mirror.listSince(from))
+    .filter((entry) => new Date(entry.erasedAt).getTime() >= fromMs)
     .sort((a, b) => a.erasedAt.localeCompare(b.erasedAt));
 
   const result: ReplayResult = { replayed: 0, skipped: 0, pending: 0, failed: [] };

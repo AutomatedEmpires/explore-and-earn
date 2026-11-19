@@ -3,8 +3,8 @@
 // decision 8).
 //
 // The wording, screening-question and visa rules follow the legal review (docs/legal/
-// 2026-11-legal-review.md sections 2.2, 2.3 and 2.6; #121, widened by #200). Their host-facing
-// wording is the agent's, pending counsel review (section 13).
+// 2026-11-legal-review.md sections 2.2, 2.3 and 2.6; #121, widened by #200 and #207). Their
+// host-facing wording is the agent's, pending counsel review (section 13).
 import { and, eq, inArray } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
 import { FEDERAL_MIN_WAGE_CENTS } from '@/lib/min-wage';
@@ -258,6 +258,22 @@ const LIMIT_BEFORE = [
   'only hiring',
 ].join('|');
 
+/**
+ * #207: after "no" or "only" and a nationality in the singular, the words that make it name
+ * people in the middle of a phrase: "no Irish allowed", "only Irish hired".
+ */
+const NATIONALITY_NEXT = [
+  'allowed',
+  'accepted',
+  'hired',
+  'considered',
+  'please',
+  'apply',
+  'may apply',
+  'can apply',
+  'should apply',
+].join('|');
+
 const MUST_BE = '(?:must|should|has to|have to|needs to|need to) be';
 const ARTICLE = '(?:an? |the )?';
 /** The end of a phrase, in text whose periods are gone: the field's end, or other punctuation. */
@@ -279,11 +295,13 @@ function termForms(term: string): { one: string; many: string } {
  * describes people: before a word for people ("Mexican workers", "white applicants", "Americans
  * only"), after "must be", and after "no", "only" or "prefer" as a plural, before a word for
  * people or at the end of a phrase ("no Mexicans", "only Irish"). So "the American River", "a
- * white shirt" and "no English required" are not flagged.
+ * white shirt" and "no English required" are not flagged. A `nationality` is an adjective whose
+ * singular after "no" or "only" also counts before "allowed", "hired" and the like (#207).
  */
-function groupMatcher(term: string, form: FlaggedGroup['form']): RegExp {
+function groupMatcher(term: string, form: FlaggedGroup['form'] | 'nationality'): RegExp {
   const { one, many } = termForms(term);
   const any = `(?:${one}|${many})`;
+  const next = form === 'nationality' ? `${PEOPLE}|${NATIONALITY_NEXT}` : PEOPLE;
   const forms =
     form === 'noun'
       ? [
@@ -292,7 +310,7 @@ function groupMatcher(term: string, form: FlaggedGroup['form']): RegExp {
           `${any} (?:${PREFERENCE_AFTER})`,
         ]
       : [
-          `(?:${LIMIT_BEFORE}) ${ARTICLE}(?:${many}(?: (?:${PEOPLE}))?|${one}(?: (?:${PEOPLE})|${PHRASE_END}))`,
+          `(?:${LIMIT_BEFORE}) ${ARTICLE}(?:${many}(?: (?:${PEOPLE}))?|${one}(?: (?:${next})|${PHRASE_END}))`,
           `${MUST_BE} ${ARTICLE}${any}`,
           `${any} (?:${PEOPLE})`,
         ];
@@ -496,6 +514,157 @@ function findAgeLimit(rule: AgeRule, text: string): string | null {
   return null;
 }
 
+// --- Equal-opportunity statements (#207) --------------------------------------------------------
+// "We hire without regard to race, religion or national origin" and "EOE M/F/D/V" name the
+// protected grounds to say they play no part, so their ground words are not flagged. Before the
+// wording is matched, the statement is taken out: its opening words and then only the list of
+// grounds right after them. A word that is not a ground ends the list, so a preference or a limit
+// beside the statement is still flagged ("EOE. Men preferred", "Regardless of age, women only").
+
+/** Words that open a non-discrimination statement. Its list of grounds follows. */
+const EEO_OPENING = [
+  'without regard (?:to|for)',
+  'regardless of',
+  'irrespective of',
+  // "We do not discriminate on the basis of", "discrimination based on ... is not tolerated".
+  'discriminat(?:e|es|ed|ing|ion)(?: against (?:anyone|anybody|any (?:applicant|candidate|employee|person|individual)|applicants|candidates|employees|people|individuals))? (?:on the basis of|based (?:on|upon)|because of|due to|by reason of|on (?:the )?grounds? of|with (?:regard|respect) to)',
+].join('|');
+
+/** Before a ground: "their race", "an applicant's age". */
+const EEO_OWNER =
+  "(?:(?:(?:an?|the) )?(?:applicant|candidate|employee|person|individual|one|someone|anyone)'s |(?:their|his|her|your|any|his or her|his/her) )?";
+const EEO_QUALIFIER_WORD =
+  '(?:actual|perceived|physical|mental|protected|past|current|former|related|known)';
+/** Before a ground: "actual or perceived race", "physical or mental disability". */
+const EEO_QUALIFIER = `(?:${EEO_QUALIFIER_WORD}(?: (?:or|and|and/or) ${EEO_QUALIFIER_WORD})? )?`;
+
+/** The grounds a non-discrimination statement names, under federal and common state law. */
+const EEO_GROUNDS = [
+  // "veteran status", "marital or parental status", "protected veteran status". First, so all of
+  // "veteran status" is read and not only "veteran".
+  `(?:${ANY_WORD} ){1,2}(?:(?:or|and|and/or) (?:${ANY_WORD} ){1,2})?status(?:es)?`,
+  // "status as a protected veteran", "status as an individual with a disability".
+  `status as (?:${ANY_WORD} ){0,5}?(?:veterans?|disabilit(?:y|ies))`,
+  'races?',
+  'racial(?: (?:background|group|identity|origin))?',
+  'colou?r',
+  'skin (?:colou?r|tone)',
+  'complexion',
+  'religions?',
+  'religious(?: (?:beliefs?|affiliation|creed|practices?|observance|dress|grooming))?',
+  'creed',
+  'faith',
+  'beliefs?',
+  'sex',
+  'sexual (?:orientation|identity|preference)',
+  'gender(?: (?:identity|expression)(?: (?:or|and|and/or) (?:identity|expression))?)?',
+  '(?:national|ethnic)(?: (?:or|and) (?:national|ethnic))? origin',
+  'nationality',
+  'ancestry',
+  'ethnicity',
+  'ethnic (?:background|group|identity)',
+  'citizenship',
+  'immigration',
+  'country of (?:origin|birth)',
+  'place of birth',
+  'birthplace',
+  'language',
+  'age',
+  'disabilit(?:y|ies)',
+  'handicaps?',
+  'physical',
+  'mental',
+  'sensory',
+  'medical (?:conditions?|history)',
+  'genetic(?: (?:information|characteristics|testing|predisposition|history))?',
+  'genetics',
+  'hiv',
+  'aids',
+  'pregnancy',
+  'childbirth',
+  'breastfeeding',
+  'lactation',
+  'reproductive (?:health(?: decisions?| decision making)?|decisions?|choices?)',
+  'veterans?',
+  'military(?: (?:service|obligations?))?',
+  'uniformed services?',
+  'political (?:affiliations?|beliefs?|opinions?|views|activit(?:y|ies)|party)',
+  'union (?:membership|activity|affiliation)',
+  'height',
+  'weight',
+  'hair(?: (?:texture|type|style))?',
+  '(?:protective )?hairstyles?',
+  '(?:personal )?appearance',
+  'arrests?(?: (?:records?|histor(?:y|ies)))?',
+  'convictions?(?: (?:records?|histor(?:y|ies)))?',
+  'criminal (?:histor(?:y|ies)|records?|backgrounds?)',
+  'source of income',
+  'caste',
+  // "any other characteristic", "other legally protected status", "protected class".
+  '(?:(?:any|all) )?(?:other )?(?:legally )?(?:protected )?(?:characteristics?|status(?:es)?|class(?:es)?|classifications?|categor(?:y|ies)|bas(?:is|es)|traits?|grounds?)',
+].join('|');
+
+/** After a ground: "protected by law", "protected under federal, state or local law". */
+const EEO_PROTECTED = `(?: (?:protected|prohibited|covered)(?: (?:by|under) (?:${ANY_WORD},? ){0,6}?laws?)?)?`;
+const EEO_GROUND = `${EEO_OWNER}${EEO_QUALIFIER}(?:${EEO_GROUNDS})${EEO_PROTECTED}${AFTER}`;
+/** Between two grounds: ", ", " or ", ", and ", "/", " (including ", "), ". */
+const EEO_CONNECTOR =
+  '(?:and|or|and/or|nor|plus|including(?: but not limited to)?|such as|as well as)';
+const EEO_JOIN = String.raw`(?:(?:\s*[,/&()])+\s*(?:${EEO_CONNECTOR} )?| ${EEO_CONNECTOR} )`;
+
+/** Equal-opportunity taglines. */
+const EEO_TAG = String.raw`(?:eoe|eeo|eeoe|equal employment opportunity(?: employer)?|(?:an? )?equal opportunity(?:\s*(?:and|&|/)\s*affirmative action)? employer|affirmative action(?:\s*(?:and|&|/)\s*equal opportunity)? employer)${AFTER}`;
+/** What a tagline lists, joined by slashes: "M/F/D/V", "Minorities/Females/Vets/Disabled". */
+const EEO_CODE = String.raw`(?:m|f|d|v|h|aa|aap|vets?|veterans?|protected veterans?|disabled|disabilit(?:y|ies)|individuals? with disabilit(?:y|ies)|minorit(?:y|ies)|women|females?|males?|sexual orientation|gender identity|affirmative action(?: employer)?|employer)${AFTER}`;
+const EEO_SLASH = String.raw`\s*/\s*`;
+/**
+ * A tagline with the codes joined to it: "EOE", "EOE/AA", "AA/EOE", "EOE M/F/D/V", "M/F/D/V EOE".
+ * Codes after a space need a slash between them, so "EOE. Men preferred" keeps "men preferred".
+ */
+const EEO_TAGLINE = [
+  `(?:${EEO_CODE}(?:${EEO_SLASH}${EEO_CODE})+[ ,:]+|(?:${EEO_CODE}${EEO_SLASH})+)?`,
+  EEO_TAG,
+  `(?:(?:${EEO_SLASH}(?:${EEO_TAG}|${EEO_CODE}))+|[ ,:]+${EEO_CODE}(?:${EEO_SLASH}(?:${EEO_TAG}|${EEO_CODE}))+)?`,
+].join('');
+
+/** A non-discrimination statement in folded text: an opening with its grounds, or a tagline. */
+const EEO_STATEMENT = new RegExp(
+  `${BEFORE}(?:(?:${EEO_OPENING}) ${EEO_GROUND}(?:${EEO_JOIN}${EEO_GROUND})*|${EEO_TAGLINE})`,
+  'gu',
+);
+
+/** Folded text with each non-discrimination statement replaced by the end of a phrase. */
+function withoutEqualOpportunity(norm: string): string {
+  return norm.replace(EEO_STATEMENT, ';');
+}
+
+/**
+ * Text with the end of each sentence and of each line written as ";" (#207). Folding drops
+ * periods, so this keeps "No Irish. We are a family business" from reading as "no irish we".
+ * A period after a one-letter word ("U.S.") or before a lowercase word ("yrs. old") is not an end.
+ */
+function markSentenceEnds(s: string): string {
+  return s
+    .normalize('NFKC')
+    .replace(/(?<=[\p{L}\p{N}]{2})\.+(?=\s+[\p{Pi}\p{Ps}"']*\p{Lu})/gu, ';')
+    .replace(/[^\S\r\n]*[\r\n]+\s*/g, '; ');
+}
+
+/** A field's text as the wording checks read it. */
+type WordingText = {
+  /** Folded (`normalizeForPhraseMatch`), with non-discrimination statements taken out. */
+  plain: string;
+  /** The same, with the end of each sentence and line kept as ";". Read for nationalities. */
+  sentences: string;
+};
+
+function wordingText(text: string): WordingText {
+  return {
+    plain: withoutEqualOpportunity(normalizeForPhraseMatch(text)),
+    sentences: withoutEqualOpportunity(normalizeForPhraseMatch(markSentenceEnds(text))),
+  };
+}
+
 /** The fields a host writes as prose. Codes, ids, enums and links are not read for wording. */
 const PROSE_FIELDS: RegExp[] = [
   /^basics\.title$/,
@@ -531,19 +700,26 @@ export type WordingLists = {
   groups: FlaggedGroup[];
 };
 
-/** One way to find flagged wording in folded text, with what to report when it does. */
-type WordingMatcher = { find: (text: string) => string | null; entry: FlaggedPhrase };
+/** One way to find flagged wording in a field's text, with what to report when it does. */
+type WordingMatcher = { find: (text: WordingText) => string | null; entry: FlaggedPhrase };
 
 const byRegExp =
   (re: RegExp) =>
-  (text: string): string | null =>
-    re.exec(text)?.[0] ?? null;
+  ({ plain }: WordingText): string | null =>
+    re.exec(plain)?.[0] ?? null;
+
+/** A nationality is also read with its sentence ends kept, so "No Irish. We…" is found (#207). */
+const bySentences =
+  (re: RegExp) =>
+  ({ plain, sentences }: WordingText): string | null =>
+    (re.exec(plain) ?? re.exec(sentences))?.[0] ?? null;
 
 /**
  * The flag-for-review wording in a draft's prose: one per field, the longest match winning (so
  * "teens welcome" is reported, not "teens"; on a tie, the listed phrase). It reads the phrase
  * list, the nationalities and the group words, and finds any maximum age or age range on its
- * own. Fields in `skip` are not read.
+ * own. A non-discrimination statement's list of grounds is not read (#207). Fields in `skip` are
+ * not read.
  */
 export function findFlaggedWording(
   draft: unknown,
@@ -558,7 +734,7 @@ export function findFlaggedWording(
     ...lists.nationalities
       .filter((n) => normalizeForPhraseMatch(n) !== '')
       .map((n) => ({
-        find: byRegExp(groupMatcher(n, 'adjective')),
+        find: bySentences(groupMatcher(n, 'nationality')),
         entry: {
           phrase: n,
           ground: 'national_origin' as const,
@@ -572,17 +748,17 @@ export function findFlaggedWording(
         entry: { phrase: g.term, ground: g.ground, suggestion: g.suggestion },
       })),
     ...LISTING_AGE_RULES.map((rule) => ({
-      find: (text: string) => findAgeLimit(rule, text),
+      find: ({ plain }: WordingText) => findAgeLimit(rule, plain),
       entry: { phrase: 'an age limit', ground: 'age' as const, suggestion: AGE_LIMIT_SUGGESTION },
     })),
   ];
   const out: FlaggedWording[] = [];
   for (const { path, text } of textFields(draft)) {
     if (skip.has(path) || !PROSE_FIELDS.some((p) => p.test(path))) continue;
-    const norm = normalizeForPhraseMatch(text);
+    const folded = wordingText(text);
     let best: FlaggedWording | null = null;
     for (const { find, entry } of matchers) {
-      const matched = find(norm);
+      const matched = find(folded);
       if (matched && (!best || matched.length > best.matched.length)) {
         const { phrase, ground, suggestion } = entry;
         best = { field: path, phrase, matched, ground, suggestion };
