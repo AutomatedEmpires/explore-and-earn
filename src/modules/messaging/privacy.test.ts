@@ -1,9 +1,11 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { withTx } from '@/lib/db';
 import { DELETED_BODY } from '@/lib/messaging';
 import { newId } from '@/lib/ids';
+import { setLegalHold, type HoldScope } from '@/modules/privacy';
 import { createTestDb, type TestDb } from '@tests/helpers/db';
+import { seedMember, seedOperator } from '@tests/helpers/sp8';
 import { messages, threads } from './schema';
 import { privacyHandler, retentionRules } from './privacy';
 import { seedHostOrg, seedSeeker } from './test-fixtures';
@@ -166,5 +168,86 @@ describe('messaging privacy', () => {
     expect(result?.deleted).toBe(1);
     const left = await t.db.select().from(threads).where(eq(threads.seekerUserId, seeker.userId));
     expect(left.map((row) => row.id)).toEqual([recentId]);
+  });
+
+  it('keeps an old thread while its organization, seeker or a sender is under a hold on messages or all', async () => {
+    const operatorId = (await seedOperator(t.db, { role: 'owner' })).userId;
+    const hold = (subject: { userId: string } | { orgId: string }, scope: HoldScope) =>
+      setLegalHold(t.db, {
+        ...subject,
+        scope,
+        reason: 'Harassment report 26-0912',
+        reviewAt: '2099-01-01',
+        operatorId,
+      });
+    const now = new Date();
+    const closed = new Date(now);
+    closed.setUTCMonth(closed.getUTCMonth() - 13);
+
+    async function oldThread(i: { orgId: string; seekerUserId: string; senderUserId: string }) {
+      const id = newId();
+      await t.db.insert(threads).values({
+        id,
+        orgId: i.orgId,
+        listingId: newId(),
+        seekerUserId: i.seekerUserId,
+        listingClosedAt: closed,
+      });
+      await t.db.insert(messages).values({
+        id: newId(),
+        threadId: id,
+        senderType: 'host',
+        senderUserId: i.senderUserId,
+        kind: 'text',
+        body: 'old',
+        createdAt: closed,
+      });
+      return id;
+    }
+
+    const heldOrg = await seedHostOrg(t.db);
+    await hold({ orgId: heldOrg.orgId }, 'messages');
+    const heldSeeker = await seedSeeker(t.db);
+    await hold({ userId: heldSeeker.userId }, 'all');
+    const org = await seedHostOrg(t.db);
+    const heldSender = await seedMember(t.db, org.orgId, 'recruiter');
+    await hold({ userId: heldSender.userId }, 'messages');
+    const otherScope = await seedSeeker(t.db);
+    await hold({ userId: otherScope.userId }, 'applications');
+    const free = await seedSeeker(t.db);
+
+    const kept = [
+      await oldThread({
+        orgId: heldOrg.orgId,
+        seekerUserId: free.userId,
+        senderUserId: heldOrg.owner.userId,
+      }),
+      await oldThread({
+        orgId: org.orgId,
+        seekerUserId: heldSeeker.userId,
+        senderUserId: org.owner.userId,
+      }),
+      await oldThread({
+        orgId: org.orgId,
+        seekerUserId: free.userId,
+        senderUserId: heldSender.userId,
+      }),
+    ];
+    const gone = [
+      await oldThread({
+        orgId: org.orgId,
+        seekerUserId: otherScope.userId,
+        senderUserId: org.owner.userId,
+      }),
+      await oldThread({ orgId: org.orgId, seekerUserId: free.userId, senderUserId: org.owner.userId }),
+    ];
+
+    const rule = retentionRules.find((item) => item.key === 'messaging.messages_12m');
+    expect(await rule?.run(t.db, now, 100)).toEqual({ deleted: gone.length });
+    const left = await t.db
+      .select({ id: threads.id })
+      .from(threads)
+      .where(inArray(threads.id, [...kept, ...gone]));
+    expect(left.map((row) => row.id).sort()).toEqual([...kept].sort());
   });
 });

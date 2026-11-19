@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
@@ -6,11 +6,14 @@ import { createTestDb, type TestDb } from '@tests/helpers/db';
 import { seedHostOrg, seedOperator, seedSeeker } from '@tests/helpers/sp8';
 import {
   activeHolds,
+  heldSubjects,
   holdsInclude,
   isOnLegalHold,
   listLegalHolds,
+  namesUnderLegalHold,
   releaseLegalHold,
   setLegalHold,
+  underLegalHold,
 } from './holds';
 
 const NOW = new Date('2026-11-18T12:00:00Z');
@@ -148,5 +151,107 @@ describe('active holds', () => {
     expect(everything.nextBefore).toBeNull();
     const older = await listLegalHolds(t.db, { includeReleased: true, before: holdId });
     expect(older.items.map((h) => h.id)).not.toContain(holdId);
+  });
+});
+
+describe('underLegalHold', () => {
+  type Held = { held: boolean };
+
+  async function held(condition: SQL): Promise<boolean> {
+    const [row] = await queryRows<Held>(t.db, sql`select ${condition} as held`);
+    return row?.held === true;
+  }
+
+  it('matches the scope itself or a hold on everything, like holdsInclude, and any scope with any', async () => {
+    const userId = (await seedSeeker(t.db)).userId;
+    await hold({ userId, scope: 'messages' });
+    const user = [sql`${userId}::uuid`];
+
+    expect(await held(underLegalHold({ users: user, scope: 'messages' }))).toBe(true);
+    expect(await held(underLegalHold({ users: user, scope: 'applications' }))).toBe(false);
+    expect(await held(underLegalHold({ users: user, scope: 'all' }))).toBe(false);
+    expect(await held(underLegalHold({ users: user, scope: 'any' }))).toBe(true);
+
+    const everything = (await seedSeeker(t.db)).userId;
+    await hold({ userId: everything, scope: 'all' });
+    for (const scope of ['all', 'applications', 'messages', 'reports', 'billing', 'any'] as const) {
+      expect(await held(underLegalHold({ users: [sql`${everything}::uuid`], scope }))).toBe(true);
+    }
+  });
+
+  it('matches an organization by its own holds only, takes text ids, and ignores null ids', async () => {
+    const org = await seedHostOrg(t.db);
+    await hold({ orgId: org.orgId, scope: 'reports' });
+    const owner = org.owner.userId;
+
+    expect(await held(underLegalHold({ orgs: [sql`${org.orgId}::text`], scope: 'reports' }))).toBe(true);
+    expect(await held(underLegalHold({ users: [sql`${org.orgId}::uuid`], scope: 'any' }))).toBe(false);
+    expect(await held(underLegalHold({ users: [sql`${owner}::uuid`], scope: 'any' }))).toBe(false);
+    expect(
+      await held(
+        underLegalHold({ users: [sql`null::uuid`, sql`${owner}::uuid`], orgs: [sql`${org.orgId}::uuid`], scope: 'any' }),
+      ),
+    ).toBe(true);
+    expect(await held(underLegalHold({ users: [sql`null::uuid`], orgs: [sql`null`], scope: 'any' }))).toBe(false);
+  });
+
+  it('stops counting a hold once it is released', async () => {
+    const userId = (await seedSeeker(t.db)).userId;
+    const { holdId } = await hold({ userId, scope: 'all' });
+    const condition = underLegalHold({ users: [sql`${userId}::uuid`], scope: 'any' });
+    expect(await held(condition)).toBe(true);
+
+    await releaseLegalHold(t.db, { holdId, operatorId }, NOW);
+
+    expect(await held(condition)).toBe(false);
+  });
+
+  it('refuses a condition that names no one', () => {
+    expect(() => underLegalHold({ scope: 'any' })).toThrow(/name the user or organization/);
+  });
+});
+
+describe('namesUnderLegalHold and heldSubjects', () => {
+  async function held(condition: SQL): Promise<boolean> {
+    const [row] = await queryRows<{ held: boolean }>(t.db, sql`select ${condition} as held`);
+    return row?.held === true;
+  }
+  const payload = (value: Record<string, unknown>) => sql`${JSON.stringify(value)}::text`;
+
+  it("finds a held id in the text, or one of the held people's addresses in any case", async () => {
+    const seeker = await seedSeeker(t.db);
+    await hold({ userId: seeker.userId, scope: 'all' });
+    const org = await seedHostOrg(t.db);
+    await hold({ orgId: org.orgId, scope: 'messages' });
+
+    expect(await held(namesUnderLegalHold(payload({ userId: seeker.userId }), 'all'))).toBe(true);
+    // A hold on all covers every scope; a hold on messages covers only messages.
+    expect(await held(namesUnderLegalHold(payload({ userId: seeker.userId }), 'billing'))).toBe(true);
+    expect(await held(namesUnderLegalHold(payload({ orgId: org.orgId }), 'messages'))).toBe(true);
+    expect(await held(namesUnderLegalHold(payload({ orgId: org.orgId }), 'all'))).toBe(false);
+    expect(await held(namesUnderLegalHold(payload({ orgId: org.orgId }), 'any'))).toBe(true);
+    // Addresses are the caller's (read from identity), matched literally and in any case.
+    const to = payload({ to: 'Maya.Held@Example.test' });
+    expect(await held(namesUnderLegalHold(to, 'all'))).toBe(false);
+    expect(await held(namesUnderLegalHold(to, 'all', [' maya.held@example.test ']))).toBe(true);
+    expect(await held(namesUnderLegalHold(payload({ to: 'mayaXheld@example.test' }), 'all', ['maya.held@example.test']))).toBe(false);
+    expect(await held(namesUnderLegalHold(payload({ userId: newId() }), 'any', ['', '  ']))).toBe(false);
+  });
+
+  it('heldSubjects lists the people and organizations whose open holds cover the scope', async () => {
+    const seeker = (await seedSeeker(t.db)).userId;
+    await hold({ userId: seeker, scope: 'billing' });
+    const org = (await seedHostOrg(t.db)).orgId;
+    const { holdId } = await hold({ orgId: org, scope: 'all' });
+
+    const billing = await heldSubjects(t.db, 'billing');
+    expect(billing.users.has(seeker)).toBe(true);
+    expect(billing.orgs.has(org)).toBe(true);
+    const reports = await heldSubjects(t.db, 'reports');
+    expect(reports.users.has(seeker)).toBe(false);
+    expect(reports.orgs.has(org)).toBe(true);
+
+    await releaseLegalHold(t.db, { holdId, operatorId }, NOW);
+    expect((await heldSubjects(t.db, 'any')).orgs.has(org)).toBe(false);
   });
 });

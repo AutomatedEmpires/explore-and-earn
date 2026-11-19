@@ -3,12 +3,14 @@
 // `privacy.retention_sweep` (03:30 UTC) opens one `retention_runs` row per registered rule and
 // queues one `privacy.retention_rule` job for it, so a slow or failing rule never holds up the
 // others. A rule deletes at most RETENTION_BATCH rows per run; a full batch queues a follow-up
-// run at once. A rule that throws or runs too long is recorded as failed and raises one alert
-// per rule per day. Nothing is retried blindly: the next sweep runs the rule again.
+// run at once. Each rule runs in one transaction that commits only if it finishes within
+// RETENTION_TIMEOUT_MS. A rule that throws or runs too long is recorded as failed with nothing
+// deleted (true: its transaction rolls back) and raises one alert per rule per day. Nothing is
+// retried blindly: the next sweep runs the rule again.
 //
 // Other modules are loaded on first use, never at import time: their barrels import this module
 // for the privacy types, so a static import here would be a cycle.
-import { and, eq, gte, lt, ne } from 'drizzle-orm';
+import { and, eq, gte, lt, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db, DbOrTx } from '@/lib/db';
 import { newId } from '@/lib/ids';
@@ -24,11 +26,55 @@ export const retentionRules: RetentionRule[] = [...coreRetentionRules, ...consen
 
 /** The most rows one run deletes. A run that deletes this many queues a follow-up. */
 export const RETENTION_BATCH = 5000;
-/** A rule that runs longer than this is recorded as failed. */
+/** A rule that runs longer than this is stopped, rolled back and recorded as failed. */
 export const RETENTION_TIMEOUT_MS = 60_000;
+/**
+ * How long after the limit the database itself stops a rule's statement, or ends its
+ * transaction while it waits between statements. The limit decides the outcome; this only
+ * frees the connection of a rule that would otherwise keep running.
+ */
+export const RETENTION_DB_GRACE_MS = 5_000;
 
 export const RETENTION_SWEEP_TOPIC = 'privacy.retention_sweep';
 export const RETENTION_RULE_TOPIC = 'privacy.retention_rule';
+
+// Retention rules skip rows under a legal hold (lead decision 2026-11-18) with this condition.
+export { heldSubjects, namesUnderLegalHold, underLegalHold, type HeldUnder } from './holds';
+
+/**
+ * How each registered rule honours legal holds, shown to reviewers and checked by a test: a
+ * new rule fails the build until it is listed here. A rule whose rows name no person or
+ * organization has nothing a hold could name.
+ */
+export const RETENTION_HOLD_COVERAGE: Readonly<Record<string, string>> = {
+  'applications.terminal_12m':
+    'Skips an application whose applicant or organization has a hold on applications or all.',
+  'discovery.listing_events_raw':
+    'Skips the raw events of an organization with a hold on all. The events name no person.',
+  'hiring.notes_12m':
+    'Skips a note whose organization or candidate has a hold on applications or all.',
+  'identity.webhook_events_30d':
+    'Names no person or organization: a provider event id and its source only.',
+  'jobs.outbox_dead_90d':
+    'Skips a job whose payload names a person (id or email) or organization with a hold on all, as the jobs eraser does.',
+  'jobs.outbox_done_30d':
+    'Skips a job whose payload names a person (id or email) or organization with a hold on all, as the jobs eraser does.',
+  'media.orphans':
+    'Skips a file whose owner or owning organization has a hold of any scope: an unused file no longer says which scope it served.',
+  'media.uploads_stale':
+    'Skips a file whose owner or owning organization has a hold of any scope.',
+  'messaging.messages_12m':
+    'Skips a thread whose organization, seeker or any sender has a hold on messages or all.',
+  'notifications.in_app_90d':
+    'Skips the notifications and sent batches of a person with a hold on all.',
+  'privacy.exports_7d': 'Skips the data download of a person with a hold on all.',
+  'privacy.rate_limit_windows_2d':
+    'Names no person or organization: counter windows, exempt from privacy coverage.',
+  'safety.reports_12m':
+    'Skips a report whose reporter (person or organization) or subject (an organization, a seeker, or the organization of a listing) has a hold on reports or all, as the safety eraser does. Not yet: reports about a thread or message, whose owners messaging exposes no lookup for.',
+  'trust.checks_12m':
+    'Skips a check about a person or organization with a hold of any scope: directly, through the file it checked, or through a review item on it. Not yet: checks on a listing revision, message, invite, interview, offer or bulk message, whose owners their modules expose no lookup for.',
+};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_ERROR_LENGTH = 500;
@@ -106,18 +152,57 @@ export async function runRetentionSweep(
   return { queued };
 }
 
-/** Rejects after `ms`. The rule's own promise is left to settle; its late error is swallowed. */
-function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+/**
+ * Runs `rule` inside one transaction of its own, which commits only if the rule finishes
+ * within `timeoutMs`. A rule that runs longer is recorded as failed with nothing deleted, and
+ * that record is true: its transaction can then only roll back.
+ *
+ * - The database stops the work too: `statement_timeout` cancels any one statement, and
+ *   `idle_in_transaction_session_timeout` ends a transaction left waiting between statements,
+ *   both RETENTION_DB_GRACE_MS after `timeoutMs` and both local to this transaction.
+ * - When the limit passes first, this rejects at once and the transaction rolls back when the
+ *   rule next settles, so no deletion it made is ever committed. Rolling back earlier would not
+ *   be safe: the rule's next statement could then run outside any transaction.
+ * - Once the rule has finished in time, the limit no longer applies and the commit's own result
+ *   is what is recorded.
+ * - A rule that throws keeps nothing either: everything it did rolls back with it.
+ */
+async function runWithinLimit(
+  db: Db,
+  rule: RetentionRule,
+  now: Date,
+  batch: number,
+  timeoutMs: number,
+): Promise<{ deleted: number }> {
+  const dbLimitMs = String(Math.max(1, Math.ceil(timeoutMs + RETENTION_DB_GRACE_MS)));
+  const timedOut = () =>
+    new Error(`Timed out after ${Math.round(timeoutMs / 1000)} s; nothing it deleted was kept`);
+  let phase: 'running' | 'committing' | 'timed_out' = 'running';
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_resolve, reject) => {
+
+  const deadline = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {
-      reject(new Error(`Timed out after ${Math.round(ms / 1000)} s`));
-    }, ms);
+      if (phase !== 'running') return;
+      phase = 'timed_out';
+      reject(timedOut());
+    }, timeoutMs);
+  });
+  const work = db.transaction(async (tx) => {
+    await tx.execute(sql`
+      select set_config('statement_timeout', ${dbLimitMs}, true),
+        set_config('idle_in_transaction_session_timeout', ${dbLimitMs}, true)
+    `);
+    const result = await rule.run(tx, now, batch);
+    if (phase === 'timed_out') throw timedOut();
+    phase = 'committing';
+    return result;
   });
   work.catch(() => {});
-  return Promise.race([work, timeout]).finally(() => {
+  try {
+    return await Promise.race([work, deadline]);
+  } finally {
     clearTimeout(timer);
-  });
+  }
 }
 
 /**
@@ -157,7 +242,7 @@ export async function runRetentionRule(
   let error: string | null = null;
   try {
     if (!rule) throw new Error(`No retention rule is registered as ${i.key}`);
-    const result = await withTimeout(rule.run(db, i.now, batch), timeoutMs);
+    const result = await runWithinLimit(db, rule, i.now, batch, timeoutMs);
     deleted = result.deleted;
     status = deleted >= batch ? 'partial' : 'ok';
   } catch (err) {

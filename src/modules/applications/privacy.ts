@@ -192,7 +192,9 @@ export const privacyHandler: PrivacyHandler = {
  * ones first, then still-open ones whose listing SP2 reports closed or removed (or no longer
  * knows). The open ones are paged through by id, `scan` at a time, until `limit` is reached or
  * none are left, so old applications to listings that are still active never hide the ones
- * behind them.
+ * behind them. An application whose applicant or organization is under a legal hold on
+ * applications (or on everything) is left as it is, as the eraser leaves it (lead decision
+ * 2026-11-18).
  */
 export async function redactDue(
   db: Db,
@@ -201,7 +203,14 @@ export async function redactDue(
   scan: number = RETENTION_SCAN,
 ): Promise<number> {
   const cutoff = addMonths(now, -RETAIN_MONTHS);
-  const old = and(lt(applications.statusChangedAt, cutoff), NOT_REDACTED);
+  // Loaded on first use: the privacy barrel loads this module's barrel.
+  const { underLegalHold } = await import('@/modules/privacy');
+  const held = underLegalHold({
+    users: [sql`${applications.seekerUserId}`],
+    orgs: [sql`${applications.orgId}`],
+    scope: 'applications',
+  });
+  const old = and(lt(applications.statusChangedAt, cutoff), NOT_REDACTED, sql`not ${held}`);
 
   const finished = await db
     .select({ id: applications.id })

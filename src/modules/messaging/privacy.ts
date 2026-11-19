@@ -151,6 +151,9 @@ export const retentionRules: RetentionRule[] = [
       const cutoff = new Date(now);
       cutoff.setUTCMonth(cutoff.getUTCMonth() - MONTHS_12);
       const cap = Math.max(0, Math.floor(limit));
+      // A thread whose organization, seeker or any sender is under a legal hold on messages
+      // (or on everything) is kept, as the eraser keeps it (lead decision 2026-11-18).
+      const { underLegalHold } = await import('@/modules/privacy');
       const rows = await queryRows<{ id: string }>(
         db,
         sql`
@@ -161,6 +164,15 @@ export const retentionRules: RetentionRule[] = [
               and (
                 select max(m.created_at) from app.messages m where m.thread_id = t.id
               ) < ${cutoff.toISOString()}::timestamptz
+              and not ${underLegalHold({
+                users: [sql`t.seeker_user_id`],
+                orgs: [sql`t.org_id`],
+                scope: 'messages',
+              })}
+              and not exists (
+                select 1 from app.messages sent where sent.thread_id = t.id
+                  and ${underLegalHold({ users: [sql`sent.sender_user_id`], scope: 'messages' })}
+              )
             limit ${cap}
           )
           returning id

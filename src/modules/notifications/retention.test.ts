@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
+import { setLegalHold, type HoldScope } from '@/modules/privacy';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { retentionRules } from './index';
 
@@ -27,22 +28,26 @@ beforeEach(async () => {
   await t.db.execute(sql`delete from app.notifications`);
 });
 
-async function seedNotification(createdAt: Date): Promise<string> {
+async function seedNotification(createdAt: Date, owner: string = userId): Promise<string> {
   const id = newId();
   await t.db.execute(sql`
     insert into app.notifications (id, user_id, type, category, title, body, created_at)
-    values (${id}, ${userId}, 'test.type', 'account', 'Title', 'Body',
+    values (${id}, ${owner}, 'test.type', 'account', 'Title', 'Body',
       ${createdAt.toISOString()}::timestamptz)
   `);
   return id;
 }
 
-async function seedBatch(status: 'pending' | 'sent', createdAt: Date): Promise<string> {
+async function seedBatch(
+  status: 'pending' | 'sent',
+  createdAt: Date,
+  owner: string = userId,
+): Promise<string> {
   const id = newId();
   await t.db.execute(sql`
     insert into app.notification_batches (id, user_id, batch_key, channel, send_after, status,
       created_at)
-    values (${id}, ${userId}, ${`batch:${id}`}, 'email',
+    values (${id}, ${owner}, ${`batch:${id}`}, 'email',
       ${createdAt.toISOString()}::timestamptz, ${status}, ${createdAt.toISOString()}::timestamptz)
   `);
   return id;
@@ -95,5 +100,38 @@ describe('notifications.in_app_90d', () => {
     expect(await rule.run(t.db, NOW, 2)).toEqual({ deleted: 2 });
     expect(await ids('notifications')).toHaveLength(0);
     expect(await ids('notification_batches')).toHaveLength(1);
+  });
+
+  it('keeps the old notifications and sent batches of a person with a hold on all', async () => {
+    const seedUser = async () => {
+      const id = newId();
+      await t.db.execute(sql`insert into app.users (id, clerk_user_id) values (${id}, ${id})`);
+      return id;
+    };
+    const hold = (holdUserId: string, scope: HoldScope) =>
+      setLegalHold(
+        t.db,
+        {
+          userId: holdUserId,
+          scope,
+          reason: 'Court order 26-0042 for this account',
+          reviewAt: '2026-12-01',
+          operatorId: userId,
+        },
+        NOW,
+      );
+    const held = await seedUser();
+    await hold(held, 'all');
+    const otherScope = await seedUser();
+    await hold(otherScope, 'messages');
+    const keptNotification = await seedNotification(daysAgo(200), held);
+    const keptBatch = await seedBatch('sent', daysAgo(200), held);
+    await seedNotification(daysAgo(200), otherScope);
+    await seedBatch('sent', daysAgo(200), otherScope);
+    await seedNotification(daysAgo(200));
+
+    expect(await rule.run(t.db, NOW, 100)).toEqual({ deleted: 3 });
+    expect(await ids('notifications')).toEqual([keptNotification]);
+    expect(await ids('notification_batches')).toEqual([keptBatch]);
   });
 });

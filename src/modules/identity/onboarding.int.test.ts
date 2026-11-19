@@ -121,4 +121,44 @@ describe('seeker onboarding with a date of birth', () => {
       await failure(db.execute(sql`update app.users set birth_year = 1850 where id = ${seeker}`)),
     ).toMatch(/users_birth_year_range/);
   });
+
+  // The refusal holds on the account (drizzle/0103). An under-age try and an adult try sent at
+  // once race on the row: whichever lands first wins, and the row is never both.
+  it('leaves an account refused or a seeker when a refusal races an adult try, never both', async () => {
+    const child = {
+      accountType: 'seeker',
+      dateOfBirth: `${new Date().getUTCFullYear() - 10}-06-01`,
+    } as const;
+    const adult = { accountType: 'seeker', dateOfBirth: '1990-04-03' } as const;
+
+    for (let n = 0; n < 5; n++) {
+      const userId = await newUser();
+      const clerk = makeFakeClerkAdmin();
+      const [refusal, adultTry] = await Promise.allSettled([
+        completeOnboarding(db, clerk, userId, child),
+        completeOnboarding(db, clerk, userId, adult),
+      ]);
+      expect(refusal).toMatchObject({
+        status: 'rejected',
+        reason: { details: { reason: 'signup_refused' } },
+      });
+      const [row] = await queryRows<{ account_type: string | null; refused: boolean }>(
+        db,
+        sql`select account_type, signup_refused_at is not null as refused
+            from app.users where id = ${userId}`,
+      );
+      const adultOutcome =
+        adultTry?.status === 'rejected'
+          ? (adultTry.reason as { details?: { reason?: string } }).details?.reason
+          : adultTry?.status;
+      expect([
+        // The refusal landed first: the adult try is refused too, and nothing is set.
+        'none/refused/signup_refused',
+        // The adult try landed first: the account is a seeker and the refusal stamped nothing.
+        'seeker/open/fulfilled',
+      ]).toContain(
+        `${row?.account_type ?? 'none'}/${row?.refused ? 'refused' : 'open'}/${adultOutcome}`,
+      );
+    }
+  });
 });

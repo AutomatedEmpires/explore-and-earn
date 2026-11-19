@@ -1,4 +1,4 @@
-// Drizzle tables for the identity module (drizzle/0100_identity.sql to 0102). Only this module
+// Drizzle tables for the identity module (drizzle/0100_identity.sql to 0103). Only this module
 // reads or writes them; other code goes through `@/modules/identity`.
 import { sql } from 'drizzle-orm';
 import { pgSchema, smallint, text, timestamp, uuid } from 'drizzle-orm/pg-core';
@@ -28,6 +28,12 @@ export const users = app.table('users', {
   birthYear: smallint('birth_year'),
   /** When a signed-in request first carried Global Privacy Control (legal review 4.5). */
   analyticsOptOutAt: ts('analytics_opt_out_at'),
+  /**
+   * When the age screen refused this account (legal review 2.6, drizzle/0103). Only the time,
+   * never the date or the year. While it is set, onboarding is refused for the account as seeker
+   * and as host. A refused account never holds the adult confirmation and is never a host.
+   */
+  signupRefusedAt: ts('signup_refused_at'),
   deletedAt: ts('deleted_at'),
   /** SHA-256 of the Clerk user id, set when the person is erased. Null until then. */
   erasedClerkIdSha256: text('erased_clerk_id_sha256').unique(),

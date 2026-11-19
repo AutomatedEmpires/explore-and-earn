@@ -4,9 +4,11 @@
 // signing up (spec 5.1), or else their home: / for a seeker and /host for a host.
 //
 // The age screen (legal review 2.6): a refused sign-up answers 403 `forbidden` with
-// details.reason `signup_refused` and a message that names no age, and sets a session cookie.
-// Every later attempt in that browser session, with any date or as a host, gets the same
-// refusal. The date of birth is never stored or logged; only the birth year is kept.
+// details.reason `signup_refused` and a message that names no age. The refusal holds on the
+// account (lead decision 2026-11-18): every later attempt for it, with any date or as a host,
+// from any browser or a direct call, gets the same refusal. The answer also sets a session
+// cookie, a second check that refuses the rest of that browser session before the account is
+// read. The date of birth is never stored or logged; only an adult's birth year is kept.
 import { z } from 'zod';
 import { hasSignupRefusal, signupRefusedCookie } from '@/app/onboarding/refusal';
 import { onboardingDestination } from '@/app/onboarding/return-to';
@@ -25,7 +27,7 @@ const input = onboardingRequestSchema.and(z.object({ returnTo: z.string().max(51
 const output = z.object({ redirectTo: z.string().startsWith('/') });
 type Output = z.output<typeof output>;
 
-/** The refusal envelope, closing onboarding for the rest of the browser session. */
+/** The refusal envelope. Its cookie also closes onboarding for the rest of the browser session. */
 function refusal(requestId: string): Output {
   const res = toErrorResponse(signupRefused(), requestId);
   res.headers.append('set-cookie', signupRefusedCookie());
