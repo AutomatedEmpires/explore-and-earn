@@ -1,12 +1,20 @@
 'use client';
 
-// Builder steps 7-9: The job, Photos and Applying (Figma 43:12041, 156:18301, 156:18601).
+// Builder steps 7-9: The job, Photos and Applying (Figma 43:12041, 156:18301, 156:18601). For an
+// H-2B listing the job step adds "Your H-2B job order" (issue 208; Figma 215:23546).
 import { useState } from 'react';
 import { Button, Checkbox, Notice, Select } from '@/ui/components';
-import { Image, Plus, Sparkles } from '@/ui/icons';
+import { Image, Plus, Sparkles, TriangleAlert } from '@/ui/icons';
 import { ApiError, api } from '../_lib/api';
 import { commaItems, lines } from '../_lib/format';
-import { DESCRIPTION_MIN, GALLERY_MAX, QUESTIONS_MAX } from '../_lib/model';
+import {
+  DESCRIPTION_MIN,
+  GALLERY_MAX,
+  H2B_FIELDS,
+  QUESTIONS_MAX,
+  h2bFixLine,
+  type H2bKey,
+} from '../_lib/model';
 import { arr, getPath, obj, str, strings, type Json } from '../_lib/paths';
 import {
   AreaField,
@@ -28,6 +36,108 @@ const VISA = [
   { value: 'h2a', label: 'H-2A' },
   { value: 'h2b', label: 'H-2B' },
 ] as const;
+
+/** 20 CFR 655.41, the rule an H-2B listing must match (also the Review warning's link). */
+const H2B_RULE = 'https://www.ecfr.gov/current/title-20/section-655.41';
+
+/** The H-2B job order fields as drawn (215:23547): textareas for terms, inputs for the office. */
+const H2B_INPUTS: Record<H2bKey, { label: string; hint: string; area: boolean }> = {
+  transportation: {
+    label: 'Travel to the job and home',
+    hint: 'Optional. How you provide or pay for the trip here and the trip home, with meals on the way.',
+    area: true,
+  },
+  tools: {
+    label: 'Tools and equipment',
+    hint: 'Optional. The tools, supplies and equipment you give workers at no charge.',
+    area: true,
+  },
+  threeFourthsGuarantee: {
+    label: 'Three-fourths hours guarantee',
+    hint: 'Optional. A short summary of the guarantee in your job order.',
+    area: true,
+  },
+  swaContact: {
+    label: 'State Workforce Agency office',
+    hint: 'Optional. The office where workers can also apply, with its phone number or website.',
+    area: false,
+  },
+  jobOrderNumber: {
+    label: 'Job order number',
+    hint: 'Optional. As it appears on your job order.',
+    area: false,
+  },
+};
+
+/**
+ * "Your H-2B job order" (Figma 215:23547; empty 215:23710; error 215:23897): five optional
+ * fields that write job.h2b, shown only while Visa sponsorship is H-2B. No field has a
+ * maxLength: a paste over the limit is kept whole and shown with its error.
+ */
+function H2bJobOrder({ form }: { form: Form }) {
+  return (
+    <div
+      role="group"
+      aria-labelledby="h2b-job-order-title"
+      className="flex flex-col gap-4 rounded-lg border border-line p-4"
+    >
+      <h3 id="h2b-job-order-title" className="text-19 font-bold text-ink">
+        Your H-2B job order
+      </h3>
+      <p className="text-16 text-ink-2">
+        Copy these from your job order. Guests see them in an H-2B section on your listing. Each
+        one is optional.
+      </p>
+      <Notice
+        title="Match your job order"
+        action={
+          <Button asChild variant="secondary">
+            <a href={H2B_RULE} target="_blank" rel="noreferrer">
+              Read the rule<span className="sr-only"> (opens in a new tab)</span>
+            </a>
+          </Button>
+        }
+      >
+        Pay and terms here must be at least as good as your H-2B job order. You confirm this when
+        you publish.
+      </Notice>
+      {H2B_FIELDS.map(({ key }) => {
+        const { label, hint, area } = H2B_INPUTS[key];
+        const path = `job.h2b.${key}`;
+        return area ? (
+          <AreaField key={key} form={form} path={path} label={label} hint={hint} rows={3} />
+        ) : (
+          <TextField
+            key={key}
+            form={form}
+            path={path}
+            label={label}
+            hint={hint}
+            onText={(v) => form.set(path, v === '' ? null : v)}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+/** Above Next while an H-2B answer shown with its error is over the limit (215:24037). */
+function H2bFixLine({ form }: { form: Form }) {
+  const shown = Object.fromEntries(
+    H2B_FIELDS.flatMap(({ key }) => {
+      const error = form.error(`job.h2b.${key}`);
+      return error ? [[`job.h2b.${key}`, error]] : [];
+    }),
+  );
+  const line = h2bFixLine(shown);
+  if (!line) return null;
+  return (
+    <p className="flex items-start gap-2 text-16 text-ink">
+      <TriangleAlert className="mt-0.5 size-5 shrink-0" />
+      {line}
+    </p>
+  );
+}
 
 export function JobSection({ form }: { form: Form }) {
   const description = str(getPath(form.draft, 'job.description')) ?? '';
@@ -149,6 +259,13 @@ export function JobSection({ form }: { form: Form }) {
         options={VISA}
         hint="A listing here does not replace the recruiting steps the Department of Labor requires."
       />
+      {/* Any other visa hides the group and keeps its answers in the draft. */}
+      {getPath(form.draft, 'job.visaSponsorship') === 'h2b' ? (
+        <>
+          <H2bJobOrder form={form} />
+          <H2bFixLine form={form} />
+        </>
+      ) : null}
     </>
   );
 }

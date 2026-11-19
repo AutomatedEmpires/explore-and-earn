@@ -676,6 +676,8 @@ const PROSE_FIELDS: RegExp[] = [
   /^genreDetails\.(staffPerks|equipment|certifications)\.\d+$/,
   /^job\.(description|typicalDay|physicalDemands)$/,
   /^job\.(responsibilities|requiredQualifications|preferredQualifications|skills|certifications)\.\d+$/,
+  // The H-2B job order terms, shown to guests in the employer's own words (#208).
+  /^job\.h2b\.(transportation|tools|threeFourthsGuarantee|swaContact|jobOrderNumber)$/,
   /^applying\.questions\.\d+\.(prompt|choices\.\d+)$/,
   /^applying\.additionalStep\.note$/,
 ];

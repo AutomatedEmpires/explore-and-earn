@@ -115,6 +115,7 @@ export type {
   ListingSummary,
   PublishedListing,
 } from './types';
+export { listingRevisionOwners, type ListingItemOwners } from './owners';
 export {
   countActiveByLocation,
   countActiveListings,

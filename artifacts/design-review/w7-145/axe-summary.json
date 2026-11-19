@@ -1,0 +1,325 @@
+{
+  "results": [
+    {
+      "file": "w7-report-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-sent-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-unreadable-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-390-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-sent-390-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-unreadable-390-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-768.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-768-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-sent-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-unreadable-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-1440-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-sent-1440-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-unreadable-1440-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-sheet-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-sheet-sent-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-sheet-390-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-sheet-768.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-sheet-768-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-sheet-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-sheet-sent-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-report-sheet-1440-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-block-seeker-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-block-seeker-390-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-block-seeker-768.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-block-seeker-768-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-block-seeker-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-block-seeker-1440-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-block-host-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-block-host-390-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-block-host-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-block-host-1440-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-mute-off-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-mute-on-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-mute-off-390-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-mute-on-390-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-mute-off-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-mute-on-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-mute-off-1440-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-mute-on-1440-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-snapshot-seeker-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-snapshot-host-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-snapshot-seeker-390-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-snapshot-host-390-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-snapshot-seeker-768.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-snapshot-host-768.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-snapshot-seeker-768-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-snapshot-host-768-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-snapshot-seeker-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-snapshot-host-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-snapshot-seeker-1440-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-snapshot-host-1440-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-candidate-pool-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-candidate-interested-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-candidate-pool-390-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-candidate-interested-390-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-candidate-pool-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-candidate-interested-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-candidate-pool-1440-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-candidate-interested-1440-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-read-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-empty-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-error-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-loading-390.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-390-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-empty-390-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-error-390-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-loading-390-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-768.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-768-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-read-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-empty-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-error-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-loading-1440.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-1440-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-empty-1440-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-error-1440-dark.png",
+      "axeSeriousOrCritical": []
+    },
+    {
+      "file": "w7-notifications-loading-1440-dark.png",
+      "axeSeriousOrCritical": []
+    }
+  ],
+  "failures": []
+}

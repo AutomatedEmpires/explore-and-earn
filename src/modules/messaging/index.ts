@@ -39,6 +39,7 @@ import './register';
 
 export * from '@/lib/messaging';
 export type { ListingScope, ThreadViewer } from './access';
+export { messagingItemOwners, type MessagingItemOwners, type MessagingOwnedItem } from './owners';
 
 export {
   createBulkMessage,

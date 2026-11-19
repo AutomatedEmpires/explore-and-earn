@@ -4,6 +4,7 @@ import type { HandlerMap } from '@/modules/jobs';
 import { asDescribedDue } from './as-described/due';
 import { refreshFit } from './fit-store';
 import { onMemberRemoved } from './interviews/close';
+import { closeForFailedHost } from './interviews/host-failed';
 import { sendInterviewReminder } from './interviews/reminders';
 import { sweepInterviews } from './interviews/sweep';
 import { sweepInvites } from './invites/sweep';
@@ -31,6 +32,10 @@ export const jobHandlers: HandlerMap = {
   'hiring.member_removed': async (payload, ctx) => {
     if (!ctx) return;
     await onMemberRemoved(ctx.db, payload);
+  },
+  'hiring.close_for_failed_host': async (payload, ctx) => {
+    if (!ctx) return;
+    await closeForFailedHost(ctx.db, payload, ctx.now);
   },
   'hiring.commit_pass': async (payload, ctx) => {
     if (!ctx) return;

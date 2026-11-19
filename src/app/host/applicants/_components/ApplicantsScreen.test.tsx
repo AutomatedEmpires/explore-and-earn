@@ -5,11 +5,17 @@
 // contrast is left to src/ui/tokens.test.ts and the Playwright run (tests/e2e/flow-d-*).
 import { createRequire } from 'node:module';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApplicantCardData } from '@/lib/hiring';
 import { applicantsQuerySchema } from '@/lib/hiring';
+import { appliedDaysAgo } from '../_lib/model';
 import { SAMPLE_IDS, SAMPLE_ORG, sampleApplicant, sampleSecondApplicant } from '../_lib/sample';
 import { ApplicantsScreen } from './ApplicantsScreen';
+
+// "Applied today" counts calendar days on this device's clock, so every test starts at a fixed
+// midday: the cards read the same whatever the hour, time zone or daylight-saving change on the
+// machine running them. Only Date is faked; timers stay real and the clock moves on from there.
+const MIDDAY = new Date(2026, 10, 18, 12);
 
 type Violation = { id: string; impact: string | null; nodes: { target: string[] }[] };
 type Axe = { run(context: Element, options: object): Promise<{ violations: Violation[] }> };
@@ -88,6 +94,11 @@ function card(name: string): HTMLElement {
   if (!article) throw new Error(`no card for ${name}`);
   return article;
 }
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+  vi.setSystemTime(MIDDAY);
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -286,5 +297,69 @@ describe('Applicants: states', () => {
     renderScreen();
     await screen.findByRole('link', { name: 'Maya Chen' });
     expect(screen.queryByRole('link', { name: 'Jordan Reyes' })).toBeNull();
+  });
+});
+
+// The day turns over at midnight on this device's clock (local time; UTC on the CI runner).
+describe('Applicants: the calendar-day boundary', () => {
+  const midnight = new Date(2026, 10, 18);
+  const justBefore = new Date(midnight.getTime() - 1);
+
+  it('reads Applied today in the first hour after midnight', async () => {
+    vi.setSystemTime(new Date(2026, 10, 18, 0, 30));
+    install({});
+    renderScreen();
+    await screen.findByRole('link', { name: 'Maya Chen' });
+    expect(within(card('Maya Chen')).getByText('Applied today')).toBeInTheDocument();
+  });
+
+  it('reads Applied today a minute before midnight', async () => {
+    vi.setSystemTime(new Date(2026, 10, 17, 23, 59));
+    install({});
+    renderScreen();
+    await screen.findByRole('link', { name: 'Maya Chen' });
+    expect(within(card('Maya Chen')).getByText('Applied today')).toBeInTheDocument();
+  });
+
+  it('a minute after midnight, 23:59 was a day ago and 00:00 is today', async () => {
+    vi.setSystemTime(new Date(2026, 10, 18, 0, 1));
+    install({
+      items: [
+        { ...sampleApplicant(), appliedAt: new Date(2026, 10, 17, 23, 59).toISOString() },
+        { ...sampleSecondApplicant(), appliedAt: midnight.toISOString() },
+      ],
+    });
+    renderScreen();
+    await screen.findByRole('link', { name: 'Maya Chen' });
+    expect(within(card('Maya Chen')).getByText('Applied 1 day ago')).toBeInTheDocument();
+    expect(within(card('Jordan Reyes')).getByText('Applied today')).toBeInTheDocument();
+  });
+
+  it('appliedDaysAgo turns over at midnight, to the millisecond', () => {
+    expect(appliedDaysAgo(justBefore.toISOString(), midnight)).toBe(1);
+    expect(appliedDaysAgo(midnight.toISOString(), midnight)).toBe(0);
+    expect(appliedDaysAgo(justBefore.toISOString(), justBefore)).toBe(0);
+    expect(appliedDaysAgo(new Date(2026, 10, 17).toISOString(), justBefore)).toBe(0);
+    expect(appliedDaysAgo(new Date(2026, 10, 17).toISOString(), midnight)).toBe(1);
+  });
+
+  it('keeps the sample applicant on the same calendar day as now, either side of midnight', () => {
+    const nows = [
+      justBefore,
+      midnight,
+      new Date(2026, 10, 18, 0, 30),
+      new Date(2026, 10, 18, 0, 59, 59, 999),
+      new Date(2026, 10, 18, 1),
+      MIDDAY,
+    ];
+    for (const now of nows) {
+      expect(appliedDaysAgo(sampleApplicant(now).appliedAt, now), now.toISOString()).toBe(0);
+    }
+    // An hour before now, but never before that day's midnight.
+    expect(sampleApplicant(MIDDAY).appliedAt).toBe(new Date(2026, 10, 18, 11).toISOString());
+    expect(sampleApplicant(justBefore).appliedAt).toBe(
+      new Date(2026, 10, 17, 22, 59, 59, 999).toISOString(),
+    );
+    expect(sampleApplicant(new Date(2026, 10, 18, 0, 30)).appliedAt).toBe(midnight.toISOString());
   });
 });
