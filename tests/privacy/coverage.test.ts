@@ -95,6 +95,16 @@ describe('computeCoverage', () => {
     });
   });
 
+  // An excuse outlives its reason once the table lands (or the claim goes): it would then hide
+  // a real gap. Every pending entry must still be a claim with no table.
+  it('excuses only claims whose table has not landed', async () => {
+    t = await createTestDb();
+    const report = await computeCoverage(t.db, privacyRegistry);
+    expect(report.claimedButMissing).toEqual(
+      expect.arrayContaining(Object.keys(PENDING_CLAIMED_TABLES)),
+    );
+  });
+
   // The media retention rules (media.orphans and its sibling) refuse to run, and alert every
   // day, while either list is non-empty. Nothing is excused here, pending or not.
   it('declares every *media_id* column, and none that does not exist', async () => {

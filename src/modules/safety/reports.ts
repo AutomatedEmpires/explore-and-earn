@@ -2,8 +2,9 @@
 //
 // A report names a subject by type and id. The module that owns a subject type registers it
 // once, at load (`registerReportSubject`): which trust subject carries out an operator's
-// decision, and how to tell that a subject exists. `report` checks the subject, stores the
-// report and opens a trust review item for it, in one transaction:
+// decision, how to tell that a subject exists and, optionally, who may report it (a message
+// or a thread: only its participants and operators; issue 209). `report` checks the subject
+// and the reporter, stores the report and opens a trust review item for it, in one transaction:
 //   * reason `child_safety`: queue `child_safety` at priority 1000 (Foundation raises the
 //     critical alert);
 //   * any other reason: queue `reports`, at priority 50 once 3 or more distinct reporters
@@ -88,7 +89,13 @@ export async function report(
   if (Array.from(details).length > SAFETY_LIMITS.detailsMax) {
     throw badRequest('Keep the details under 1,000 characters', { reason: 'details_too_long' });
   }
-  if (!isUuid(i.subjectId) || !(await subject.exists(db, i.subjectId))) {
+  // A reporter the subject's check refuses gets the unknown subject's answer, so a refusal never
+  // confirms that the subject exists.
+  if (
+    !isUuid(i.subjectId) ||
+    !(await subject.exists(db, i.subjectId)) ||
+    (subject.mayReport && !(await subject.mayReport(db, i.subjectId, reporter)))
+  ) {
     throw notFound("We couldn't find what you reported");
   }
 

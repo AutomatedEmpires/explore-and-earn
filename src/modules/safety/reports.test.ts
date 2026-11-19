@@ -183,6 +183,49 @@ describe('report', () => {
     ).toBe(0);
   });
 
+  it('asks the reporter check once the subject exists, and refuses as for an unknown subject', async () => {
+    const allowed = await seeker();
+    const refused = await seeker();
+    const subjectId = newId();
+    const asked: { id: string; reporter: unknown }[] = [];
+    registerReportSubject('community_post', {
+      trustSubjectType: 'community_post',
+      exists: async (_db, id) => id === subjectId,
+      mayReport: async (_db, id, reporter) => {
+        asked.push({ id, reporter });
+        return reporter.userId === allowed;
+      },
+    });
+    const input = { subjectType: 'community_post', subjectId, reason: 'spam' } as const;
+    const refusal = async (p: Promise<unknown>) => {
+      const err = (await p.then(
+        () => ({}),
+        (e: unknown) => e,
+      )) as Record<string, unknown>;
+      return { code: err.code, status: err.status, message: err.message, details: err.details };
+    };
+
+    const turnedDown = await refusal(report(t.db, { userId: refused, orgId }, input));
+    const unknown = await refusal(report(t.db, { userId: refused }, { ...input, subjectId: newId() }));
+    expect(turnedDown).toMatchObject({ code: 'not_found' });
+    expect(turnedDown).toEqual(unknown);
+    expect(
+      await count(sql`select count(*)::int as n from app.reports where reporter_user_id = ${refused}`),
+    ).toBe(0);
+
+    const r = await report(t.db, { userId: allowed }, input);
+    expect(r.created).toBe(true);
+    expect(await item(r.reportId)).toMatchObject({
+      subject_type: 'community_post',
+      subject_id: subjectId,
+    });
+    // Asked with the reporter as given, and never about a subject that doesn't exist.
+    expect(asked).toEqual([
+      { id: subjectId, reporter: { userId: refused, orgId } },
+      { id: subjectId, reporter: { userId: allowed } },
+    ]);
+  });
+
   it('quotes at most 500 characters of the details in the review reason', async () => {
     const details = 'x'.repeat(600);
     const r = await report(t.db, { userId: await seeker() }, {
