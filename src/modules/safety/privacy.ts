@@ -154,31 +154,64 @@ export const privacyHandler: PrivacyHandler = {
 
 type Report = { id: string; subject_type: string; subject_id: string; at: string };
 
+/** The organization a report's subject belongs to and the people on it, as its module says. */
+type Owners = { orgId: string | null; userIds: readonly string[] };
+type OwnerLookup = (db: DbOrTx, ids: string[]) => Promise<ReadonlyMap<string, Owners>>;
+type Held = { users: ReadonlySet<string>; orgs: ReadonlySet<string> };
+
 /**
- * The reports about a listing whose organization has a hold on reports (or on everything).
- * The listings module says whose each listing is; nothing is read when no such hold is open.
+ * The report subjects another module owns, and how to ask it who owns a batch of them: a
+ * listing's organization, a thread's organization and seeker, and a message's thread
+ * organization, seeker and sender. Each module is loaded on first use (#216).
  */
-async function heldThroughListing(
-  db: DbOrTx,
-  page: Report[],
-  heldOrgs: ReadonlySet<string>,
-): Promise<Set<string>> {
-  if (heldOrgs.size === 0) return new Set();
-  const about = page.filter((row) => row.subject_type === 'listing');
-  if (about.length === 0) return new Set();
-  const { getListingSummaries } = await import('@/modules/listings');
-  const listings = await getListingSummaries(
-    db,
-    about.map((row) => row.subject_id),
-  );
-  return new Set(
-    about
-      .filter((row) => {
-        const orgId = listings.get(row.subject_id)?.orgId;
-        return orgId !== undefined && heldOrgs.has(orgId);
-      })
-      .map((row) => row.id),
-  );
+const SUBJECT_OWNERS = new Map<string, OwnerLookup>([
+  [
+    'listing',
+    async (db, ids) => {
+      const { getListingSummaries } = await import('@/modules/listings');
+      const listings = await getListingSummaries(db, ids);
+      return new Map(
+        [...listings].map(([id, listing]): [string, Owners] => [
+          id,
+          { orgId: listing.orgId, userIds: [] },
+        ]),
+      );
+    },
+  ],
+  [
+    'thread',
+    async (db, ids) => (await import('@/modules/messaging')).messagingItemOwners(db, 'thread', ids),
+  ],
+  [
+    'message',
+    async (db, ids) =>
+      (await import('@/modules/messaging')).messagingItemOwners(db, 'message', ids),
+  ],
+]);
+
+/**
+ * The reports about a subject whose owner has a hold on reports (or on everything): one read
+ * per subject type in the page, and nothing is read when no such hold is open.
+ */
+async function heldThroughSubject(db: DbOrTx, page: Report[], held: Held): Promise<Set<string>> {
+  const kept = new Set<string>();
+  if (held.users.size + held.orgs.size === 0) return kept;
+  for (const [type, lookup] of SUBJECT_OWNERS) {
+    const about = page.filter((row) => row.subject_type === type);
+    if (about.length === 0) continue;
+    const owners = await lookup(db, [...new Set(about.map((row) => row.subject_id))]);
+    for (const row of about) {
+      const owner = owners.get(row.subject_id);
+      if (
+        owner &&
+        ((owner.orgId !== null && held.orgs.has(owner.orgId)) ||
+          owner.userIds.some((userId) => held.users.has(userId)))
+      ) {
+        kept.add(row.id);
+      }
+    }
+  }
+  return kept;
 }
 
 export const retentionRules: RetentionRule[] = [
@@ -191,9 +224,8 @@ export const retentionRules: RetentionRule[] = [
       const cutoff = addMonths(now, -RETAIN_MONTHS);
       // A report whose reporter or subject is under a legal hold on reports (or on everything)
       // is kept, as the eraser keeps it (lead decision 2026-11-18). The reporter and an
-      // organization or seeker subject are on the row; a listing's organization comes from the
-      // listings module. Reports about a thread or message are not yet matched to their owner:
-      // messaging exposes no owner lookup.
+      // organization or seeker subject are on the row; the owners of a listing, thread or
+      // message come from the module that owns it.
       const { heldSubjects, underLegalHold } = await import('@/modules/privacy');
       const held = await heldSubjects(db, 'reports');
       const onTheRow = underLegalHold({
@@ -224,7 +256,7 @@ export const retentionRules: RetentionRule[] = [
               for update of r skip locked
             `,
           );
-          const kept = await heldThroughListing(tx, page, held.orgs);
+          const kept = await heldThroughSubject(tx, page, held);
           for (const row of page) {
             if (due.length < cap && !kept.has(row.id)) due.push(row.id);
           }

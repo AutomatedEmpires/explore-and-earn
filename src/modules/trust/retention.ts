@@ -3,9 +3,10 @@
 //
 // A check about a person or organization under a legal hold of any scope is kept too (lead
 // decision 2026-11-18): checks are the safety record an investigation reads. "About" means the
-// check's subject is them, or a file they own (the media module says who), or a review item on
-// the check is about them. Checks on a listing revision, message, invite, interview, offer or
-// bulk message are not yet matched to their owner: those modules expose no owner lookup.
+// check's subject, or the subject of a review item on the check, is them or something they own:
+// a file, a listing revision, a message, a bulk message, an invite, an interview or an offer.
+// The module that owns each of those says who owns it (#216), so this rule never reads their
+// tables.
 import { sql, type SQL } from 'drizzle-orm';
 import { queryRows, type DbOrTx } from '@/lib/db';
 import type { RetentionRule } from '@/modules/privacy';
@@ -83,30 +84,103 @@ function namesHeld(underLegalHold: Privacy['underLegalHold']): SQL {
 
 type Candidate = { id: string; subject_type: string; subject_id: string; at: string };
 
+/** The organization a subject belongs to and the people on it, as its module says. */
+type Owners = { orgId: string | null; userIds: readonly string[] };
+type OwnerLookup = (db: DbOrTx, ids: string[]) => Promise<ReadonlyMap<string, Owners>>;
+
 /**
- * The candidates whose subject is a file owned by a held person or organization. The media
- * module says who owns each file; nothing is read when no hold is open.
+ * The subject types another module owns, and how to ask it who owns a batch of them. Each
+ * module is loaded on first use: its barrel loads this module's barrel.
  */
-async function heldThroughFile(db: DbOrTx, page: Candidate[], held: Held): Promise<Set<string>> {
-  if (held.users.size + held.orgs.size === 0) return new Set();
-  const files = page.filter((row) => row.subject_type === 'media');
-  if (files.length === 0) return new Set();
-  const { getMediaMeta } = await import('@/modules/media');
-  const owners = await getMediaMeta(
+const OWNER_LOOKUPS = new Map<string, OwnerLookup>([
+  [
+    'media',
+    async (db, ids) => {
+      const { getMediaMeta } = await import('@/modules/media');
+      const files = await getMediaMeta(db, ids);
+      return new Map(
+        [...files].map(([id, file]): [string, Owners] => [
+          id,
+          { orgId: file.ownerOrgId, userIds: [file.ownerUserId] },
+        ]),
+      );
+    },
+  ],
+  [
+    'listing_revision',
+    async (db, ids) => (await import('@/modules/listings')).listingRevisionOwners(db, ids),
+  ],
+  [
+    'message',
+    async (db, ids) =>
+      (await import('@/modules/messaging')).messagingItemOwners(db, 'message', ids),
+  ],
+  [
+    'bulk_message',
+    async (db, ids) =>
+      (await import('@/modules/messaging')).messagingItemOwners(db, 'bulk_message', ids),
+  ],
+  [
+    'invite',
+    async (db, ids) => (await import('@/modules/hiring')).hiringItemOwners(db, 'invite', ids),
+  ],
+  [
+    'interview',
+    async (db, ids) => (await import('@/modules/hiring')).hiringItemOwners(db, 'interview', ids),
+  ],
+  [
+    'offer',
+    async (db, ids) => (await import('@/modules/hiring')).hiringItemOwners(db, 'offer', ids),
+  ],
+]);
+
+/** One subject a check is about: the check's own, or that of a review item on it. */
+type About = { checkId: string; type: string; id: string };
+
+/**
+ * The candidates about something a held person or organization owns: the check's subject, or
+ * the subject of a review item on it, is a type another module owns, and that module names a
+ * held person or organization as its owner. One read for the review items and one per subject
+ * type in the page; nothing is read when no hold is open.
+ */
+async function heldThroughOwner(db: DbOrTx, page: Candidate[], held: Held): Promise<Set<string>> {
+  if (held.users.size + held.orgs.size === 0 || page.length === 0) return new Set();
+  const about: About[] = page
+    .filter((row) => OWNER_LOOKUPS.has(row.subject_type))
+    .map((row) => ({ checkId: row.id, type: row.subject_type, id: row.subject_id }));
+  const items = await queryRows<{ check_id: string; subject_type: string; subject_id: string }>(
     db,
-    files.map((row) => row.subject_id),
+    sql`
+      select r.check_id::text as check_id, r.subject_type, r.subject_id
+      from app.review_items r
+      where r.check_id in (${sql.join(
+        page.map((row) => sql`${row.id}::uuid`),
+        sql`, `,
+      )})
+        and r.subject_type in (${list([...OWNER_LOOKUPS.keys()])})
+    `,
   );
-  return new Set(
-    files
-      .filter((row) => {
-        const owner = owners.get(row.subject_id);
-        return (
-          owner !== undefined &&
-          (held.users.has(owner.ownerUserId) ||
-            (owner.ownerOrgId !== null && held.orgs.has(owner.ownerOrgId)))
-        );
-      })
-      .map((row) => row.id),
+  for (const item of items) {
+    about.push({ checkId: item.check_id, type: item.subject_type, id: item.subject_id });
+  }
+
+  const kept = new Set<string>();
+  for (const [type, lookup] of OWNER_LOOKUPS) {
+    const ofType = about.filter((subject) => subject.type === type);
+    if (ofType.length === 0) continue;
+    const owners = await lookup(db, [...new Set(ofType.map((subject) => subject.id))]);
+    for (const subject of ofType) {
+      const owner = owners.get(subject.id);
+      if (owner && ownedByHeld(owner, held)) kept.add(subject.checkId);
+    }
+  }
+  return kept;
+}
+
+function ownedByHeld(owner: Owners, held: Held): boolean {
+  return (
+    (owner.orgId !== null && held.orgs.has(owner.orgId)) ||
+    owner.userIds.some((userId) => held.users.has(userId))
   );
 }
 
@@ -118,7 +192,7 @@ export const retentionRules: RetentionRule[] = [
       if (limit <= 0) return { deleted: 0 };
       const cutoff = monthsBefore(now, KEEP_MONTHS).toISOString();
       const refs = await foreignRefs(db);
-      // Loaded on first use: the privacy and media barrels load this module's barrel.
+      // Loaded on first use: the privacy barrel loads this module's barrel.
       const { heldSubjects, underLegalHold } = await import('@/modules/privacy');
       const held = await heldSubjects(db, 'any');
       const unreferenced = sql.join(
@@ -155,7 +229,7 @@ export const retentionRules: RetentionRule[] = [
               for update of c skip locked
             `,
           );
-          const kept = await heldThroughFile(tx, page, held);
+          const kept = await heldThroughOwner(tx, page, held);
           for (const row of page) {
             if (due.length < limit && !kept.has(row.id)) due.push(row.id);
           }

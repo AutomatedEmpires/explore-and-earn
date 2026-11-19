@@ -10,6 +10,7 @@ import { resetSp2 } from '@tests/fakes/sp4/sp2';
 import { createTestDb, type TestDb } from '@tests/helpers/db';
 import { seedListingRow } from '@tests/helpers/sp2';
 import { seedOrg, seedUser } from '@tests/helpers/sp4';
+import { seedThread } from '@tests/helpers/sp5';
 import { block, mute, privacyHandler, retentionRules } from './index';
 
 vi.mock('@/modules/hostpages', async () => (await import('@tests/fakes/sp4/sp2')).hostpagesModule);
@@ -368,5 +369,135 @@ describe('retention', () => {
       )})`,
     );
     expect(left.map((row) => row.id).sort()).toEqual([...held].sort());
+  });
+
+  describe('reports about a thread or message (#216)', () => {
+    const OLD = '2025-01-01T00:00:00Z';
+    let operatorId: string;
+
+    beforeAll(async () => {
+      operatorId = (await seedUser(t.db, { accountType: 'host' })).id;
+    });
+
+    const hold = (subject: { userId: string } | { orgId: string }, scope: HoldScope) =>
+      setLegalHold(
+        t.db,
+        {
+          ...subject,
+          scope,
+          reason: 'Harassment report 26-0912',
+          reviewAt: '2026-12-01',
+          operatorId,
+        },
+        NOW,
+      );
+
+    /** An org, a seeker, a host member, a thread between them and a message the member sent. */
+    async function conversation(): Promise<{
+      orgId: string;
+      seekerId: string;
+      senderId: string;
+      threadId: string;
+      messageId: string;
+    }> {
+      const { orgId } = await seedOrg(t.db, { name: 'Thread Org' });
+      const seekerId = (await seedUser(t.db, { accountType: 'seeker' })).id;
+      const senderId = (await seedUser(t.db, { accountType: 'host' })).id;
+      const threadId = await seedThread(t.db, {
+        orgId,
+        listingId: newId(),
+        seekerUserId: seekerId,
+      });
+      const messageId = newId();
+      await t.db.execute(sql`
+        insert into app.messages (id, thread_id, sender_type, sender_user_id, kind, body)
+        values (${messageId}, ${threadId}, 'host', ${senderId}, 'text', 'Send the deposit first.')
+      `);
+      return { orgId, seekerId, senderId, threadId, messageId };
+    }
+
+    const about = (subjectType: 'thread' | 'message', subjectId: string, reporterUserId: string) =>
+      insertReport({ reporterUserId, subjectType, subjectId, createdAt: OLD });
+
+    async function left(ids: string[]): Promise<string[]> {
+      const rows = await queryRows<{ id: string }>(
+        t.db,
+        sql`select id from app.reports where id in (${sql.join(
+          ids.map((id) => sql`${id}::uuid`),
+          sql`, `,
+        )})`,
+      );
+      return rows.map((row) => row.id).sort();
+    }
+
+    it('keeps a report about a thread or message whose organization, seeker or sender is under a hold on reports or all', async () => {
+      const rule = retentionRules.find((r) => r.key === 'safety.reports_12m');
+      await rule?.run(t.db, NOW, 1000);
+      const reporter = (await seedUser(t.db, { accountType: 'seeker' })).id;
+
+      const heldOrg = await conversation();
+      await hold({ orgId: heldOrg.orgId }, 'reports');
+      const heldSeeker = await conversation();
+      await hold({ userId: heldSeeker.seekerId }, 'all');
+      const heldSender = await conversation();
+      await hold({ userId: heldSender.senderId }, 'reports');
+      const otherScope = await conversation();
+      await hold({ orgId: otherScope.orgId }, 'messages');
+      await hold({ userId: otherScope.senderId }, 'applications');
+      const free = await conversation();
+
+      const kept = [
+        await about('thread', heldOrg.threadId, reporter),
+        await about('message', heldOrg.messageId, reporter),
+        await about('thread', heldSeeker.threadId, reporter),
+        await about('message', heldSeeker.messageId, reporter),
+        await about('message', heldSender.messageId, reporter),
+      ];
+      const gone = [
+        // A thread names its organization and seeker, not who sent each message in it.
+        await about('thread', heldSender.threadId, reporter),
+        await about('thread', otherScope.threadId, reporter),
+        await about('message', otherScope.messageId, reporter),
+        await about('thread', free.threadId, reporter),
+        await about('message', free.messageId, reporter),
+        await about('message', newId(), reporter),
+      ];
+
+      expect((await rule?.run(t.db, NOW, 100))?.deleted).toBe(gone.length);
+      expect(await left([...kept, ...gone])).toEqual([...kept].sort());
+    });
+
+    it('reaches the reports behind more held threads and messages than one batch holds', async () => {
+      const rule = retentionRules.find((r) => r.key === 'safety.reports_12m');
+      await rule?.run(t.db, NOW, 1000);
+      const reporter = (await seedUser(t.db, { accountType: 'seeker' })).id;
+      const held = await conversation();
+      await hold({ orgId: held.orgId }, 'reports');
+      const free = await conversation();
+
+      const heldReports = [
+        await insertReport({
+          reporterUserId: reporter,
+          subjectType: 'thread',
+          subjectId: held.threadId,
+          createdAt: '2025-01-01T00:00:00Z',
+        }),
+        await insertReport({
+          reporterUserId: reporter,
+          subjectType: 'message',
+          subjectId: held.messageId,
+          createdAt: '2025-01-02T00:00:00Z',
+        }),
+      ];
+      const behind = await insertReport({
+        reporterUserId: reporter,
+        subjectType: 'message',
+        subjectId: free.messageId,
+        createdAt: '2025-02-01T00:00:00Z',
+      });
+
+      expect((await rule?.run(t.db, NOW, 1))?.deleted).toBe(1);
+      expect(await left([...heldReports, behind])).toEqual([...heldReports].sort());
+    });
   });
 });

@@ -587,6 +587,14 @@ describe('the privacy module rules and the ledger check', () => {
     );
   });
 
+  it('no rule records a hold coverage gap any more (#216)', () => {
+    const gaps = Object.entries(RETENTION_HOLD_COVERAGE)
+      .filter(([, text]) => /\bnot yet\b|no lookup/i.test(text))
+      .map(([key]) => key);
+
+    expect(gaps).toEqual([]);
+  });
+
   it('isErasureRecorded is true only for a user in the deletion ledger', async () => {
     const erased = newId();
     await t.db.execute(sql`

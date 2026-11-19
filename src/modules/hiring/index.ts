@@ -60,6 +60,7 @@ import './notification-types';
 import './pipeline/register';
 
 export * from '@/lib/hiring';
+export { hiringItemOwners, type HiringItemOwners, type HiringOwnedItem } from './owners';
 
 export {
   FIT_WEIGHTS,
