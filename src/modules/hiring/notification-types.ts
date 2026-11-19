@@ -8,6 +8,14 @@ function text(d: NotificationData, key: string): string {
   return typeof value === 'string' ? value : '';
 }
 
+/**
+ * The seeker's first name, or "A candidate" when the data has none. A host the applicant gate
+ * refuses gets no `firstName` (issue 222, the rule in `interviews/deliver.ts`).
+ */
+function who(d: NotificationData): string {
+  return text(d, 'firstName') || 'A candidate';
+}
+
 const openIt = () => 'Open Explore&Earn to see it.';
 
 defineType({
@@ -31,8 +39,7 @@ defineType({
   type: 'hiring.invite_response',
   category: 'applications',
   push: true,
-  title: (d) =>
-    d.interested === false ? `${text(d, 'firstName')} isn't interested` : `${text(d, 'firstName')} is interested`,
+  title: (d) => (d.interested === false ? `${who(d)} isn't interested` : `${who(d)} is interested`),
   body: openIt,
   email: { template: 'Digest', batch: { key: 'invites', delayMinutes: 60 } },
 });
@@ -48,8 +55,8 @@ for (const type of [
   const title: Record<(typeof type), (d: NotificationData) => string> = {
     'hiring.interview_invited': (d) => `${text(d, 'orgName')} invited you to an interview`,
     'hiring.interview_scheduled': (d) => `Interview scheduled: ${text(d, 'position')}`,
-    'hiring.interview_times_requested': (d) => `${text(d, 'firstName')} asked for new interview times`,
-    'hiring.interview_declined': (d) => `${text(d, 'firstName')} declined the interview`,
+    'hiring.interview_times_requested': (d) => `${who(d)} asked for new interview times`,
+    'hiring.interview_declined': (d) => `${who(d)} declined the interview`,
     'hiring.interview_canceled': (d) => `Interview canceled: ${text(d, 'position')}`,
     'hiring.interview_reminder_24h': (d) => `Interview tomorrow: ${text(d, 'position')}`,
   };
@@ -81,7 +88,7 @@ defineType({
 defineType({
   type: 'hiring.interview_outcome_due',
   category: 'applications',
-  title: (d) => `How did the interview with ${text(d, 'firstName')} go?`,
+  title: (d) => `How did the interview with ${text(d, 'firstName') || 'a candidate'} go?`,
   body: openIt,
 });
 
@@ -98,10 +105,7 @@ defineType({
   type: 'hiring.offer_response',
   category: 'applications',
   push: true,
-  title: (d) =>
-    d.accepted === false
-      ? `${text(d, 'firstName')} declined your offer`
-      : `${text(d, 'firstName')} accepted your offer`,
+  title: (d) => (d.accepted === false ? `${who(d)} declined your offer` : `${who(d)} accepted your offer`),
   body: openIt,
   email: { template: 'HiringUpdate' },
 });
