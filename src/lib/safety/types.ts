@@ -40,6 +40,12 @@ export type ReportSubjectRegistration = {
   /** The trust subject type whose handlers carry out the decision. */
   trustSubjectType: string;
   exists(db: DbOrTx, id: string): Promise<boolean>;
+  /**
+   * Whether `reporter` may report this subject, asked only once `exists` is true (issue 209).
+   * Leave it out when anyone signed in may report the subject. A refused reporter gets the same
+   * `not_found` as a subject that doesn't exist, so a refusal never confirms the subject exists.
+   */
+  mayReport?(db: DbOrTx, id: string, reporter: Reporter): Promise<boolean>;
 };
 
 /** One report, for the console's Safety tab (SP8). */

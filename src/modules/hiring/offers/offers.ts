@@ -32,7 +32,7 @@ import { requireApplicantReads } from '../pipeline/gate';
 import { offers, pipelineEntries } from '../schema';
 import { requireHostTakesAnswers } from '../interviews/answers';
 import { blockedConflict, stampIfBlocked } from '../interviews/blocks';
-import { placeOf, seekerFirstName } from '../interviews/deliver';
+import { hostMayKnowName, placeOf, seekerFirstName } from '../interviews/deliver';
 import { publishOffer } from './deliver';
 import { setOfferState } from '../interviews/state';
 import './register';
@@ -259,7 +259,13 @@ async function loadVisibleOffer(
   return row;
 }
 
-async function notifyResponse(
+/**
+ * `hiring.offer_response` to the offer's sender and the listing team. A host the applicant gate
+ * refuses is told "A candidate", with no `firstName` and no name read (issue 222, the rule in
+ * `interviews/deliver.ts`). The answer is refused before this while the host is refused (issue
+ * 212), so that matters only if the host's status changes during the answer.
+ */
+export async function notifyOfferResponse(
   db: DbOrTx,
   offer: OfferRow,
   seekerUserId: string,
@@ -268,7 +274,8 @@ async function notifyResponse(
   const team = await listingTeam(db, { orgId: offer.orgId, listingId: offer.listingId });
   const recipients = [...new Set([offer.createdBy, ...team])];
   const place = await placeOf(db, offer.listingId, offer.orgId);
-  const firstName = await seekerFirstName(db, seekerUserId);
+  const named = await hostMayKnowName(db, offer.orgId);
+  const name = named ? { firstName: await seekerFirstName(db, seekerUserId) } : {};
   const base = getEnv().APP_URL.replace(/\/+$/, '');
   for (const userId of recipients) {
     await notify(db, userId, 'hiring.offer_response', {
@@ -277,7 +284,7 @@ async function notifyResponse(
       audience: 'host',
       orgName: place.orgName,
       position: offer.position,
-      firstName,
+      ...name,
       accepted,
       url: `${base}/host/messages/${offer.threadId}`,
     });
@@ -448,7 +455,7 @@ async function respond(
       code: to === 'accepted' ? 'offer_accepted' : 'offer_declined',
       visibleTo: 'all',
     });
-    await notifyResponse(tx, updated, seekerUserId, to === 'accepted');
+    await notifyOfferResponse(tx, updated, seekerUserId, to === 'accepted');
     await record(tx, {
       actorType: 'user',
       actorId: seekerUserId,
