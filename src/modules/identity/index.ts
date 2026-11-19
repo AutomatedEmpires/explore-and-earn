@@ -55,6 +55,7 @@ export { isAnalyticsOptedOut, recordAnalyticsOptOut } from './analytics-opt-out'
 export {
   completeOnboarding,
   isSignupRefusal,
+  isSignupRefusedAccount,
   onboardingRequestSchema,
   setAccountType,
   signupRefused,

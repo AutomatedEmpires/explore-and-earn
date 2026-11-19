@@ -1,4 +1,8 @@
 // Host interview proposals, new rounds, cancellation and outcomes.
+//
+// Each one acts on an applicant, so each is refused unless the host is verified (legal review
+// 7.1, issue 198), with the applicant list's 409, inside its transaction and before anything is
+// read or written. That includes interviews the host set up while it was verified.
 import { and, eq, inArray } from 'drizzle-orm';
 import type { ApplicationStatus } from '@/lib/applications';
 import { DEFAULT_TZ, resolveTimeZone } from '@/lib/discovery';
@@ -13,6 +17,7 @@ import type { HostContext } from '@/server/guards';
 import { requireEntry, requireListing } from '../access';
 import { recordPipelineEvent, staleStatus, transitionStatus } from '../core';
 import { enqueueNoteScan } from '../notes';
+import { requireApplicantReads } from '../pipeline/gate';
 import { interviewSlots, interviews, pipelineEntries } from '../schema';
 import { blockedConflict, stampIfBlocked } from './blocks';
 import { notifyInterview, publishInterviewInvite, scheduleFields } from './deliver';
@@ -87,7 +92,9 @@ async function viewOf(db: Db, id: string, now: Date): Promise<HostInterviewView>
   return view;
 }
 
+/** The org's interview for a new round, a cancel or an outcome, once the host may act on it. */
 async function loadHostInterview(db: DbOrTx, ctx: HostContext, id: string): Promise<InterviewRow> {
+  await requireApplicantReads(db, ctx.orgId);
   const [row] = await db.select().from(interviews).where(eq(interviews.id, id));
   if (!row || row.orgId !== ctx.orgId) throw notFound('Interview not found', { reason: 'not_found' });
   await requireListing(db, ctx, row.listingId);
@@ -109,6 +116,7 @@ export async function proposeInterview(
     throw badRequest('Use a shorter video link.', { reason: 'video_url_too_long' });
   }
   const id = await withTx(db, async (tx) => {
+    await requireApplicantReads(tx, ctx.orgId);
     const entry = await requireEntry(tx, ctx, applicationId, { forUpdate: true });
     if (!OPEN.includes(entry.status)) throw staleStatus(entry.status as ApplicationStatus);
     if (await stampIfBlocked(tx, { orgId: entry.orgId, seekerUserId: entry.seekerUserId, applicationId })) {

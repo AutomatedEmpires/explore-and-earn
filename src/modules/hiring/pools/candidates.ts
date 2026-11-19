@@ -2,7 +2,9 @@
 // `getCandidateCards` at stage `pool`, so a seeker who turned visibility off, became ineligible
 // or blocked the org either way is gone on the next load. The only filters are state,
 // available-by and skills (no protected trait, P0 item 13). Pool cards never carry a photo: it
-// appears only after an application or an Interested answer (legal review 2.2 item 5).
+// appears only after an application or an Interested answer (legal review 2.2 item 5). Fit
+// shows and ranks only where it is on for the listing and for where the seeker lives (spec 8.3,
+// lead decision 2026-11-18).
 import { and, asc, eq, inArray, isNotNull, isNull, lte, sql, type SQL } from 'drizzle-orm';
 import type { Db, DbOrTx } from '@/lib/db';
 import { badRequest, isAppError, notFound } from '@/lib/errors';
@@ -13,7 +15,7 @@ import { getPublicMediaUrls, getStorage } from '@/modules/media';
 import { getCandidateCards } from '@/modules/profiles';
 import type { HostContext } from '@/server/guards';
 import { requireListing } from '../access';
-import { fitAvailable } from '../fit/score';
+import { fitAvailable, fitDisabledStates } from '../fit/score';
 import { FIT_WEIGHTS_VERSION } from '../fit/weights';
 import { hostInviteStatus } from '../invites/status';
 import { candidatePoolEntries, candidatePoolRuns, invites } from '../schema';
@@ -82,6 +84,27 @@ async function clearScores(db: Db, listingId: string): Promise<void> {
     .where(and(eq(candidatePoolEntries.listingId, listingId), isNotNull(candidatePoolEntries.fitLines)));
 }
 
+/**
+ * Fit is off for a seeker who lives in a disabled state (lead decision 2026-11-18, issue 198;
+ * see fit/score.ts): drop any score a refresh stored for one before the state was disabled, so
+ * it is neither shown nor ranked. `state` is where the seeker lived at that refresh, the same
+ * profile the score came from, and null when unknown or outside the US.
+ */
+async function clearDisabledStateScores(db: Db, listingId: string): Promise<void> {
+  const disabled = await fitDisabledStates(db);
+  if (disabled.length === 0) return;
+  await db
+    .update(candidatePoolEntries)
+    .set({ fitScore: null, fitLines: null })
+    .where(
+      and(
+        eq(candidatePoolEntries.listingId, listingId),
+        inArray(candidatePoolEntries.state, [...disabled]),
+        isNotNull(candidatePoolEntries.fitLines),
+      ),
+    );
+}
+
 function viewClause(view: View): SQL {
   if (view === 'saved') return isNotNull(candidatePoolEntries.savedAt) as SQL;
   if (view === 'hidden') return isNotNull(candidatePoolEntries.hiddenAt) as SQL;
@@ -136,6 +159,7 @@ export async function listCandidates(
   const cursor = i.cursor ? decodeCursor(i.cursor, { listingId: h.id, view, fitOn }) : null;
   if (!cursor) await refreshIfStale(db, h, now);
   if (!fitOn) await clearScores(db, h.id);
+  else await clearDisabledStateScores(db, h.id);
 
   const rank = sql<number>`(100 - coalesce(${candidatePoolEntries.fitScore}, -1))`;
   const avail = sql<string>`coalesce(${candidatePoolEntries.availableFrom}, ${NO_DATE}::date)`;

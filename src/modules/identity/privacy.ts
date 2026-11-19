@@ -24,6 +24,8 @@ export const privacyHandler: PrivacyHandler = {
         adultAttestedAt: users.adultAttestedAt,
         birthYear: users.birthYear,
         analyticsOptOutAt: users.analyticsOptOutAt,
+        // When the age screen refused the account (drizzle/0103); null for everyone else.
+        signupRefusedAt: users.signupRefusedAt,
         createdAt: users.createdAt,
       })
       .from(users)
@@ -70,6 +72,7 @@ export const privacyHandler: PrivacyHandler = {
       user.email === null &&
       user.displayName === DELETED_NAME &&
       user.birthYear === null &&
+      user.signupRefusedAt === null &&
       user.deletedAt !== null;
     if (done) return { erased: 0, retained };
 
@@ -82,6 +85,10 @@ export const privacyHandler: PrivacyHandler = {
         // The birth year goes. The analytics opt-out stays: it only ever says "do not track
         // this account", and keeping it means no later job can track an erased person.
         birthYear: null,
+        // The under-age refusal goes with the account: a deleted account can never onboard
+        // again (deleted_at), so the stamp has nothing left to hold. A hold on everything
+        // (above) keeps it with the rest of the record.
+        signupRefusedAt: null,
         clerkUserId: pseudonym,
         deletedAt,
       })
