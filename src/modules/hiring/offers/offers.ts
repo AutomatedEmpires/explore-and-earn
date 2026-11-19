@@ -3,6 +3,11 @@
 // Sending and canceling act on an applicant, so both are refused unless the host is verified
 // (legal review 7.1, issue 198), with the applicant list's 409, inside the transaction and
 // before anything is read or written. That includes an offer sent while the host was verified.
+//
+// Accepting and declining tell the host the seeker's first name, so both are refused while the
+// host fails that gate (issue 212): the invite's neutral 409 `not_taking_answers`, inside the
+// transaction, once the offer is known to be the seeker's and before anything is written or sent
+// (`requireHostTakesAnswers`). The offer stays `sent`.
 import { and, desc, eq, inArray, lt, or } from 'drizzle-orm';
 import type { ApplicationStatus } from '@/lib/applications';
 import { track } from '@/lib/analytics';
@@ -25,6 +30,7 @@ import { staleStatus, transitionStatus } from '../core';
 import { enqueueNoteScan } from '../notes';
 import { requireApplicantReads } from '../pipeline/gate';
 import { offers, pipelineEntries } from '../schema';
+import { requireHostTakesAnswers } from '../interviews/answers';
 import { blockedConflict, stampIfBlocked } from '../interviews/blocks';
 import { placeOf, seekerFirstName } from '../interviews/deliver';
 import { publishOffer } from './deliver';
@@ -417,6 +423,7 @@ async function respond(
 ): Promise<SeekerOfferItem> {
   await withTx(db, async (tx) => {
     const visible = await loadVisibleOffer(tx, seekerUserId, offerId);
+    await requireHostTakesAnswers(tx, visible.offer.orgId);
     const [updated] = await tx
       .update(offers)
       .set({ status: to, respondedAt: now })
