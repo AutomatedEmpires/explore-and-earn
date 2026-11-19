@@ -18,7 +18,13 @@ import {
   ProfileSections,
   ResumeLink,
 } from '../profiles/ProfileSections';
-import { dayRange, joinDot, placeLabel, workAuthorizationLine } from '../profiles/format';
+import {
+  dayRange,
+  joinDot,
+  phoneLabel,
+  placeLabel,
+  workAuthorizationLine,
+} from '../profiles/format';
 
 export type ApplicationSnapshotViewProps = {
   snapshot: ApplicationSnapshotV1;
@@ -44,7 +50,7 @@ export function ApplicationSnapshotView({
   const { listing, profile, answers } = snapshot;
   const name = `${profile.firstName} ${profile.lastName}`.trim();
   const dates = dayRange(listing.startDate, listing.endDate);
-  const contact = joinDot([profile.email, profile.phone]);
+  const contact = joinDot([profile.email, phoneLabel(profile.phone)]);
   const work = profile.workAuthorization
     ? workAuthorizationLine(profile.workAuthorization, audience)
     : null;

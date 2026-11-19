@@ -99,20 +99,14 @@ export function SkillsCard({
   skills: readonly { label: string; highlighted: boolean }[];
 }) {
   if (skills.length === 0) return null;
+  // One comma-separated line, as the Compact PDF lists them, so a wrap never strands a separator.
   return (
     <InfoCard title="Skills">
-      <ul className="flex flex-wrap gap-x-2 gap-y-1 text-16 text-ink">
-        {orderedSkills(skills).map((skill, i) => (
-          <li key={`${skill.label}-${i}`} className="flex items-center gap-2">
-            {i > 0 ? (
-              <span aria-hidden="true" className="text-muted">
-                ·
-              </span>
-            ) : null}
-            <span>{skill.label}</span>
-          </li>
-        ))}
-      </ul>
+      <p className="text-16 wrap-anywhere text-ink">
+        {orderedSkills(skills)
+          .map((skill) => skill.label)
+          .join(', ')}
+      </p>
     </InfoCard>
   );
 }

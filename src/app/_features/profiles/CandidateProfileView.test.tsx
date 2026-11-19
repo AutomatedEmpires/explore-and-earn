@@ -31,7 +31,7 @@ describe('CandidateProfileView', () => {
     expect(screen.getByRole('heading', { name: 'Maya R.' })).toBeInTheDocument();
     expect(screen.getByText('Juneau, AK')).toBeInTheDocument();
     expect(screen.getByText('Available from May 1, 2027')).toBeInTheDocument();
-    expect(screen.getByText('Line handling')).toBeInTheDocument();
+    expect(screen.getByText('Line handling, Knots')).toBeInTheDocument();
     const text = document.body.textContent ?? '';
     expect(text).not.toContain('Rodriguez');
     expect(text).not.toContain('@');
@@ -50,7 +50,7 @@ describe('CandidateProfileView', () => {
       />,
     );
     expect(screen.getByRole('heading', { name: 'Maya Rodriguez' })).toBeInTheDocument();
-    expect(screen.getByText('maya@example.test · +15415550123')).toBeInTheDocument();
+    expect(screen.getByText('maya@example.test · (541) 555-0123')).toBeInTheDocument();
     expect(screen.getByText('Deckhand, Kettle Ridge Lodge')).toBeInTheDocument();
     expect(screen.getByText('Self-reported')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/visa|sponsor|H-2B/i);

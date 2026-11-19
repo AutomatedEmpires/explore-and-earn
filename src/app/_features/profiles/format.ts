@@ -50,6 +50,13 @@ export function placeLabel(p: { city: string; region: string | null }): string {
   return p.region ? `${p.city}, ${p.region}` : p.city;
 }
 
+/** A US number in E.164 ('+14065550142') reads as '(406) 555-0142'; others stay as stored. */
+export function phoneLabel(phone: string | null): string | null {
+  if (!phone) return null;
+  const us = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(phone);
+  return us ? `(${us[1]}) ${us[2]}-${us[3]}` : phone;
+}
+
 /** Parts joined with ' · ', leaving out blanks. */
 export function joinDot(parts: readonly (string | null | undefined)[]): string {
   return parts.filter((part): part is string => !!part && part.trim() !== '').join(' · ');

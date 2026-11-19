@@ -13,7 +13,7 @@
 import type { ReactNode } from 'react';
 import { formatAvailableFrom, type CandidateCard } from '@/lib/profiles';
 import { CategoryBadge } from '@/ui/components';
-import { joinDot, placeLabel } from './format';
+import { joinDot, phoneLabel, placeLabel } from './format';
 import {
   InfoCard,
   ProfileIdentity,
@@ -55,7 +55,7 @@ export function CandidateProfileView({ card, resumeHref }: CandidateProfileViewP
   }
 
   const { profile } = card;
-  const contact = joinDot([profile.email, profile.phone]);
+  const contact = joinDot([profile.email, phoneLabel(profile.phone)]);
   return (
     <div className="flex flex-col gap-4">
       <InfoCard>
