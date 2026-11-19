@@ -304,7 +304,7 @@ describe('Reply: when it doesn’t go', () => {
   });
 });
 
-describe('Reply: a host the verification gate refuses (#199)', () => {
+describe('Reply: a host the verification gate refuses (issue 199)', () => {
   it.each(REFUSED)(
     '%s: the thread read shows the applicant list’s refusal, announced, with a way back',
     async (status) => {
