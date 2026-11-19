@@ -21,6 +21,7 @@ import { record } from '@/modules/audit';
 import { emit } from '@/modules/jobs';
 import { getRevision } from '@/modules/listings';
 import { notify } from '@/modules/notifications';
+import { hostApplicantGate } from '@/modules/verification';
 import { buildReceipt, isTerminal, WITHDRAWABLE } from './receipt';
 import { applicationEvents, applications, type ApplicationRow } from './schema';
 import { resolveListingTeam } from './submit';
@@ -118,13 +119,16 @@ async function notifyMemberIdsOf(tx: Tx, revisionId: string): Promise<string[]> 
 }
 
 /**
- * Withdraws a locked application. `firstName` goes into the hosts' notification; a system
- * withdrawal (privacy erasure) passes null, so the name is not copied anywhere new.
+ * Withdraws a locked application. With `withName`, the seeker's first name goes into the hosts'
+ * notification, but only when the applicant gate lets the host see applicant data: a host it
+ * refuses is told without the name, and the name is not read (issue 229, the rule of issue
+ * 222). A system withdrawal (privacy erasure) passes `withName: false`, so the name is not
+ * copied anywhere new.
  */
 async function withdrawLocked(
   tx: Tx,
   row: ApplicationRow,
-  i: { actor: Actor; reason?: WithdrawReason; note?: string; firstName: string | null },
+  i: { actor: Actor; reason?: WithdrawReason; note?: string; withName: boolean },
 ): Promise<void> {
   const at = new Date();
   const reason = i.reason ?? null;
@@ -162,12 +166,14 @@ async function withdrawLocked(
     listingId: row.listingId,
     notifyMemberIds: await notifyMemberIdsOf(tx, row.listingRevisionId),
   });
+  const named = i.withName && team.length > 0 && (await hostApplicantGate(tx, row.orgId)).ok;
+  const firstName = named ? row.snapshot.profile.firstName : null;
   for (const member of team) {
     await notify(tx, member.userId, 'applications.withdrawn', {
       applicationId: row.id,
       listingId: row.listingId,
       listingTitle: row.snapshot.listing.title,
-      ...(i.firstName ? { firstName: i.firstName } : {}),
+      ...(firstName ? { firstName } : {}),
       url: `/host/applicants?application=${row.id}`,
     });
   }
@@ -202,7 +208,7 @@ export function withdraw(
       actor: { type: 'seeker', userId: i.seekerUserId },
       reason: i.reason,
       note: i.note,
-      firstName: row.snapshot.profile.firstName,
+      withName: true,
     });
   });
 }
@@ -225,10 +231,7 @@ async function withdrawOpen(
     .orderBy(applications.id)
     .for('update');
   for (const row of rows) {
-    await withdrawLocked(tx, row, {
-      actor,
-      firstName: actor.type === 'seeker' ? row.snapshot.profile.firstName : null,
-    });
+    await withdrawLocked(tx, row, { actor, withName: actor.type === 'seeker' });
   }
   return rows.length;
 }
