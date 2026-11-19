@@ -4,6 +4,10 @@
 // check, so a retry, a double tap or a withdrawn application never creates a second row or a
 // second notification. Concurrent submits race on the unique key; the losers return the
 // winner's row with `created: false`.
+//
+// The name rule for host notices (issue 229, the rule of issue 222): a host the applicant gate
+// refuses is never told the seeker's first name. It still gets `applications.new_applicant`,
+// with no `firstName` in the data, and the name is not read for it. A verified host is told it.
 import { and, eq, sql } from 'drizzle-orm';
 import { withTx, type Db, type DbOrTx, type Tx } from '@/lib/db';
 import {
@@ -25,6 +29,7 @@ import { notify } from '@/modules/notifications';
 import { canAccessListing, listMembers, type Member } from '@/modules/orgs';
 import { buildProfileSnapshot, getOwnProfile, grantReveal } from '@/modules/profiles';
 import { isBlockedBetween } from '@/modules/safety';
+import { hostApplicantGate } from '@/modules/verification';
 import { buildReceipt } from './receipt';
 import { applicationEvents, applications, type ApplicationRow } from './schema';
 import {
@@ -254,12 +259,15 @@ async function submitInTx(
     listingId: inserted.listingId,
     notifyMemberIds: content.applying.notifyMemberIds,
   });
+  // Step 3 refuses a refused host, so this matters only if its status changed since then.
+  const named = team.length > 0 && (await hostApplicantGate(tx, orgId)).ok;
+  const name = named ? { firstName: snapshot.profile.firstName } : {};
   for (const member of team) {
     await notify(tx, member.userId, 'applications.new_applicant', {
       applicationId: inserted.id,
       listingId: inserted.listingId,
       listingTitle: listing.title,
-      firstName: snapshot.profile.firstName,
+      ...name,
       url: `/host/applicants?application=${inserted.id}`,
     });
   }
