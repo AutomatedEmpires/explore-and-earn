@@ -1,9 +1,10 @@
 // Invite answers and lists (SP5 plan Task 15, spec 8.4): Interested opens the thread and the
 // staged reveal, Not interested carries a reason the host sees, Mute host answers Not
 // interested, repeated answers are idempotent, expiry is read before the sweep, and pending or
-// held invites never reach the seeker.
+// held invites never reach the seeker. A host the applicant gate refuses gets no Interested
+// answer and no first name (legal review 7.1, issue 198).
 import { and, eq } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { sql } from 'drizzle-orm';
@@ -15,6 +16,8 @@ import { profilesFake, safetyFake } from '@tests/fakes/sp5/sp4';
 import { messagingFake } from '@tests/fakes/sp5/messaging';
 import { createTestDb, type TestDb } from '@tests/helpers/db';
 import { FIXED_NOW, seedHostOrg, seedInvite, seedSeeker } from '@tests/helpers/sp5';
+import * as orgs from '@/modules/orgs';
+import type { VerificationStatus } from '@/modules/verification';
 
 const mocks = vi.hoisted(() => ({ getCommunityIdentities: vi.fn() }));
 
@@ -235,6 +238,98 @@ describe('respondToInvite', () => {
     await respondToInvite(t.db, s.seekerUserId, inviteId, { response: 'not_interested' }, NOW);
     expect(await responses(departed)).toHaveLength(0);
     expect(await responses(s.senderId)).toHaveLength(1);
+  });
+});
+
+describe('answers to a host the applicant gate refuses (legal review 7.1, issue 198)', () => {
+  const REFUSED = ['unverified', 'running', 'needs_review', 'needs_info', 'failed'] as const;
+
+  /** SP2 reports this verification status for the org (the fake reports `verified` otherwise). */
+  function verification(orgId: string, status: VerificationStatus): void {
+    vi.spyOn(orgs, 'getOrgSummaries').mockImplementation(async (db, ids) => {
+      const out = await orgsFake.getOrgSummaries(db, ids);
+      const row = out.get(orgId);
+      if (row) out.set(orgId, { ...row, verificationStatus: status });
+      return out;
+    });
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it.each(REFUSED)(
+    'answers Interested with a neutral 409 while the host is %s, and opens, reveals and tells nothing',
+    async (status) => {
+      const s = await setup();
+      const inviteId = await invite(s);
+      verification(s.orgId, status);
+
+      const err = await respondToInvite(t.db, s.seekerUserId, inviteId, { response: 'interested' }, NOW).then(
+        () => null,
+        (e: unknown) => e as { status: number; code: string; message: string; details: unknown },
+      );
+      expect(err).toMatchObject({
+        status: 409,
+        code: 'conflict',
+        message: "This job isn't taking answers right now",
+        details: { reason: 'not_taking_answers' },
+      });
+      // The seeker is not told why.
+      expect(JSON.stringify(err)).not.toMatch(/verif/i);
+      expect(JSON.stringify(err)).not.toContain(status);
+
+      expect(calls('ensureThread')).toHaveLength(0);
+      expect(calls('postCard')).toHaveLength(0);
+      expect(calls('postEvent')).toHaveLength(0);
+      expect(profilesFake.calls.filter((c) => c.name === 'grantReveal')).toHaveLength(0);
+      expect(mocks.getCommunityIdentities).not.toHaveBeenCalled();
+      expect(await responses(s.senderId)).toHaveLength(0);
+      const [row] = await t.db.select().from(invites).where(eq(invites.id, inviteId));
+      expect(row).toMatchObject({ status: 'sent', threadId: null, respondedAt: null });
+      expect(await t.db.select().from(pipelineEvents).where(eq(pipelineEvents.inviteId, inviteId))).toEqual([]);
+    },
+  );
+
+  it('takes the Interested answer once the host is verified again', async () => {
+    const s = await setup();
+    const inviteId = await invite(s);
+    verification(s.orgId, 'needs_info');
+    await expect(
+      respondToInvite(t.db, s.seekerUserId, inviteId, { response: 'interested' }, NOW),
+    ).rejects.toMatchObject({ details: { reason: 'not_taking_answers' } });
+    vi.restoreAllMocks();
+    const r = await respondToInvite(t.db, s.seekerUserId, inviteId, { response: 'interested' }, NOW);
+    expect(r.threadId).toEqual(expect.any(String));
+    expect(profilesFake.calls.filter((c) => c.name === 'grantReveal')).toHaveLength(1);
+  });
+
+  it('records Not interested for a refused host and tells it without the first name', async () => {
+    const s = await setup();
+    const inviteId = await invite(s);
+    verification(s.orgId, 'failed');
+    const r = await respondToInvite(t.db, s.seekerUserId, inviteId, { response: 'not_interested', reason: 'pay' }, NOW);
+    expect(r).toMatchObject({ threadId: null, invite: { status: 'not_interested' } });
+    expect(calls('ensureThread')).toHaveLength(0);
+    expect(profilesFake.calls.filter((c) => c.name === 'grantReveal')).toHaveLength(0);
+    expect(mocks.getCommunityIdentities).not.toHaveBeenCalled();
+    const told = await responses(s.senderId);
+    expect(told).toHaveLength(1);
+    expect(told[0]?.title).toBe("A candidate isn't interested");
+    expect(told[0]?.data).toMatchObject({ firstName: 'A candidate', interested: false });
+    expect(JSON.stringify(told)).not.toContain('Maya');
+  });
+
+  it('mutes a refused host and records Not interested without the first name', async () => {
+    const s = await setup();
+    const inviteId = await invite(s);
+    verification(s.orgId, 'failed');
+    const r = await muteInviteHost(t.db, s.seekerUserId, inviteId, NOW);
+    expect(r.invite).toMatchObject({ status: 'not_interested' });
+    expect(safetyFake.calls.filter((c) => c.name === 'mute')).toHaveLength(1);
+    expect(mocks.getCommunityIdentities).not.toHaveBeenCalled();
+    const told = await responses(s.senderId);
+    expect(told.map((n) => n.data.firstName)).toEqual(['A candidate']);
   });
 });
 

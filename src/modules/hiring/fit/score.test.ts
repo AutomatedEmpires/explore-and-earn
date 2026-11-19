@@ -29,7 +29,7 @@ vi.mock('@/modules/discovery', async (orig) => ({
 }));
 
 import { refreshFit, scoreApplications } from '../fit-store';
-import { fitAvailable, scoreSeekers } from './score';
+import { fitAvailable, scoreSeekers, seekersInDisabledStates } from './score';
 import { FIT_WEIGHTS_VERSION } from './weights';
 
 const OPERATOR = { operatorId: '019a4a3c-0000-7000-8000-00000000f001' };
@@ -156,6 +156,62 @@ describe('scoreSeekers', () => {
     poolSeeker(seeker);
     expect(await scoreSeekers(t.db, await info(listing.id), [seeker])).toBeNull();
   });
+
+  // Lead decision 2026-11-18 (issue 198), pending counsel under SP5 open item 2.
+  it('leaves out a seeker who lives in a disabled state, wherever the listing is', async () => {
+    await setSetting(t.db, 'hiring.fit_disabled_states', ['CO'], OPERATOR);
+    const listing = onSite('UT');
+    expect(await fitAvailable(t.db, await info(listing.id))).toBe(true);
+    const coloradan = newId();
+    const lowerCase = newId();
+    const utahn = newId();
+    poolSeeker(coloradan, { region: 'CO' });
+    poolSeeker(lowerCase, { region: 'co', countryCode: 'us' });
+    poolSeeker(utahn, { region: 'UT' });
+    const scores = await scoreSeekers(t.db, await info(listing.id), [coloradan, lowerCase, utahn], '2026-11-03');
+    expect(scores && [...scores.keys()]).toEqual([utahn]);
+
+    const remote = newId();
+    listingsFake.setListing({ id: remote, orgId: newId(), category: 'remote', state: null, remoteStates: ['UT', 'NV'] });
+    const remoteScores = await scoreSeekers(t.db, await info(remote), [coloradan, utahn], '2026-11-03');
+    expect(remoteScores && [...remoteScores.keys()]).toEqual([utahn]);
+  });
+
+  it('applies only the listing rule to a seeker with no US home state', async () => {
+    await setSetting(t.db, 'hiring.fit_disabled_states', ['CO'], OPERATOR);
+    const listing = onSite('UT');
+    const noState = newId();
+    const abroad = newId();
+    poolSeeker(noState, { region: null });
+    poolSeeker(abroad, { region: 'CO', countryCode: 'MX' });
+    const scores = await scoreSeekers(t.db, await info(listing.id), [noState, abroad], '2026-11-03');
+    expect(scores && [...scores.keys()].sort()).toEqual([noState, abroad].sort());
+
+    // The listing rule still turns fit off for everyone on a listing in a disabled state.
+    expect(await scoreSeekers(t.db, await info(onSite('CO').id), [noState, abroad])).toBeNull();
+  });
+
+  it('scores a Coloradan while Colorado is not disabled', async () => {
+    const listing = onSite('UT');
+    const coloradan = newId();
+    poolSeeker(coloradan, { region: 'CO' });
+    expect((await scoreSeekers(t.db, await info(listing.id), [coloradan], '2026-11-03'))?.has(coloradan)).toBe(true);
+  });
+});
+
+describe('seekersInDisabledStates', () => {
+  it('names the seekers who live in a disabled state and reads nothing while none is', async () => {
+    const coloradan = newId();
+    const utahn = newId();
+    const unknown = newId();
+    poolSeeker(coloradan, { region: 'CO' });
+    poolSeeker(utahn, { region: 'UT' });
+    expect(await seekersInDisabledStates(t.db, [coloradan, utahn, unknown], [])).toEqual(new Set());
+    expect(profilesFake.calls.filter((c) => c.name === 'getFitInputs')).toEqual([]);
+    expect(await seekersInDisabledStates(t.db, [coloradan, utahn, unknown], ['CO', 'NY'])).toEqual(
+      new Set([coloradan]),
+    );
+  });
 });
 
 describe('scoreApplications', () => {
@@ -207,6 +263,21 @@ describe('scoreApplications', () => {
     expect(cleared?.fitScore).toBeNull();
     expect(cleared?.fitLines).toBeNull();
     expect(cleared?.fitWeightsVersion).toBeNull();
+  });
+
+  it('nulls the score of an applicant who lives in a disabled state, on a listing elsewhere', async () => {
+    const listing = onSite('UT');
+    const coloradan = newId();
+    const utahn = newId();
+    poolSeeker(coloradan, { region: 'CO' });
+    poolSeeker(utahn, { region: 'UT' });
+    const fromColorado = await entry(listing, coloradan);
+    const fromUtah = await entry(listing, utahn);
+    expect(await scoreApplications(t.db, { listingId: listing.id })).toBe(2);
+    await setSetting(t.db, 'hiring.fit_disabled_states', ['CO'], OPERATOR);
+    expect(await scoreApplications(t.db, { listingId: listing.id })).toBe(1);
+    expect(await row(fromColorado)).toMatchObject({ fitScore: null, fitLines: null, fitWeightsVersion: null });
+    expect((await row(fromUtah))?.fitScore).toBeGreaterThan(0);
   });
 
   it('nulls every score when hiring.fit_enabled is false', async () => {

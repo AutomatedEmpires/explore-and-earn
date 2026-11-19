@@ -162,6 +162,8 @@ describe('read stubs', () => {
   const db = {} as never;
 
   it('say nobody is blocked or muted', async () => {
+    // Real queries from W5 on (safety/blocks.test.ts). An id that is not a uuid names nobody,
+    // so these still answer neutrally, without touching the database.
     const a = { type: 'user', id: 'u1' } as const;
     const b = { type: 'org', id: 'o1' } as const;
     expect(await safety.isBlockedBetween(db, a, b)).toEqual({

@@ -235,8 +235,9 @@ describe('getInterestedCandidate', () => {
   it('counts no view for an invite it refuses', async () => {
     const s = await setup();
     await expect(getInterestedCandidate(t.db, s.ctx, s.inviteId, NOW)).rejects.toMatchObject({ code: 'not_found' });
-    mocks.hostApplicantGate.mockResolvedValue({ ok: false, reason: 'unverified' });
+    // Answered while the host was verified: a refused host gets no Interested answer (issue 198).
     await respondToInvite(t.db, s.seekerUserId, s.inviteId, { response: 'interested' }, NOW);
+    mocks.hostApplicantGate.mockResolvedValue({ ok: false, reason: 'unverified' });
     await expect(getInterestedCandidate(t.db, s.ctx, s.inviteId, NOW)).rejects.toMatchObject({
       details: { reason: 'verification_unverified' },
     });
