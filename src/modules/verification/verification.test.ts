@@ -125,13 +125,29 @@ const orgStatus = async (orgId: string) =>
     )
   )[0];
 
+/**
+ * The org's `verification.decided` events, one row per decision: its listings.resume_screening
+ * row. Each decision also fans out to hiring.close_for_failed_host (see `decidedTopics`).
+ */
 const decidedEvents = (orgId: string) =>
   queryRows<{ topic: string; status: string }>(
     t.db,
     sql`select topic, payload->'data'->>'status' as status from app.outbox
       where payload->>'event' = 'verification.decided' and payload->'data'->>'orgId' = ${orgId}
+        and topic = 'listings.resume_screening'
       order by created_at, id`,
   );
+
+/** Every outbox topic the org's `verification.decided` events fanned out to. */
+const decidedTopics = async (orgId: string) =>
+  (
+    await queryRows<{ topic: string }>(
+      t.db,
+      sql`select topic from app.outbox
+        where payload->>'event' = 'verification.decided' and payload->'data'->>'orgId' = ${orgId}
+        order by topic`,
+    )
+  ).map((row) => row.topic);
 
 const auditActions = async (orgId: string) =>
   (
@@ -486,6 +502,11 @@ describe('operator decisions (subject organization)', () => {
     expect(await getVerificationStatus(t.db, org.orgId)).toBe('failed');
     expect(await decidedEvents(org.orgId)).toEqual([
       { topic: 'listings.resume_screening', status: 'failed' },
+    ]);
+    // Hiring closes the failed host's open interviews and offers (issue 212).
+    expect(await decidedTopics(org.orgId)).toEqual([
+      'hiring.close_for_failed_host',
+      'listings.resume_screening',
     ]);
     for (const userId of [org.owner.userId, admin.userId]) {
       expect(await notificationsFor(userId)).toEqual([

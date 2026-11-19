@@ -22,6 +22,16 @@ export type PhotoAlts = ReadonlyMap<string, string | null>;
 
 export type PhotoRef = { src: string; srcSet: string; alt: string };
 
+/** One H-2B job order term: its icon, the guest's label and the employer's own words. */
+export type H2bTerm = {
+  kind: 'travel' | 'tools' | 'guarantee' | 'state';
+  label: string;
+  value: string;
+};
+
+/** The "H-2B job terms" section (Figma 223:20363; none filled in, 223:20530). */
+export type H2bTerms = { intro: string; terms: H2bTerm[]; closing: string | null };
+
 export type ListingView = {
   listingId: string;
   title: string;
@@ -53,6 +63,8 @@ export type ListingView = {
   typicalDay: string | null;
   qualifications: string | null;
   perks: string | null;
+  /** The employer's H-2B job order terms, after Perks; null unless the listing is H-2B. */
+  h2b: H2bTerms | null;
   /** The category's own facts (vessel type, home port, ...); staff perks join Perks. */
   details: { label: string; value: string }[];
 };
@@ -249,6 +261,53 @@ function perks(content: ListingContent): string | null {
   return all.length > 0 ? all.join(' · ') : null;
 }
 
+/** A filled answer, or null for an empty or missing one. */
+function filled(v: string | null | undefined): string | null {
+  const t = v?.trim();
+  return t ? t : null;
+}
+
+/**
+ * The H-2B job terms (issue 208): one row per filled field, in the employer's own words, and
+ * only while the listing is H-2B (answers kept after a visa change stay hidden). Nothing here
+ * says or implies the listing counts as H-2B recruitment (legal review 2.3 item 1).
+ */
+function h2bTerms(job: Job, host: string): H2bTerms | null {
+  if (job.visaSponsorship !== 'h2b') return null;
+  const h = job.h2b;
+  const terms: H2bTerm[] = [];
+  const travel = filled(h?.transportation);
+  if (travel) terms.push({ kind: 'travel', label: 'Travel to the job and home', value: travel });
+  const tools = filled(h?.tools);
+  if (tools) terms.push({ kind: 'tools', label: 'Tools and equipment', value: tools });
+  const guarantee = filled(h?.threeFourthsGuarantee);
+  if (guarantee) terms.push({ kind: 'guarantee', label: 'Hours guarantee', value: guarantee });
+  const office = filled(h?.swaContact);
+  const number = filled(h?.jobOrderNumber);
+  if (office || number) {
+    const value = [
+      office ? sentence(`You can also apply at the state job office: ${office}`) : '',
+      number ? sentence(`Job order ${number}`) : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    terms.push({ kind: 'state', label: 'Apply through the state', value });
+  }
+  const intro = `${host} also hires through the H-2B visa program.`;
+  if (terms.length === 0) {
+    return {
+      intro: `${intro} It hasn’t added terms from its job order. Ask it about travel, tools and guaranteed hours before you accept.`,
+      terms,
+      closing: null,
+    };
+  }
+  return {
+    intro: `${intro} It gave us these terms from its job order.`,
+    terms,
+    closing: `These are the employer’s words. Ask ${host} to confirm them in writing before you accept.`,
+  };
+}
+
 const HOUSING_SLOTS = [
   ['bedroom', 'Bedroom'],
   ['bathroom', 'Bathroom'],
@@ -365,6 +424,7 @@ export function buildListingView(detail: ListingDetail, alts: PhotoAlts): Listin
     typicalDay: c.job.typicalDay,
     qualifications: qualifications(c.job),
     perks: perks(c),
+    h2b: h2bTerms(c.job, detail.host.name),
     details: detail.categoryFields.filter((f) => f.label !== 'Staff perks'),
   };
 }

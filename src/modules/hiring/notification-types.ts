@@ -106,6 +106,17 @@ defineType({
   email: { template: 'HiringUpdate' },
 });
 
+// The seeker's notice when an offer closes without the host canceling it (issue 212: the host
+// failed verification). Neutral: it never says why.
+defineType({
+  type: 'hiring.offer_canceled',
+  category: 'applications',
+  push: true,
+  title: (d) => `Offer canceled: ${text(d, 'position')}`,
+  body: openIt,
+  email: { template: 'HiringUpdate' },
+});
+
 defineType({
   type: 'hiring.marked_hired',
   category: 'applications',

@@ -3,6 +3,7 @@
 //   Skip · Apply · Save pinned above the bottom tabs;
 // - 768 (45:7566): one centred column with the action row under the deal;
 // - 1440 (45:7615): a 600 px side panel with its own header and a pinned action bar.
+// An H-2B listing adds "H-2B job terms" after Perks (issue 208; "H-2B fields" 223:20362).
 // Every fact renders on the server, so nothing moves once the page has painted.
 import { Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -13,9 +14,12 @@ import {
   BadgeCheck,
   Banknote,
   BedDouble,
+  Briefcase,
   CalendarDays,
   ChevronRight,
   Clock,
+  Compass,
+  FileText,
   Flag,
   ShieldCheck,
   Users,
@@ -23,7 +27,7 @@ import {
   X,
   type IconComponent,
 } from '@/ui/icons';
-import type { ListingView, PhotoRef } from '../_lib/listing-view';
+import type { H2bTerm, H2bTerms, ListingView, PhotoRef } from '../_lib/listing-view';
 import { ActionBar, ListingActionsProvider, ShareButton, type ListingActionsInit } from './listing-actions';
 
 /**
@@ -157,6 +161,42 @@ function PhotoStrip({ photos, label }: { photos: PhotoRef[]; label: string }) {
   );
 }
 
+const H2B_ICON: Record<H2bTerm['kind'], IconComponent> = {
+  travel: Compass,
+  tools: Briefcase,
+  guarantee: Clock,
+  state: FileText,
+};
+
+/**
+ * "H-2B job terms" (issue 208; Figma 223:20363, none filled in 223:20530): each row has an icon
+ * and a text label, so nothing rests on the icon alone.
+ */
+function H2bSection({ h2b }: { h2b: H2bTerms }) {
+  return (
+    <Section title="H-2B job terms">
+      <p>{h2b.intro}</p>
+      {h2b.terms.length > 0 ? (
+        <ul className="flex flex-col gap-3">
+          {h2b.terms.map((t) => {
+            const Icon = H2B_ICON[t.kind];
+            return (
+              <li key={t.kind} className="flex items-start gap-2.5">
+                <Icon className="mt-0.5 size-5 shrink-0 text-ink-2" />
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <p className="font-semibold">{t.label}</p>
+                  <p className="whitespace-pre-line wrap-anywhere">{t.value}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+      {h2b.closing ? <p className="text-ink-2">{h2b.closing}</p> : null}
+    </Section>
+  );
+}
+
 export type ListingDetailProps = {
   view: ListingView;
   actions: ListingActionsInit;
@@ -250,6 +290,9 @@ export function ListingDetail({ view, actions, path }: ListingDetailProps) {
                 <p>{view.perks}</p>
               </Section>
             ) : null}
+
+            {/* After Perks, so the approved order is unchanged (#45 lead decision). */}
+            {view.h2b ? <H2bSection h2b={view.h2b} /> : null}
 
             {view.details.length > 0 ? (
               <Section title="Details">
