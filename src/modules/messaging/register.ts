@@ -1,6 +1,8 @@
-// Trust subjects, report subjects and the host page reply-time slot (SP5 W4).
+// Trust subjects, report subjects, the host page reply-time slot (SP5 W4), and the host-reply
+// count SP4's silent-host check reads (legal review 7.3; issue 199).
 import type { DbOrTx, Tx } from '@/lib/db';
 import { REPLY_STATS } from '@/lib/messaging';
+import { registerHostReplyCounter } from '@/modules/applications';
 import { registerReportSubject } from '@/modules/safety';
 // Application tests replace the hostpages barrel and omit this export. The lookup is not on
 // the index, so both calls stay on the provider file.
@@ -12,7 +14,7 @@ import { decideBulk } from './bulk';
 import { decideMessage } from './send';
 import { messages, threads } from './schema';
 import { getReplyStats } from './stats';
-import { setThreadReadOnly } from './threads';
+import { hostRepliesByApplication, setThreadReadOnly } from './threads';
 
 registerSubjectHandlers('message', {
   approve: (db, id) => decideMessage(db, id, 'approve'),
@@ -44,6 +46,8 @@ async function threadExists(db: DbOrTx, id: string): Promise<boolean> {
 
 registerReportSubject('message', { trustSubjectType: 'message', exists: messageExists });
 registerReportSubject('thread', { trustSubjectType: 'thread', exists: threadExists });
+
+registerHostReplyCounter((db, orgId) => hostRepliesByApplication(db, orgId));
 
 if (!getHostPageProvider('reply_time')) {
   registerHostPageProvider({

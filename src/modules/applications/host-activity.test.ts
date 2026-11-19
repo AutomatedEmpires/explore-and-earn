@@ -1,7 +1,7 @@
 // A new host opening applications (legal review 7.3): each open of a person counts against the
 // daily profile-view cap, and each application opened queues the silent-host check, which opens
 // one fraud item for a host in its first 30 days that has opened SILENT_HOST_OPENED applications
-// and answered none.
+// and answered none. A status change or a message from the host is an answer.
 import { sql } from 'drizzle-orm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from '@/app/api/v1/host/applications/[id]/route';
@@ -9,6 +9,8 @@ import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { record } from '@/modules/audit';
 import { runWorker } from '@/modules/jobs';
+// Messaging registers the host-reply count the check reads (applications never imports it).
+import '@/modules/messaging';
 import { NEW_HOST_DAILY_CAP, consumeNewHostDaily } from '@/modules/ratelimit';
 import { SILENT_HOST_OPENED } from '@/modules/verification';
 import { resetSp2 } from '@tests/fakes/sp4/sp2';
@@ -100,6 +102,26 @@ async function opened(orgId: string, actorId: string, n: number): Promise<void> 
   }
 }
 
+/** A message from the host in the application's thread, in the given scan state. */
+async function hostMessage(scanState: 'clear' | 'held' | 'removed'): Promise<void> {
+  const [app] = await queryRows<{ listingId: string; seekerId: string }>(
+    t.db,
+    sql`select listing_id as "listingId", seeker_user_id as "seekerId" from app.applications
+      where id = ${id}`,
+  );
+  if (!app) throw new Error('no application');
+  await t.db.execute(sql`
+    insert into app.threads (id, org_id, listing_id, seeker_user_id, application_id)
+    values (${newId()}, ${w.orgId}, ${app.listingId}, ${app.seekerId}, ${id})
+    on conflict do nothing
+  `);
+  await t.db.execute(sql`
+    insert into app.messages (id, thread_id, sender_type, sender_user_id, kind, body, scan_state)
+    select ${newId()}, t.id, 'host', ${w.owner.user.id}, 'text', 'Can you start Monday?', ${scanState}
+    from app.threads t where t.application_id = ${id}
+  `);
+}
+
 describe('opening an application', () => {
   it('queues one silent-host check per application a new host opens', async () => {
     await getHostApplication(t.db, w.owner, id);
@@ -169,6 +191,21 @@ describe('the silent-host check', () => {
     await opened(w.orgId, w.owner.user.id, SILENT_HOST_OPENED + 5);
     await checkSilentHost(t.db, w.orgId);
     expect(await silentItems(w.orgId)).toEqual([]);
+  });
+
+  it('stays quiet for a new host that opened 10 applications and replied by message', async () => {
+    await hostMessage('clear');
+    await opened(w.orgId, w.owner.user.id, SILENT_HOST_OPENED);
+    await checkSilentHost(t.db, w.orgId);
+    expect(await silentItems(w.orgId)).toEqual([]);
+  });
+
+  it('still alerts when the only host message never reached the applicant', async () => {
+    await hostMessage('held');
+    await hostMessage('removed');
+    await opened(w.orgId, w.owner.user.id, SILENT_HOST_OPENED);
+    await checkSilentHost(t.db, w.orgId);
+    expect(await silentItems(w.orgId)).toEqual([{ queue: 'fraud', reason: 'silent_host' }]);
   });
 
   it('stays quiet for a host past its first 30 days', async () => {

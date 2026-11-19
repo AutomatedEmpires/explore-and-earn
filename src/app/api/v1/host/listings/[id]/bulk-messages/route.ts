@@ -1,10 +1,15 @@
 // POST /api/v1/host/listings/{id}/bulk-messages. Billing gets 403 role_not_allowed (plan
-// rule H); a listing of another org, or outside the member's scope, is 404.
+// rule H); a host the applicant verification gate refuses gets the applicant list's 409 before
+// any read (issue 199); a listing of another org, or outside the member's scope, is 404.
 import { notFound, unauthorized } from '@/lib/errors';
 import { bulkMessageSchema, idParamSchema } from '@/lib/messaging';
 import { listApplicationIdsByStatus } from '@/modules/hiring';
 import { getHiringInfoMany } from '@/modules/listings';
-import { createBulkMessage, requireHiringCapability } from '@/modules/messaging';
+import {
+  createBulkMessage,
+  requireHiringCapability,
+  requireMessagingAccess,
+} from '@/modules/messaging';
 import { canAccessListing } from '@/modules/orgs';
 import { apiRoute } from '@/server/api';
 
@@ -20,6 +25,7 @@ export const POST = apiRoute({
   handler: async ({ db, host, input }) => {
     if (!host) throw unauthorized();
     requireHiringCapability(host, 'messages.access');
+    await requireMessagingAccess(db, host.orgId);
     const [info] = await getHiringInfoMany(db, [input.id]);
     if (!info || info.orgId !== host.orgId) throw notFound();
     const allowed = await canAccessListing(db, host, {

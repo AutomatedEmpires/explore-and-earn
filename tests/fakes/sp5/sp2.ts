@@ -165,6 +165,7 @@ export const listingsFake = {
 const members = new Map<string, Member[]>();
 const access = new Map<string, ListingAccess>();
 const orgNames = new Map<string, string>();
+const verification = new Map<string, OrgSummary['verificationStatus']>();
 const orgCalls: Call[] = [];
 
 function orgCall(name: string, args: unknown[]): void {
@@ -175,6 +176,7 @@ export function resetOrgs(): void {
   members.clear();
   access.clear();
   orgNames.clear();
+  verification.clear();
   orgCalls.length = 0;
 }
 
@@ -188,6 +190,14 @@ export function setAccess(userId: string, row: ListingAccess): void {
 
 export function setOrgName(orgId: string, name: string): void {
   orgNames.set(orgId, name);
+}
+
+/** The org's verification status, for tests of the verified-host gate. Unset, it is verified. */
+export function setOrgVerification(
+  orgId: string,
+  status: OrgSummary['verificationStatus'],
+): void {
+  verification.set(orgId, status);
 }
 
 function accessOf(userId: string): ListingAccess {
@@ -227,8 +237,9 @@ function summary(id: string): OrgSummary {
     requireRecruiterApproval: false,
     primaryLocationId: null,
     // These orgs list jobs and read applicants, which only a verified host may do (legal review
-    // 7.1). Tests of the gate itself set the status in the database or mock the gate.
-    verificationStatus: 'verified',
+    // 7.1). Tests of the gate itself set the status with setOrgVerification, in the database or
+    // by mocking the gate.
+    verificationStatus: verification.get(id) ?? 'verified',
     ownerUserId: null,
     createdAt: new Date(0),
   };
@@ -247,12 +258,14 @@ export const orgsFake = {
   setMembers,
   setAccess,
   setOrgName,
+  setOrgVerification,
   reset: resetOrgs,
   calls: orgCalls,
 } satisfies Partial<Orgs> & {
   setMembers: typeof setMembers;
   setAccess: typeof setAccess;
   setOrgName: typeof setOrgName;
+  setOrgVerification: typeof setOrgVerification;
   reset: typeof resetOrgs;
   calls: Call[];
 };
