@@ -1,5 +1,5 @@
 // Hiring's privacy registration. Export and erase follow the SP5 retention rules.
-import { and, asc, eq, inArray, isNotNull, lt, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import type { Db, Tx } from '@/lib/db';
 import { getHiringInfoMany } from '@/modules/listings';
 import { getOrgSummaries } from '@/modules/orgs';
@@ -213,6 +213,11 @@ export const retentionRules: RetentionRule[] = [
     async run(db: Db, now: Date, limit: number) {
       const cutoff = addMonths(now, -12);
       let left = Math.max(0, limit);
+      // A note whose organization or candidate is under a legal hold on applications (or on
+      // everything) is kept, as the eraser keeps it (lead decision 2026-11-18).
+      const { underLegalHold } = await import('@/modules/privacy');
+      const notHeld = (user: SQL, org: SQL) =>
+        sql`not ${underLegalHold({ users: [user], orgs: [org], scope: 'applications' })}`;
       const inviteIds = await idsToNull(db, left, () =>
         db
           .select({ id: invites.id })
@@ -221,6 +226,7 @@ export const retentionRules: RetentionRule[] = [
             and(
               isNotNull(invites.note),
               sql`coalesce(${invites.respondedAt}, ${invites.expiresAt}) < ${cutoff}`,
+              notHeld(sql`${invites.seekerUserId}`, sql`${invites.orgId}`),
             ),
           )
           .limit(left),
@@ -239,6 +245,7 @@ export const retentionRules: RetentionRule[] = [
               inArray(pipelineEntries.status, [...TERMINAL]),
               lt(pipelineEntries.lastStatusAt, cutoff),
               or(isNotNull(interviews.note), isNotNull(interviews.requestNote)),
+              notHeld(sql`${pipelineEntries.seekerUserId}`, sql`${interviews.orgId}`),
             ),
           )
           .limit(left),
@@ -260,6 +267,7 @@ export const retentionRules: RetentionRule[] = [
               inArray(pipelineEntries.status, [...TERMINAL]),
               lt(pipelineEntries.lastStatusAt, cutoff),
               isNotNull(offers.note),
+              notHeld(sql`${pipelineEntries.seekerUserId}`, sql`${offers.orgId}`),
             ),
           )
           .limit(left),

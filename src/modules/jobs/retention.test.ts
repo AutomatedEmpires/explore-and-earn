@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
+import { setLegalHold, type HoldScope } from '@/modules/privacy';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { retentionRules } from './index';
 
@@ -23,11 +24,15 @@ beforeEach(async () => {
   await t.db.execute(sql`delete from app.outbox`);
 });
 
-async function seed(status: string, updatedAt: Date): Promise<string> {
+async function seed(
+  status: string,
+  updatedAt: Date,
+  payload: Record<string, unknown> = {},
+): Promise<string> {
   const id = newId();
   await t.db.execute(sql`
     insert into app.outbox (id, topic, payload, status, created_at, updated_at)
-    values (${id}, 'test.topic', '{}'::jsonb, ${status},
+    values (${id}, 'test.topic', ${JSON.stringify(payload)}::jsonb, ${status},
       ${updatedAt.toISOString()}::timestamptz, ${updatedAt.toISOString()}::timestamptz)
   `);
   return id;
@@ -101,5 +106,49 @@ describe('jobs.outbox_dead_90d', () => {
     const left = await remaining();
     expect(left).toHaveLength(2);
     expect(left).toContain(done);
+  });
+});
+
+describe('legal holds (lead decision 2026-11-18)', () => {
+  it('keeps a settled job whose payload names a person or organization with a hold on all, as the eraser does', async () => {
+    const seedUser = async () => {
+      const id = newId();
+      await t.db.execute(sql`
+        insert into app.users (id, clerk_user_id, email) values (${id}, ${id}, ${`${id}@example.test`})
+      `);
+      return id;
+    };
+    const operatorId = await seedUser();
+    const hold = (subject: { userId: string } | { orgId: string }, scope: HoldScope) =>
+      setLegalHold(
+        t.db,
+        { ...subject, scope, reason: 'Court order 26-0042 for this account', reviewAt: '2026-12-01', operatorId },
+        NOW,
+      );
+    const heldUser = await seedUser();
+    await hold({ userId: heldUser }, 'all');
+    const heldOrg = newId();
+    await hold({ orgId: heldOrg }, 'all');
+    const otherScope = await seedUser();
+    await hold({ userId: otherScope }, 'messages');
+
+    const kept = [
+      await seed('done', daysAgo(31), { userId: heldUser }),
+      await seed('dead', daysAgo(91), { userId: heldUser }),
+      // By the person's address too, in any case, as the jobs eraser matches it.
+      await seed('done', daysAgo(31), { to: `${heldUser}@EXAMPLE.test` }),
+      await seed('done', daysAgo(31), { orgId: heldOrg }),
+    ];
+    const gone = [
+      await seed('done', daysAgo(31), { userId: otherScope }),
+      await seed('dead', daysAgo(91), { orgId: newId() }),
+      await seed('done', daysAgo(31)),
+    ];
+
+    expect(await rule('jobs.outbox_done_30d').run(t.db, NOW, 100)).toEqual({ deleted: 2 });
+    expect(await rule('jobs.outbox_dead_90d').run(t.db, NOW, 100)).toEqual({ deleted: 1 });
+    const left = new Set(await remaining());
+    expect(kept.every((id) => left.has(id))).toBe(true);
+    expect(gone.some((id) => left.has(id))).toBe(false);
   });
 });

@@ -2,6 +2,7 @@
 // downloads. Every rule compares with `<`, so a row exactly at its limit is kept.
 import { sql } from 'drizzle-orm';
 import { queryRows } from '@/lib/db';
+import { underLegalHold } from './holds';
 import type { RetentionRule } from './types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -10,6 +11,7 @@ const RATE_LIMIT_KEEP_DAYS = 2;
 /** The one storage call the exports rule makes. */
 export type ExportStore = { remove(bucket: 'privacy-exports', path: string): Promise<void> };
 
+/** Counter windows name no person or organization (PRIVACY_EXEMPT_TABLES), so no hold applies. */
 const rateLimitWindows: RetentionRule = {
   key: 'privacy.rate_limit_windows_2d',
   description: 'Rate-limit counters are deleted after 2 days.',
@@ -25,6 +27,8 @@ const rateLimitWindows: RetentionRule = {
  * Deletes the zip of each export whose `export_expires_at` has passed, then clears its path, so
  * the download answers "expired" and the file is gone. The request row stays as the record that
  * the export was made. The 7 days are set when the export completes (`privacy.export_ttl_days`).
+ * The download of a person with a hold on `all` is kept until the hold is released, as the
+ * privacy module's eraser keeps that person's privacy records.
  *
  * The object is removed before the path is cleared: if the run stops in between, the next run
  * finds the path again and removing a missing object is not an error.
@@ -37,11 +41,12 @@ export function createExportsRule(getStore: () => Promise<ExportStore>): Retenti
       const expired = await queryRows<{ id: string; export_path: string }>(
         db,
         sql`
-          select id, export_path from app.privacy_requests
-          where kind = 'export'
-            and export_path is not null
-            and export_expires_at < ${now.toISOString()}::timestamptz
-          order by export_expires_at
+          select r.id, r.export_path from app.privacy_requests r
+          where r.kind = 'export'
+            and r.export_path is not null
+            and r.export_expires_at < ${now.toISOString()}::timestamptz
+            and not ${underLegalHold({ users: [sql`r.user_id`], scope: 'all' })}
+          order by r.export_expires_at
           limit ${limit}
         `,
       );
