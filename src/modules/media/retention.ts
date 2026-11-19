@@ -9,7 +9,8 @@
 // an Owner is alerted, and no file is deleted.
 //
 // Rows are deleted in one transaction together with the `media.cleanup` job that removes their
-// stored objects, so a crash never leaves stored objects without their cleanup.
+// stored objects, so a crash never leaves stored objects without their cleanup. Neither rule
+// deletes a file whose owner or owning organization is under a legal hold.
 import { sql, type SQL } from 'drizzle-orm';
 import { queryRows, type Db, type DbOrTx } from '@/lib/db';
 import { enqueue } from '@/modules/jobs';
@@ -98,13 +99,24 @@ type DeletedRow = {
   variants: Record<string, string> | null;
 };
 
-/** Deletes the matching rows and queues the removal of their stored objects. */
+/**
+ * Deletes the matching rows and queues the removal of their stored objects. A file whose owner
+ * or owning organization has a legal hold of any scope is kept (lead decision 2026-11-18): an
+ * unused file no longer says which record, and so which hold scope, it belonged to.
+ */
 async function deleteWithObjects(
   db: Db,
   where: SQL,
   columns: readonly MediaColumnRef[],
   limit: number,
 ): Promise<{ deleted: number }> {
+  // Loaded on first use, like the registry: the privacy barrel imports this module's barrel.
+  const { underLegalHold } = await import('@/modules/privacy');
+  const held = underLegalHold({
+    users: [sql`m.owner_user_id`],
+    orgs: [sql`m.owner_org_id`],
+    scope: 'any',
+  });
   return db.transaction(async (tx) => {
     const rows = await queryRows<DeletedRow>(
       tx,
@@ -113,6 +125,7 @@ async function deleteWithObjects(
         where id in (
           select m.id from app.media m
           where ${where} ${unreferenced(columns)}
+            and not ${held}
           order by m.updated_at
           limit ${limit}
           for update of m skip locked

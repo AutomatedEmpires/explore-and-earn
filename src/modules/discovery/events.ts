@@ -254,7 +254,9 @@ export function dedupeKeyFor(
 
 /**
  * Deletes at most `limit` raw events with `occurred_at < cutoff` and returns how many went.
- * Shared by the nightly maintenance and SP8's retention rule (internal).
+ * Shared by the nightly maintenance and SP8's retention rule (internal). The events of an
+ * organization under a legal hold on everything are kept on both paths (lead decision
+ * 2026-11-18); the events name no person.
  */
 export async function deleteRawEventsBefore(
   db: DbOrTx,
@@ -262,14 +264,17 @@ export async function deleteRawEventsBefore(
   limit: number,
 ): Promise<number> {
   if (!Number.isInteger(limit) || limit <= 0) return 0;
+  // Loaded on first use: the privacy barrel loads this module's barrel.
+  const { underLegalHold } = await import('@/modules/privacy');
   const rows = await queryRows<{ n: number }>(
     db,
     sql`
       with gone as (
         delete from app.listing_events
         where id in (
-          select id from app.listing_events
-          where occurred_at < ${cutoff.toISOString()}::timestamptz
+          select e.id from app.listing_events e
+          where e.occurred_at < ${cutoff.toISOString()}::timestamptz
+            and not ${underLegalHold({ orgs: [sql`e.org_id`], scope: 'all' })}
           limit ${limit}
         )
         returning 1
