@@ -308,7 +308,7 @@ test.describe('views', () => {
     for (const screen of ['snapshot-seeker', 'snapshot-host'] as const) {
       test(`${screen} at ${size.width}`, async ({ page }) => {
         await open(page, screen, size);
-        await expect(page.getByRole('heading', { name: 'Lodge housekeeper' })).toBeVisible();
+        await expect(page.getByRole('region', { name: 'Lodge housekeeper' })).toBeVisible();
         await expect(page.getByText('Self-reported')).toBeVisible();
         if (screen === 'snapshot-host') {
           await expect(page.getByText('Needs visa sponsorship', { exact: true })).toBeVisible();
@@ -335,7 +335,7 @@ test.describe('views', () => {
     test(`dark snapshot at ${size.width}`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: 'dark' });
       await open(page, 'snapshot-seeker', size);
-      await expect(page.getByRole('heading', { name: 'Lodge housekeeper' })).toBeVisible();
+      await expect(page.getByRole('region', { name: 'Lodge housekeeper' })).toBeVisible();
       await check(page, 'snapshot-seeker', size.width, true);
     });
   }

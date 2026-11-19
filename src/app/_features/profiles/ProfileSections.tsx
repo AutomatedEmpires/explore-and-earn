@@ -13,13 +13,19 @@ import { Avatar, Badge, Button } from '@/ui/components';
 import { FileText } from '@/ui/icons';
 import { dayLabel, joinDot, LANGUAGE_LEVELS, monthRange, webHref } from './format';
 
-/** One card. With a title it is a named region, so screen readers can jump between them. */
+/**
+ * One card. With a title it is a named region, so screen readers can jump between them.
+ * `titleAs="p"` keeps the look but not the heading, for a title the host page already shows as
+ * its own heading (the receipt's h1 is the listing title).
+ */
 export function InfoCard({
   title,
+  titleAs: Title = 'h2',
   children,
   className,
 }: {
   title?: string;
+  titleAs?: 'h2' | 'p';
   children: ReactNode;
   className?: string;
 }) {
@@ -28,7 +34,7 @@ export function InfoCard({
       aria-label={title}
       className={cn('flex flex-col gap-3 rounded-xl border border-line bg-surface p-4', className)}
     >
-      {title ? <h2 className="text-19 font-bold text-ink">{title}</h2> : null}
+      {title ? <Title className="text-19 font-bold text-ink">{title}</Title> : null}
       {children}
     </section>
   );

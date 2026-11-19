@@ -19,7 +19,9 @@ describe('ApplicationSnapshotView', () => {
         resumeHref={RESUME}
       />,
     );
-    expect(screen.getByRole('heading', { name: 'Deckhand', level: 2 })).toBeInTheDocument();
+    // The listing card is a named region whose title is not a second page heading.
+    expect(screen.getByRole('region', { name: 'Deckhand' })).toHaveTextContent('Deckhand');
+    expect(screen.queryByRole('heading', { name: 'Deckhand' })).not.toBeInTheDocument();
     expect(screen.getByText('Kettle Ridge Lodge · Juneau, AK')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Maya Rodriguez' })).toBeInTheDocument();
     expect(screen.getByText('Deckhand, Kettle Ridge Lodge')).toBeInTheDocument();

@@ -62,7 +62,8 @@ export function ApplicationSnapshotView({
 
   return (
     <div className="flex flex-col gap-4">
-      <InfoCard title={listing.title}>
+      {/* Not a heading: the receipt and applicant pages already head the page with it. */}
+      <InfoCard title={listing.title} titleAs="p">
         <p className="text-14 wrap-anywhere text-muted">
           {joinDot([listing.orgName, listing.locationLabel])}
         </p>
