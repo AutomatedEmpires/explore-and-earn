@@ -1,4 +1,6 @@
-// One template, scanned once, sent to each open thread (SP5 W4, plan decision 26).
+// One template, scanned once, sent to each open thread (SP5 W4, plan decision 26). A host the
+// applicant verification gate refuses sends none: it is refused at create with the applicant
+// list's 409, and a bulk queued before the gate refused it sends no copy (gate.ts; issue 199).
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { ApplicationStatus } from '@/lib/applications';
@@ -12,6 +14,7 @@ import { enqueue } from '@/modules/jobs';
 import { getRelationships } from '@/modules/safety';
 import type { HostContext } from '@/server/guards';
 import { requireHiringCapability } from './access';
+import { hostMayMessage, requireMessagingAccess } from './gate';
 import { bulkMessages, messages, threads } from './schema';
 import { scanHostText } from './scan';
 import { sendHostMessage } from './send';
@@ -30,6 +33,7 @@ export async function createBulkMessage(
   i: { listingId: string; statuses: ApplicationStatus[]; body: string; applicationIds: string[] },
 ): Promise<{ bulkId: string; recipients: number }> {
   requireHiringCapability(ctx, 'messages.access');
+  await requireMessagingAccess(db, ctx.orgId);
   const byApplication = await threadIdsForApplications(db, i.applicationIds);
   const ordered: string[] = [];
   const seen = new Set<string>();
@@ -106,6 +110,9 @@ export async function runBulkSend(db: Db, payload: unknown): Promise<void> {
   const bulkId = parsed.data.bulkId;
   const [bulk] = await db.select().from(bulkMessages).where(eq(bulkMessages.id, bulkId));
   if (!bulk) return;
+  // The gate refused the host after it queued this: no scan and no copy. Each copy also checks
+  // the gate (sendHostMessage), for a refusal that lands while the copies go out.
+  if (!(await hostMayMessage(db, bulk.orgId))) return;
 
   let state = bulk.scanState;
   if (state === 'pending') {

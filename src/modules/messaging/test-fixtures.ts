@@ -3,11 +3,53 @@ import { sql } from 'drizzle-orm';
 import { withTx, type Db } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import type { HostContext } from '@/server/guards';
-import { seedHostOrg, seedMember, seedSeeker } from '@tests/helpers/sp5';
+import type { VerificationStatus } from '@/modules/verification';
+import { seedHostOrg as seedAnyHostOrg, seedMember, seedSeeker } from '@tests/helpers/sp5';
 import type { ThreadViewer } from './access';
 import { ensureThread } from './threads';
 
-export { seedHostOrg, seedMember, seedSeeker };
+export { seedMember, seedSeeker };
+
+/** Every verification status the applicant gate refuses, so the host may not message applicants. */
+export const GATED_STATUSES = [
+  'unverified',
+  'running',
+  'needs_review',
+  'needs_info',
+  'failed',
+] as const satisfies readonly VerificationStatus[];
+
+/** The applicant list's refusal copy (hiring/pipeline/gate.ts), which messaging repeats. */
+export const GATE_REFUSAL: Record<(typeof GATED_STATUSES)[number], string> = {
+  unverified: 'Publish your first listing to verify your business, then you can see applicants.',
+  running: "We're verifying your business. This usually takes a few hours.",
+  needs_review: "We're verifying your business. This usually takes a few hours.",
+  needs_info: 'Answer our verification question to see your applicants.',
+  failed: "We couldn't verify your business. Ask for a review to see your applicants.",
+};
+
+export async function setVerification(
+  db: Db,
+  orgId: string,
+  status: VerificationStatus,
+): Promise<void> {
+  await db.execute(
+    sql`update app.organizations set verification_status = ${status} where id = ${orgId}`,
+  );
+}
+
+/**
+ * A host org that may message applicants. Only a verified host may (legal review 7.1), so the
+ * org is verified; a test of the gate itself sets another status with `setVerification`.
+ */
+export async function seedHostOrg(
+  db: Db,
+  o?: Parameters<typeof seedAnyHostOrg>[1],
+): ReturnType<typeof seedAnyHostOrg> {
+  const org = await seedAnyHostOrg(db, o);
+  await setVerification(db, org.orgId, 'verified');
+  return org;
+}
 
 export type SeededThread = {
   orgId: string;
