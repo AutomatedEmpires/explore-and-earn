@@ -190,12 +190,28 @@ describe('read only', () => {
   it('stamps a block the first time the thread is read', async () => {
     const seeded = await world();
     safetyFake.setBlocked(seeded.orgId, seeded.seekerId);
+    // The org blocked the seeker: the seeker is never told so.
     await expect(getThread(t.db, seekerViewer(seeded.seekerId), seeded.threadId)).resolves.toMatchObject({
-      readOnly: 'blocked',
+      readOnly: 'unavailable',
       canSend: false,
     });
     const [row] = await t.db.select().from(threads).where(eq(threads.id, seeded.threadId));
     expect(row?.readOnlyReason).toBe('blocked');
+    await expect(
+      getThread(t.db, hostViewer(seeded.ownerId, seeded.orgId, 'owner'), seeded.threadId),
+    ).resolves.toMatchObject({ readOnly: 'blocked', canSend: false });
+  });
+
+  it('tells only the side that blocked that the thread is blocked', async () => {
+    const seeded = await world();
+    safetyFake.setBlocked(seeded.orgId, seeded.seekerId, 'user');
+    await expect(getThread(t.db, seekerViewer(seeded.seekerId), seeded.threadId)).resolves.toMatchObject({
+      readOnly: 'blocked',
+      canSend: false,
+    });
+    await expect(
+      getThread(t.db, hostViewer(seeded.ownerId, seeded.orgId, 'owner'), seeded.threadId),
+    ).resolves.toMatchObject({ readOnly: 'unavailable', canSend: false });
   });
 });
 
