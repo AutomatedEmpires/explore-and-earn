@@ -1,4 +1,13 @@
 // Offers: send, cancel, accept, decline, lists and the letter link.
+//
+// Sending and canceling act on an applicant, so both are refused unless the host is verified
+// (legal review 7.1, issue 198), with the applicant list's 409, inside the transaction and
+// before anything is read or written. That includes an offer sent while the host was verified.
+//
+// Accepting and declining tell the host the seeker's first name, so both are refused while the
+// host fails that gate (issue 212): the invite's neutral 409 `not_taking_answers`, inside the
+// transaction, once the offer is known to be the seeker's and before anything is written or sent
+// (`requireHostTakesAnswers`). The offer stays `sent`.
 import { and, desc, eq, inArray, lt, or } from 'drizzle-orm';
 import type { ApplicationStatus } from '@/lib/applications';
 import { track } from '@/lib/analytics';
@@ -19,7 +28,9 @@ import type { HostContext } from '@/server/guards';
 import { requireEntry, requireListing } from '../access';
 import { staleStatus, transitionStatus } from '../core';
 import { enqueueNoteScan } from '../notes';
+import { requireApplicantReads } from '../pipeline/gate';
 import { offers, pipelineEntries } from '../schema';
+import { requireHostTakesAnswers } from '../interviews/answers';
 import { blockedConflict, stampIfBlocked } from '../interviews/blocks';
 import { placeOf, seekerFirstName } from '../interviews/deliver';
 import { publishOffer } from './deliver';
@@ -129,6 +140,31 @@ export async function offerBundles(db: DbOrTx, ids: string[]): Promise<Map<strin
 export async function hostOfferViews(db: DbOrTx, ids: string[]): Promise<Map<string, HostOfferView>> {
   const rows = await offerBundles(db, ids);
   return new Map([...rows].map(([id, bundle]) => [id, bundle.view]));
+}
+
+/**
+ * Each application's latest offer, keyed by application id (the applicant detail). One offer is
+ * open at a time, so the latest is the open one when any is.
+ */
+export async function hostOfferViewsByApplication(
+  db: DbOrTx,
+  applicationIds: string[],
+): Promise<Map<string, HostOfferView>> {
+  if (applicationIds.length === 0) return new Map();
+  const rows = await db
+    .select({ id: offers.id, applicationId: offers.applicationId })
+    .from(offers)
+    .where(inArray(offers.applicationId, applicationIds))
+    .orderBy(desc(offers.createdAt), desc(offers.id));
+  const latest = new Map<string, string>();
+  for (const row of rows) if (!latest.has(row.applicationId)) latest.set(row.applicationId, row.id);
+  const views = await hostOfferViews(db, [...latest.values()]);
+  const out = new Map<string, HostOfferView>();
+  for (const [applicationId, id] of latest) {
+    const view = views.get(id);
+    if (view) out.set(applicationId, view);
+  }
+  return out;
 }
 
 export async function seekerOfferViews(
@@ -256,6 +292,7 @@ export async function sendOffer(
   now = new Date(),
 ): Promise<HostOfferView> {
   const id = await withTx(db, async (tx) => {
+    await requireApplicantReads(tx, ctx.orgId);
     const entry = await requireEntry(tx, ctx, applicationId, { forUpdate: true });
     const [open] = await tx
       .select({ id: offers.id })
@@ -339,6 +376,7 @@ export async function sendOffer(
 
 export async function cancelOffer(db: Db, ctx: HostContext, offerId: string, now = new Date()): Promise<HostOfferView> {
   await withTx(db, async (tx) => {
+    await requireApplicantReads(tx, ctx.orgId);
     const [existing] = await tx.select().from(offers).where(eq(offers.id, offerId));
     if (!existing || existing.orgId !== ctx.orgId) throw notFound('Offer not found', { reason: 'not_found' });
     await requireListing(tx, ctx, existing.listingId);
@@ -385,6 +423,7 @@ async function respond(
 ): Promise<SeekerOfferItem> {
   await withTx(db, async (tx) => {
     const visible = await loadVisibleOffer(tx, seekerUserId, offerId);
+    await requireHostTakesAnswers(tx, visible.offer.orgId);
     const [updated] = await tx
       .update(offers)
       .set({ status: to, respondedAt: now })

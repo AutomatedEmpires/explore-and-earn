@@ -47,6 +47,21 @@ describe('readConsent', () => {
     });
   });
 
+  it('treats a cookie that is not valid percent-encoding as no choice, and never throws', () => {
+    // decodeURIComponent throws URIError on these. apiRoute reads consent on every request, so a
+    // throw here would answer 500 on every API route for that browser.
+    for (const bad of ['%', '%E0%A4%A', '1.%ZZ.a.1', `%C0%AF${consentCookieValue(id, true, now)}`]) {
+      const cookie = `other=1; ${CONSENT_COOKIE}=${bad}`;
+      expect(() => readConsent(req({ cookie }), { now })).not.toThrow();
+      const read = readConsent(req({ 'x-vercel-ip-country': 'DE', cookie }), { now });
+      expect(read).toEqual({ region: 'eu', analytics: null });
+      expect(allowedByConsent(read)).toBe(false);
+    }
+    // A valid choice still reads when another cookie on the header is malformed.
+    const cookie = `junk=%; ${CONSENT_COOKIE}=${consentCookieValue(id, true, now)}`;
+    expect(readConsent(req({ 'x-vercel-ip-country': 'DE', cookie }), { now }).analytics).toBe(true);
+  });
+
   it('reads the cookie and lets Sec-GPC refuse analytics everywhere', () => {
     const cookie = `${CONSENT_COOKIE}=${consentCookieValue(id, true, now)}`;
     expect(

@@ -13,9 +13,13 @@ export type ThreadEventCode =
   | 'hired'
   | 'withdrawn';
 /**
- * Why a thread is read-only, as its viewer sees it. `unavailable` is shown, never stored: a
- * thread closed by a block reads `blocked` only to the side that made the block, and
- * `unavailable` to the other side (SP4 spec 8.7 and 10).
+ * Why a thread is read-only, as its viewer sees it. `unavailable` is shown, never stored, and
+ * names no reason:
+ * - a thread closed by a block reads `blocked` only to the side that made the block, and
+ *   `unavailable` to the other side (SP4 spec 8.7 and 10);
+ * - while the host's team may not message applicants (the applicant verification gate refuses
+ *   it), the seeker reads `unavailable`. The host's team gets the gate's 409 instead of the
+ *   thread (issue 199).
  */
 export type ReadOnlyReason = 'withdrawn' | 'blocked' | 'removed' | 'listing_closed' | 'unavailable';
 export type MessageState = 'sending' | 'sent' | 'not_delivered' | 'removed';

@@ -2,9 +2,10 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
-import type { MediaColumnRef } from '@/modules/privacy';
+import { releaseLegalHold, setLegalHold, type HoldScope, type MediaColumnRef } from '@/modules/privacy';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
 import { seedHostOrg, seedListingRow } from '../../../tests/helpers/sp2';
+import { seedOperator, seedSeeker } from '../../../tests/helpers/sp8';
 import type { MediaStatus } from './kinds';
 import {
   assertMediaColumnsDeclared,
@@ -23,13 +24,25 @@ const HERO: MediaColumnRef = { table: 'landing_pages', column: 'hero_media_id', 
 let t: TestDb;
 let orgId: string;
 let ownerUserId: string;
+let operatorId: string;
 
 beforeAll(async () => {
   t = await createTestDb();
   const org = await seedHostOrg(t.db);
   orgId = org.orgId;
   ownerUserId = org.owner.userId;
+  operatorId = (await seedOperator(t.db, { role: 'owner' })).userId;
 });
+
+/** An open legal hold on one person or organization. */
+async function hold(subject: { userId: string } | { orgId: string }, scope: HoldScope): Promise<string> {
+  const { holdId } = await setLegalHold(
+    t.db,
+    { ...subject, scope, reason: 'Fraud investigation 26-311', reviewAt: '2026-12-01', operatorId },
+    NOW,
+  );
+  return holdId;
+}
 
 afterAll(async () => {
   await t.close();
@@ -40,14 +53,21 @@ beforeEach(async () => {
   await t.db.execute(sql`delete from app.media`);
 });
 
-async function seed(o: { status: MediaStatus; createdAt: Date; updatedAt?: Date }): Promise<string> {
+async function seed(o: {
+  status: MediaStatus;
+  createdAt: Date;
+  updatedAt?: Date;
+  /** Defaults to the host org's owner and the org. */
+  owner?: { userId: string; orgId: string | null };
+}): Promise<string> {
   const id = newId();
   const approved = o.status === 'approved';
   const variants = approved ? { '320': `${id}/320.webp`, '640': `${id}/640.webp` } : null;
   await t.db.execute(sql`
     insert into app.media (id, owner_user_id, owner_org_id, kind, status, bucket, path,
       declared_mime, size_bytes, variants, created_at, updated_at)
-    values (${id}, ${ownerUserId}, ${orgId}, 'listing_photo', ${o.status},
+    values (${id}, ${o.owner?.userId ?? ownerUserId}, ${o.owner ? o.owner.orgId : orgId},
+      'listing_photo', ${o.status},
       ${approved ? 'media-public' : 'quarantine'}, ${id}, 'image/jpeg', 1000,
       ${variants ? JSON.stringify(variants) : null}::jsonb,
       ${o.createdAt.toISOString()}::timestamptz,
@@ -100,6 +120,21 @@ describe('media.uploads_stale', () => {
 
     expect(await rule('media.uploads_stale').run(t.db, NOW, 2)).toEqual({ deleted: 2 });
     expect(await remaining()).toHaveLength(1);
+  });
+
+  it('keeps a stale upload whose owner has a hold of any scope', async () => {
+    const seeker = (await seedSeeker(t.db)).userId;
+    await hold({ userId: seeker }, 'messages');
+    const held = await seed({
+      status: 'uploaded',
+      createdAt: daysAgo(30),
+      owner: { userId: seeker, orgId: null },
+    });
+    const free = await seed({ status: 'uploaded', createdAt: daysAgo(30) });
+
+    expect(await rule('media.uploads_stale').run(t.db, NOW, 100)).toEqual({ deleted: 1 });
+    expect(await remaining()).toEqual([held]);
+    expect((await cleanupJobs()).map((job) => job.mediaId)).toEqual([free]);
   });
 
   it('never deletes a file that finished scanning, however old', async () => {
@@ -198,6 +233,36 @@ describe('media.orphans', () => {
     } finally {
       await t.db.execute(sql`delete from app.landing_pages where key = 'state:alaska'`);
     }
+  });
+
+  it('keeps an unused file while its owner or its organization is under a hold (lead decision 2026-11-18)', async () => {
+    // The review's case: a host under a fraud investigation swaps a listing's photos. The old
+    // photos are no longer used, but the hold must keep them.
+    const host = await seedHostOrg(t.db);
+    const orgHold = await hold({ orgId: host.orgId }, 'reports');
+    const seeker = (await seedSeeker(t.db)).userId;
+    const userHold = await hold({ userId: seeker }, 'all');
+    const byOrg = await seed({
+      status: 'approved',
+      createdAt: daysAgo(90),
+      owner: { userId: host.owner.userId, orgId: host.orgId },
+    });
+    const byUser = await seed({
+      status: 'approved',
+      createdAt: daysAgo(90),
+      owner: { userId: seeker, orgId: null },
+    });
+    const free = await seed({ status: 'approved', createdAt: daysAgo(90) });
+
+    expect(await rule('media.orphans').run(t.db, NOW, 100)).toEqual({ deleted: 1 });
+    expect((await remaining()).sort()).toEqual([byOrg, byUser].sort());
+    expect((await cleanupJobs()).map((job) => job.mediaId)).toEqual([free]);
+
+    // Once both holds are released the next run deletes them.
+    await releaseLegalHold(t.db, { holdId: orgHold, operatorId }, NOW);
+    await releaseLegalHold(t.db, { holdId: userHold, operatorId }, NOW);
+    expect(await rule('media.orphans').run(t.db, NOW, 100)).toEqual({ deleted: 2 });
+    expect(await remaining()).toEqual([]);
   });
 
   it('refuses a column name that is not a plain identifier', async () => {

@@ -133,7 +133,10 @@ describe('eventSubscribers', () => {
       'discovery.sync_host',
       'support.enterprise_onboarding',
     ]);
-    expect(eventSubscribers['verification.decided']).toEqual(['listings.resume_screening']);
+    expect(eventSubscribers['verification.decided']).toEqual([
+      'listings.resume_screening',
+      'hiring.close_for_failed_host',
+    ]);
     for (const event of ['listing.changed', 'listing.closed', 'listing.removed'] as const) {
       expect(eventSubscribers[event]).toEqual(['discovery.sync_listing']);
     }

@@ -63,6 +63,7 @@ describe('identity privacy handler', () => {
       'displayName',
       'email',
       'id',
+      'signupRefusedAt',
     ]);
   });
 
@@ -165,6 +166,57 @@ describe('identity privacy handler', () => {
     expect(
       await queryRows(t.db, sql`select 1 from app.users where id = ${seeker.userId} and birth_year is null`),
     ).toHaveLength(1);
+  });
+
+  // An under-age refusal (drizzle/0103) holds on an account that has no type yet.
+  async function seedRefused(refusedAt: string): Promise<string> {
+    const userId = newId();
+    await t.db.execute(sql`
+      insert into app.users (id, clerk_user_id, email, display_name, signup_refused_at)
+      values (${userId}, ${`user_refused_${userId}`}, ${`refused-${userId}@example.test`}, 'Sam',
+              ${refusedAt}::timestamptz)
+    `);
+    return userId;
+  }
+
+  async function refusedAt(userId: string): Promise<string | null | undefined> {
+    const [found] = await queryRows<{ refused: string | null }>(
+      t.db,
+      sql`select to_char(signup_refused_at at time zone 'utc',
+            'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as refused
+          from app.users where id = ${userId}`,
+    );
+    return found?.refused;
+  }
+
+  it('exports the refusal, keeps it under a hold on everything, and clears it with the account', async () => {
+    const refused = '2026-11-02T09:30:00.000Z';
+    const userId = await seedRefused(refused);
+    const subject = { kind: 'user' as const, userId };
+
+    const part = await privacyHandler.exportData(t.db, subject);
+    expect(part.records.account?.[0]).toMatchObject({
+      accountType: null,
+      birthYear: null,
+      signupRefusedAt: new Date(refused),
+    });
+
+    // A hold on everything keeps the record as it is, the refusal included.
+    await erase(subject, ['all']);
+    expect(await refusedAt(userId)).toBe(refused);
+    // Deleting the account clears it: a deleted account can never onboard again.
+    expect((await erase(subject)).erased).toBe(1);
+    expect(await refusedAt(userId)).toBeNull();
+    expect((await erase(subject)).erased).toBe(0);
+  });
+
+  it('finishes a row that was pseudonymized while it still held a refusal', async () => {
+    const userId = await seedRefused('2026-11-02T09:30:00.000Z');
+    const subject = { kind: 'user' as const, userId };
+    await erase(subject);
+    await t.db.execute(sql`update app.users set signup_refused_at = now() where id = ${userId}`);
+    expect((await erase(subject)).erased).toBe(1);
+    expect(await refusedAt(userId)).toBeNull();
   });
 
   it('holds a narrower scope without keeping the identity', async () => {

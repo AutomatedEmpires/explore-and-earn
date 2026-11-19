@@ -1,5 +1,18 @@
-// Threads, participation and reading (SP5 W4).
-import { and, desc, eq, inArray, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
+// Threads, participation and reading (SP5 W4). A host the applicant verification gate refuses
+// lists and reads no thread (gate.ts; issue 199).
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  notInArray,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import type { DbOrTx, Tx } from '@/lib/db';
 import { queryRows } from '@/lib/db';
 import { conflict, notFound } from '@/lib/errors';
@@ -23,6 +36,7 @@ import { getCommunityIdentities } from '@/modules/profiles';
 import { getRelationships, isBlockedBetween } from '@/modules/safety';
 import type { HostContext } from '@/server/guards';
 import { inScope, listingScope, requireHiringCapability, type ThreadViewer } from './access';
+import { hostMayMessage, orgMayMessage, requireMessagingAccess } from './gate';
 import { messages, threads } from './schema';
 
 const PAGE = 30;
@@ -46,7 +60,11 @@ function closedLongEnough(row: ThreadRow, now: Date): boolean {
   return row.listingClosedAt !== null && now.getTime() - row.listingClosedAt.getTime() > CLOSE_MS;
 }
 
-/** Stored reason, a listing closed more than 90 days, or a block either way. */
+/**
+ * Stored reason, a listing closed more than 90 days, a block either way, or a host whose team may
+ * not message applicants (the applicant verification gate refuses it): `unavailable`, which
+ * names no reason and is never stored, so the thread opens again once the host is verified.
+ */
 export async function blockingReason(
   db: DbOrTx,
   row: ThreadRow,
@@ -64,7 +82,8 @@ export async function blockingReason(
     orgId: row.orgId,
     seekerUserIds: [row.seekerUserId],
   });
-  return rel?.blocked ? 'blocked' : null;
+  if (rel?.blocked) return 'blocked';
+  return (await hostMayMessage(db, row.orgId)) ? null : 'unavailable';
 }
 
 /** Stamps `blocked` when the thread has no reason yet. A later `removed` still wins. */
@@ -317,6 +336,39 @@ export async function threadIdsForApplications(
   return out;
 }
 
+/**
+ * Host replies per application (legal review 7.3: the silent-host alert counts them as answers).
+ * A reply is a message the org's team sent in the application's thread, text or card, including
+ * one still in the scan; one the scan or an operator held or removed never reached the
+ * applicant and does not count. With `applicationIds`, each id is in the map, 0 when the host
+ * has not replied; without, every application of the org that has a reply.
+ */
+export async function hostRepliesByApplication(
+  db: DbOrTx,
+  orgId: string,
+  applicationIds?: string[],
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>((applicationIds ?? []).map((id) => [id, 0]));
+  if (applicationIds?.length === 0) return out;
+  const filters = [
+    eq(threads.orgId, orgId),
+    isNotNull(threads.applicationId),
+    eq(messages.senderType, 'host'),
+    notInArray(messages.scanState, ['held', 'removed']),
+  ];
+  if (applicationIds) filters.push(inArray(threads.applicationId, applicationIds));
+  const rows = await db
+    .select({ applicationId: threads.applicationId, n: sql<number>`count(*)::int` })
+    .from(threads)
+    .innerJoin(messages, eq(messages.threadId, threads.id))
+    .where(and(...filters))
+    .groupBy(threads.applicationId);
+  for (const row of rows) {
+    if (row.applicationId) out.set(row.applicationId, row.n);
+  }
+  return out;
+}
+
 async function requireThread(
   db: DbOrTx,
   viewer: ThreadViewer,
@@ -331,7 +383,8 @@ async function requireThread(
  * The read-only reason as `viewer` may see it. A thread closed by a block reads `blocked` only
  * to the side that made a block that still stands; the other side, and both sides after an
  * unblock, see `unavailable`. So a seeker never learns that a host blocked them, and a host
- * never learns that a seeker did (SP4 spec 8.7 and 10).
+ * never learns that a seeker did (SP4 spec 8.7 and 10). A thread whose host may not message
+ * applicants already reads `unavailable` (`blockingReason`), so the seeker never learns why.
  */
 async function viewerReason(
   db: DbOrTx,
@@ -349,12 +402,18 @@ async function viewerReason(
   return mine.byA ? 'blocked' : 'unavailable';
 }
 
+/**
+ * One page of a thread. A host the applicant verification gate refuses gets the applicant
+ * list's 409 before anything is read. The seeker reads their messages whatever the host's status;
+ * while the host is refused, the thread reads `unavailable` and takes no message.
+ */
 export async function getThread(
   db: DbOrTx,
   viewer: ThreadViewer,
   threadId: string,
   o?: { before?: string },
 ): Promise<ThreadView> {
+  if (viewer.kind === 'host') await requireMessagingAccess(db, viewer.ctx.orgId);
   const thread = await requireThread(db, viewer, threadId);
   const now = new Date();
   let reason = await blockingReason(db, thread, now);
@@ -451,6 +510,7 @@ export async function listThreads(
     filters.push(eq(threads.seekerUserId, userId));
   } else {
     requireHiringCapability(viewer.ctx, 'messages.access');
+    await requireMessagingAccess(db, viewer.ctx.orgId);
     const scope = await listingScope(db, viewer.ctx);
     filters.push(eq(threads.orgId, viewer.ctx.orgId));
     if (!scope.all) {
@@ -530,7 +590,10 @@ async function summarize(
     const incoming = seeker ? row.lastToSeekerAt : row.lastToHostAt;
     const seen = readAt.get(row.id);
     const preview = previews.get(row.id);
-    const readOnly = row.readOnlyReason !== null || closedLongEnough(row, new Date());
+    const readOnly =
+      row.readOnlyReason !== null ||
+      closedLongEnough(row, new Date()) ||
+      !orgMayMessage(orgs.get(row.orgId));
     return {
       threadId: row.id,
       listingId: row.listingId,

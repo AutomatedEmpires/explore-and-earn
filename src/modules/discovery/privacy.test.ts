@@ -9,7 +9,7 @@ import { seedSeeker } from '../../../tests/helpers/sp2';
 import { queryRows, withTx } from '@/lib/db';
 import type { DiscoveryQuery } from '@/lib/discovery';
 import { newId } from '@/lib/ids';
-import type { HoldScope } from '@/modules/privacy';
+import { setLegalHold, type HoldScope } from '@/modules/privacy';
 import { eraseUserData, exportUserData, privacyHandler, retentionRules } from './privacy';
 
 const DAY_MS = 86_400_000;
@@ -312,5 +312,39 @@ describe('retentionRules', () => {
         from app.listing_events`,
     );
     expect(left).toEqual([{ at: boundary.toISOString() }]);
+  });
+
+  it('keeps the raw events of an organization with a hold on all (lead decision 2026-11-18)', async () => {
+    const now = new Date('2026-11-10T04:00:00Z');
+    const old = new Date(now.getTime() - 200 * DAY_MS);
+    await t.db.execute(sql`delete from app.listing_events`);
+    const operatorId = (await seedSeeker(t.db)).userId;
+    const hold = (orgId: string, scope: HoldScope) =>
+      setLegalHold(
+        t.db,
+        { orgId, scope, reason: 'Fraud investigation 26-311', reviewAt: '2026-12-01', operatorId },
+        now,
+      );
+    const heldOrg = newId();
+    await hold(heldOrg, 'all');
+    const otherScope = newId();
+    await hold(otherScope, 'reports');
+    const event = async (orgId: string) => {
+      const id = newId();
+      await t.db.execute(sql`
+        insert into app.listing_events (id, listing_id, org_id, type, source, occurred_at)
+        values (${id}::uuid, ${listings[0] ?? ''}::uuid, ${orgId}::uuid, 'view', 'seek',
+          ${old.toISOString()}::timestamptz)
+      `);
+      return id;
+    };
+    const kept = await event(heldOrg);
+    await event(otherScope);
+    await event(DEFAULT_ORG_ID);
+
+    const [rule] = retentionRules;
+    expect(await rule?.run(t.db, now, 100)).toEqual({ deleted: 2 });
+    const left = await queryRows<{ id: string }>(t.db, sql`select id from app.listing_events`);
+    expect(left).toEqual([{ id: kept }]);
   });
 });

@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getDb } from '@/lib/db';
 import { getEnv } from '@/lib/env';
+import { isSignupRefusedAccount } from '@/modules/identity';
 import { findHostMembership } from '@/modules/orgs';
 import { requireUser, type CurrentUser } from '@/server/guards';
 import { adminOrigin, homeFor, signInUrl } from '@/server/shell';
@@ -54,8 +55,11 @@ export default async function OnboardingPage({ searchParams }: { searchParams: S
   const state = await onboardingFor(user, returnTo);
   if ('to' in state) redirect(state.to);
 
-  // A sign-up refused earlier in this browser session opens on the refusal (legal review 2.6).
-  const refused = isSignupRefusedValue((await cookies()).get(SIGNUP_REFUSED_COOKIE)?.value);
+  // A refused sign-up opens on the refusal (legal review 2.6): one refused on this account, in
+  // any browser, or earlier in this browser session.
+  const refused =
+    isSignupRefusedValue((await cookies()).get(SIGNUP_REFUSED_COOKIE)?.value) ||
+    (await isSignupRefusedAccount(getDb(), user.id));
 
   return (
     <AuthFrame footer="Explore&Earn is free for seekers, forever.">

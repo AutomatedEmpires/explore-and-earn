@@ -18,7 +18,7 @@
 #   3. Copies the dump and manifest to backupcrypt:pg/<date>/ and checks the copy.
 #   4. Syncs the two media buckets to backupcrypt:files/, keeping changed and deleted files
 #      under backupcrypt:files-deleted/<date>/.
-#   5. Deletes dumps and kept files older than 35 days.
+#   5. Deletes each dated folder of dumps and kept files 35 days after the date in its name.
 # Only the buckets media-public and media-private are read. No other bucket is listed anywhere
 # in this file, and none may be added without a decision recorded in the runbook.
 name: Backup
@@ -170,11 +170,26 @@ jobs:
           done
 
       - name: Delete dumps and kept files older than 35 days
+        # A dated folder goes 35 days after the date in its name (the day of the run that wrote
+        # it), never by a file's own time: rclone keeps a file's modification time when it moves
+        # it into files-deleted/, so an age filter would delete an old file the night it was
+        # deleted. scripts/backup-prune.ts decides which folders are due (tested in
+        # src/server/ops/backup-prune.test.ts); a folder whose name is not a date is never deleted.
         run: |
-          rclone delete --min-age 35d backupcrypt:pg
-          rclone delete --min-age 35d backupcrypt:files-deleted
-          rclone rmdirs --leave-root backupcrypt:pg
-          rclone rmdirs --leave-root backupcrypt:files-deleted
+          set -euo pipefail
+          for area in pg files-deleted; do
+            listing="$RUNNER_TEMP/prune-$area.txt"
+            due="$RUNNER_TEMP/prune-$area-due.txt"
+            if ! rclone lsf --dirs-only "backupcrypt:$area/" > "$listing"; then
+              echo "::warning::Could not list backupcrypt:$area/ (it may not exist yet). Nothing in it was deleted."
+              continue
+            fi
+            pnpm --silent exec tsx scripts/backup-prune.ts --today "$BACKUP_DATE" --keep-days 35 \
+              < "$listing" > "$due"
+            while IFS= read -r folder; do
+              rclone purge "backupcrypt:$area/$folder"
+            done < "$due"
+          done
 
       - name: Remove the local copies
         if: always()

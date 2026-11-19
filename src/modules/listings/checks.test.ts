@@ -298,6 +298,24 @@ describe('runListingChecks', () => {
       ]);
     });
 
+    it('skips an equal-opportunity statement and flags a preference beside it (issue 207)', async () => {
+      const r = await check((c) => {
+        c.job.description = `${DESCRIPTION} We hire without regard to race, religion, national origin, sex, age or disability.`;
+        c.job.preferredQualifications = ['EOE. Men preferred.'];
+        c.job.requiredQualifications = ['EOE M/F/D/V'];
+      });
+      expect(r.errors).toEqual([]);
+      expect(r.warnings).toEqual([
+        {
+          code: 'wording_flagged',
+          section: 'job',
+          field: 'job.preferredQualifications.0',
+          message:
+            '"men preferred" can read as a preference for men or for women. Describe the work and the skills it needs, not the kind of person you want. If the job needs it, you can keep it: we will review the listing before it goes live.',
+        },
+      ]);
+    });
+
     it('leaves a field with blocked wording to the block', async () => {
       const r = await check((c) => {
         c.job.description = `${DESCRIPTION} US citizens only. Young team.`;
@@ -800,6 +818,27 @@ describe('the wording lists', () => {
     }
   });
 
+  // Issue 207: a singular nationality after "no" or "only" in the middle of the text, where the
+  // folded text has no period left to end the phrase.
+  it.each(nationalities)('flags %s after no or only, mid-text (issue 207)', (n) => {
+    for (const text of [
+      `No ${n}. We are a family-run lodge`,
+      `Only ${n}. Apply by May 1`,
+      `Hiring now! No ${n}! Call Sam`,
+      `No ${n}\nWe are a family-run lodge`,
+      `No ${n} allowed on the crew`,
+      `Only ${n} hired for the front desk`,
+      `Lift crew wanted, no ${n} need apply, call Sam`,
+    ]) {
+      expect(
+        findFlaggedWording(inDescription(text), { flagged: [], nationalities: [n], groups: [] }),
+        text,
+      ).toEqual([
+        expect.objectContaining({ field: 'job.description', phrase: n, ground: 'national_origin' }),
+      ]);
+    }
+  });
+
   // Issue 200: each group term on its own, in the forms that state a preference or a limit.
   it.each(groups.map((g) => [g.term, g] as const))('flags the group %j', (_term, entry) => {
     const forms =
@@ -969,9 +1008,64 @@ describe('the wording lists', () => {
     'Join a three-man crew',
     'Our foreman schedules the crews',
     'Born and raised in Alaska, our family runs the lodge',
+    // Issue 207: a language, a dish or a menu after "no" or "only", mid-text; words that only
+    // look like an equal-opportunity statement.
+    'No English required. We train you',
+    'No Spanish needed. We train you',
+    'Only English menus. We print them daily',
+    'No French fries. We serve salads',
+    'Spanish speakers welcome. We are bilingual',
+    'We are an equal opportunity employer',
+    'Equal opportunity for advancement',
+    'Regardless of the weather, we ski every day',
   ])('does not flag %j', (text) => {
     expect(findFlaggedWording(inDescription(text), lists)).toEqual([]);
   });
+
+  // Issue 207: an equal-opportunity statement names the protected grounds to say they play no
+  // part. Its ground words are not a preference.
+  it.each([
+    'We hire without regard to race, religion, national origin, sex, age or disability',
+    'EOE M/F/D/V',
+    'EOE/AA/Minorities/Females/Vets/Disability',
+    'EOE Minorities/Females/Vets/Disabled. Preferred skills include first aid',
+    'All qualified applicants will receive consideration for employment without regard to race, color, religion, sex, sexual orientation, gender identity, national origin, disability, or status as a protected veteran',
+    'We are an equal opportunity employer and do not discriminate on the basis of race, religion, nationality, ethnicity, pregnancy or criminal history',
+    'Applicants are considered regardless of their religion, national or ethnic origin, citizenship status, or any other characteristic protected by federal, state or local law',
+    'Equal Opportunity Employer: we hire irrespective of religious beliefs, country of origin, height and weight, or hair texture',
+    'We do not discriminate against anyone based on religion or national origin. Apply today',
+    'Without regard to sex (including pregnancy, childbirth and related medical conditions), religion, or physical or mental disability',
+    'Equal opportunity/affirmative action employer. We hire without regard to arrest or conviction records',
+    'Discrimination based on an applicant’s religion, ancestry or marital status is not tolerated',
+  ])('does not flag the equal-opportunity statement %j (issue 207)', (text) => {
+    expect(findFlaggedWording(inDescription(text), lists)).toEqual([]);
+  });
+
+  // Issue 207: a real preference or limit beside an equal-opportunity statement is still flagged.
+  it.each<[string, string, string]>([
+    ['EOE. Men preferred', 'men preferred', 'sex'],
+    ['EOE M/F/D/V. Females preferred', 'females preferred', 'sex'],
+    ['Equal opportunity employer. Must be under 35', 'under 35', 'age'],
+    ['We hire without regard to race or religion. Christians preferred', 'christians', 'religion'],
+    ['Regardless of age, women only', 'women only', 'sex'],
+    ['Regardless of race, whites only', 'whites only', 'race'],
+    [
+      'We hire regardless of national origin, but Mexican workers preferred',
+      'mexican workers',
+      'national_origin',
+    ],
+    ['Without regard to religion or disability: no felons', 'no felons', 'criminal_history'],
+    ['We do not discriminate based on age. Young, energetic team wanted', 'young', 'age'],
+    ['EOE. No Irish. We are a family-run lodge', 'no irish', 'national_origin'],
+    ['Regardless of experience, no one over 40', 'no one over 40', 'age'],
+  ])(
+    'still flags %j as %j (%s) beside an equal-opportunity statement (issue 207)',
+    (text, matched, ground) => {
+      expect(findFlaggedWording(inDescription(text), lists)).toEqual([
+        expect.objectContaining({ field: 'job.description', matched, ground }),
+      ]);
+    },
+  );
 
   // Legal review 2.2: a bona fide use still goes to an operator, as a flag and never a block.
   it.each<[string, string]>([

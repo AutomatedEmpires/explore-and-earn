@@ -8,6 +8,7 @@ import {
   completeOnboarding,
   isAdultOn,
   isSignupRefusal,
+  isSignupRefusedAccount,
   onboardingRequestSchema,
   setAccountType,
 } from './onboarding';
@@ -302,7 +303,7 @@ describe('the age screen (legal review 2.6, P0 item 17)', () => {
       ['the birthday, before it has begun everywhere', BIRTHDAY, new Date('2026-11-18T11:59:59Z')],
       ['one day short', '2008-11-19', onTheDay],
       ['a child', '2016-06-01', onTheDay],
-    ])('refuses %s and stores nothing', async (_name, dateOfBirth, now) => {
+    ])('refuses %s and keeps only the time of the refusal', async (_name, dateOfBirth, now) => {
       const userId = await newUser();
       const clerk = makeFakeClerkAdmin();
 
@@ -327,6 +328,7 @@ describe('the age screen (legal review 2.6, P0 item 17)', () => {
       expect(row.account_type).toBeNull();
       expect(row.adult_attested_at).toBeNull();
       expect(row.birth_year).toBeNull();
+      expect(row.signup_refused_at).not.toBeNull();
       expect(clerk.calls).toEqual([]);
       expect(audit.record).not.toHaveBeenCalled();
     });
@@ -367,6 +369,144 @@ describe('the age screen (legal review 2.6, P0 item 17)', () => {
       expect.objectContaining({ data: { accountType: 'seeker' } }),
     );
     expect(clerk.metadata.get('user_1')).toEqual({ account_type: 'seeker' });
+  });
+});
+
+// Lead decision 2026-11-18 (explore-and-earn#45): once the product knows an account belongs to
+// a minor (legal review 2.6), the refusal holds on the account, not only on the browser session.
+describe('an under-age refusal holds on the account', () => {
+  const CHILD_DOB = '2016-06-01';
+  const NOW = new Date('2026-11-18T12:00:00Z');
+  const HOST = { accountType: 'host', organizationName: 'Kettle Ridge Lodge' } as const;
+
+  /** The error a call ends with, or 'no error'. */
+  async function outcome(call: Promise<unknown>): Promise<unknown> {
+    return call.then(
+      () => 'no error',
+      (e: unknown) => e,
+    );
+  }
+
+  async function refuse(userId: string, clerk = makeFakeClerkAdmin()): Promise<void> {
+    const err = await outcome(
+      completeOnboarding(
+        t.db,
+        clerk,
+        userId,
+        { accountType: 'seeker', dateOfBirth: CHILD_DOB },
+        { now: NOW },
+      ),
+    );
+    expect(isSignupRefusal(err)).toBe(true);
+  }
+
+  /** The database's own message for a failed statement (drizzle keeps it as the cause). */
+  async function failure(statement: Promise<unknown>): Promise<string> {
+    const err = await outcome(statement);
+    if (!(err instanceof Error)) return 'no error';
+    return err.cause instanceof Error ? err.cause.message : err.message;
+  }
+
+  it('refuses every later try, with an adult date or as a host, and keeps the first time', async () => {
+    const userId = await newUser();
+    const clerk = makeFakeClerkAdmin();
+    await refuse(userId, clerk);
+    const stamped = (await wholeRow(userId)).signup_refused_at;
+    expect(stamped).not.toBeNull();
+
+    // There is no cookie at this level: the account alone keeps onboarding closed.
+    for (const retry of [
+      SEEKER,
+      HOST,
+      { accountType: 'seeker', dateOfBirth: CHILD_DOB },
+    ] as const) {
+      const err = await outcome(completeOnboarding(t.db, clerk, userId, retry, { now: NOW }));
+      expect(isSignupRefusal(err)).toBe(true);
+      expect(err).toMatchObject({ code: 'forbidden', message: 'We can’t make you an account' });
+    }
+
+    const row = await wholeRow(userId);
+    expect(row.account_type).toBeNull();
+    expect(row.signup_refused_at).toBe(stamped);
+    expect(await queryRows(t.db, sql`select id from app.organizations`)).toEqual([]);
+    // Neither Clerk nor the audit log hears about the refusal or any retry.
+    expect(clerk.calls).toEqual([]);
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('adds only the time of the refusal to the row, never the date or the year', async () => {
+    const userId = await newUser();
+    const before = await wholeRow(userId);
+    await refuse(userId);
+    const row = await wholeRow(userId);
+
+    const changed = Object.keys(row).filter((key) => row[key] !== before[key]);
+    expect(changed.sort()).toEqual(['signup_refused_at', 'updated_at']);
+    expect(row.birth_year).toBeNull();
+    expect(row.adult_attested_at).toBeNull();
+    expect(JSON.stringify(row)).not.toContain(CHILD_DOB);
+    // The stamp is the database's clock at the refusal, not anything the person typed.
+    const [stamp] = await queryRows<{ fresh: boolean }>(
+      t.db,
+      sql`select signup_refused_at > now() - interval '1 minute' as fresh
+          from app.users where id = ${userId}`,
+    );
+    expect(stamp?.fresh).toBe(true);
+  });
+
+  it('closes every other way to an account type, such as accepting a team invitation', async () => {
+    const userId = await newUser();
+    await refuse(userId);
+    const clerk = makeFakeClerkAdmin();
+    for (const input of [
+      { accountType: 'host' },
+      { accountType: 'seeker', adultAttested: true },
+    ] as const) {
+      expect(isSignupRefusal(await outcome(setAccountType(t.db, clerk, userId, input)))).toBe(true);
+    }
+    expect((await userRow(userId))?.account_type).toBeNull();
+    expect(clerk.calls).toEqual([]);
+  });
+
+  it('tells the page whether an account was refused', async () => {
+    const refused = await newUser('user_refused');
+    const other = await newUser('user_other');
+    await refuse(refused);
+    expect(await isSignupRefusedAccount(t.db, refused)).toBe(true);
+    expect(await isSignupRefusedAccount(t.db, other)).toBe(false);
+    expect(await isSignupRefusedAccount(t.db, '00000000-0000-7000-8000-00000000abcd')).toBe(false);
+  });
+
+  it('refuses, without stamping it, an account whose type is already set', async () => {
+    const userId = await newUser();
+    await completeOnboarding(t.db, makeFakeClerkAdmin(), userId, SEEKER);
+    await refuse(userId);
+    const row = await wholeRow(userId);
+    expect(row.account_type).toBe('seeker');
+    expect(row.signup_refused_at).toBeNull();
+  });
+
+  it('never holds a refusal with the adult confirmation or on a host (drizzle/0103)', async () => {
+    const refused = await newUser('user_refused');
+    await refuse(refused);
+    expect(
+      await failure(
+        t.db.execute(sql`update app.users set adult_attested_at = now() where id = ${refused}`),
+      ),
+    ).toMatch(/users_signup_refused_not_adult/);
+    expect(
+      await failure(
+        t.db.execute(sql`update app.users set account_type = 'host' where id = ${refused}`),
+      ),
+    ).toMatch(/users_signup_refused_not_host/);
+
+    const seeker = await newUser('user_seeker');
+    await completeOnboarding(t.db, makeFakeClerkAdmin(), seeker, SEEKER);
+    expect(
+      await failure(
+        t.db.execute(sql`update app.users set signup_refused_at = now() where id = ${seeker}`),
+      ),
+    ).toMatch(/users_signup_refused_not_adult/);
   });
 });
 

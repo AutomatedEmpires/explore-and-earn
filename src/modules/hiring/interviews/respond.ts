@@ -1,4 +1,9 @@
 // Seeker answers: pick a slot, ask for new times, or decline.
+//
+// Each answer tells the host the seeker's first name, so each is refused while the host fails
+// the applicant gate (issue 212): the invite's neutral 409 `not_taking_answers`, inside the
+// transaction, once the interview is known to be the seeker's and before anything is written or
+// sent (`requireHostTakesAnswers`). The interview stays as it was.
 import { and, eq } from 'drizzle-orm';
 import { TERMINAL_STATUSES } from '@/lib/applications';
 import { withdraw } from '@/modules/applications';
@@ -12,6 +17,7 @@ import { enqueue } from '@/modules/jobs';
 import { postEvent } from '@/modules/messaging';
 import { recordPipelineEvent } from '../core';
 import { interviewSlots, interviews, pipelineEntries } from '../schema';
+import { requireHostTakesAnswers } from './answers';
 import { notifyInterview, scheduleFields } from './deliver';
 import { seekerInterviewViews } from './reads';
 import { setInterviewState } from './state';
@@ -58,6 +64,7 @@ export async function pickSlot(
 ): Promise<SeekerInterviewItem> {
   await withTx(db, async (tx) => {
     const visible = await loadVisible(tx, seekerUserId, interviewId);
+    await requireHostTakesAnswers(tx, visible.interview.orgId);
     // The entry is locked before the interview, as a pipeline transition locks them.
     const [entry] = await tx
       .select()
@@ -175,7 +182,8 @@ export async function requestNewTimes(
 ): Promise<SeekerInterviewItem> {
   assertWindows(input.windows, now);
   await withTx(db, async (tx) => {
-    await loadVisible(tx, seekerUserId, interviewId);
+    const visible = await loadVisible(tx, seekerUserId, interviewId);
+    await requireHostTakesAnswers(tx, visible.interview.orgId);
     const [locked] = await tx.select().from(interviews).where(eq(interviews.id, interviewId)).for('update');
     if (!locked || (locked.status !== 'invited' && locked.status !== 'scheduled')) {
       throw conflict('This interview is no longer open.', { reason: 'interview_closed' });
@@ -225,6 +233,7 @@ export async function declineInterview(
 ): Promise<{ interview: SeekerInterviewItem; withdrawn: boolean }> {
   await withTx(db, async (tx) => {
     const visible = await loadVisible(tx, seekerUserId, interviewId);
+    await requireHostTakesAnswers(tx, visible.interview.orgId);
     const [locked] = await tx.select().from(interviews).where(eq(interviews.id, interviewId)).for('update');
     if (!locked || !(ACTIVE as readonly string[]).includes(locked.status)) {
       throw conflict('This interview is no longer open.', { reason: 'interview_closed' });

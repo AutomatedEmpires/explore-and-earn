@@ -134,7 +134,10 @@ export type SettingValue<K extends SettingKey> = SettingValues[K];
 
 // --- Listing wording lists (legal review 2.2, 2.6; #121) ----------------------------------------
 // These are the agent's first lists for counsel to confirm (legal review section 13). Each one
-// errs toward review: a flagged listing costs an operator a look, never a host's listing.
+// errs toward review: a flagged listing costs an operator a look, never a host's listing. The
+// listing checks skip the list of grounds in a non-discrimination statement ("without regard to
+// race, religion or national origin", "EOE M/F/D/V"), so these entries are not flagged there
+// (#207). A preference or a limit beside the statement is still flagged.
 
 /** Entries of one ground that share the neutral wording offered. */
 const flag = (ground: WordingGround, suggestion: string, phrases: string[]): FlaggedPhrase[] =>

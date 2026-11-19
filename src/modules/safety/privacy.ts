@@ -11,7 +11,7 @@
 // everything leaves all three tables as they are (SP8 eraser rules). Once a report is unlinked
 // nothing ties it to the subject any more, so a second run keeps (and reports) nothing.
 import { and, asc, eq, or, sql } from 'drizzle-orm';
-import { queryRows, type Db, type DbOrTx, type Tx } from '@/lib/db';
+import { queryRows, withTx, type Db, type DbOrTx, type Tx } from '@/lib/db';
 import type {
   EraseResult,
   ExportPart,
@@ -152,6 +152,35 @@ export const privacyHandler: PrivacyHandler = {
   erase,
 };
 
+type Report = { id: string; subject_type: string; subject_id: string; at: string };
+
+/**
+ * The reports about a listing whose organization has a hold on reports (or on everything).
+ * The listings module says whose each listing is; nothing is read when no such hold is open.
+ */
+async function heldThroughListing(
+  db: DbOrTx,
+  page: Report[],
+  heldOrgs: ReadonlySet<string>,
+): Promise<Set<string>> {
+  if (heldOrgs.size === 0) return new Set();
+  const about = page.filter((row) => row.subject_type === 'listing');
+  if (about.length === 0) return new Set();
+  const { getListingSummaries } = await import('@/modules/listings');
+  const listings = await getListingSummaries(
+    db,
+    about.map((row) => row.subject_id),
+  );
+  return new Set(
+    about
+      .filter((row) => {
+        const orgId = listings.get(row.subject_id)?.orgId;
+        return orgId !== undefined && heldOrgs.has(orgId);
+      })
+      .map((row) => row.id),
+  );
+}
+
 export const retentionRules: RetentionRule[] = [
   {
     key: 'safety.reports_12m',
@@ -160,17 +189,59 @@ export const retentionRules: RetentionRule[] = [
       const cap = Math.max(0, Math.floor(limit));
       if (cap === 0) return { deleted: 0 };
       const cutoff = addMonths(now, -RETAIN_MONTHS);
-      const rows = await queryRows<{ id: string }>(
-        db,
-        sql`delete from app.reports where id in (
-              select id from app.reports
-              where created_at < ${cutoff.toISOString()}::timestamptz
-              order by created_at, id
+      // A report whose reporter or subject is under a legal hold on reports (or on everything)
+      // is kept, as the eraser keeps it (lead decision 2026-11-18). The reporter and an
+      // organization or seeker subject are on the row; a listing's organization comes from the
+      // listings module. Reports about a thread or message are not yet matched to their owner:
+      // messaging exposes no owner lookup.
+      const { heldSubjects, underLegalHold } = await import('@/modules/privacy');
+      const held = await heldSubjects(db, 'reports');
+      const onTheRow = underLegalHold({
+        users: [
+          sql`r.reporter_user_id`,
+          sql`case when r.subject_type = 'seeker_profile' then r.subject_id end`,
+        ],
+        orgs: [sql`r.reporter_org_id`, sql`case when r.subject_type = 'org' then r.subject_id end`],
+        scope: 'reports',
+      });
+      return withTx(db, async (tx) => {
+        // Pages oldest first until `cap` may go, so held reports at the front never stop the
+        // ones behind them. With no hold open, one page is enough.
+        const due: string[] = [];
+        let after: { at: string; id: string } | null = null;
+        for (;;) {
+          const page: Report[] = await queryRows<Report>(
+            tx,
+            sql`
+              select r.id, r.subject_type, r.subject_id::text as subject_id,
+                r.created_at::text as at
+              from app.reports r
+              where r.created_at < ${cutoff.toISOString()}::timestamptz
+                and not ${onTheRow}
+                ${after ? sql`and (r.created_at, r.id) > (${after.at}::timestamptz, ${after.id}::uuid)` : sql``}
+              order by r.created_at, r.id
               limit ${cap}
-            )
-            returning id`,
-      );
-      return { deleted: rows.length };
+              for update of r skip locked
+            `,
+          );
+          const kept = await heldThroughListing(tx, page, held.orgs);
+          for (const row of page) {
+            if (due.length < cap && !kept.has(row.id)) due.push(row.id);
+          }
+          const last = page.at(-1);
+          if (due.length >= cap || page.length < cap || !last) break;
+          after = { at: last.at, id: last.id };
+        }
+        if (due.length === 0) return { deleted: 0 };
+        const rows = await queryRows<{ id: string }>(
+          tx,
+          sql`delete from app.reports where id in (${sql.join(
+            due.map((id) => sql`${id}::uuid`),
+            sql`, `,
+          )}) returning id`,
+        );
+        return { deleted: rows.length };
+      });
     },
   },
 ];

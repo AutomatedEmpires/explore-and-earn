@@ -4,7 +4,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applicationSnapshotV1Schema } from '@/lib/applications';
 import { queryRows, withTx } from '@/lib/db';
-import type { HoldScope } from '@/modules/privacy';
+import { setLegalHold, type HoldScope } from '@/modules/privacy';
 import { resetSp2, setListingState } from '@tests/fakes/sp4/sp2';
 import { createTestDb, type TestDb } from '@tests/helpers/db';
 import { seedUser } from '@tests/helpers/sp4';
@@ -353,6 +353,42 @@ describe('retention rule applications.terminal_12m', () => {
     expect(await storedSnapshot(behind)).not.toContain('maya@example.test');
     for (const id of blockers) expect(await storedSnapshot(id)).toContain('maya@example.test');
     expect(await redactDue(t.db, new Date(), 10, 2)).toBe(0);
+  });
+
+  it('leaves an old application alone while its applicant or organization is under a hold on applications or all', async () => {
+    // Drain whatever earlier tests in this file left due.
+    await rule?.run(t.db, new Date(), 1000);
+    const operator = await seedUser(t.db, { accountType: 'host' });
+    const hold = (subject: { userId: string } | { orgId: string }, scope: HoldScope) =>
+      setLegalHold(t.db, {
+        ...subject,
+        scope,
+        reason: 'Discrimination complaint 26-77',
+        reviewAt: '2099-01-01',
+        operatorId: operator.id,
+      });
+    const oldFinished = async (seekerId: string) => {
+      const id = await apply(seekerId);
+      await forceStatus(t.db, id, 'not_selected');
+      await ageStatus(id, 13);
+      return id;
+    };
+    const heldSeeker = await seedUser(t.db, { accountType: 'seeker' });
+    await hold({ userId: heldSeeker.id }, 'applications');
+    const otherScope = await seedUser(t.db, { accountType: 'seeker' });
+    await hold({ userId: otherScope.id }, 'messages');
+    const held = await oldFinished(heldSeeker.id);
+    const due = await oldFinished(otherScope.id);
+
+    expect((await rule?.run(t.db, new Date(), 100))?.deleted).toBe(1);
+    expect(await storedSnapshot(held)).toContain('maya@example.test');
+    expect(await storedSnapshot(due)).not.toContain('maya@example.test');
+
+    // A hold on the host organization keeps every application to it.
+    await hold({ orgId: w.orgId }, 'all');
+    const toHeldOrg = await oldFinished(w.seeker.id);
+    expect((await rule?.run(t.db, new Date(), 100))?.deleted).toBe(0);
+    expect(await storedSnapshot(toHeldOrg)).toContain('maya@example.test');
   });
 
   it('redacts at most `limit` applications in one run', async () => {

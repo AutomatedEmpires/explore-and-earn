@@ -15,7 +15,11 @@ import postgres from 'postgres';
 import type { Db } from '@/lib/db';
 
 export type BackupManifest = {
-  /** ISO time the snapshot was taken. */
+  /**
+   * ISO time of the restore point. For a backup it is read just before the snapshot begins, so
+   * it is never later than the snapshot: everything committed before it is in the dump. The
+   * deletion replay after a restore starts from here, less a margin.
+   */
   takenAt: string;
   /** Applied migration file names, sorted. */
   migrations: string[];
@@ -239,8 +243,40 @@ const spawnPgDump: RunDump = (args, env) =>
 
 const SNAPSHOT_ID = /^[0-9A-Za-z-]+$/;
 
+/** The open transaction a backup reads in: raw statements, no parameters. */
+export type SnapshotTx = {
+  unsafe(text: string): PromiseLike<Iterable<Record<string, unknown>>>;
+};
+
+/** The one connection a backup runs on: postgres.js in production, a fake in unit tests. */
+export type BackupSession = {
+  begin<T>(mode: string, fn: (tx: SnapshotTx) => Promise<T>): Promise<T>;
+  end(o: { timeout: number }): Promise<void>;
+};
+
+function postgresSession(databaseUrl: string): BackupSession {
+  const client = postgres(databaseUrl, {
+    max: 1,
+    prepare: false,
+    connect_timeout: 10,
+    onnotice: () => {},
+  });
+  return {
+    begin: async <T>(mode: string, fn: (tx: SnapshotTx) => Promise<T>) =>
+      (await client.begin(mode, (tx) => fn(tx))) as T,
+    end: (o) => client.end(o),
+  };
+}
+
+const SNAPSHOT_MODE = 'isolation level repeatable read read only';
+
 /**
  * Takes a dump and its manifest from one snapshot.
+ *
+ * The manifest's `takenAt` is read from `clock` BEFORE the transaction begins, so it is never
+ * later than the snapshot. An erasure that commits after the snapshot is missing from the dump,
+ * and the deletion replay after a restore only reads ledger entries from takenAt (less its
+ * margin), so a takenAt read after the snapshot could let such an erasure be undone.
  *
  * `databaseUrl` must keep its session open for the whole dump: Supabase's session pooler or a
  * direct connection, never the transaction pooler (an exported snapshot disappears with the
@@ -251,24 +287,23 @@ export async function takeConsistentBackup(i: {
   databaseUrl: string;
   dumpPath: string;
   runDump?: RunDump;
-  now?: Date;
+  /** Defaults to the system clock. */
+  clock?: () => Date;
+  /** Defaults to one postgres.js connection on `databaseUrl`. */
+  session?: BackupSession;
 }): Promise<BackupManifest> {
   const runDump = i.runDump ?? spawnPgDump;
   const env = pgEnvFromUrl(i.databaseUrl);
-  const client = postgres(i.databaseUrl, {
-    max: 1,
-    prepare: false,
-    connect_timeout: 10,
-    onnotice: () => {},
-  });
+  const takenAt = (i.clock ?? (() => new Date()))();
+  const session = i.session ?? postgresSession(i.databaseUrl);
   try {
-    const manifest = await client.begin('isolation level repeatable read read only', async (tx) => {
-      const [row] = await tx.unsafe('select pg_export_snapshot() as id');
+    return await session.begin(SNAPSHOT_MODE, async (tx) => {
+      const [row] = [...(await tx.unsafe('select pg_export_snapshot() as id'))];
       const snapshotId: unknown = row?.id;
       if (typeof snapshotId !== 'string' || !SNAPSHOT_ID.test(snapshotId)) {
         throw new Error('backup: the database did not export a snapshot');
       }
-      const built = await buildBackupManifest(async (text) => [...(await tx.unsafe(text))], i.now);
+      const built = await buildBackupManifest(async (text) => [...(await tx.unsafe(text))], takenAt);
       await runDump(
         [
           '--format=custom',
@@ -283,8 +318,7 @@ export async function takeConsistentBackup(i: {
       );
       return built;
     });
-    return manifest as BackupManifest;
   } finally {
-    await client.end({ timeout: 5 });
+    await session.end({ timeout: 5 });
   }
 }

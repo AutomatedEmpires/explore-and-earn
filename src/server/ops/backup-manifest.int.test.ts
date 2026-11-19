@@ -128,7 +128,11 @@ describe('takeConsistentBackup (postgres)', () => {
 
 /** The first ```sql block after the marker line in the runbook. */
 function runbookRoleSql(): string {
-  const runbook = readFileSync(path.resolve('docs/runbooks/backups.md'), 'utf8');
+  // `\n` line endings, so a Windows checkout (CRLF) reads the same.
+  const runbook = readFileSync(path.resolve('docs/runbooks/backups.md'), 'utf8').replace(
+    /\r\n/g,
+    '\n',
+  );
   const match = /<!-- backup_reader:sql -->\s*```sql\n([\s\S]*?)```/.exec(runbook);
   if (!match?.[1]) throw new Error('docs/runbooks/backups.md has no backup_reader SQL block');
   return match[1];
