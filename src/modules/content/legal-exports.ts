@@ -1,24 +1,42 @@
-// W5 fills legal documents and acceptances.
-import type { HandlerMap } from '@/modules/jobs';
-import type { DbOrTx } from '@/lib/db';
-import { stubPrivacyHandler, type RetentionRule } from '@/modules/privacy';
-import { HELP_TABLES } from './help-exports';
+// W5's part of the content module: legal documents, their versions and acceptances, the drafts
+// for counsel and the cookie-consent epoch. content/index.ts re-exports this file.
+import type { RetentionRule } from '@/modules/privacy';
 
-const noop: HandlerMap[string] = async () => {};
+export {
+  getLegalVersion,
+  getPublishedLegal,
+  isLegalSlug,
+  LEGAL_EFFECTIVE_TOPIC,
+  LEGAL_NOTIFY_TOPIC,
+  LEGAL_SLUGS,
+  LEGAL_TITLES,
+  listLegalDocumentsForConsole,
+  listLegalVersions,
+  NOTICE_PERIOD_DAYS,
+  ONBOARDING_LEGAL,
+  publishDueLegal,
+  recordCounselApproval,
+  RETENTION_TABLE_TOKEN,
+  saveLegalDraft,
+  scheduleLegal,
+  type LegalDocumentRow,
+  type LegalSlug,
+  type LegalVersion,
+  type PublishedLegal,
+  type SaveLegalDraftInput,
+} from './legal';
+export {
+  pendingAcceptances,
+  publishedOnboardingLegal,
+  recordAcceptance,
+  type LegalItem,
+} from './acceptance';
+export { getConsentNotBefore, resetConsentEpochCache } from './consent-epoch';
+export { ensureLegalDrafts, parseDraft, readLegalDraft, type ParsedDraft } from './drafts';
+export { renderRetentionTable } from './retention-table';
+export { LEGAL_NOTIFY_CHUNK, legalJobHandlers } from './legal-jobs';
+export { privacyHandler } from './privacy';
+export { LEGAL_STATUSES, type LegalStatus } from './schema-legal';
 
-export async function getConsentNotBefore(_db: DbOrTx): Promise<Date | null> {
-  return null;
-}
-
-export async function pendingAcceptances(_db: DbOrTx, _userId: string): Promise<unknown[]> {
-  return [];
-}
-
-export const privacyHandler = stubPrivacyHandler('content', [...HELP_TABLES]);
-
+/** Acceptances are kept 7 years by the eraser; content owns no sweep rule. */
 export const retentionRules: RetentionRule[] = [];
-
-export const legalJobHandlers: HandlerMap = {
-  'content.legal_effective': noop,
-  'content.legal_notify_chunk': noop,
-};

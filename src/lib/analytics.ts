@@ -2,9 +2,14 @@
 // props are scrubbed, and the distinct id is our internal user id, never an email.
 // In the browser, use `trackClient` from ./analytics-client instead.
 //
-// Consent: apiRoute puts the request's verdict in the request context (`analyticsAllowed`),
-// and an event is dropped when that says no. Global Privacy Control (`Sec-GPC: 1`) always says
-// no, in every region (legal review 4.5). SP8 W5 (#149) also drops events outside a request.
+// Consent (SP8 Plan decision 19): apiRoute puts the request's verdict in the request context
+// (`analyticsAllowed`): the visitor's cookie choice, where an EU visitor needs an explicit yes;
+// Global Privacy Control (`Sec-GPC: 1`), a no in every region (legal review 4.5); a view-as
+// session, a no; and a signed-in account's recorded opt-out (users.analytics_opt_out_at), a no.
+// An event is sent only when that verdict, or the caller's explicit `{ allowed }`, is yes.
+// Outside apiRoute (jobs, cron, webhooks, server components, server actions) there is no
+// verdict, so an event is dropped unless the caller passes `{ allowed }`; code that knows the
+// person calls `trackForUser` from @/modules/privacy, which decides from their consent record.
 import { PostHog } from 'posthog-node';
 import { getRequestContext } from '@/server/request-context';
 import { scrubProps } from './analytics-scrub';
@@ -32,14 +37,26 @@ function getClient(): PostHog | null {
   return client;
 }
 
+/** Whether the current request allows analytics. False outside a request. */
+export function isAnalyticsAllowed(): boolean {
+  return getRequestContext()?.analyticsAllowed === true;
+}
+
 /**
- * Records a product event. Fire and forget: never throws, never blocks the caller. A no-op
- * when NEXT_PUBLIC_POSTHOG_KEY is not set, and when the current request does not allow
- * analytics (no consent in the EU, a view-as session, or Global Privacy Control anywhere).
+ * Records a product event. Fire and forget: never throws, never blocks the caller. Sends only
+ * when `opts.allowed`, or else the current request's verdict, is true; a request that refuses
+ * analytics is never overridden. A no-op when NEXT_PUBLIC_POSTHOG_KEY is not set.
  */
-export function track(event: string, props?: Record<string, unknown>, distinctId?: string): void {
+export function track(
+  event: string,
+  props?: Record<string, unknown>,
+  distinctId?: string,
+  opts?: { allowed?: boolean },
+): void {
   try {
-    if (getRequestContext()?.analyticsAllowed === false) return;
+    const verdict = getRequestContext()?.analyticsAllowed;
+    if (verdict === false) return;
+    if ((opts?.allowed ?? verdict) !== true) return;
     const posthog = getClient();
     if (!posthog) return;
     posthog.capture({

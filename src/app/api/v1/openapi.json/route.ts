@@ -5,6 +5,7 @@
 // documented route is missing from this list. Keep it sorted.
 import '@/app/api/v1/applications/route';
 import '@/app/api/v1/apply/[listingId]/context/route';
+import '@/app/api/v1/consent/route';
 import '@/app/api/v1/discovery/deck/route';
 import '@/app/api/v1/discovery/locations/[locationId]/route';
 import '@/app/api/v1/discovery/map/route';
@@ -57,6 +58,7 @@ import '@/app/api/v1/host/verification/info/route';
 import '@/app/api/v1/host/verification/route';
 import '@/app/api/v1/interviews/[id]/ics/route';
 import '@/app/api/v1/landing/route';
+import '@/app/api/v1/legal/[slug]/route';
 import '@/app/api/v1/listings/[id]/events/route';
 import '@/app/api/v1/listings/[id]/route';
 import '@/app/api/v1/me/ai-consent/route';
@@ -81,6 +83,8 @@ import '@/app/api/v1/me/invites/[id]/mute/route';
 import '@/app/api/v1/me/invites/[id]/respond/route';
 import '@/app/api/v1/me/invites/[id]/route';
 import '@/app/api/v1/me/invites/route';
+import '@/app/api/v1/me/legal/acceptances/route';
+import '@/app/api/v1/me/legal/pending/route';
 import '@/app/api/v1/me/mutes/[orgId]/route';
 import '@/app/api/v1/me/mutes/route';
 import '@/app/api/v1/me/notification-preferences/route';
