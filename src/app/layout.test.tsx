@@ -22,6 +22,7 @@ const request = vi.hoisted(() => ({
   headers: {} as Record<string, string>,
   cookie: null as string | null,
   act: undefined as unknown,
+  clerkUserId: null as string | null,
   fail: false,
 }));
 
@@ -38,7 +39,27 @@ vi.mock('next/headers', () => ({
 
 vi.mock('@clerk/nextjs/server', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@clerk/nextjs/server')>()),
-  auth: vi.fn(async () => ({ sessionClaims: request.act ? { act: request.act } : {} })),
+  auth: vi.fn(async () => ({
+    userId: request.clerkUserId,
+    sessionClaims: request.act ? { act: request.act } : {},
+  })),
+}));
+
+const account = vi.hoisted(() => ({
+  optedOut: false,
+  fail: false,
+  read: vi.fn(),
+}));
+vi.mock('@/modules/identity', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/modules/identity')>()),
+  findUserByClerkId: vi.fn(async (_db: unknown, clerkUserId: string) => {
+    if (account.fail) throw new Error('database unavailable');
+    return { id: '0190f7a2-0000-7000-8000-0000000000a1', clerkUserId };
+  }),
+  isAnalyticsOptedOut: vi.fn(async () => {
+    account.read();
+    return account.optedOut;
+  }),
 }));
 
 vi.mock('@/lib/db', async (importOriginal) => ({
@@ -75,7 +96,11 @@ beforeEach(() => {
   request.headers = {};
   request.cookie = null;
   request.act = undefined;
+  request.clerkUserId = null;
   request.fail = false;
+  account.optedOut = false;
+  account.fail = false;
+  account.read.mockClear();
   connection.mockClear();
 });
 
@@ -109,5 +134,33 @@ describe('RootLayout', () => {
   it('loads nothing when the request cannot be read', async () => {
     request.fail = true;
     expect(consentTag(await render())).toBe('eu:unset:0');
+  });
+
+  // Review of PR 231: a signed-in account's recorded opt-out (users.analytics_opt_out_at) is a
+  // refusal in the browser too, from any browser, as apiRoute treats it.
+  it("refuses analytics for a signed-in account that opted out, from a browser with no signal", async () => {
+    request.headers = { 'x-vercel-ip-country': 'US' };
+    request.clerkUserId = 'user_opted_out';
+    account.optedOut = true;
+    expect(consentTag(await render())).toBe('other:denied:0');
+
+    account.optedOut = false;
+    expect(consentTag(await render())).toBe('other:unset:0');
+
+    // A lookup that fails counts as an opt-out: analytics never loads on a guess.
+    account.fail = true;
+    expect(consentTag(await render())).toBe('other:denied:0');
+  });
+
+  it('reads the account only when the page would otherwise load analytics', async () => {
+    request.clerkUserId = 'user_eu';
+    request.headers = { 'x-vercel-ip-country': 'DE' };
+    expect(consentTag(await render())).toBe('eu:unset:0');
+    request.headers = { 'x-vercel-ip-country': 'US', 'sec-gpc': '1' };
+    expect(consentTag(await render())).toBe('other:denied:0');
+    request.headers = { 'x-vercel-ip-country': 'US' };
+    request.clerkUserId = null;
+    expect(consentTag(await render())).toBe('other:unset:0');
+    expect(account.read).not.toHaveBeenCalled();
   });
 });

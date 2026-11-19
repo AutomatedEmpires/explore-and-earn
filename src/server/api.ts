@@ -16,7 +16,7 @@ import type { z } from 'zod';
 import { getDb, type Db } from '@/lib/db';
 import { gpcFromHeaders } from '@/lib/privacy-signals';
 import { isAnalyticsOptedOut, recordAnalyticsOptOut } from '@/modules/identity';
-import { allowedByConsent, readConsent } from '@/modules/privacy';
+import { allowedByConsent, CONSENT_COOKIE, readConsent } from '@/modules/privacy';
 import { getConsentNotBefore } from '@/modules/content';
 import '@/server/sp8-wiring';
 import { getEnv, type Env } from '@/lib/env';
@@ -342,6 +342,15 @@ function stampAnalyticsOptOut(userId: string): void {
 }
 
 /**
+ * The date a cookie choice must be newer than (the newest material Cookie Policy). Only a request
+ * that carries the consent cookie needs it, so no other request reads the database for it.
+ */
+async function consentNotBefore(req: Request): Promise<Date | null> {
+  if (!req.headers.get('cookie')?.includes(`${CONSENT_COOKIE}=`)) return null;
+  return getConsentNotBefore(getDb());
+}
+
+/**
  * Whether a signed-in account has a recorded analytics opt-out (users.analytics_opt_out_at, SP8
  * W5 #149). Read only when the request would otherwise allow analytics. A failed read counts as
  * an opt-out, so analytics never runs on a guess; it never fails the request.
@@ -379,9 +388,7 @@ export function apiRoute<I = undefined, O = unknown>(opts: ApiRouteOptions<I, O>
         context.viewAs = viewAs;
         context.analyticsAllowed =
           !viewAs &&
-          allowedByConsent(
-            readConsent(req, { notBefore: await getConsentNotBefore(getDb()) }),
-          );
+          allowedByConsent(readConsent(req, { notBefore: await consentNotBefore(req) }));
         const who = await authenticate(auth);
         // Global Privacy Control is a rejection everywhere (legal review 4.5): analyticsAllowed
         // is already false for it, and a signed-in user's opt-out is recorded once.

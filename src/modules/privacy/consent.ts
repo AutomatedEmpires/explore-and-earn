@@ -11,27 +11,12 @@
 // (users.analytics_opt_out_at). An EU visitor who rejected analytics, or never chose, is never
 // tracked from a job.
 import { asc, desc, eq } from 'drizzle-orm';
-import { boolean, integer, pgSchema, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import type { DbOrTx } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
 import { track } from '@/lib/analytics';
-
-const app = pgSchema('app');
-const ts = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
-
-/** The DDL lives in drizzle/7250_privacy_consent.sql. */
-export const consentRecords = app.table('consent_records', {
-  id: uuid('id').primaryKey(),
-  consentId: text('consent_id').notNull(),
-  userId: uuid('user_id'),
-  country: text('country'),
-  region: text('region', { enum: ['eu', 'other'] }).notNull(),
-  analytics: boolean('analytics').notNull(),
-  policyVersion: integer('policy_version').notNull(),
-  createdAt: ts('created_at').notNull().defaultNow(),
-  updatedAt: ts('updated_at').notNull().defaultNow(),
-});
+import { CONSENT_MAX_AGE } from './consent-cookie';
+import { consentRecords } from './schema-consent';
 
 /** The privacy handler claims these tables. */
 export const CONSENT_TABLES: readonly string[] = ['consent_records'];
@@ -99,21 +84,42 @@ export async function eraseConsentLinks(db: DbOrTx, userId: string): Promise<num
   return rows.length;
 }
 
+/** The date a choice must be newer than: the newest material Cookie Policy's effective date. */
+export type ConsentEpoch = (db: DbOrTx) => Promise<Date | null>;
+
+let consentEpoch: ConsentEpoch | null = null;
+
+/**
+ * The content module, which owns the Cookie Policy, registers where the epoch comes from when it
+ * loads, so this module reads it without importing content. Null clears it (tests).
+ */
+export function registerConsentEpoch(source: ConsentEpoch | null): void {
+  consentEpoch = source;
+}
+
 /**
  * Whether analytics may record this person outside a request. Their latest choice allows it when
- * it accepted analytics, or when its region is `other` and it didn't refuse. No choice is a no:
- * the region is unknown, and the default is the EU's. A Global Privacy Control opt-out on the
- * account (users.analytics_opt_out_at) is a no whatever they chose.
+ * it accepted analytics, or when its region is `other` and it didn't refuse; like the cookie, a
+ * choice counts for one year (CONSENT_MAX_AGE) and only when it is newer than the newest material
+ * Cookie Policy. No choice is a no: the region is unknown, and the default is the EU's. A Global
+ * Privacy Control opt-out on the account (users.analytics_opt_out_at) is a no whatever they chose.
  */
-export async function consentForUser(db: DbOrTx, userId: string): Promise<boolean> {
+export async function consentForUser(
+  db: DbOrTx,
+  userId: string,
+  now: Date = new Date(),
+): Promise<boolean> {
   const [latest] = await db
-    .select({ analytics: consentRecords.analytics })
+    .select({ analytics: consentRecords.analytics, createdAt: consentRecords.createdAt })
     .from(consentRecords)
     .where(eq(consentRecords.userId, userId))
     .orderBy(desc(consentRecords.createdAt), desc(consentRecords.id))
     .limit(1);
   // `analytics` is never null, so "region other and not a refusal" is an acceptance too.
   if (!latest?.analytics) return false;
+  if (now.getTime() - latest.createdAt.getTime() >= CONSENT_MAX_AGE * 1000) return false;
+  const notBefore = consentEpoch ? await consentEpoch(db) : null;
+  if (notBefore && latest.createdAt < notBefore) return false;
   // Identity's barrel imports this module for the privacy types; load it on first use.
   const { isAnalyticsOptedOut } = await import('@/modules/identity');
   return !(await isAnalyticsOptedOut(db, userId));

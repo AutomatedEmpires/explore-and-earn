@@ -2,8 +2,9 @@
 // Plan decision 19): `<region>:<granted|denied|unset>:<0|1>`. The region comes from
 // `x-vercel-ip-country` (a missing header counts as the EU, spec 8.4); the state from the
 // ee_consent cookie, where a choice older than the newest material Cookie Policy counts as no
-// choice; `Sec-GPC: 1` is `denied` everywhere; the last field is 1 in a view-as session.
-// parseConsentMeta in src/lib/analytics-client.tsx reads it back.
+// choice; `Sec-GPC: 1`, and a signed-in account's recorded opt-out, are `denied` everywhere; the
+// last field is 1 in a view-as session. parseConsentMeta in src/lib/analytics-client.tsx reads it
+// back and applies consentAllowsAnalytics's rule.
 import { gpcFromHeaders } from '@/lib/privacy-signals';
 import { CONSENT_EU_COUNTRIES, parseConsentCookie } from '@/modules/privacy';
 
@@ -23,12 +24,19 @@ export function consentState(i: {
   headers: HeaderReader;
   cookieValue: string | null;
   notBefore: Date | null;
+  /** The signed-in account has a recorded analytics opt-out (users.analytics_opt_out_at). */
+  optedOut?: boolean;
   now?: Date;
 }): ConsentState {
-  if (gpcFromHeaders(i.headers)) return 'denied';
+  if (i.optedOut || gpcFromHeaders(i.headers)) return 'denied';
   const choice = parseConsentCookie(i.cookieValue, { notBefore: i.notBefore, now: i.now });
   if (!choice) return 'unset';
   return choice.analytics ? 'granted' : 'denied';
+}
+
+/** The rule initAnalytics applies: an explicit yes, or outside the EU anything but a no. */
+export function consentAllowsAnalytics(region: ConsentRegion, state: ConsentState): boolean {
+  return state === 'granted' || (region === 'other' && state !== 'denied');
 }
 
 export function consentMeta(i: {
@@ -36,6 +44,7 @@ export function consentMeta(i: {
   cookieValue: string | null;
   notBefore: Date | null;
   viewAs: boolean;
+  optedOut?: boolean;
   now?: Date;
 }): string {
   return `${consentRegion(i.headers)}:${consentState(i)}:${i.viewAs ? 1 : 0}`;

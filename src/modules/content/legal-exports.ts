@@ -1,6 +1,11 @@
 // W5's part of the content module: legal documents, their versions and acceptances, the drafts
 // for counsel and the cookie-consent epoch. content/index.ts re-exports this file.
-import type { RetentionRule } from '@/modules/privacy';
+import { registerConsentEpoch, type RetentionRule } from '@/modules/privacy';
+import { getConsentNotBefore, resetConsentEpochCache } from './consent-epoch';
+
+// Background analytics (privacy's consentForUser) asks again after a material Cookie Policy, as
+// the cookie does; privacy reads the date through this registration, never by importing content.
+registerConsentEpoch((db) => getConsentNotBefore(db));
 
 export {
   getLegalVersion,
@@ -31,7 +36,7 @@ export {
   recordAcceptance,
   type LegalItem,
 } from './acceptance';
-export { getConsentNotBefore, resetConsentEpochCache } from './consent-epoch';
+export { getConsentNotBefore, resetConsentEpochCache };
 export { ensureLegalDrafts, parseDraft, readLegalDraft, type ParsedDraft } from './drafts';
 export { renderRetentionTable } from './retention-table';
 export { LEGAL_NOTIFY_CHUNK, legalJobHandlers } from './legal-jobs';

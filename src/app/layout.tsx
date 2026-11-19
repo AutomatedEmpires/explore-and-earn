@@ -5,9 +5,15 @@ import { Figtree } from 'next/font/google';
 import { cookies, headers } from 'next/headers';
 import { connection } from 'next/server';
 import type { ReactNode } from 'react';
-import { consentMeta } from '@/app/_features/consent/consent-meta';
+import {
+  consentAllowsAnalytics,
+  consentMeta,
+  consentRegion,
+  consentState,
+} from '@/app/_features/consent/consent-meta';
 import { getDb } from '@/lib/db';
 import { getConsentNotBefore } from '@/modules/content';
+import { findUserByClerkId, isAnalyticsOptedOut } from '@/modules/identity';
 import { CONSENT_COOKIE } from '@/modules/privacy';
 import { clerkProviderProps } from '@/ui/clerk';
 import './globals.css';
@@ -32,20 +38,42 @@ async function readConsentMeta(): Promise<string> {
   try {
     const [requestHeaders, jar] = await Promise.all([headers(), cookies()]);
     let viewAs = false;
+    let clerkUserId: string | null = null;
     try {
-      const claims = (await auth()).sessionClaims as { act?: unknown } | null;
-      viewAs = Boolean(claims?.act);
+      const session = await auth();
+      viewAs = Boolean((session.sessionClaims as { act?: unknown } | null)?.act);
+      clerkUserId = session.userId ?? null;
     } catch {
-      // No Clerk request scope (the keyless dev proxy): not a view-as session.
+      // No Clerk request scope (the keyless dev proxy): signed out, not a view-as session.
     }
-    return consentMeta({
+    const cookieValue = jar.get(CONSENT_COOKIE)?.value ?? null;
+    const consent = {
       headers: requestHeaders,
-      cookieValue: jar.get(CONSENT_COOKIE)?.value ?? null,
-      notBefore: await getConsentNotBefore(getDb()),
+      cookieValue,
+      // Only a choice needs the Cookie Policy date it must be newer than.
+      notBefore: cookieValue ? await getConsentNotBefore(getDb()) : null,
       viewAs,
-    });
+    };
+    // A signed-in account's recorded opt-out is a refusal in every browser, as apiRoute treats
+    // it; it is read only when the page would otherwise load analytics.
+    const optedOut =
+      !viewAs &&
+      clerkUserId !== null &&
+      consentAllowsAnalytics(consentRegion(requestHeaders), consentState(consent)) &&
+      (await accountOptedOut(clerkUserId));
+    return consentMeta({ ...consent, optedOut });
   } catch {
     return UNREADABLE_CONSENT;
+  }
+}
+
+/** Whether the Clerk user's account has a recorded analytics opt-out. Unreadable counts as yes. */
+async function accountOptedOut(clerkUserId: string): Promise<boolean> {
+  try {
+    const user = await findUserByClerkId(getDb(), clerkUserId);
+    return user ? await isAnalyticsOptedOut(getDb(), user.id) : false;
+  } catch {
+    return true;
   }
 }
 

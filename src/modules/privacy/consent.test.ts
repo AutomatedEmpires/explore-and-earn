@@ -16,9 +16,10 @@ import {
   eraseConsentLinks,
   exportConsent,
   recordConsent,
+  registerConsentEpoch,
   trackForUser,
 } from './consent';
-import { consentRetentionRules } from './consent-rules';
+import { CONSENT_RECORDS_RULE, consentRetentionRules } from './consent-rules';
 
 const sent = vi.hoisted(() => ({ events: [] as { distinctId: string; event: string }[] }));
 
@@ -201,6 +202,28 @@ describe('consentForUser and trackForUser (no request context, as in a job)', ()
     expect(sent.events).toEqual([]);
   });
 
+  // Review of PR 231: a stored choice counts only as long as the cookie would, one year, and
+  // only when it is newer than the newest material Cookie Policy.
+  it('stops counting an acceptance after a year, or after a new material Cookie Policy', async () => {
+    const { userId } = await seedSeeker(t.db);
+    await t.db.execute(sql`
+      insert into app.consent_records (id, consent_id, user_id, region, analytics, policy_version, created_at)
+      values (${newId()}, ${newId()}, ${userId}, 'eu', true, 1, ${NOW.toISOString()}::timestamptz)
+    `);
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    expect(await consentForUser(t.db, userId, new Date(NOW.getTime() + 364 * DAY_MS))).toBe(true);
+    expect(await consentForUser(t.db, userId, new Date(NOW.getTime() + 365 * DAY_MS))).toBe(false);
+
+    try {
+      registerConsentEpoch(async () => new Date(NOW.getTime() + DAY_MS));
+      expect(await consentForUser(t.db, userId, new Date(NOW.getTime() + 2 * DAY_MS))).toBe(false);
+      registerConsentEpoch(async () => new Date(NOW.getTime() - DAY_MS));
+      expect(await consentForUser(t.db, userId, new Date(NOW.getTime() + 2 * DAY_MS))).toBe(true);
+    } finally {
+      registerConsentEpoch(null);
+    }
+  });
+
   it('never throws, and drops the event when consent cannot be read', async () => {
     const broken = {
       select: () => {
@@ -213,7 +236,12 @@ describe('consentForUser and trackForUser (no request context, as in a job)', ()
 });
 
 describe('privacy.consent_records_24m', () => {
-  const rule = consentRetentionRules.find((r) => r.key === 'privacy.consent_records_24m');
+  const rule = consentRetentionRules.find((r) => r.key === CONSENT_RECORDS_RULE);
+
+  it('has the key spec 8.3 names', () => {
+    expect(CONSENT_RECORDS_RULE).toBe('privacy.consent_records_24m');
+    expect(rule).toBeDefined();
+  });
 
   async function seedRecord(userId: string | null, createdAt: Date): Promise<string> {
     const id = newId();

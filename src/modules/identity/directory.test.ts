@@ -3,7 +3,12 @@ import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { newId } from '@/lib/ids';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
-import { getUserContact, listActiveOperators, markOperatorAssigned } from './index';
+import {
+  getUserContact,
+  listActiveOperators,
+  markOperatorAssigned,
+  pageUserIdsByAccountType,
+} from './index';
 import { operators, users } from './schema';
 
 let t: TestDb;
@@ -55,6 +60,52 @@ describe('getUserContact', () => {
     expect(await getUserContact(t.db, gone)).toMatchObject({ id: gone, deleted: true });
     expect(await getUserContact(t.db, newId())).toBeNull();
     expect(await getUserContact(t.db, 'not-a-uuid')).toBeNull();
+  });
+});
+
+describe('pageUserIdsByAccountType', () => {
+  async function addUser(accountType: 'seeker' | 'host' | null, deleted = false): Promise<string> {
+    const id = newId();
+    await t.db.insert(users).values({
+      id,
+      clerkUserId: `user_${id}`,
+      accountType,
+      adultAttestedAt: accountType === 'seeker' ? new Date() : null,
+      deletedAt: deleted ? new Date() : null,
+    });
+    return id;
+  }
+
+  it('pages live seekers or hosts in id order, never deleted, untyped or operator accounts', async () => {
+    const seekers = [await addUser('seeker'), await addUser('seeker'), await addUser('seeker')];
+    const host = await addUser('host');
+    await addUser('seeker', true);
+    await addUser(null);
+    await addOperator();
+    const sorted = (ids: string[]) => [...ids].sort();
+
+    const first = await pageUserIdsByAccountType(t.db, {
+      types: ['seeker'],
+      afterId: null,
+      limit: 2,
+    });
+    expect(first).toEqual(sorted(seekers).slice(0, 2));
+    const rest = await pageUserIdsByAccountType(t.db, {
+      types: ['seeker'],
+      afterId: first.at(-1) ?? null,
+      limit: 2,
+    });
+    expect(rest).toEqual(sorted(seekers).slice(2));
+
+    expect(
+      await pageUserIdsByAccountType(t.db, { types: ['seeker', 'host'], afterId: null, limit: 10 }),
+    ).toEqual(sorted([...seekers, host]));
+    expect(
+      await pageUserIdsByAccountType(t.db, { types: ['host'], afterId: 'junk', limit: 10 }),
+    ).toEqual([host]);
+    expect(await pageUserIdsByAccountType(t.db, { types: [], afterId: null, limit: 10 })).toEqual(
+      [],
+    );
   });
 });
 

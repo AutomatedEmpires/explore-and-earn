@@ -30,6 +30,8 @@ export {
   getUserContact,
   listActiveOperators,
   markOperatorAssigned,
+  pageUserIdsByAccountType,
+  USER_PAGE_MAX,
   type ActiveOperator,
   type OperatorFilter,
   type UserContact,

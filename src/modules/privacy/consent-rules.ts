@@ -7,8 +7,11 @@ import { queryRows } from '@/lib/db';
 import { underLegalHold } from './holds';
 import type { RetentionRule } from './types';
 
+/** The rule's key (spec 8.3). Named on its own line: gitleaks reads `key: '<id>'` as a secret. */
+export const CONSENT_RECORDS_RULE = 'privacy.consent_records_24m';
+
 const consentRecords24m: RetentionRule = {
-  key: 'privacy.consent_records_24m',
+  key: CONSENT_RECORDS_RULE,
   description: 'Records of your cookie choices are deleted after 24 months.',
   async run(db, now, limit) {
     const deleted = await queryRows<{ id: string }>(

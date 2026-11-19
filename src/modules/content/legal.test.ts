@@ -5,6 +5,9 @@ import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { queryRows, type Db } from '@/lib/db';
 import { isAppError } from '@/lib/errors';
+// Loading the content module registers the Cookie Policy date with privacy.
+import '@/modules/content';
+import { consentForUser } from '@/modules/privacy';
 import { createTestDb, type TestDb } from '@tests/helpers/db';
 import { seedHostOrg, seedOperator, seedSeeker } from '@tests/helpers/sp8';
 import { getConsentNotBefore, resetConsentEpochCache } from './consent-epoch';
@@ -483,6 +486,34 @@ describe('getConsentNotBefore', () => {
       resetConsentEpochCache();
       await publishDueLegal(c.db, asked);
       expect(await getConsentNotBefore(c.db)).toEqual(asked);
+    } finally {
+      await c.close();
+    }
+  });
+
+  // Review of PR 231: background analytics asks again after a material Cookie Policy, as the
+  // cookie does. Content registers its date with privacy when it loads.
+  it("is what privacy's consentForUser checks a stored acceptance against", async () => {
+    const c = await createTestDb();
+    try {
+      const v1 = await approved(c.db, 'cookies');
+      await scheduleLegal(c.db, { documentId: v1.id, effectiveAt: NOW, operatorId, now: NOW });
+      const { userId: before } = await seedSeeker(c.db);
+      const { userId: after } = await seedSeeker(c.db);
+      for (const [userId, at] of [
+        [before, new Date(NOW.getTime() - DAY)],
+        [after, new Date(NOW.getTime() + DAY)],
+      ] as const) {
+        await c.db.execute(sql`
+          insert into app.consent_records
+            (id, consent_id, user_id, region, analytics, policy_version, created_at)
+          values (gen_random_uuid(), gen_random_uuid()::text, ${userId}, 'eu', true, 1,
+            ${at.toISOString()}::timestamptz)
+        `);
+      }
+      const later = new Date(NOW.getTime() + 2 * DAY);
+      expect(await consentForUser(c.db, before, later)).toBe(false);
+      expect(await consentForUser(c.db, after, later)).toBe(true);
     } finally {
       await c.close();
     }
