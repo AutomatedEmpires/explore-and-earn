@@ -614,6 +614,45 @@ describe('runListingChecks', () => {
         expect(ackKey(r.warnings[0] as Issue)).toBe('h2b_job_order');
       }
     });
+
+    it('reads every H-2B job order field for wording to review (issue 208)', async () => {
+      const r = await check((c) => {
+        c.job.visaSponsorship = 'h2b';
+        c.job.h2b = {
+          transportation: 'Bus fare home for men only.',
+          tools: 'Young workers get new gloves.',
+          threeFourthsGuarantee: 'Three-fourths of the hours. Must be under 35.',
+          swaContact: 'Bozeman Job Service. Mexican workers preferred.',
+          jobOrderNumber: 'MT 4417260, no felons',
+        };
+      });
+      expect(r.errors).toEqual([]);
+      expect(brief(r.warnings)).toEqual([
+        { code: 'wording_flagged', section: 'job', field: 'job.h2b.transportation' },
+        { code: 'wording_flagged', section: 'job', field: 'job.h2b.tools' },
+        { code: 'wording_flagged', section: 'job', field: 'job.h2b.threeFourthsGuarantee' },
+        { code: 'wording_flagged', section: 'job', field: 'job.h2b.swaContact' },
+        { code: 'wording_flagged', section: 'job', field: 'job.h2b.jobOrderNumber' },
+        { code: 'h2b_job_order', section: 'job', field: 'job.visaSponsorship' },
+      ]);
+    });
+
+    it('refuses an H-2B job order answer over its limit, never shortening it (issue 208)', async () => {
+      const r = await check((c) => {
+        c.job.visaSponsorship = 'h2b';
+        c.job.h2b = {
+          transportation: null,
+          tools: null,
+          threeFourthsGuarantee: null,
+          swaContact: null,
+          jobOrderNumber: `Job order MT 4417260, posted Nov 2, ${'x'.repeat(38)}`,
+        };
+      });
+      expect(brief(r.errors)).toEqual([
+        { code: 'required_missing', section: 'job', field: 'job.h2b.jobOrderNumber' },
+      ]);
+      expect(r.parsed).toBeNull();
+    });
   });
 
   it.each(['http://a.com', 'https://bit.ly/x'])('flags the link %s', async (url) => {
@@ -1084,5 +1123,37 @@ describe('the wording lists', () => {
         lists,
       ),
     ).toEqual([]);
+  });
+
+  // Issue 208 (lead decision on #45): the five H-2B job order fields are host prose too.
+  it.each([
+    ['transportation', 'We pay the bus fare for men only.', 'men only', 'sex'],
+    ['tools', 'Young workers get new gloves at no charge.', 'young', 'age'],
+    ['threeFourthsGuarantee', 'Three-fourths of the hours. Must be under 35.', 'under 35', 'age'],
+    ['swaContact', 'Bozeman Job Service. Mexican workers preferred.', 'mexican workers', 'national_origin'],
+    ['jobOrderNumber', 'MT 4417260, no felons', 'no felons', 'criminal_history'],
+  ])('reads job.h2b.%s', (key, text, matched, ground) => {
+    const draft = { job: { visaSponsorship: 'h2b', h2b: { [key]: text } } };
+    expect(findFlaggedWording(draft, lists)).toEqual([
+      expect.objectContaining({ field: `job.h2b.${key}`, matched, ground }),
+    ]);
+  });
+
+  it('finds nothing in plain H-2B job order terms', () => {
+    const draft = {
+      job: {
+        visaSponsorship: 'h2b',
+        h2b: {
+          transportation:
+            'We repay your fare here and meals on the way once you finish half the season.',
+          tools: 'Uniforms, cleaning supplies and carts, at no charge.',
+          threeFourthsGuarantee:
+            'We offer at least three-fourths of the job order hours in each 6-week period.',
+          swaContact: 'Bozeman Job Service · (406) 555-0142',
+          jobOrderNumber: 'MT 4417260',
+        },
+      },
+    };
+    expect(findFlaggedWording(draft, lists)).toEqual([]);
   });
 });

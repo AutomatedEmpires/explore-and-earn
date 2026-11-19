@@ -1,5 +1,6 @@
 // The reply step of flow D as plain functions: the note it starts with, what a failed send means
-// for the host, and the words for a read-only conversation. Client-safe.
+// for the host, the words for a read-only conversation, and the verified-host gate's refusal.
+// Client-safe.
 import { ApiError } from '@/app/_features/api';
 import type { ReadOnlyReason } from '@/lib/messaging';
 
@@ -65,6 +66,29 @@ export function readOnlyText(reason: ReadOnlyReason | null, firstName: string): 
     default:
       return 'This conversation is closed.';
   }
+}
+
+/**
+ * The statuses the verified-host gate refuses (`hostApplicantGate`, issues 182 and 199), as the
+ * 409's `verification_<status>` reason names them. Only a verified host may message applicants.
+ */
+const REFUSED_STATUSES = ['unverified', 'running', 'needs_review', 'needs_info', 'failed'] as const;
+export type RefusedStatus = (typeof REFUSED_STATUSES)[number];
+export type VerificationRefusal = { status: RefusedStatus; copy: string };
+
+export const VERIFICATION_REFUSED_TITLE =
+  'You can message applicants once your business is verified';
+
+/**
+ * The verified-host gate's refusal on a thread read or a send: a 409 `verification_<status>`.
+ * Its message is the applicant list's own refusal for that status, word for word, and it names
+ * the next step ("Answer our verification question to see your applicants."), so the screen
+ * shows it as sent. Any other failure is null and keeps its usual words.
+ */
+export function verificationRefusal(err: unknown): VerificationRefusal | null {
+  if (!(err instanceof ApiError) || err.status !== 409 || !err.reason) return null;
+  const status = REFUSED_STATUSES.find((s) => err.reason === `verification_${s}`);
+  return status ? { status, copy: err.message } : null;
 }
 
 /** A stable id for one reply, so a retry after a failed send is stored once. */

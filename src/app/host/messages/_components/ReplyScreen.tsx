@@ -3,7 +3,8 @@
 // The reply step of flow D (Figma 01 Host, section D: Reply 45:14113 at 390, 45:14214 at 768,
 // 45:14362 at 1440; Reply sent 45:14510 and 45:14617). The note is ready, so answering is one
 // tap: Send reply. A reply that didn't send keeps its words and is retried with the same
-// clientId, so the server stores it once.
+// clientId, so the server stores it once. A host the verified-host gate refuses (#199) sees the
+// applicant list's refusal for its status, with the next step, in place of the conversation.
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import type { ReadOnlyReason } from '@/lib/messaging';
@@ -16,7 +17,7 @@ import {
   Textarea,
   Toast,
 } from '@/ui/components';
-import { Cloud } from '@/ui/icons';
+import { Cloud, Lock } from '@/ui/icons';
 import { hiringApi, isOffline, isStatus } from '../../applicants/_lib/api';
 import {
   defaultReply,
@@ -24,7 +25,10 @@ import {
   readOnlyText,
   SEND_PROBLEM_COPY,
   sendProblem,
+  VERIFICATION_REFUSED_TITLE,
+  verificationRefusal,
   type SendProblem,
+  type VerificationRefusal,
 } from '../_lib/reply';
 
 type Loaded = {
@@ -37,7 +41,8 @@ type Loaded = {
 type ScreenState =
   | { kind: 'loading' }
   | { kind: 'ready'; data: Loaded }
-  | { kind: 'error'; problem: 'offline' | 'missing' | 'failed' };
+  | { kind: 'error'; problem: 'offline' | 'missing' | 'failed' }
+  | { kind: 'refused'; refusal: VerificationRefusal };
 
 async function load(threadId: string): Promise<ScreenState> {
   try {
@@ -67,6 +72,8 @@ async function load(threadId: string): Promise<ScreenState> {
       },
     };
   } catch (err) {
+    const refusal = verificationRefusal(err);
+    if (refusal) return { kind: 'refused', refusal };
     if (isOffline(err)) return { kind: 'error', problem: 'offline' };
     if (isStatus(err, 404) || isStatus(err, 400)) return { kind: 'error', problem: 'missing' };
     return { kind: 'error', problem: 'failed' };
@@ -95,11 +102,13 @@ function ReplyForm({
   data,
   applicantsHref,
   onReadOnly,
+  onRefused,
 }: {
   threadId: string;
   data: Loaded;
   applicantsHref: string;
   onReadOnly: () => void;
+  onRefused: (refusal: VerificationRefusal) => void;
 }) {
   const [text, setText] = useState(data.note);
   const [send, setSend] = useState<SendState>({ kind: 'idle', invalid: false });
@@ -128,6 +137,12 @@ function ReplyForm({
       await hiringApi.sendReply(threadId, { clientId: id, body });
       setSend({ kind: 'sent' });
     } catch (err) {
+      // The gate refused the host since the thread opened: no reply can go until it is verified.
+      const refusal = verificationRefusal(err);
+      if (refusal) {
+        onRefused(refusal);
+        return;
+      }
       const problem = sendProblem(err);
       if (problem === 'read_only') {
         onReadOnly();
@@ -239,6 +254,10 @@ export function ReplyScreen({
     );
   }, []);
 
+  const markRefused = useCallback((refusal: VerificationRefusal) => {
+    setState({ kind: 'refused', refusal });
+  }, []);
+
   const back = (
     <Button asChild variant="secondary">
       <Link href={applicantsHref}>Back to applicants</Link>
@@ -248,6 +267,19 @@ export function ReplyScreen({
   let body: ReactNode;
   if (state.kind === 'loading') {
     body = <Loading />;
+  } else if (state.kind === 'refused') {
+    // The applicants screen's access refusal (ErrorState with Lock), announced: it replaces the
+    // loading status or the composer. Trying again changes nothing until the business is verified.
+    body = (
+      <ErrorState
+        icon={Lock}
+        titleAs="h1"
+        title={VERIFICATION_REFUSED_TITLE}
+        description={state.refusal.copy}
+        action={back}
+        announce="alert"
+      />
+    );
   } else if (state.kind === 'error') {
     body =
       state.problem === 'offline' ? (
@@ -292,6 +324,7 @@ export function ReplyScreen({
         data={state.data}
         applicantsHref={applicantsHref}
         onReadOnly={markReadOnly}
+        onRefused={markRefused}
       />
     );
   }
