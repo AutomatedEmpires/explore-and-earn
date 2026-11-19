@@ -4,8 +4,7 @@ import { queryRows } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { releaseLegalHold, setLegalHold, type HoldScope } from '@/modules/privacy';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
-import { seedListingRow, seedMedia } from '../../../tests/helpers/sp2';
-import { seedThread } from '../../../tests/helpers/sp5';
+import { seedMedia } from '../../../tests/helpers/sp2';
 import { seedHostOrg, seedOperator, seedSeeker } from '../../../tests/helpers/sp8';
 import { retentionRules } from './index';
 
@@ -153,41 +152,6 @@ describe('trust.checks_12m', () => {
         )
       ).holdId;
 
-    /** A listing revision of `orgId`, with only the columns its table requires. */
-    async function seedRevision(orgId: string): Promise<string> {
-      const id = newId();
-      const listingId = await seedListingRow(t.db, { orgId });
-      await t.db.execute(sql`
-        insert into app.listing_revisions (id, listing_id, org_id, revision_number, status, content,
-          title, primary_category, genre, occupation_code, employment_type, schedule, openings,
-          date_mode, weekly_hours, pay_kind, pay_min_cents, pay_max_cents, pay_unit,
-          housing_provided, meals_provided, visa_sponsorship, min_age, timezone)
-        values (${id}, ${listingId}, ${orgId}, 1, 'approved', '{}'::jsonb, 'Lift Operator',
-          'seasonal', 'ski_resort', '53-7011', 'employee', 'full_time', 1, 'ongoing', 40, 'fixed',
-          2000, 2000, 'hour', false, false, 'none', 18, 'America/Los_Angeles')
-      `);
-      return id;
-    }
-
-    /** A message from `senderUserId` in a new thread of `orgId` with `seekerUserId`. */
-    async function seedMessage(i: {
-      orgId: string;
-      seekerUserId: string;
-      senderUserId: string;
-    }): Promise<string> {
-      const threadId = await seedThread(t.db, {
-        orgId: i.orgId,
-        listingId: newId(),
-        seekerUserId: i.seekerUserId,
-      });
-      const id = newId();
-      await t.db.execute(sql`
-        insert into app.messages (id, thread_id, sender_type, sender_user_id, kind, body)
-        values (${id}, ${threadId}, 'seeker', ${i.senderUserId}, 'text', 'Hello')
-      `);
-      return id;
-    }
-
     it('keeps a check about a held person or organization, or about what they own, and deletes the rest', async () => {
       const old = before(5000);
       const heldOrg = await seedHostOrg(t.db);
@@ -207,15 +171,6 @@ describe('trust.checks_12m', () => {
           type: 'media',
           id: await seedMedia(t.db, heldOrg.orgId, 'listing_photo'),
         }),
-        await seedCheck(old, { type: 'listing_revision', id: await seedRevision(heldOrg.orgId) }),
-        await seedCheck(old, {
-          type: 'message',
-          id: await seedMessage({
-            orgId: freeOrg.orgId,
-            seekerUserId: heldSeeker,
-            senderUserId: heldSeeker,
-          }),
-        }),
       ];
       // The review's case: the check behind a resolved review item about a held host.
       const behindItem = await seedCheck(old);
@@ -231,15 +186,6 @@ describe('trust.checks_12m', () => {
           type: 'media',
           id: await seedMedia(t.db, freeOrg.orgId, 'listing_photo'),
         }),
-        await seedCheck(old, { type: 'listing_revision', id: await seedRevision(freeOrg.orgId) }),
-        await seedCheck(old, {
-          type: 'message',
-          id: await seedMessage({
-            orgId: freeOrg.orgId,
-            seekerUserId: freeSeeker,
-            senderUserId: freeSeeker,
-          }),
-        }),
         await seedCheck(old),
       ];
 
@@ -250,6 +196,30 @@ describe('trust.checks_12m', () => {
         sql`select check_id from app.review_items where id = ${itemId}`,
       );
       expect(item?.check_id).toBe(behindItem);
+    });
+
+    it('reaches the checks behind more held ones than one batch holds', async () => {
+      const held = await seedHostOrg(t.db);
+      await hold({ orgId: held.orgId }, 'all');
+      const free = await seedHostOrg(t.db);
+      const heldFiles = [];
+      for (let i = 0; i < 3; i++) {
+        heldFiles.push(
+          await seedCheck(before(9000 - i), {
+            type: 'media',
+            id: await seedMedia(t.db, held.orgId, 'listing_photo'),
+          }),
+        );
+      }
+      // Newer than every held check, so a single batch of 2 would only see held ones.
+      const behind = await seedCheck(before(1000), {
+        type: 'media',
+        id: await seedMedia(t.db, free.orgId, 'listing_photo'),
+      });
+
+      expect(await rule.run(t.db, NOW, 2)).toEqual({ deleted: 1 });
+      expect(await checks()).toEqual([...heldFiles].sort());
+      expect(await checks()).not.toContain(behind);
     });
 
     it('deletes the held checks on the next run once the hold is released', async () => {

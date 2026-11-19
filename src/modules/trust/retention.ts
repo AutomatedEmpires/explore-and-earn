@@ -3,8 +3,9 @@
 //
 // A check about a person or organization under a legal hold of any scope is kept too (lead
 // decision 2026-11-18): checks are the safety record an investigation reads. "About" means the
-// check's subject is them, or is a file, listing revision, message, invite, interview, offer or
-// bulk message they own, or a review item on the check is about them.
+// check's subject is them, or a file they own (the media module says who), or a review item on
+// the check is about them. Checks on a listing revision, message, invite, interview, offer or
+// bulk message are not yet matched to their owner: those modules expose no owner lookup.
 import { sql, type SQL } from 'drizzle-orm';
 import { queryRows, type DbOrTx } from '@/lib/db';
 import type { RetentionRule } from '@/modules/privacy';
@@ -44,40 +45,12 @@ async function foreignRefs(db: DbOrTx): Promise<ForeignRef[]> {
   );
 }
 
-type UnderLegalHold = typeof import('@/modules/privacy').underLegalHold;
+type Privacy = typeof import('@/modules/privacy');
+type Held = Awaited<ReturnType<Privacy['heldSubjects']>>;
 
 /** Subject types whose id is the person's own user id, and those whose id is the org's own id. */
 const PERSON_SUBJECTS = ['user', 'seeker_profile'];
 const ORG_SUBJECTS = ['organization', 'host_page', 'business_verification'];
-
-/**
- * Subject types owned by a person or organization recorded on the subject's own row: the row
- * (aliased `s`, joined as needed) and its owner columns.
- */
-const OWNED_SUBJECTS: { type: string; from: SQL; users: SQL[]; orgs: SQL[] }[] = [
-  {
-    type: 'media',
-    from: sql`app.media s`,
-    users: [sql`s.owner_user_id`],
-    orgs: [sql`s.owner_org_id`],
-  },
-  { type: 'listing_revision', from: sql`app.listing_revisions s`, users: [], orgs: [sql`s.org_id`] },
-  {
-    type: 'message',
-    from: sql`app.messages s join app.threads s_thread on s_thread.id = s.thread_id`,
-    users: [sql`s.sender_user_id`, sql`s_thread.seeker_user_id`],
-    orgs: [sql`s_thread.org_id`],
-  },
-  {
-    type: 'invite',
-    from: sql`app.invites s`,
-    users: [sql`s.seeker_user_id`],
-    orgs: [sql`s.org_id`],
-  },
-  { type: 'interview', from: sql`app.interviews s`, users: [], orgs: [sql`s.org_id`] },
-  { type: 'offer', from: sql`app.offers s`, users: [], orgs: [sql`s.org_id`] },
-  { type: 'bulk_message', from: sql`app.bulk_messages s`, users: [], orgs: [sql`s.org_id`] },
-];
 
 const list = (values: readonly string[]) =>
   sql.join(
@@ -94,22 +67,13 @@ function namedBy(a: 'c' | 'r'): { users: SQL[]; orgs: SQL[] } {
   };
 }
 
-/** The check's subject id as a uuid, or null when it is not one (so the cast never fails). */
-const SUBJECT_UUID = sql`(case when c.subject_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-  then c.subject_id::uuid end)`;
-
-/** True for a check (alias `c`) about a person or organization under a hold of any scope. */
-function heldCheck(underLegalHold: UnderLegalHold): SQL {
-  const owned = OWNED_SUBJECTS.map(
-    (o) => sql`exists (
-      select 1 from ${o.from}
-      where c.subject_type = ${o.type} and s.id = ${SUBJECT_UUID}
-        and ${underLegalHold({ users: o.users, orgs: o.orgs, scope: 'any' })}
-    )`,
-  );
+/**
+ * True for a check (alias `c`) that names a held person or organization itself, or whose
+ * review item does. Read in the same statement as the candidates.
+ */
+function namesHeld(underLegalHold: Privacy['underLegalHold']): SQL {
   return sql`(
     ${underLegalHold({ ...namedBy('c'), scope: 'any' })}
-    or ${sql.join(owned, sql` or `)}
     or exists (
       select 1 from app.review_items r
       where r.check_id = c.id and ${underLegalHold({ ...namedBy('r'), scope: 'any' })}
@@ -117,16 +81,46 @@ function heldCheck(underLegalHold: UnderLegalHold): SQL {
   )`;
 }
 
+type Candidate = { id: string; subject_type: string; subject_id: string; at: string };
+
+/**
+ * The candidates whose subject is a file owned by a held person or organization. The media
+ * module says who owns each file; nothing is read when no hold is open.
+ */
+async function heldThroughFile(db: DbOrTx, page: Candidate[], held: Held): Promise<Set<string>> {
+  if (held.users.size + held.orgs.size === 0) return new Set();
+  const files = page.filter((row) => row.subject_type === 'media');
+  if (files.length === 0) return new Set();
+  const { getMediaMeta } = await import('@/modules/media');
+  const owners = await getMediaMeta(
+    db,
+    files.map((row) => row.subject_id),
+  );
+  return new Set(
+    files
+      .filter((row) => {
+        const owner = owners.get(row.subject_id);
+        return (
+          owner !== undefined &&
+          (held.users.has(owner.ownerUserId) ||
+            (owner.ownerOrgId !== null && held.orgs.has(owner.ownerOrgId)))
+        );
+      })
+      .map((row) => row.id),
+  );
+}
+
 export const retentionRules: RetentionRule[] = [
   {
     key: 'trust.checks_12m',
     description: 'Records of automatic safety checks are deleted after 12 months.',
     async run(db, now, limit) {
+      if (limit <= 0) return { deleted: 0 };
       const cutoff = monthsBefore(now, KEEP_MONTHS).toISOString();
       const refs = await foreignRefs(db);
-      // Loaded on first use: the privacy barrel loads this module's barrel.
-      const { underLegalHold } = await import('@/modules/privacy');
-      const held = heldCheck(underLegalHold);
+      // Loaded on first use: the privacy and media barrels load this module's barrel.
+      const { heldSubjects, underLegalHold } = await import('@/modules/privacy');
+      const held = await heldSubjects(db, 'any');
       const unreferenced = sql.join(
         refs.map(
           (ref) => sql`and not exists (
@@ -138,25 +132,40 @@ export const retentionRules: RetentionRule[] = [
       );
 
       return db.transaction(async (tx) => {
-        const candidates = await queryRows<{ id: string }>(
-          tx,
-          sql`
-            select c.id from app.trust_checks c
-            where c.created_at < ${cutoff}::timestamptz
-              and not exists (
-                select 1 from app.review_items r
-                where r.check_id = c.id and r.status <> 'resolved'
-              )
-              ${unreferenced}
-              and not ${held}
-            order by c.created_at
-            limit ${limit}
-            for update of c skip locked
-          `,
-        );
-        if (candidates.length === 0) return { deleted: 0 };
+        // Pages through the candidates oldest first until `limit` may go, so held checks at the
+        // front never stop the ones behind them. With no hold open, one page is enough.
+        const due: string[] = [];
+        let after: { at: string; id: string } | null = null;
+        for (;;) {
+          const page: Candidate[] = await queryRows<Candidate>(
+            tx,
+            sql`
+              select c.id, c.subject_type, c.subject_id, c.created_at::text as at
+              from app.trust_checks c
+              where c.created_at < ${cutoff}::timestamptz
+                and not exists (
+                  select 1 from app.review_items r
+                  where r.check_id = c.id and r.status <> 'resolved'
+                )
+                ${unreferenced}
+                and not ${namesHeld(underLegalHold)}
+                ${after ? sql`and (c.created_at, c.id) > (${after.at}::timestamptz, ${after.id}::uuid)` : sql``}
+              order by c.created_at, c.id
+              limit ${limit}
+              for update of c skip locked
+            `,
+          );
+          const kept = await heldThroughFile(tx, page, held);
+          for (const row of page) {
+            if (due.length < limit && !kept.has(row.id)) due.push(row.id);
+          }
+          const last = page.at(-1);
+          if (due.length >= limit || page.length < limit || !last) break;
+          after = { at: last.at, id: last.id };
+        }
+        if (due.length === 0) return { deleted: 0 };
         const ids = sql.join(
-          candidates.map((row) => sql`${row.id}::uuid`),
+          due.map((id) => sql`${id}::uuid`),
           sql`, `,
         );
         // A resolved item keeps its own reason and confidence; only the link to the check goes.

@@ -1,7 +1,7 @@
 // Legal holds (SP8 spec section 3). A hold never blocks a privacy request: the erasers skip
 // the held scopes and report them as `legal_hold`. The reason is free text an operator wrote,
 // so it stays in this table and never reaches the audit log, an export or an email.
-import { and, desc, eq, isNull, lt, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, sql, type SQL } from 'drizzle-orm';
 import type { Db, DbOrTx } from '@/lib/db';
 import { badRequest, conflict, notFound } from '@/lib/errors';
 import { newId } from '@/lib/ids';
@@ -165,6 +165,12 @@ export async function isOnLegalHold(
 /** What keeps a retention rule's row: a hold on that scope (or on `all`), or one of any scope. */
 export type HeldUnder = HoldScope | 'any';
 
+/** The hold scopes that keep a row held under `scope`, as holdsInclude decides. */
+function scopesKeeping(scope: HeldUnder): readonly HoldScope[] {
+  if (scope === 'any') return HOLD_SCOPES;
+  return HOLD_SCOPES.filter((held) => holdsInclude([held], scope));
+}
+
 /**
  * The batch form of isOnLegalHold, as SQL for a retention rule's query: true when an
  * unreleased hold covers the row. Rules use it as `and not ${underLegalHold(...)}` (lead
@@ -186,8 +192,7 @@ export function underLegalHold(i: {
   if (users.length + orgs.length === 0) {
     throw new Error('underLegalHold: name the user or organization the row belongs to');
   }
-  const scopes =
-    i.scope === 'any' ? HOLD_SCOPES : HOLD_SCOPES.filter((held) => holdsInclude([held], i.scope));
+  const scopes = scopesKeeping(i.scope);
   const subjects = [
     ...users.map((id) => sql`privacy_hold.user_id::text = (${id})::text`),
     ...orgs.map((id) => sql`privacy_hold.org_id::text = (${id})::text`),
@@ -206,26 +211,54 @@ export function underLegalHold(i: {
 /**
  * Like underLegalHold, for a row that names its person or organization only inside free-form
  * text, such as a job payload: true when `text` contains the id of a person or organization
- * with an unreleased hold covering `scope`, or a held person's email address in any case. The
- * match is literal (strpos), so no character in an address acts as a wildcard.
+ * with an unreleased hold covering `scope`, or one of `emails` (the held people's addresses,
+ * which the caller reads from identity) in any case. The match is literal (strpos), so no
+ * character in an address acts as a wildcard.
  */
-export function namesUnderLegalHold(text: SQL, scope: HeldUnder): SQL {
-  const scopes =
-    scope === 'any' ? HOLD_SCOPES : HOLD_SCOPES.filter((held) => holdsInclude([held], scope));
-  return sql`exists (
+export function namesUnderLegalHold(
+  text: SQL,
+  scope: HeldUnder,
+  emails: readonly string[] = [],
+): SQL {
+  const byId = sql`exists (
     select 1 from app.privacy_legal_holds privacy_hold
-    left join app.users privacy_hold_user on privacy_hold_user.id = privacy_hold.user_id
     where privacy_hold.released_at is null
       and privacy_hold.scope in (${sql.join(
-        scopes.map((held) => sql`${held}`),
+        scopesKeeping(scope).map((held) => sql`${held}`),
         sql`, `,
       )})
-      and (
-        strpos(${text}, coalesce(privacy_hold.user_id, privacy_hold.org_id)::text) > 0
-        or (nullif(trim(privacy_hold_user.email), '') is not null
-          and strpos(lower(${text}), lower(trim(privacy_hold_user.email))) > 0)
-      )
+      and strpos(${text}, coalesce(privacy_hold.user_id, privacy_hold.org_id)::text) > 0
   )`;
+  const addresses = [...new Set(emails.map((email) => email.trim().toLowerCase()))].filter(
+    (email) => email !== '',
+  );
+  if (addresses.length === 0) return byId;
+  const byEmail = addresses.map((email) => sql`strpos(lower(${text}), ${email}::text) > 0`);
+  return sql`(${byId} or ${sql.join(byEmail, sql` or `)})`;
+}
+
+/**
+ * The people and organizations with an unreleased hold covering `scope`, in one read. For a
+ * retention rule that must ask another module who owns a row: it checks the owners it gets
+ * back against these sets instead of reading holds row by row.
+ */
+export async function heldSubjects(
+  db: DbOrTx,
+  scope: HeldUnder,
+): Promise<{ users: ReadonlySet<string>; orgs: ReadonlySet<string> }> {
+  const rows = await db
+    .select({ userId: privacyLegalHolds.userId, orgId: privacyLegalHolds.orgId })
+    .from(privacyLegalHolds)
+    .where(
+      and(
+        isNull(privacyLegalHolds.releasedAt),
+        inArray(privacyLegalHolds.scope, [...scopesKeeping(scope)]),
+      ),
+    );
+  return {
+    users: new Set(rows.flatMap((row) => (row.userId ? [row.userId] : []))),
+    orgs: new Set(rows.flatMap((row) => (row.orgId ? [row.orgId] : []))),
+  };
 }
 
 /** The console's hold list, newest first, 50 a page. `before` is the last id of the page before. */

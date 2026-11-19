@@ -5,9 +5,10 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryRows, withTx } from '@/lib/db';
 import { newId } from '@/lib/ids';
-import type { HoldScope, PrivacySubject } from '@/modules/privacy';
+import { setLegalHold, type HoldScope, type PrivacySubject } from '@/modules/privacy';
 import { resetSp2 } from '@tests/fakes/sp4/sp2';
 import { createTestDb, type TestDb } from '@tests/helpers/db';
+import { seedListingRow } from '@tests/helpers/sp2';
 import { seedOrg, seedUser } from '@tests/helpers/sp4';
 import { block, mute, privacyHandler, retentionRules } from './index';
 
@@ -42,6 +43,7 @@ type World = {
 async function insertReport(i: {
   reporterUserId: string;
   reporterOrgId?: string;
+  subjectType?: string;
   subjectId: string;
   createdAt?: string;
 }): Promise<string> {
@@ -49,7 +51,8 @@ async function insertReport(i: {
   await t.db.execute(sql`
     insert into app.reports (id, reporter_user_id, reporter_org_id, subject_type, subject_id,
       reason, details, created_at)
-    values (${id}, ${i.reporterUserId}, ${i.reporterOrgId ?? null}, 'listing', ${i.subjectId},
+    values (${id}, ${i.reporterUserId}, ${i.reporterOrgId ?? null}, ${i.subjectType ?? 'listing'},
+      ${i.subjectId},
       'scam', 'They asked for a deposit.', ${i.createdAt ?? '2026-10-01T00:00:00Z'}::timestamptz)
   `);
   return id;
@@ -258,5 +261,112 @@ describe('retention', () => {
     }
     expect((await rule?.run(t.db, NOW, 2))?.deleted).toBe(2);
     expect((await rule?.run(t.db, NOW, 2))?.deleted).toBe(1);
+  });
+
+  it('safety.reports_12m keeps an old report whose reporter or subject is under a hold on reports or all', async () => {
+    const rule = retentionRules.find((r) => r.key === 'safety.reports_12m');
+    const operatorId = (await seedUser(t.db, { accountType: 'host' })).id;
+    const hold = (subject: { userId: string } | { orgId: string }, scope: HoldScope) =>
+      setLegalHold(
+        t.db,
+        { ...subject, scope, reason: 'Harassment report 26-0912', reviewAt: '2026-12-01', operatorId },
+        NOW,
+      );
+    const old = '2025-01-01T00:00:00Z';
+    // Drain whatever earlier tests left due.
+    await rule?.run(t.db, NOW, 1000);
+    const free = (await seedUser(t.db, { accountType: 'seeker' })).id;
+
+    const heldReporter = (await seedUser(t.db, { accountType: 'seeker' })).id;
+    await hold({ userId: heldReporter }, 'reports');
+    const { orgId: heldReporterOrg } = await seedOrg(t.db, { name: 'Held Reporter Org' });
+    await hold({ orgId: heldReporterOrg }, 'all');
+    const { orgId: heldOrg } = await seedOrg(t.db, { name: 'Held Subject Org' });
+    await hold({ orgId: heldOrg }, 'reports');
+    const heldSeeker = (await seedUser(t.db, { accountType: 'seeker' })).id;
+    await hold({ userId: heldSeeker }, 'all');
+    const { orgId: heldListingOrg } = await seedOrg(t.db, { name: 'Held Listing Org' });
+    await hold({ orgId: heldListingOrg }, 'reports');
+    const heldListing = await seedListingRow(t.db, { orgId: heldListingOrg });
+    const otherScope = (await seedUser(t.db, { accountType: 'seeker' })).id;
+    await hold({ userId: otherScope }, 'messages');
+
+    const kept = [
+      await insertReport({ reporterUserId: heldReporter, subjectId: newId(), createdAt: old }),
+      await insertReport({
+        reporterUserId: free,
+        reporterOrgId: heldReporterOrg,
+        subjectId: newId(),
+        createdAt: old,
+      }),
+      await insertReport({ reporterUserId: free, subjectType: 'org', subjectId: heldOrg, createdAt: old }),
+      await insertReport({
+        reporterUserId: free,
+        subjectType: 'seeker_profile',
+        subjectId: heldSeeker,
+        createdAt: old,
+      }),
+      await insertReport({ reporterUserId: free, subjectId: heldListing, createdAt: old }),
+    ];
+    const gone = [
+      await insertReport({ reporterUserId: otherScope, subjectId: newId(), createdAt: old }),
+      await insertReport({
+        reporterUserId: free,
+        subjectType: 'seeker_profile',
+        subjectId: otherScope,
+        createdAt: old,
+      }),
+      await insertReport({ reporterUserId: free, subjectId: newId(), createdAt: old }),
+    ];
+
+    expect((await rule?.run(t.db, NOW, 100))?.deleted).toBe(gone.length);
+    const left = await queryRows<{ id: string }>(
+      t.db,
+      sql`select id from app.reports where id in (${sql.join(
+        [...kept, ...gone].map((id) => sql`${id}::uuid`),
+        sql`, `,
+      )})`,
+    );
+    expect(left.map((row) => row.id).sort()).toEqual([...kept].sort());
+  });
+
+  it('safety.reports_12m reaches the reports behind more held ones than one batch holds', async () => {
+    const rule = retentionRules.find((r) => r.key === 'safety.reports_12m');
+    await rule?.run(t.db, NOW, 1000);
+    const operatorId = (await seedUser(t.db, { accountType: 'host' })).id;
+    const { orgId: heldOrg } = await seedOrg(t.db, { name: 'Held Paging Org' });
+    await setLegalHold(
+      t.db,
+      { orgId: heldOrg, scope: 'reports', reason: 'Fraud investigation 26-311', reviewAt: '2026-12-01', operatorId },
+      NOW,
+    );
+    const reporter = (await seedUser(t.db, { accountType: 'seeker' })).id;
+    const held = [
+      await insertReport({
+        reporterUserId: reporter,
+        subjectId: await seedListingRow(t.db, { orgId: heldOrg }),
+        createdAt: '2025-01-01T00:00:00Z',
+      }),
+      await insertReport({
+        reporterUserId: reporter,
+        subjectId: await seedListingRow(t.db, { orgId: heldOrg }),
+        createdAt: '2025-01-02T00:00:00Z',
+      }),
+    ];
+    const behind = await insertReport({
+      reporterUserId: reporter,
+      subjectId: newId(),
+      createdAt: '2025-02-01T00:00:00Z',
+    });
+
+    expect((await rule?.run(t.db, NOW, 1))?.deleted).toBe(1);
+    const left = await queryRows<{ id: string }>(
+      t.db,
+      sql`select id from app.reports where id in (${sql.join(
+        [...held, behind].map((id) => sql`${id}::uuid`),
+        sql`, `,
+      )})`,
+    );
+    expect(left.map((row) => row.id).sort()).toEqual([...held].sort());
   });
 });

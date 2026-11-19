@@ -39,7 +39,7 @@ export const RETENTION_SWEEP_TOPIC = 'privacy.retention_sweep';
 export const RETENTION_RULE_TOPIC = 'privacy.retention_rule';
 
 // Retention rules skip rows under a legal hold (lead decision 2026-11-18) with this condition.
-export { namesUnderLegalHold, underLegalHold, type HeldUnder } from './holds';
+export { heldSubjects, namesUnderLegalHold, underLegalHold, type HeldUnder } from './holds';
 
 /**
  * How each registered rule honours legal holds, shown to reviewers and checked by a test: a
@@ -70,8 +70,10 @@ export const RETENTION_HOLD_COVERAGE: Readonly<Record<string, string>> = {
   'privacy.exports_7d': 'Skips the data download of a person with a hold on all.',
   'privacy.rate_limit_windows_2d':
     'Names no person or organization: counter windows, exempt from privacy coverage.',
+  'safety.reports_12m':
+    'Skips a report whose reporter (person or organization) or subject (an organization, a seeker, or the organization of a listing) has a hold on reports or all, as the safety eraser does. Not yet: reports about a thread or message, whose owners messaging exposes no lookup for.',
   'trust.checks_12m':
-    'Skips a check about a person or organization with a hold of any scope: directly, through the file, listing revision, message, invite, interview, offer or bulk message it checked, or through a review item on it.',
+    'Skips a check about a person or organization with a hold of any scope: directly, through the file it checked, or through a review item on it. Not yet: checks on a listing revision, message, invite, interview, offer or bulk message, whose owners their modules expose no lookup for.',
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;

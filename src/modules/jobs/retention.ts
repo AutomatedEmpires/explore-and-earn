@@ -17,8 +17,13 @@ async function deleteSettled(
   limit: number,
 ): Promise<{ deleted: number }> {
   const cutoff = new Date(now.getTime() - days * DAY_MS).toISOString();
-  // Loaded on first use: the privacy barrel loads this module's barrel.
-  const { namesUnderLegalHold } = await import('@/modules/privacy');
+  // Loaded on first use: the privacy and identity barrels load this module's barrel.
+  const { heldSubjects, namesUnderLegalHold } = await import('@/modules/privacy');
+  const { getUserContacts } = await import('@/modules/identity');
+  const held = await heldSubjects(db, 'all');
+  const emails = [...(await getUserContacts(db, [...held.users])).values()].flatMap((contact) =>
+    contact.email ? [contact.email] : [],
+  );
   const rows = await queryRows(
     db,
     sql`
@@ -26,7 +31,7 @@ async function deleteSettled(
       where id in (
         select o.id from app.outbox o
         where o.status = ${status} and o.updated_at < ${cutoff}::timestamptz
-          and not ${namesUnderLegalHold(sql`o.payload::text`, 'all')}
+          and not ${namesUnderLegalHold(sql`o.payload::text`, 'all', emails)}
         order by o.updated_at
         limit ${limit}
       )
