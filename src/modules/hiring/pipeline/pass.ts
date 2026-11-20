@@ -1,4 +1,9 @@
 // Pass with a 10-second undo. The commit job sends the Not selected message.
+//
+// Pass and Undo act on an applicant, so both ask the verified-host gate first (legal review 7.1,
+// issue 234): a host it refuses gets the applicant list's 409 and nothing is written. The commit
+// job asks again: a pass that was pending when the host was refused is dropped, not committed,
+// so no applicant is closed out by a host the platform has refused.
 import { and, eq } from 'drizzle-orm';
 import type { ApplicationStatus } from '@/lib/applications';
 import { PASS_UNDO_MS } from '@/lib/hiring';
@@ -16,10 +21,12 @@ import {
   threadIdsForApplications,
 } from '@/modules/messaging';
 import { getOrgSummaries, listMembers } from '@/modules/orgs';
+import { hostApplicantGate } from '@/modules/verification';
 import type { HostContext } from '@/server/guards';
 import { requireEntry } from '../access';
 import { staleStatus, transitionStatus, type PipelineEntryRow } from '../core';
 import { pendingPasses, pipelineEntries } from '../schema';
+import { requireApplicantReads } from './gate';
 
 const PASS_FROM: ApplicationStatus[] = ['new', 'shortlisted', 'interviewing', 'offered'];
 
@@ -76,6 +83,7 @@ export async function pass(
   now: Date = new Date(),
 ): Promise<{ undoUntil: string }> {
   return withTx(db, async (tx) => {
+    await requireApplicantReads(tx, ctx.orgId);
     const entry = await requireEntry(tx, ctx, applicationId, { forUpdate: true });
     if (!PASS_FROM.includes(entry.status as ApplicationStatus)) throw staleStatus(entry.status as ApplicationStatus);
     const [pending] = await tx
@@ -118,6 +126,7 @@ export async function undoPass(
   now: Date = new Date(),
 ): Promise<{ status: ApplicationStatus }> {
   return withTx(db, async (tx) => {
+    await requireApplicantReads(tx, ctx.orgId);
     const entry = await requireEntry(tx, ctx, applicationId, { forUpdate: true });
     const [pending] = await tx
       .select()
@@ -151,6 +160,20 @@ export async function commitPass(db: Db, payload: unknown, now: Date): Promise<v
       .where(and(eq(pendingPasses.applicationId, applicationId), eq(pendingPasses.commitAt, commitTime)))
       .returning();
     if (!pending) return;
+
+    // The host was refused after it passed: the pending row is gone and nothing else happens.
+    const gate = await hostApplicantGate(tx, pending.orgId);
+    if (!gate.ok) {
+      await record(tx, {
+        actorType: 'system',
+        orgId: pending.orgId,
+        action: 'hiring.pass_dropped',
+        subjectType: 'application',
+        subjectId: applicationId,
+        data: { reason: `verification_${gate.reason}` },
+      });
+      return;
+    }
 
     const result = await transitionStatus(
       tx,

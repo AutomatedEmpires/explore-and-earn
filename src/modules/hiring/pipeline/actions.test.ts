@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { auditEvents, notifications } from '@/db/schema';
 import type { Db } from '@/lib/db';
@@ -50,6 +50,8 @@ beforeEach(() => {
 
 async function entry(status: 'new' | 'shortlisted' | 'interviewing' | 'offered' | 'withdrawn' = 'new') {
   const org = await seedHostOrg(t.db);
+  // Only a verified host may shortlist or mark hired (issue 234).
+  await t.db.execute(sql`update app.organizations set verification_status = 'verified' where id = ${org.orgId}`);
   const seeker = await seedSeeker(t.db);
   const listingId = newId();
   listingsFake.setListing({ id: listingId, orgId: org.orgId, title: 'Lift Operator' });
@@ -109,4 +111,33 @@ describe('shortlist and mark hired', () => {
       details: { reason: 'stale_status', current: 'offered' },
     });
   });
+
+  it.each(['unverified', 'running', 'needs_review', 'needs_info', 'failed'] as const)(
+    'refuses shortlist and mark hired while the host is %s, and tells the seeker nothing (issue 234)',
+    async (status) => {
+      const { applicationId, ctx, org, seeker } = await entry('interviewing');
+      const listed = await entry('new');
+      for (const orgId of [org.orgId, listed.org.orgId]) {
+        await t.db.execute(sql`update app.organizations set verification_status = ${status} where id = ${orgId}`);
+      }
+      applicationsFake.calls.length = 0;
+      const refused = { status: 409, code: 'conflict', details: { reason: `verification_${status}` } };
+
+      await expect(markHired(t.db as Db, ctx, applicationId)).rejects.toMatchObject(refused);
+      await expect(shortlist(t.db as Db, listed.ctx, listed.applicationId, true)).rejects.toMatchObject(refused);
+
+      const [row] = await t.db.select().from(pipelineEntries).where(eq(pipelineEntries.applicationId, applicationId));
+      expect(row?.status).toBe('interviewing');
+      const [other] = await t.db
+        .select()
+        .from(pipelineEntries)
+        .where(eq(pipelineEntries.applicationId, listed.applicationId));
+      expect(other?.status).toBe('new');
+      expect(await t.db.select().from(notifications).where(eq(notifications.userId, seeker.userId))).toEqual([]);
+      const audits = await t.db.select().from(auditEvents).where(eq(auditEvents.subjectId, applicationId));
+      expect(audits.map((a) => a.action)).not.toContain('hiring.marked_hired');
+      expect(applicationsFake.calls.some((call) => call.name === 'setStatus')).toBe(false);
+      expect(track).not.toHaveBeenCalled();
+    },
+  );
 });

@@ -1,4 +1,8 @@
 // Shortlist and Mark hired. A stale move commits the mirror, then returns 409.
+//
+// Both act on an applicant, and Mark hired sends the seeker a platform notice, so both ask the
+// verified-host gate first (legal review 7.1, issue 234): a host it refuses gets the applicant
+// list's 409 and nothing is written, including for applications it received while verified.
 import type { ApplicationStatus } from '@/lib/applications';
 import { track } from '@/lib/analytics';
 import type { Db } from '@/lib/db';
@@ -9,6 +13,7 @@ import { record } from '@/modules/audit';
 import type { HostContext } from '@/server/guards';
 import { requireEntry } from '../access';
 import { staleStatus, transitionStatus } from '../core';
+import { requireApplicantReads } from './gate';
 
 export async function shortlist(
   db: Db,
@@ -18,6 +23,7 @@ export async function shortlist(
 ): Promise<{ status: ApplicationStatus }> {
   const to: ApplicationStatus = on ? 'shortlisted' : 'new';
   const outcome = await withTx(db, async (tx) => {
+    await requireApplicantReads(tx, ctx.orgId);
     await requireEntry(tx, ctx, applicationId, { forUpdate: true });
     const result = await transitionStatus(tx, {
       applicationId,
@@ -39,6 +45,7 @@ export async function markHired(
   applicationId: string,
 ): Promise<{ status: 'hired' }> {
   const outcome = await withTx(db, async (tx) => {
+    await requireApplicantReads(tx, ctx.orgId);
     const entry = await requireEntry(tx, ctx, applicationId, { forUpdate: true });
     const result = await transitionStatus(tx, {
       applicationId,

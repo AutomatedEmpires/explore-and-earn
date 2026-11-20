@@ -69,6 +69,8 @@ describe('applicant routes', () => {
 
   it('hides an applicant outside a recruiter’s location', async () => {
     const org = await seedHostOrg(t.db);
+    // A verified host: the applicant gate comes first and would answer 409 otherwise (issue 234).
+    await t.db.execute(sql`update app.organizations set verification_status = 'verified' where id = ${org.orgId}`);
     const loc1 = await seedLocation(t.db, { orgId: org.orgId });
     const loc2 = await seedLocation(t.db, { orgId: org.orgId, city: 'Juneau' });
     const recruiter = await seedMember(t.db, org.orgId, 'recruiter', { scope: 'assigned' });

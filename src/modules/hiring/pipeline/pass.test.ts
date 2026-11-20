@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { auditEvents } from '@/db/schema';
 import type { HostApplicationCard } from '@/lib/applications';
@@ -70,8 +70,14 @@ function mayaCard(applicationId: string): HostApplicationCard {
   };
 }
 
+/** Sets the org's verification status; only a verified host may pass or undo (issue 234). */
+async function setVerification(orgId: string, status: string): Promise<void> {
+  await t.db.execute(sql`update app.organizations set verification_status = ${status} where id = ${orgId}`);
+}
+
 async function ready(status: 'new' | 'withdrawn' | 'offered' = 'new') {
   const org = await seedHostOrg(t.db);
+  await setVerification(org.orgId, 'verified');
   const seeker = await seedSeeker(t.db);
   const listingId = newId();
   listingsFake.setListing({ id: listingId, orgId: org.orgId, title: 'Lift Operator' });
@@ -190,4 +196,55 @@ describe('pass with undo', () => {
     const audits = await t.db.select().from(auditEvents).where(eq(auditEvents.subjectId, applicationId));
     expect(audits.map((row) => row.action)).toContain('hiring.pass_committed');
   });
+
+  it.each(['unverified', 'running', 'needs_review', 'needs_info', 'failed'] as const)(
+    'drops a pending pass when the host is %s at commit time (issue 234)',
+    async (status) => {
+      const { applicationId, ctx, org } = await ready();
+      await pass(t.db as Db, ctx, applicationId, FIXED_NOW);
+      await setVerification(org.orgId, status);
+      applicationsFake.calls.length = 0;
+
+      await runAt(new Date(FIXED_NOW.getTime() + 11_000));
+
+      const [entry] = await t.db.select().from(pipelineEntries).where(eq(pipelineEntries.applicationId, applicationId));
+      expect(entry?.status).toBe('new');
+      expect(applicationsFake.calls.some((call) => call.name === 'setStatus')).toBe(false);
+      expect(messages()).toEqual([]);
+      expect(await t.db.select().from(pendingPasses).where(eq(pendingPasses.applicationId, applicationId))).toEqual([]);
+      const audits = await t.db.select().from(auditEvents).where(eq(auditEvents.subjectId, applicationId));
+      expect(audits.map((row) => row.action)).not.toContain('hiring.pass_committed');
+      expect(audits.find((row) => row.action === 'hiring.pass_dropped')?.data).toEqual({
+        reason: `verification_${status}`,
+      });
+
+      // The pass is gone, not parked: it does not commit once the host is verified again.
+      await setVerification(org.orgId, 'verified');
+      await runAt(new Date(FIXED_NOW.getTime() + 60_000));
+      const [later] = await t.db.select().from(pipelineEntries).where(eq(pipelineEntries.applicationId, applicationId));
+      expect(later?.status).toBe('new');
+      expect(messages()).toEqual([]);
+    },
+  );
+
+  it.each(['unverified', 'running', 'needs_review', 'needs_info', 'failed'] as const)(
+    'refuses pass and undo while the host is %s (issue 234)',
+    async (status) => {
+      const fresh = await ready();
+      const passed = await ready();
+      await pass(t.db as Db, passed.ctx, passed.applicationId, FIXED_NOW);
+      await setVerification(fresh.org.orgId, status);
+      await setVerification(passed.org.orgId, status);
+      const refused = { status: 409, code: 'conflict', details: { reason: `verification_${status}` } };
+
+      await expect(pass(t.db as Db, fresh.ctx, fresh.applicationId, FIXED_NOW)).rejects.toMatchObject(refused);
+      await expect(
+        undoPass(t.db as Db, passed.ctx, passed.applicationId, new Date(FIXED_NOW.getTime() + 1_000)),
+      ).rejects.toMatchObject(refused);
+      expect(await t.db.select().from(pendingPasses).where(eq(pendingPasses.applicationId, fresh.applicationId))).toEqual([]);
+      expect(
+        await t.db.select().from(pendingPasses).where(eq(pendingPasses.applicationId, passed.applicationId)),
+      ).toHaveLength(1);
+    },
+  );
 });

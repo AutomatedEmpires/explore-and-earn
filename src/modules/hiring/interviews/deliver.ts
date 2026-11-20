@@ -6,6 +6,10 @@
 // for Not interested: the title says "A candidate", the data has no `firstName`, and the name is
 // not read when only the host is told. Everything else stays, the calendar file included, so a
 // withdrawn or upcoming interview still reaches the host's calendar. Seeker notices are unchanged.
+//
+// The invite itself (issue 234): `publishInterviewInvite` posts nothing for a host the gate
+// refuses. The invite is set to held, so the seeker does not see it, and a later release
+// delivers it once the host is verified. Messaging holds a message the same way.
 import { eq } from 'drizzle-orm';
 import type { DbOrTx, Tx } from '@/lib/db';
 import { getEnv } from '@/lib/env';
@@ -90,6 +94,11 @@ export async function publishInterviewInvite(tx: Tx, row: InterviewRow): Promise
   if (!entry) return;
   // A block can land while the text is being scanned; nothing goes out after it.
   if (await isBlocked(tx, { orgId: row.orgId, seekerUserId: entry.seekerUserId })) return;
+  // A host can be refused while the text is being scanned or held; the invite waits, held.
+  if (!(await hostApplicantGate(tx, row.orgId)).ok) {
+    await tx.update(interviews).set({ scanState: 'held' }).where(eq(interviews.id, row.id));
+    return;
+  }
   await postCard(tx, row.threadId, { type: 'interview', refId: row.id }, row.organizerUserId);
   await notifyInterview(
     tx,
