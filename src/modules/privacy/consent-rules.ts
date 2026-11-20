@@ -10,7 +10,8 @@ import type { RetentionRule } from './types';
 /** The rule's key (spec 8.3). Named on its own line: gitleaks reads `key: '<id>'` as a secret. */
 export const CONSENT_RECORDS_RULE = 'privacy.consent_records_24m';
 
-const consentRecords24m: RetentionRule = {
+/** Defined and tested here; registered by the follow-up task (see consentRetentionRules). */
+export const consentRecordsRetentionRule: RetentionRule = {
   key: CONSENT_RECORDS_RULE,
   description: 'Records of your cookie choices are deleted after 24 months.',
   async run(db, now, limit) {
@@ -33,4 +34,9 @@ const consentRecords24m: RetentionRule = {
   },
 };
 
-export const consentRetentionRules: RetentionRule[] = [consentRecords24m];
+/**
+ * The consent rules retention.ts registers. Empty for now (lead decision 2026-11-19, #149):
+ * registering consentRecordsRetentionRule also needs its RETENTION_HOLD_COVERAGE entry in
+ * retention.ts, which another task holds, so a follow-up task registers both together.
+ */
+export const consentRetentionRules: RetentionRule[] = [];

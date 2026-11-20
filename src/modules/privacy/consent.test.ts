@@ -19,7 +19,11 @@ import {
   registerConsentEpoch,
   trackForUser,
 } from './consent';
-import { CONSENT_RECORDS_RULE, consentRetentionRules } from './consent-rules';
+import {
+  CONSENT_RECORDS_RULE,
+  consentRecordsRetentionRule,
+  consentRetentionRules,
+} from './consent-rules';
 
 const sent = vi.hoisted(() => ({ events: [] as { distinctId: string; event: string }[] }));
 
@@ -236,11 +240,17 @@ describe('consentForUser and trackForUser (no request context, as in a job)', ()
 });
 
 describe('privacy.consent_records_24m', () => {
-  const rule = consentRetentionRules.find((r) => r.key === CONSENT_RECORDS_RULE);
+  const rule = consentRecordsRetentionRule;
 
   it('has the key spec 8.3 names', () => {
     expect(CONSENT_RECORDS_RULE).toBe('privacy.consent_records_24m');
-    expect(rule).toBeDefined();
+    expect(rule.key).toBe(CONSENT_RECORDS_RULE);
+  });
+
+  // Lead decision 2026-11-19 (#149): the rule is registered, with its legal-hold coverage entry
+  // in retention.ts, by a follow-up task.
+  it('is not registered yet', () => {
+    expect(consentRetentionRules).toEqual([]);
   });
 
   async function seedRecord(userId: string | null, createdAt: Date): Promise<string> {
@@ -258,11 +268,10 @@ describe('privacy.consent_records_24m', () => {
   }
 
   it('is described the way the privacy policy shows it', () => {
-    expect(rule?.description).toBe('Records of your cookie choices are deleted after 24 months.');
+    expect(rule.description).toBe('Records of your cookie choices are deleted after 24 months.');
   });
 
   it('deletes choices older than 24 months, except those of a person under a legal hold', async () => {
-    if (!rule) throw new Error('rule not registered');
     await t.db.execute(sql`delete from app.consent_records`);
     const { userId: held } = await seedSeeker(t.db);
     const { userId: free } = await seedSeeker(t.db);
