@@ -51,6 +51,7 @@ const REFERENCE = [
   'host-header',
   'profile-header',
   'community-post',
+  'jobs-by-state',
 ] as const;
 
 const ROUTES: Route[] = [

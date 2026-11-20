@@ -108,6 +108,12 @@ export const referenceScreens = [
     summary: 'A photo post with reactions, and a host announcement.',
     role: 'Seeker',
   },
+  {
+    slug: 'jobs-by-state',
+    title: 'Jobs by state',
+    summary: 'Hover a state to see how many jobs are open there.',
+    role: 'Seeker',
+  },
 ] as const;
 
 export const galleryHome = '/design-system';

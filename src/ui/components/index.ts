@@ -38,6 +38,7 @@ export { IconButton, type IconButtonProps } from './IconButton';
 export { IconLink, type IconLinkProps } from './IconLink';
 export { Img, type ImgProps } from './Img';
 export { Input, type InputProps } from './Input';
+export { JobsByState, type JobsByStateProps } from './JobsByState';
 export {
   formatPay,
   formatStart,
