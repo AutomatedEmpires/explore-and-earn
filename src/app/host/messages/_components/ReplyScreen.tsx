@@ -5,19 +5,15 @@
 // tap: Send reply. A reply that didn't send keeps its words and is retried with the same
 // clientId, so the server stores it once. A host the verified-host gate refuses (#199) sees the
 // applicant list's refusal for its status, with the next step, in place of the conversation.
+// Once the conversation has loaded, Report and Block applicant sit under it (issue 224).
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { BlockDialog } from '@/app/_features/safety/BlockDialog';
+import { ReportSheet } from '@/app/_features/safety/ReportSheet';
 import type { ReadOnlyReason } from '@/lib/messaging';
 import { MESSAGES, READ_ONLY } from '@/lib/messaging';
-import {
-  Button,
-  ErrorState,
-  Notice,
-  Skeleton,
-  Textarea,
-  Toast,
-} from '@/ui/components';
-import { Cloud, Lock } from '@/ui/icons';
+import { Button, ErrorState, Notice, Skeleton, Textarea, Toast } from '@/ui/components';
+import { Cloud, Flag, Lock } from '@/ui/icons';
 import { hiringApi, isOffline, isStatus } from '../../applicants/_lib/api';
 import {
   defaultReply,
@@ -37,6 +33,11 @@ type Loaded = {
   note: string;
   readOnly: ReadOnlyReason | null;
   canSend: boolean;
+  /**
+   * The application a block goes by (PUT /host/blocks). Null for a conversation an invite
+   * started, which has none, and for one the team had already blocked when it loaded.
+   */
+  blockBy: string | null;
 };
 type ScreenState =
   | { kind: 'loading' }
@@ -69,6 +70,7 @@ async function load(threadId: string): Promise<ScreenState> {
         note: defaultReply(startDate, new Date()),
         readOnly: view.readOnly,
         canSend: view.canSend,
+        blockBy: view.readOnly === 'blocked' ? null : view.thread.applicationId,
       },
     };
   } catch (err) {
@@ -168,8 +170,8 @@ function ReplyForm({
           {data.firstName} has your reply
         </h1>
         <p className="text-16 text-ink-2">
-          {data.firstName} can answer in the app. You can write another note from{' '}
-          {data.firstName}’s card.
+          {data.firstName} can answer in the app. You can write another note from {data.firstName}’s
+          card.
         </p>
         <Button asChild size="lg" className="self-start">
           <Link href={applicantsHref}>Back to applicants</Link>
@@ -183,7 +185,9 @@ function ReplyForm({
     <>
       <header className="flex flex-col gap-4">
         <h1 className="text-24 font-extrabold text-ink">Reply to {data.name}</h1>
-        <p className="text-16 text-ink-2">This note is ready. Send it, or change the words first.</p>
+        <p className="text-16 text-ink-2">
+          This note is ready. Send it, or change the words first.
+        </p>
       </header>
       <form noValidate onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
         {failure ? (
@@ -222,6 +226,67 @@ function ReplyForm({
   );
 }
 
+/**
+ * Report and Block applicant under the conversation (issue 224; SP5 plan Task 34), the W7 parts
+ * exactly as #145 built them, with their copy. Report sends a `thread` report from the
+ * ReportSheet. Block applicant shows only when the conversation has an application, and blocks
+ * by it in the host BlockDialog; the conversation then reads as closed (its read-only notice is
+ * announced), the button goes, and focus moves to Report.
+ */
+function ConversationSafety({
+  threadId,
+  firstName,
+  blockBy,
+  onBlocked,
+}: {
+  threadId: string;
+  firstName: string;
+  blockBy: string | null;
+  onBlocked: () => void;
+}) {
+  const report = useRef<HTMLButtonElement>(null);
+  const [blocking, setBlocking] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+
+  // The Block applicant button is gone once the block went through; its neighbour takes focus.
+  useEffect(() => {
+    if (blocked) report.current?.focus();
+  }, [blocked]);
+
+  return (
+    <div className="flex flex-wrap gap-2 pt-4">
+      <ReportSheet
+        subject={{ type: 'thread', id: threadId }}
+        trigger={
+          <Button ref={report} variant="ghost" icon={Flag}>
+            Report
+          </Button>
+        }
+      />
+      {blockBy ? (
+        <>
+          {blocked ? null : (
+            <Button variant="ghost" onClick={() => setBlocking(true)}>
+              Block applicant
+            </Button>
+          )}
+          <BlockDialog
+            by="host"
+            applicationId={blockBy}
+            firstName={firstName}
+            open={blocking}
+            onOpenChange={setBlocking}
+            onBlocked={() => {
+              setBlocked(true);
+              onBlocked();
+            }}
+          />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export function ReplyScreen({
   threadId,
   orgName,
@@ -256,6 +321,15 @@ export function ReplyScreen({
 
   const markRefused = useCallback((refusal: VerificationRefusal) => {
     setState({ kind: 'refused', refusal });
+  }, []);
+
+  // The team blocked the applicant here: the conversation closes, as PUT /host/blocks does.
+  const markBlocked = useCallback(() => {
+    setState((s) =>
+      s.kind === 'ready'
+        ? { kind: 'ready', data: { ...s.data, canSend: false, readOnly: 'blocked' } }
+        : s,
+    );
   }, []);
 
   const back = (
@@ -333,6 +407,14 @@ export function ReplyScreen({
     <div className="flex flex-col gap-4">
       <p className="text-16 font-semibold text-ink-2 md:hidden">{orgName}</p>
       {body}
+      {state.kind === 'ready' ? (
+        <ConversationSafety
+          threadId={threadId}
+          firstName={state.data.firstName}
+          blockBy={state.data.blockBy}
+          onBlocked={markBlocked}
+        />
+      ) : null}
     </div>
   );
 }

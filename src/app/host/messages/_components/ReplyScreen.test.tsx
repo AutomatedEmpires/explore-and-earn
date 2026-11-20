@@ -2,12 +2,14 @@
 // The reply step of flow D in jsdom, against a fetch stub that answers like the SP5 API: the
 // ready note, Send reply in one tap, Reply sent, and the states (didn't send and the retry,
 // offline, an empty reply, read-only, a thread that isn't there, and a host the verification gate
-// refuses). axe runs over each state; jsdom
+// refuses), and Report and Block on the conversation (issue 224). axe runs over each state; jsdom
 // has no layout, so color contrast is left to src/ui/tokens.test.ts and the Playwright run.
 import { createRequire } from 'node:module';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { REPORT_NOT_FOUND, REPORT_PRIVACY } from '@/app/_features/safety/copy';
 import { READ_ONLY, sendMessageSchema, type ReadOnlyReason } from '@/lib/messaging';
+import { hostBlockSchema, REPORT_REASON_LABELS, REPORT_THANKS, reportSchema } from '@/lib/safety';
 import {
   SAMPLE_IDS,
   SAMPLE_ORG,
@@ -73,13 +75,22 @@ function refusal(status: Refused): Response {
   );
 }
 
+/** What the safety routes received since the last install(). */
+const safety: { reports: unknown[]; blocks: unknown[] } = { reports: [], blocks: [] };
+
 function install(o: {
   thread?: () => Response;
   detail?: () => Response;
   send?: (n: number) => Response;
   readOnly?: ReadOnlyReason;
+  /** The thread's application; null for a thread an invite started. */
+  applicationId?: string | null;
+  report?: () => Response;
+  block?: () => Response;
 }) {
   const sent: Record<string, unknown>[] = [];
+  safety.reports = [];
+  safety.blocks = [];
   const card = sampleApplicant();
   vi.stubGlobal(
     'fetch',
@@ -90,12 +101,25 @@ function install(o: {
       const method = init?.method ?? 'GET';
       if (url.pathname === `/api/v1/threads/${SAMPLE_IDS.thread}` && method === 'GET') {
         if (o.thread) return o.thread();
+        const view = sampleThread(card);
         return json({
-          ...sampleThread(card),
+          ...view,
+          thread: {
+            ...view.thread,
+            ...(o.applicationId === undefined ? {} : { applicationId: o.applicationId }),
+          },
           readOnly: o.readOnly ?? null,
           canSend: !o.readOnly,
           cards: {},
         });
+      }
+      if (url.pathname === '/api/v1/reports' && method === 'POST') {
+        safety.reports.push(JSON.parse(String(init?.body)));
+        return o.report ? o.report() : json({ reportId: 'r1' }, 201);
+      }
+      if (url.pathname === '/api/v1/host/blocks' && method === 'PUT') {
+        safety.blocks.push(JSON.parse(String(init?.body)));
+        return o.block ? o.block() : new Response(null, { status: 204 });
       }
       if (url.pathname === `/api/v1/host/applicants/${SAMPLE_IDS.application}`) {
         return o.detail ? o.detail() : json(sampleDetail(card));
@@ -115,7 +139,11 @@ function install(o: {
 function renderScreen() {
   return render(
     <main>
-      <ReplyScreen threadId={SAMPLE_IDS.thread} orgName={SAMPLE_ORG} applicantsHref="/host/applicants" />
+      <ReplyScreen
+        threadId={SAMPLE_IDS.thread}
+        orgName={SAMPLE_ORG}
+        applicantsHref="/host/applicants"
+      />
     </main>,
   );
 }
@@ -135,7 +163,9 @@ describe('Reply: answering', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Reply to Maya Chen' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('This note is ready. Send it, or change the words first.')).toBeInTheDocument();
+    expect(
+      screen.getByText('This note is ready. Send it, or change the words first.'),
+    ).toBeInTheDocument();
     expect(replyBox()).toHaveValue(DEFAULT_NOTE);
     expect(screen.getByText('Maya sees this in the app.')).toBeInTheDocument();
     expect(await seriousOrCritical(container)).toEqual([]);
@@ -165,7 +195,9 @@ describe('Reply: answering', () => {
     const sent = install({});
     renderScreen();
     await screen.findByRole('heading', { level: 1, name: 'Reply to Maya Chen' });
-    fireEvent.change(replyBox(), { target: { value: '  Hi Maya, can you talk Thursday at 10?  ' } });
+    fireEvent.change(replyBox(), {
+      target: { value: '  Hi Maya, can you talk Thursday at 10?  ' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Send reply' }));
     await screen.findByRole('heading', { level: 1, name: 'Maya has your reply' });
     expect(sent.map((s) => s.body)).toEqual(['Hi Maya, can you talk Thursday at 10?']);
@@ -186,7 +218,9 @@ describe('Reply: answering', () => {
   it('keeps the first name and a plain note when the applicant detail fails', async () => {
     install({ detail: () => failure(404, 'not_found') });
     renderScreen();
-    expect(await screen.findByRole('heading', { level: 1, name: 'Reply to Maya' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Reply to Maya' }),
+    ).toBeInTheDocument();
     expect(replyBox()).toHaveValue('Thanks for applying. When could you start?');
   });
 });
@@ -359,5 +393,133 @@ describe('Reply: a host the verification gate refuses (issue 199)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Your reply didn’t send');
     expect(screen.queryByText(REFUSED_TITLE)).toBeNull();
     expect(replyBox()).toHaveValue(DEFAULT_NOTE);
+  });
+});
+
+describe('Reply: Report and Block on the conversation (issue 224)', () => {
+  const HARASSMENT = REPORT_REASON_LABELS.harassment;
+
+  async function openReport() {
+    await screen.findByRole('heading', { level: 1, name: /^Reply to Maya/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Report' }));
+    return screen.findByRole('dialog', { name: 'Report this conversation' });
+  }
+
+  it('offers nothing before the conversation loads, or when it isn’t available', async () => {
+    install({ thread: () => failure(404, 'not_found') });
+    renderScreen();
+    expect(screen.queryByRole('button', { name: 'Report' })).toBeNull();
+    await screen.findByRole('heading', { name: 'This conversation isn’t available' });
+    expect(screen.queryByRole('button', { name: 'Report' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Block/ })).toBeNull();
+  });
+
+  it('reports the conversation from the sheet, which says reports are private', async () => {
+    install({});
+    const { container } = renderScreen();
+    const sheet = await openReport();
+    expect(within(sheet).getByText(REPORT_PRIVACY)).toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: 'Send report' })).toBeDisabled();
+    expect(await seriousOrCritical(sheet)).toEqual([]);
+
+    fireEvent.click(within(sheet).getByRole('radio', { name: HARASSMENT }));
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Send report' }));
+    expect(await within(sheet).findByText(REPORT_THANKS)).toBeInTheDocument();
+    expect(safety.reports).toEqual([
+      { subjectType: 'thread', subjectId: SAMPLE_IDS.thread, reason: 'harassment' },
+    ]);
+    expect(reportSchema.safeParse(safety.reports[0]).success).toBe(true);
+
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Done' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByRole('button', { name: 'Report' })).toHaveFocus();
+    expect(await seriousOrCritical(container)).toEqual([]);
+  });
+
+  it('a report the server refuses reads as not found and keeps the choice (issue 209)', async () => {
+    // A reporter outside the conversation gets the same 404 as an unknown thread.
+    install({ report: () => failure(404, 'not_found') });
+    renderScreen();
+    const sheet = await openReport();
+    fireEvent.click(within(sheet).getByRole('radio', { name: HARASSMENT }));
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Send report' }));
+    expect(await within(sheet).findByRole('alert')).toHaveTextContent(REPORT_NOT_FOUND);
+    expect(within(sheet).getByRole('radio', { name: HARASSMENT })).toBeChecked();
+    expect(within(sheet).queryByText(REPORT_THANKS)).toBeNull();
+  });
+
+  it('blocks the applicant by her application, then the conversation reads as closed', async () => {
+    install({});
+    renderScreen();
+    await screen.findByRole('heading', { level: 1, name: 'Reply to Maya Chen' });
+    const opener = screen.getByRole('button', { name: 'Block applicant' });
+    opener.focus();
+    fireEvent.click(opener);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Block Maya?' });
+    expect(dialog).toHaveTextContent(
+      "Maya can't apply to your jobs or message your team, and your conversation with Maya closes. Maya isn't told.",
+    );
+    expect(dialog).not.toHaveTextContent(/blocked you|notif/i);
+    expect(within(dialog).queryByRole('checkbox')).toBeNull();
+    expect(await seriousOrCritical(dialog)).toEqual([]);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Block' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(safety.blocks).toEqual([{ applicationId: SAMPLE_IDS.application }]);
+    expect(hostBlockSchema.safeParse(safety.blocks[0]).success).toBe(true);
+    expect(screen.getByText(READ_ONLY)).toBeInTheDocument();
+    expect(
+      screen.getByText('You and this applicant can’t message each other.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /Your reply/ })).toBeNull();
+    // The closed notice is announced; Block applicant goes, and its neighbour takes focus.
+    expect(screen.getByText(READ_ONLY).closest('[role="status"]')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Block applicant' })).toBeNull();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Report' })).toHaveFocus());
+  });
+
+  it('a block that fails keeps the dialog open with the reason, and the composer', async () => {
+    install({ block: () => failure(403, 'forbidden', 'role_not_allowed') });
+    renderScreen();
+    await screen.findByRole('heading', { level: 1, name: 'Reply to Maya Chen' });
+    fireEvent.click(screen.getByRole('button', { name: 'Block applicant' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Block Maya?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Block' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Only owners, admins and recruiters can block applicants.',
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(replyBox()).toHaveValue(DEFAULT_NOTE);
+    expect(screen.queryByText(READ_ONLY)).toBeNull();
+  });
+
+  it('a conversation an invite started has no application, so it offers Report only', async () => {
+    install({ applicationId: null });
+    const { container } = renderScreen();
+    await screen.findByRole('heading', { level: 1, name: 'Reply to Maya' });
+    expect(screen.getByRole('button', { name: 'Report' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Block/ })).toBeNull();
+    expect(await seriousOrCritical(container)).toEqual([]);
+  });
+
+  it('a conversation the team already blocked offers Report, and not Block again', async () => {
+    install({ readOnly: 'blocked' });
+    const { container } = renderScreen();
+    expect(
+      await screen.findByText('You and this applicant can’t message each other.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Report' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Block/ })).toBeNull();
+    expect(await seriousOrCritical(container)).toEqual([]);
+  });
+
+  it('a closed conversation can still be reported and blocked', async () => {
+    install({ readOnly: 'withdrawn' });
+    renderScreen();
+    await screen.findByText(READ_ONLY);
+    expect(screen.getByRole('button', { name: 'Report' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Block applicant' })).toBeInTheDocument();
   });
 });

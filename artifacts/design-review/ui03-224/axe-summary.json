@@ -1,0 +1,308 @@
+[
+  {
+    "file": "ui03-listing-end-390.png",
+    "width": 390,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-listing-end-390-dark.png",
+    "width": 390,
+    "theme": "dark",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-listing-end-1440.png",
+    "width": 1440,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-listing-end-1440-dark.png",
+    "width": 1440,
+    "theme": "dark",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-listing-end-muted-390.png",
+    "width": 390,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-listing-report-sheet-390.png",
+    "width": 390,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-listing-report-sheet-390-dark.png",
+    "width": 390,
+    "theme": "dark",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-listing-report-sheet-1440.png",
+    "width": 1440,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-listing-report-sheet-1440-dark.png",
+    "width": 1440,
+    "theme": "dark",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-listing-block-dialog-390.png",
+    "width": 390,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-listing-block-dialog-390-dark.png",
+    "width": 390,
+    "theme": "dark",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-listing-block-dialog-1440.png",
+    "width": 1440,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-listing-block-dialog-1440-dark.png",
+    "width": 1440,
+    "theme": "dark",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-listing-blocked-toast-390.png",
+    "width": 390,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-listing-blocked-toast-1440.png",
+    "width": 1440,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [
+      "target-size: .z-30 > .aria-pressed\\:border-primary.aria-pressed\\:text-ink[aria-label=\"Save\"]"
+    ],
+    "other": []
+  },
+  {
+    "file": "ui03-thread-ready-390.png",
+    "width": 390,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-thread-ready-390-dark.png",
+    "width": 390,
+    "theme": "dark",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-thread-ready-1440.png",
+    "width": 1440,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-thread-ready-1440-dark.png",
+    "width": 1440,
+    "theme": "dark",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-thread-report-sheet-390.png",
+    "width": 390,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-thread-report-sheet-1440.png",
+    "width": 1440,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-thread-report-sent-390.png",
+    "width": 390,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-thread-block-dialog-390.png",
+    "width": 390,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-thread-block-dialog-390-dark.png",
+    "width": 390,
+    "theme": "dark",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-thread-block-dialog-1440.png",
+    "width": 1440,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-thread-block-dialog-1440-dark.png",
+    "width": 1440,
+    "theme": "dark",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-thread-blocked-390.png",
+    "width": 390,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-thread-blocked-1440.png",
+    "width": 1440,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-thread-already-blocked-390.png",
+    "width": 390,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-notifications-seeker-390.png",
+    "width": 390,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-notifications-seeker-390-dark.png",
+    "width": 390,
+    "theme": "dark",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-notifications-seeker-1440.png",
+    "width": 1440,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-notifications-seeker-1440-dark.png",
+    "width": 1440,
+    "theme": "dark",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-notifications-seeker-empty-390.png",
+    "width": 390,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-notifications-host-390.png",
+    "width": 390,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-notifications-host-390-dark.png",
+    "width": 390,
+    "theme": "dark",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-notifications-host-1440.png",
+    "width": 1440,
+    "theme": "light",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  },
+  {
+    "file": "ui03-notifications-host-1440-dark.png",
+    "width": 1440,
+    "theme": "dark",
+    "overflowX": false,
+    "serious": [],
+    "other": []
+  }
+]

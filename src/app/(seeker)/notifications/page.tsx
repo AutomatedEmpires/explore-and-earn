@@ -1,25 +1,18 @@
 import type { Metadata } from 'next';
-import { NotificationList } from '@/app/_components/NotificationList';
-import { getDb } from '@/lib/db';
-import { listNotifications } from '@/modules/notifications';
+import { NotificationList } from '@/app/_features/notifications/NotificationList';
 import { seekerPage } from '@/server/shell';
-import { seekerNavIcons } from '@/ui/nav-icons';
 
 export const metadata: Metadata = { title: 'Notifications · Explore&Earn' };
 
-// Notifications already work (Foundation, Task 17), so this page is real, not a placeholder.
+// The seeker's Notifications (issue 224): the W7 NotificationList (#145) under the heading. The
+// list reads GET /api/v1/notifications itself, 20 a page with Load more, and marks rows read.
 export default async function NotificationsPage() {
-  const user = await seekerPage('/notifications', { guests: false });
-  const { items } = await listNotifications(getDb(), user.id, { limit: 50 });
+  await seekerPage('/notifications', { guests: false });
 
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-28 font-extrabold tracking-tight text-ink">Notifications</h1>
-      <NotificationList
-        items={items}
-        icon={seekerNavIcons.notifications}
-        emptyDescription="Updates on your applications, invites and messages will show up here."
-      />
+      <NotificationList />
     </div>
   );
 }

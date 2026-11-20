@@ -4,6 +4,8 @@
 // - 768 (45:7566): one centred column with the action row under the deal;
 // - 1440 (45:7615): a 600 px side panel with its own header and a pinned action bar.
 // An H-2B listing adds "H-2B job terms" after Perks (issue 208; "H-2B fields" 223:20362).
+// A signed-in seeker reports the job, blocks the host or mutes it at the end (issue 224,
+// listing-safety.tsx); a guest keeps the Report link.
 // Every fact renders on the server, so nothing moves once the page has painted.
 import { Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -28,7 +30,13 @@ import {
   type IconComponent,
 } from '@/ui/icons';
 import type { H2bTerm, H2bTerms, ListingView, PhotoRef } from '../_lib/listing-view';
-import { ActionBar, ListingActionsProvider, ShareButton, type ListingActionsInit } from './listing-actions';
+import {
+  ActionBar,
+  ListingActionsProvider,
+  ShareButton,
+  type ListingActionsInit,
+} from './listing-actions';
+import { ListingSafety, type ListingSafetyHost } from './listing-safety';
 
 /**
  * At 390 the bar is fixed on top of the bottom tabs (their border, padding and 56 px row). It is
@@ -202,9 +210,14 @@ export type ListingDetailProps = {
   actions: ListingActionsInit;
   /** The listing's own path, for Share. */
   path: string;
+  /**
+   * The host, for a signed-in seeker: Report opens the ReportSheet, and Block host and the mute
+   * switch show (issue 224). Null or left out for a guest, who keeps the link to /report.
+   */
+  safety?: ListingSafetyHost | null;
 };
 
-export function ListingDetail({ view, actions, path }: ListingDetailProps) {
+export function ListingDetail({ view, actions, path, safety = null }: ListingDetailProps) {
   return (
     <ListingActionsProvider init={actions}>
       {/* 1440: the panel sits over a scrim; a click outside goes back to Seek. */}
@@ -312,15 +325,23 @@ export function ListingDetail({ view, actions, path }: ListingDetailProps) {
               You never pay to get a job. Report any listing that asks you to.
             </p>
 
-            <div className="flex flex-wrap gap-2">
-              <Button asChild variant="ghost">
-                <Link href={`/report?subject=listing:${encodeURIComponent(view.listingId)}`}>
-                  <Flag className="size-5" />
-                  Report
-                </Link>
-              </Button>
-              <ShareButton url={path} />
-            </div>
+            {safety ? (
+              <ListingSafety
+                listingId={view.listingId}
+                host={safety}
+                share={<ShareButton url={path} />}
+              />
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <Button asChild variant="ghost">
+                  <Link href={`/report?subject=listing:${encodeURIComponent(view.listingId)}`}>
+                    <Flag className="size-5" />
+                    Report
+                  </Link>
+                </Button>
+                <ShareButton url={path} />
+              </div>
+            )}
           </div>
         </div>
         <ActionBar

@@ -4,10 +4,13 @@
 // - A wrong slug answers 308 to the canonical address, keeping `source`.
 // - Unknown and removed listings are 404; a closed listing shows its closed view and noindex.
 // - Active listings carry the JobPosting JSON-LD.
+// - A signed-in seeker gets Report in a sheet, Block host and the mute switch (issue 224).
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
+import { getDb } from '@/lib/db';
 import { getEnv } from '@/lib/env';
 import { buildJobPostingJsonLd } from '@/modules/landing';
+import { listMutes } from '@/modules/safety';
 import { seekerPage, signInUrl } from '@/server/shell';
 import { getPageViewer } from '@/server/viewer';
 import { ClosedListing } from '../../_components/closed-listing';
@@ -77,12 +80,22 @@ export default async function JobViewPage({
   }
   if (slug !== slugOf(detail.href, detail.listingId)) permanentRedirect(here);
 
-  const view = buildListingView(detail, await photoAlts(detail));
+  // Only the seeker's own mutes are read; nothing here asks whether the host blocked them.
+  const seekerId = seeker ? viewer.seekerId : null;
+  const [alts, mutes] = await Promise.all([
+    photoAlts(detail),
+    seekerId ? listMutes(getDb(), seekerId) : Promise.resolve([]),
+  ]);
+  const view = buildListingView(detail, alts);
+  const { orgId, name } = detail.host;
   return (
     <>
       <ListingDetail
         view={view}
         path={canonical}
+        safety={
+          seekerId ? { orgId, orgName: name, muted: mutes.some((m) => m.orgId === orgId) } : null
+        }
         actions={{
           listingId: detail.listingId,
           title: detail.title,
