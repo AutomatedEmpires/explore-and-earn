@@ -124,11 +124,11 @@ describe('media privacy handler', () => {
       { table: 'not_migrated_yet', column: 'media_id', array: false },
     ];
 
-    // A post held under a `reports` hold was kept by its own module's step.
-    const held = await withTx(t.db, (tx) => eraseMedia(tx, subject, { holds: ['reports'] }, columns));
-    expect(held).toEqual({
+    // The record that keeps the two files is someone else's shared record.
+    const shared = await withTx(t.db, (tx) => eraseMedia(tx, subject, { holds: [] }, columns));
+    expect(shared).toEqual({
       erased: 1,
-      retained: [{ table: 'media', reason: 'legal_hold', until: null }],
+      retained: [{ table: 'media', reason: 'shared_record', until: null }],
     });
     expect(await statusOf(photo)).toBe('approved');
     expect(await statusOf(inGallery)).toBe('approved');
@@ -136,17 +136,33 @@ describe('media privacy handler', () => {
     expect(await cleanupFor(photo)).toEqual([]);
     expect(await cleanupFor(inGallery)).toEqual([]);
 
-    // With no hold, the record that keeps it is someone else's shared record.
-    const shared = await withTx(t.db, (tx) => eraseMedia(tx, subject, { holds: [] }, columns));
-    expect(shared).toEqual({
-      erased: 0,
-      retained: [{ table: 'media', reason: 'shared_record', until: null }],
-    });
-
     // Once nothing references the files, they go.
     await t.db.execute(sql`delete from app.community_posts`);
     const gone = await withTx(t.db, (tx) => eraseMedia(tx, subject, { holds: [] }, columns));
     expect(gone).toEqual({ erased: 2, retained: [] });
+  });
+
+  it('keeps every file while a hold of any scope is open, referenced or not (issue 232)', async () => {
+    // A held application shows the applicant's photo through its snapshot JSON, which no
+    // registered column names. So under any hold nothing of the person's is deleted.
+    const org = await seedHostOrg(t.db);
+    const avatar = await seedMedia(t.db, org.orgId, 'logo');
+    const rejected = await seedMedia(t.db, org.orgId, 'listing_photo', 'rejected');
+    const subject = { kind: 'user' as const, userId: org.owner.userId };
+
+    for (const scope of ['applications', 'messages', 'reports', 'billing'] as const) {
+      expect(await erase(subject, [scope])).toEqual({
+        erased: 0,
+        retained: [{ table: 'media', reason: 'legal_hold', until: null }],
+      });
+    }
+    expect(await statusOf(avatar)).toBe('approved');
+    expect(await statusOf(rejected)).toBe('rejected');
+    expect(await cleanupFor(avatar)).toEqual([]);
+
+    // Once the hold is released the re-erasure removes them.
+    expect(await erase(subject)).toEqual({ erased: 2, retained: [] });
+    expect(await statusOf(avatar)).toBeNull();
   });
 
   it('exports the approved files a person uploaded, under the names the archive uses', async () => {

@@ -21,13 +21,15 @@ import { seedHostOrg, seedMember, seedOperator, seedSeeker } from '@tests/helper
 import './engine';
 import {
   deactivateRequester,
+  eraseAfterHoldRelease,
   finalizeDeletion,
+  isBeingErased,
   replayErasure,
   requestDeletion,
   runEraseStep,
   type EraseDeps,
 } from './erase';
-import { setLegalHold } from './holds';
+import { releaseLegalHold, setLegalHold } from './holds';
 import './notification-types';
 import type { EraseResult, PrivacyHandler, PrivacySubject } from './types';
 
@@ -568,5 +570,227 @@ describe('replayErasure', () => {
         sql`select 1 from app.privacy_deletion_ledger where user_id = ${org.owner.userId}`,
       ),
     ).toHaveLength(1);
+  });
+});
+
+describe('after a legal hold is released (issue 232)', () => {
+  const reErasures = (requestId: string) =>
+    queryRows(
+      t.db,
+      sql`select 1 from app.outbox
+          where topic = 'privacy.hold_release_erase' and payload->>'requestId' = ${requestId}`,
+    );
+  const heldSteps = (requestId: string) =>
+    queryRows<{ module: string }>(
+      t.db,
+      sql`select module from app.privacy_request_steps
+          where request_id = ${requestId}
+            and retained @> '[{"reason":"legal_hold"}]'::jsonb order by module`,
+    );
+
+  it('erases what the hold kept: the account, the organization and the step records', async () => {
+    const org = await seedHostOrg(t.db);
+    const operator = await seedOperator(t.db, { role: 'owner' });
+    const { holdId } = await setLegalHold(
+      t.db,
+      {
+        userId: org.owner.userId,
+        scope: 'all',
+        reason: 'Litigation hold 2026-232',
+        reviewAt: '2027-01-01',
+        operatorId: operator.userId,
+      },
+      NOW,
+    );
+    const { requestId } = await requestDeletion(t.db, clerk, org.owner.userId, deps());
+    await drain();
+    expect((await request(requestId)).status).toBe('completed');
+    expect((await userRow(org.owner.userId)).email).toBe(org.owner.email);
+    expect((await heldSteps(requestId)).length).toBeGreaterThan(0);
+    expect(await reErasures(requestId)).toHaveLength(0);
+    const emails = stubOutbox.length;
+    const clerkCalls = clerk.calls.length;
+    order = [];
+
+    await releaseLegalHold(t.db, { holdId, operatorId: operator.userId }, NOW);
+    expect(await reErasures(requestId)).toHaveLength(1);
+    // Nothing is erased until the job runs.
+    expect((await userRow(org.owner.userId)).email).toBe(org.owner.email);
+
+    const result = await eraseAfterHoldRelease(t.db, requestId, { registry, now: NOW });
+
+    expect(result).toEqual({ modules: 4 });
+    // Every module again, media last, for the person and the organization only they ran.
+    expect(order).toEqual(['notes:user', 'notes:org', 'media:user', 'media:org']);
+    expect(await userRow(org.owner.userId)).toMatchObject({
+      email: null,
+      clerk_user_id: `deleted:${org.owner.userId}`,
+      erased_clerk_id_sha256: clerkIdHash(org.owner.clerkUserId),
+    });
+    expect(
+      await queryRows(
+        t.db,
+        sql`select 1 from app.org_memberships where user_id = ${org.owner.userId}`,
+      ),
+    ).toHaveLength(0);
+    const [closed] = await queryRows<{ deleted: boolean }>(
+      t.db,
+      sql`select deleted_at is not null as deleted from app.organizations where id = ${org.orgId}`,
+    );
+    expect(closed).toEqual({ deleted: true });
+    // The request's own record no longer says anything is held.
+    expect(await heldSteps(requestId)).toEqual([]);
+    expect((await request(requestId)).status).toBe('completed');
+    // No second email, no Clerk call, one ledger row.
+    expect(stubOutbox).toHaveLength(emails);
+    expect(clerk.calls).toHaveLength(clerkCalls);
+    expect(
+      await queryRows(
+        t.db,
+        sql`select 1 from app.privacy_deletion_ledger where user_id = ${org.owner.userId}`,
+      ),
+    ).toHaveLength(1);
+    const audit = await queryRows(
+      t.db,
+      sql`select 1 from app.audit_events
+          where action = 'privacy.hold_release_erased' and subject_id = ${requestId}`,
+    );
+    expect(audit).toHaveLength(1);
+
+    // Running the job twice is harmless.
+    await eraseAfterHoldRelease(t.db, requestId, { registry, now: NOW });
+    expect(await heldSteps(requestId)).toEqual([]);
+  });
+
+  it('still keeps what another open hold covers', async () => {
+    const seeker = await seedSeeker(t.db);
+    const operator = await seedOperator(t.db, { role: 'owner' });
+    const place = () =>
+      setLegalHold(
+        t.db,
+        {
+          userId: seeker.userId,
+          scope: 'all',
+          reason: 'Two matters, one person',
+          reviewAt: '2027-01-01',
+          operatorId: operator.userId,
+        },
+        NOW,
+      );
+    const first = await place();
+    await place();
+    const { requestId } = await requestDeletion(t.db, clerk, seeker.userId, deps());
+    await drain();
+
+    await releaseLegalHold(t.db, { holdId: first.holdId, operatorId: operator.userId }, NOW);
+    await eraseAfterHoldRelease(t.db, requestId, { registry, now: NOW });
+
+    expect((await userRow(seeker.userId)).email).toBe(seeker.user.email);
+    expect((await heldSteps(requestId)).map((s) => s.module)).toContain('identity');
+  });
+
+  it('does nothing for a deletion that is not finished, or for an export', async () => {
+    const seeker = await seedSeeker(t.db);
+    const { requestId } = await requestDeletion(t.db, clerk, seeker.userId, deps());
+    expect(await eraseAfterHoldRelease(t.db, requestId, { registry, now: NOW })).toEqual({
+      modules: 0,
+    });
+    expect(order).toEqual([]);
+    expect((await userRow(seeker.userId)).email).toBe(seeker.user.email);
+    expect(await eraseAfterHoldRelease(t.db, newId(), { registry, now: NOW })).toEqual({
+      modules: 0,
+    });
+  });
+
+  it('is queued by finalize when the hold was released while the deletion ran', async () => {
+    const seeker = await seedSeeker(t.db);
+    const operator = await seedOperator(t.db, { role: 'owner' });
+    const { holdId } = await setLegalHold(
+      t.db,
+      {
+        userId: seeker.userId,
+        scope: 'reports',
+        reason: 'Fraud inquiry 232',
+        reviewAt: '2027-01-01',
+        operatorId: operator.userId,
+      },
+      NOW,
+    );
+    fakeResult = (module) => ({
+      erased: 0,
+      retained:
+        module === 'notes' ? [{ table: 'reports', reason: 'legal_hold', until: null }] : [],
+    });
+    const { requestId } = await requestDeletion(t.db, clerk, seeker.userId, deps());
+    const firstWave = await queryRows<{ id: string }>(
+      t.db,
+      sql`select id::text from app.privacy_request_steps
+          where request_id = ${requestId} and phase = 'erase' and module <> 'media'`,
+    );
+    for (const step of firstWave) await runEraseStep(t.db, step.id, deps());
+
+    // The release finds the request still running and leaves it to finalize.
+    await releaseLegalHold(t.db, { holdId, operatorId: operator.userId }, NOW);
+    expect(await reErasures(requestId)).toHaveLength(0);
+
+    await drain();
+    expect((await request(requestId)).status).toBe('completed');
+    expect(await reErasures(requestId)).toHaveLength(1);
+  });
+
+  it('is not queued by finalize while the hold that kept the records is still open', async () => {
+    const seeker = await seedSeeker(t.db);
+    const operator = await seedOperator(t.db, { role: 'owner' });
+    await setLegalHold(
+      t.db,
+      {
+        userId: seeker.userId,
+        scope: 'reports',
+        reason: 'Fraud inquiry 233',
+        reviewAt: '2027-01-01',
+        operatorId: operator.userId,
+      },
+      NOW,
+    );
+    fakeResult = (module) => ({
+      erased: 0,
+      retained:
+        module === 'notes' ? [{ table: 'reports', reason: 'legal_hold', until: null }] : [],
+    });
+    const { requestId } = await requestDeletion(t.db, clerk, seeker.userId, deps());
+    await drain();
+    expect((await request(requestId)).status).toBe('completed');
+    expect(await reErasures(requestId)).toHaveLength(0);
+  });
+});
+
+describe('isBeingErased (issue 232)', () => {
+  it('is true while the deletion is open, and the finished one is marked on the account', async () => {
+    const seeker = await seedSeeker(t.db);
+    expect(await isBeingErased(t.db, seeker.userId)).toBe(false);
+    const { requestId } = await requestDeletion(t.db, clerk, seeker.userId, deps());
+    expect(await isBeingErased(t.db, seeker.userId)).toBe(true);
+    await t.db.execute(
+      sql`update app.privacy_requests set status = 'needs_action' where id = ${requestId}`,
+    );
+    expect(await isBeingErased(t.db, seeker.userId)).toBe(true);
+    await t.db.execute(
+      sql`update app.privacy_requests set status = 'running' where id = ${requestId}`,
+    );
+
+    // Finishing it marks the account deleted in the same transaction, which is what the
+    // guards check once the request is no longer open.
+    await drain();
+    expect((await request(requestId)).status).toBe('completed');
+    expect(await isBeingErased(t.db, seeker.userId)).toBe(false);
+    expect((await userRow(seeker.userId)).deleted_at).not.toBeNull();
+
+    const other = await seedSeeker(t.db);
+    const second = await requestDeletion(t.db, clerk, other.userId, deps());
+    await t.db.execute(
+      sql`update app.privacy_requests set status = 'failed' where id = ${second.requestId}`,
+    );
+    expect(await isBeingErased(t.db, other.userId)).toBe(false);
+    expect(await isBeingErased(t.db, 'not-a-uuid')).toBe(false);
   });
 });

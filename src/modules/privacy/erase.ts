@@ -6,6 +6,8 @@
 //
 // A legal hold never blocks a request. Each step reads the subject's holds inside its own
 // transaction and hands them to the module, which keeps the held scopes and reports them.
+// When the hold is released, every module runs again for that request (the
+// `privacy.hold_release_erase` job), so nothing stays once there is no basis to keep it.
 import { and, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db, DbOrTx, Tx } from '@/lib/db';
@@ -23,7 +25,7 @@ import {
   type EmailProvider,
 } from '@/modules/notifications';
 import type { PrivacyRegistry } from '@/server/privacy-registry';
-import { activeHolds } from './holds';
+import { activeHolds, HOLD_RELEASE_ERASE_TOPIC, holdReleasedSince } from './holds';
 import { writeLedgerRow } from './ledger';
 import { getOwnershipSummary } from './ports';
 import {
@@ -43,12 +45,13 @@ import {
   requireRequester,
   resolveRegistry,
   subjectOf,
+  UUID,
   type RequestRow,
   type Retained,
   type StepRow,
 } from './requests';
 import { privacyRequestSteps, privacyRequests } from './schema';
-import { HOLD_SCOPES, type HoldScope, type PrivacySubject } from './types';
+import { HOLD_SCOPES, type EraseResult, type HoldScope, type PrivacySubject } from './types';
 
 /** Runs in the finalize step, after every other module (Plan decision 9). */
 export const FINALIZE_MODULES = ['identity'] as const;
@@ -91,6 +94,31 @@ async function holdsFor(
   const requester = await activeHolds(tx, { kind: 'user', userId: requesterUserId });
   const held = new Set<HoldScope>([...own, ...requester]);
   return HOLD_SCOPES.filter((scope) => held.has(scope));
+}
+
+/**
+ * True while the person's deletion request is open: asked for and neither finished nor failed.
+ * The guards refuse such an account (`requireUser`). A finished deletion needs no check here:
+ * the finalize step marks the account deleted in the transaction that completes the request.
+ * The lookup is the one the open-request index serves, so it is cheap enough for every request.
+ */
+export async function isBeingErased(db: DbOrTx, userId: string): Promise<boolean> {
+  if (!UUID.test(userId)) return false;
+  return (await findOpenRequest(db, userId, 'delete')) !== null;
+}
+
+/** The requester first, then each organization the steps name, once. */
+function subjectsOf(
+  userId: string,
+  steps: readonly Pick<StepRow, 'subjectKind' | 'subjectId'>[],
+): PrivacySubject[] {
+  const orgIds = new Set(
+    steps.filter((step) => step.subjectKind === 'org').map((step) => step.subjectId),
+  );
+  return [
+    { kind: 'user', userId },
+    ...[...orgIds].sort().map((orgId): PrivacySubject => ({ kind: 'org', orgId })),
+  ];
 }
 
 type Blocked = { blocked: true; orgIds: string[]; names: string[] };
@@ -440,6 +468,23 @@ export async function finalizeDeletion(
         payload: { ledgerId: ledger.ledgerId },
         dedupeKey: `privacy_ledger_mirror:${ledger.ledgerId}`,
       });
+
+      // A hold released while this deletion ran: steps that finished under it kept records
+      // there is no longer a basis to keep. The release leaves a running request to this
+      // step (holds.ts), and both lock the request row, so one of them queues the job.
+      const keptUnderHold = [...steps.flatMap(retainedOf), ...result.retained].some(
+        (r) => r.reason === 'legal_hold',
+      );
+      if (
+        keptUnderHold &&
+        (await holdReleasedSince(tx, subjectsOf(current.userId, steps), current.createdAt))
+      ) {
+        await enqueue(tx, {
+          topic: HOLD_RELEASE_ERASE_TOPIC,
+          payload: { requestId },
+          dedupeKey: `privacy_hold_release_erase:${requestId}`,
+        });
+      }
     });
     request = await loadRequest(db, requestId);
     if (!request || request.status !== 'completed') return;
@@ -504,41 +549,135 @@ export async function finalizeDeletion(
     .where(and(eq(privacyRequests.id, requestId), isNotNull(privacyRequests.blockedReason)));
 }
 
+/** Called in the eraser's transaction with what one module did for one subject. */
+type AfterErase = (
+  tx: Tx,
+  module: string,
+  subject: PrivacySubject,
+  result: EraseResult,
+) => Promise<void>;
+
 /**
- * Erases the person again after a restore, straight through and in the same order: every
- * module but media and identity for the person and the organizations only they belong to, then
- * media, then identity, then the ledger row if the restored database lacks it. It calls no
- * Clerk API, sends no email and writes nothing to the mirror.
+ * Runs every module's eraser straight through, in the order a deletion uses: every module but
+ * media and identity for each subject, then media, then identity for the person. Each call has
+ * its own transaction and reads the subject's holds inside it. Returns the number of modules.
  */
-export async function replayErasure(
+async function eraseInOrder(
   db: Db,
-  i: { userId: string; requestId: string },
-  deps: Pick<EraseDeps, 'registry' | 'now'> = {},
-): Promise<{ modules: number }> {
+  i: { userId: string; requestId: string; subjects: readonly PrivacySubject[] },
+  deps: Pick<EraseDeps, 'registry' | 'now'>,
+  after?: AfterErase,
+): Promise<number> {
   const registry = await resolveRegistry(deps.registry);
   const now = deps.now ?? new Date();
   const user: PrivacySubject = { kind: 'user', userId: i.userId };
-  const orgs = (await getOwnershipSummary(db, i.userId))
-    .filter((org) => org.role === 'owner' && org.otherMembers === 0)
-    .map((org): PrivacySubject => ({ kind: 'org', orgId: org.orgId }));
-  const subjects = [user, ...orgs];
 
   const run = (module: string, subject: PrivacySubject) =>
     db.transaction(async (tx) => {
       await allowErase(tx);
       const holds = await holdsFor(tx, subject, i.userId);
-      await registry.handlerFor(module).erase(tx, subject, { requestId: i.requestId, now, holds });
+      const result = await registry
+        .handlerFor(module)
+        .erase(tx, subject, { requestId: i.requestId, now, holds });
+      await after?.(tx, module, subject, result);
     });
 
   const modules = registry.handlers.map((handler) => handler.module);
   const first = modules.filter((m) => !isLastWave(m) && !isFinalizeModule(m));
   const last = modules.filter((m) => isLastWave(m));
   for (const wave of [first, last]) {
-    for (const mod of wave) for (const subject of subjects) await run(mod, subject);
+    for (const mod of wave) for (const subject of i.subjects) await run(mod, subject);
   }
   for (const mod of FINALIZE_MODULES) await run(mod, user);
-  await writeLedgerRow(db, { userId: i.userId, requestId: i.requestId, erasedAt: now });
-  return { modules: first.length + last.length + FINALIZE_MODULES.length };
+  return first.length + last.length + FINALIZE_MODULES.length;
+}
+
+/**
+ * Erases the person again after a restore, straight through and in the same order: every
+ * module but media and identity for the person and the organizations only they belong to, then
+ * media, then identity, then the ledger row if the restored database lacks it. It calls no
+ * Clerk API, sends no email and writes nothing to the mirror. The holds in the database are
+ * respected, so the restore puts the mirrored holds back first (replay-deletions.ts).
+ */
+export async function replayErasure(
+  db: Db,
+  i: { userId: string; requestId: string },
+  deps: Pick<EraseDeps, 'registry' | 'now'> = {},
+): Promise<{ modules: number }> {
+  const orgs = (await getOwnershipSummary(db, i.userId))
+    .filter((org) => org.role === 'owner' && org.otherMembers === 0)
+    .map((org): PrivacySubject => ({ kind: 'org', orgId: org.orgId }));
+  const subjects: PrivacySubject[] = [{ kind: 'user', userId: i.userId }, ...orgs];
+  const modules = await eraseInOrder(db, { ...i, subjects }, deps);
+  await writeLedgerRow(db, {
+    userId: i.userId,
+    requestId: i.requestId,
+    erasedAt: deps.now ?? new Date(),
+  });
+  return { modules };
+}
+
+/**
+ * The `privacy.hold_release_erase` job (lead decision 2026-11-19): a legal hold was released,
+ * so the finished deletion that kept records under it erases again. Every module runs, in
+ * order, for the person and each organization the request's steps name (the memberships that
+ * showed which organizations were theirs may be gone by now). A hold that is still open is
+ * still respected. Each step's record is brought up to date, so the request no longer reports
+ * records as held once they are gone. No Clerk call, no email, no new ledger row.
+ *
+ * A request that is not a finished deletion changes nothing. Safe to repeat.
+ */
+export async function eraseAfterHoldRelease(
+  db: Db,
+  requestId: string,
+  deps: Pick<EraseDeps, 'registry' | 'now'> = {},
+): Promise<{ modules: number }> {
+  const request = await loadRequest(db, requestId);
+  if (!request || request.kind !== 'delete' || request.status !== 'completed') {
+    return { modules: 0 };
+  }
+  const steps = await db
+    .select({
+      subjectKind: privacyRequestSteps.subjectKind,
+      subjectId: privacyRequestSteps.subjectId,
+    })
+    .from(privacyRequestSteps)
+    .where(eq(privacyRequestSteps.requestId, request.id));
+  const subjects = subjectsOf(request.userId, steps);
+
+  const modules = await eraseInOrder(
+    db,
+    { userId: request.userId, requestId: request.id, subjects },
+    deps,
+    async (tx, module, subject, result) => {
+      await tx
+        .update(privacyRequestSteps)
+        .set({
+          erased: sql`coalesce(${privacyRequestSteps.erased}, 0) + ${result.erased}`,
+          retained: sql`${JSON.stringify(result.retained)}::jsonb`,
+        })
+        .where(
+          and(
+            eq(privacyRequestSteps.requestId, request.id),
+            eq(privacyRequestSteps.module, module),
+            eq(privacyRequestSteps.subjectKind, subject.kind),
+            eq(
+              privacyRequestSteps.subjectId,
+              subject.kind === 'user' ? subject.userId : subject.orgId,
+            ),
+          ),
+        );
+    },
+  );
+  await record(db, {
+    actorType: 'system',
+    actorId: null,
+    action: 'privacy.hold_release_erased',
+    subjectType: 'privacy_request',
+    subjectId: request.id,
+    data: { modules },
+  });
+  return { modules };
 }
 
 const stepPayload = z.object({ stepId: z.uuid() });

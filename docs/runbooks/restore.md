@@ -9,10 +9,11 @@ How to prove that a backup can be restored (the drill), and what to do in a real
 
 ## Why a restore needs more than the dump
 
-A restored database is as old as its backup. Three things have moved on since, and each has its own step:
+A restored database is as old as its backup. Four things have moved on since, and each has its own step:
 
 | What moved on | What fixes it |
 |---|---|
+| Legal holds placed or released after the backup are missing from the database | `pnpm ops:replay-deletions` puts them back first, from the hold mirror, so a replayed deletion keeps what a hold was keeping |
 | People who asked to be erased after the backup are back in the database | `pnpm ops:replay-deletions` erases them again, from the deletion ledger mirror |
 | Sign-ups, profile changes and team changes made in Clerk | `pnpm ops:resync-clerk` re-pulls users, organizations and memberships |
 | Payments and subscription changes in Stripe | SP2's `reconcileAll` |
@@ -95,12 +96,14 @@ Both are **dry runs by default**. Without `--apply` they change nothing and prin
 
 | Command | Dry run prints | With `--apply` |
 |---|---|---|
-| `pnpm ops:replay-deletions --since <ISO time>` | `pending`: erasures it would replay. `skipped`: erasures the database already has | Erases those users in `DATABASE_URL`. Cannot be undone. Exits 1 if any erasure failed, and lists the ledger IDs |
+| `pnpm ops:replay-deletions --since <ISO time>` | `holdsPending`: legal holds it would put back or release. `pending`: erasures it would replay. `skipped`: erasures the database already has | Puts the mirrored legal holds back (`holdsApplied`), then erases those users in `DATABASE_URL`. Cannot be undone. Exits 1 if any erasure failed, and lists the ledger IDs |
 | `pnpm ops:resync-clerk` | How many users, organizations and memberships Clerk holds | Updates `DATABASE_URL` from Clerk. Reads Clerk and never writes to it. An erased user is never re-created |
 
 `ops:replay-deletions` needs `DATABASE_URL`, `BACKUP_SUPABASE_URL` and `BACKUP_SUPABASE_SERVICE_ROLE_KEY`. `ops:resync-clerk` needs `DATABASE_URL` and `CLERK_SECRET_KEY`. Both are safe to run twice: a second run finds nothing left to do.
 
 `--since` is the restore point: the `takenAt` in the dump's `manifest.json`, or for a Supabase restore the time of the backup you restored. When unsure, use an earlier time. Replaying an erasure the database already has is skipped, and missing one leaves a deleted person's data in place.
+
+**Legal holds come first.** Every hold is copied to the backup project when it is set and again when it is released (`ledger` bucket, `holds/`), without its reason. Before it replays anything, `ops:replay-deletions` reads those copies and brings the database in line: a hold placed after the backup is put back, and a hold released after the backup is released, which queues the erasure of what it kept. If the copies cannot be read or a hold cannot be written, the command stops and replays **nothing**. Fix the cause and run it again; never replay deletions without the holds. A hold that was put back shows the note "Put back from the hold mirror after a database restore" as its reason: the real reason is in the legal record that asked for the hold. If the operator who placed it is not in the restored database yet, the hold is recorded under an Owner.
 
 The command starts **one hour before** `--since`, and its summary shows that time as `from`. Two clocks are involved: the erasing job stamps a ledger entry with its own time just before the erasure commits, and `takenAt` is read on the backup runner just before the snapshot begins. An erasure that commits just after the snapshot is missing from the dump but can carry a ledger time a little before `takenAt`. Without the hour it would be skipped, and the restore would bring that person back for good. The hour costs nothing: entries the restored database already reflects are skipped.
 
@@ -109,7 +112,7 @@ The command starts **one hour before** `--since`, and its summary shows that tim
 Use this order. It is the order in SP8 spec 8.11:
 
 1. **Restore.** Either restore the newest dump from `ee-backup` into a new Supabase project, or use Supabase's "restore to new project". Prefer a new project over restoring in place, so the damaged database stays available for investigation.
-2. **`pnpm ops:replay-deletions --since <restore point> --apply`.** Run the dry run first and read the counts. Do not open the app to users before this has finished with no failures.
+2. **`pnpm ops:replay-deletions --since <restore point> --apply`.** Run the dry run first and read the counts, `holdsPending` included: each is a legal hold the restored database lost. With `--apply` the holds are put back before any deletion is replayed. Do not open the app to users before this has finished with no failures.
 3. **`pnpm ops:resync-clerk --apply`.** Re-pulls users, organizations and memberships through `handleClerkEvent`.
 4. **SP2 `reconcileAll`.** Brings subscriptions and payments back in line with Stripe.
 5. **SP3 `rebuildSearchProjection`.** Rebuilds search from the restored listings.

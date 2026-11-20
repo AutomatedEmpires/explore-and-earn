@@ -5,7 +5,7 @@
 //   check accepts only under a test runner: no browser can upload to it).
 // The environment check refuses `local` and `stub` when APP_ENV=prod.
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
 import { getEnv } from '@/lib/env';
@@ -26,6 +26,11 @@ export interface Storage {
   copy(from: ObjectRef, to: ObjectRef): Promise<void>;
   /** Deletes the object; a missing object is not an error. */
   remove(bucket: Bucket, path: string): Promise<void>;
+  /**
+   * Every object path under the folder `prefix` (`<prefix>/...`), at any depth, sorted. A
+   * folder that does not exist lists nothing.
+   */
+  listUnder(bucket: Bucket, prefix: string): Promise<string[]>;
   /** A URL that reads a private object for `expiresSec` seconds. */
   signedUrl(bucket: Bucket, path: string, expiresSec: number): Promise<string>;
   /** The permanent URL of an object in the public bucket. */
@@ -38,6 +43,9 @@ export class ObjectNotFoundError extends Error {
     this.name = 'ObjectNotFoundError';
   }
 }
+
+/** How many entries one Supabase list call returns at most. */
+const LIST_PAGE = 1000;
 
 /** Signed upload URLs last as long as Supabase's (2 hours). */
 const UPLOAD_URL_TTL_SEC = 2 * 60 * 60;
@@ -95,6 +103,14 @@ export function memoryStorage(): MemoryStorage {
     },
     async remove(bucket, p) {
       objects.delete(key(bucket, p));
+    },
+    async listUnder(bucket, prefix) {
+      assertSafe(bucket, prefix);
+      const folder = `${key(bucket, prefix)}/`;
+      return [...objects.keys()]
+        .filter((k) => k.startsWith(folder))
+        .map((k) => k.slice(bucket.length + 1))
+        .sort();
     },
     async signedUrl(bucket, p, expiresSec) {
       if (!objects.has(key(bucket, p))) throw new ObjectNotFoundError(bucket, p);
@@ -182,6 +198,8 @@ export function localStorage(dir: string, opts: LocalStorageOptions = {}): Stora
   const urlOf = (bucket: Bucket, p: string) => `${baseUrl()}${LOCAL_ROUTE}/${bucket}/${p}`;
   const isMissing = (err: unknown) =>
     typeof err === 'object' && err !== null && 'code' in err && err.code === 'ENOENT';
+  const isNotAFolder = (err: unknown) =>
+    typeof err === 'object' && err !== null && 'code' in err && err.code === 'ENOTDIR';
 
   return {
     async signedUploadUrl(bucket, p) {
@@ -213,6 +231,21 @@ export function localStorage(dir: string, opts: LocalStorageOptions = {}): Stora
     },
     async remove(bucket, p) {
       await rm(fileOf(bucket, p), { force: true });
+    },
+    async listUnder(bucket, prefix) {
+      const folder = fileOf(bucket, prefix);
+      let entries;
+      try {
+        entries = await readdir(folder, { recursive: true, withFileTypes: true });
+      } catch (err) {
+        if (isMissing(err) || isNotAFolder(err)) return [];
+        throw err;
+      }
+      return entries
+        .filter((entry) => entry.isFile())
+        .map((entry) => path.relative(folder, path.join(entry.parentPath, entry.name)))
+        .map((relative) => `${prefix}/${relative.split(path.sep).join('/')}`)
+        .sort();
     },
     async signedUrl(bucket, p, expiresSec) {
       const token = signLocalToken(secret(), 'read', bucket, p, nowSec() + expiresSec);
@@ -302,6 +335,28 @@ export function supabaseStorage(opts: SupabaseStorageOptions = {}): Storage {
       if (error) fail('copy', from.bucket, from.path, error);
     },
     remove,
+    async listUnder(bucket, prefix) {
+      assertSafe(bucket, prefix);
+      const found: string[] = [];
+      const folders = [prefix];
+      for (let folder = folders.pop(); folder !== undefined; folder = folders.pop()) {
+        for (let offset = 0; ; offset += LIST_PAGE) {
+          const { data, error } = await bucketApi(bucket).list(folder, {
+            limit: LIST_PAGE,
+            offset,
+            sortBy: { column: 'name', order: 'asc' },
+          });
+          if (error) fail('list', bucket, folder, error);
+          for (const entry of data) {
+            // Supabase lists one level at a time: a folder is an entry with no id.
+            if (entry.id) found.push(`${folder}/${entry.name}`);
+            else folders.push(`${folder}/${entry.name}`);
+          }
+          if (data.length < LIST_PAGE) break;
+        }
+      }
+      return found.sort();
+    },
     async signedUrl(bucket, p, expiresSec) {
       const { data, error } = await bucketApi(bucket).createSignedUrl(p, expiresSec);
       if (error) fail('signedUrl', bucket, p, error);

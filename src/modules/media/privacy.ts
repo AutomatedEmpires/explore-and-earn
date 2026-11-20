@@ -2,6 +2,11 @@
 // see which files the records those modules kept still use. A file is deleted, with every
 // stored copy, unless it is child-safety evidence (`blocked`) or a kept record still points at
 // it through a registered media column.
+//
+// While the person or organization has a legal hold of any scope, nothing is deleted (lead
+// decision 2026-11-18, the same rule as `media.orphans`). A held record can show a file that
+// no registered column names: a held application keeps its photo ids inside its snapshot
+// JSON. Releasing the hold queues the erasure again, and that run removes the files.
 import { asc, eq, inArray, sql } from 'drizzle-orm';
 import { queryRows, type DbOrTx } from '@/lib/db';
 import { enqueue } from '@/modules/jobs';
@@ -85,7 +90,7 @@ export async function eraseMedia(
 ): Promise<EraseResult> {
   const rows = await tx.select().from(media).where(ownedBy(s)).orderBy(asc(media.id)).for('update');
   if (rows.length === 0) return { erased: 0, retained: [] };
-  if (ctx.holds.includes('all')) {
+  if (ctx.holds.length > 0) {
     return { erased: 0, retained: [{ table: 'media', reason: 'legal_hold', until: null }] };
   }
 
@@ -114,12 +119,8 @@ export async function eraseMedia(
   const retained: EraseResult['retained'] = [];
   if (blocked.length > 0) retained.push({ table: 'media', reason: 'safety', until: null });
   if (referenced.size > 0) {
-    // A kept record uses the file: held when a hold kept it, else shared with someone else.
-    retained.push({
-      table: 'media',
-      reason: ctx.holds.length > 0 ? 'legal_hold' : 'shared_record',
-      until: null,
-    });
+    // A record someone else keeps still uses the file.
+    retained.push({ table: 'media', reason: 'shared_record', until: null });
   }
   return { erased: doomed.length, retained };
 }

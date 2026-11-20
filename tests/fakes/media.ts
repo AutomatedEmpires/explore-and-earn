@@ -38,6 +38,13 @@ function memoryStore(): Storage {
     async remove(bucket, p) {
       objects.delete(key(bucket, p));
     },
+    async listUnder(bucket, prefix) {
+      const folder = `${key(bucket, prefix)}/`;
+      return [...objects.keys()]
+        .filter((k) => k.startsWith(folder))
+        .map((k) => k.slice(bucket.length + 1))
+        .sort();
+    },
     async signedUrl(bucket, p, expiresSec) {
       if (!objects.has(key(bucket, p))) throw missing(bucket, p);
       return `memory://${bucket}/${p}?expiresIn=${expiresSec}`;

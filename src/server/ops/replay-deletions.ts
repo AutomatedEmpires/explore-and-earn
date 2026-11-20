@@ -9,6 +9,11 @@
 // little before the restore point. Starting early is safe: a user the restored database already
 // shows as erased is skipped, so the only cost is a few entries read twice.
 //
+// Legal holds come first (lead decision 2026-11-19). A hold placed after the backup is missing
+// from the restored database, and a replay would erase what it was keeping. The engine mirrors
+// every hold beside the ledger, so the holds are put back before any erasure is replayed. If
+// they cannot be read or written, the run stops there and replays nothing.
+//
 // It is a dry run unless `apply` is true: by default it only reports what it would replay.
 import type { Db } from '@/lib/db';
 import { logger } from '@/lib/logger';
@@ -24,13 +29,40 @@ export type LedgerEntry = {
   erasedAt: string;
 };
 
+/** One mirrored legal hold: ids, a scope and times. The reason is never mirrored. */
+export type HoldEntry = {
+  holdId: string;
+  userId: string | null;
+  orgId: string | null;
+  scope: 'all' | 'applications' | 'messages' | 'reports' | 'billing';
+  /** A day, `YYYY-MM-DD`. */
+  reviewAt: string;
+  createdBy: string;
+  /** ISO time. */
+  createdAt: string;
+  releasedAt: string | null;
+  releasedBy: string | null;
+};
+
 export interface LedgerMirror {
   put(entry: LedgerEntry): Promise<void>;
   listSince(since: Date): Promise<LedgerEntry[]>;
+  putHold(entry: HoldEntry): Promise<void>;
+  listHolds(): Promise<HoldEntry[]>;
 }
 
 /** Erases one user again: the engine's `replayErasure` (no Clerk call, email or mirror write). */
 export type ReplayErasure = (db: Db, i: { userId: string; requestId: string }) => Promise<unknown>;
+
+/**
+ * Brings one hold in the database in line with its mirrored copy: the engine's
+ * `applyMirroredHold`. With `apply: false` it only says what would change.
+ */
+export type ApplyHold = (
+  db: Db,
+  hold: HoldEntry,
+  o: { apply: boolean },
+) => Promise<'added' | 'released' | 'unchanged'>;
 
 export type ReplayResult = {
   /** Erasures replayed in this run. Always 0 in a dry run. */
@@ -41,6 +73,11 @@ export type ReplayResult = {
   pending: number;
   /** Ledger IDs whose replay threw. The run goes on to the next entry. */
   failed: string[];
+  /**
+   * Mirrored legal holds the database lacked or showed unreleased: `applied` with `apply`,
+   * `pending` in a dry run.
+   */
+  holds: { applied: number; pending: number };
 };
 
 /** The privacy engine's function, looked up when first needed. */
@@ -51,6 +88,16 @@ async function engineReplay(): Promise<ReplayErasure> {
     throw new Error('not implemented: replayErasure (W1)');
   }
   return replay as ReplayErasure;
+}
+
+/** The privacy engine's function, looked up when first needed. */
+async function engineApplyHold(): Promise<ApplyHold> {
+  const privacy: Record<string, unknown> = await import('@/modules/privacy');
+  const apply = privacy.applyMirroredHold;
+  if (typeof apply !== 'function') {
+    throw new Error('not implemented: applyMirroredHold');
+  }
+  return apply as ApplyHold;
 }
 
 /** The engine's mirror of the backup project's `ledger` bucket. */
@@ -87,12 +134,15 @@ export function replayFrom(restorePoint: Date): Date {
  * is the restore point: a backup manifest's `takenAt`. One failing entry does not stop the
  * rest: its ledger ID is returned in `failed`, and the caller must treat a non-empty `failed`
  * as an unfinished restore.
+ *
+ * Before any erasure, every mirrored legal hold is put back (see the header). A hold that
+ * cannot be listed or written throws, and nothing is replayed.
  */
 export async function replayDeletions(
   db: Db,
   mirror: LedgerMirror,
   since: Date,
-  o: { apply?: boolean; replay?: ReplayErasure } = {},
+  o: { apply?: boolean; replay?: ReplayErasure; applyHold?: ApplyHold } = {},
 ): Promise<ReplayResult> {
   if (Number.isNaN(since.getTime())) throw new Error('replayDeletions: `since` is not a date');
   const from = replayFrom(since);
@@ -102,7 +152,27 @@ export async function replayDeletions(
     .filter((entry) => new Date(entry.erasedAt).getTime() >= fromMs)
     .sort((a, b) => a.erasedAt.localeCompare(b.erasedAt));
 
-  const result: ReplayResult = { replayed: 0, skipped: 0, pending: 0, failed: [] };
+  const result: ReplayResult = {
+    replayed: 0,
+    skipped: 0,
+    pending: 0,
+    failed: [],
+    holds: { applied: 0, pending: 0 },
+  };
+
+  // Holds first: the replay below reads them from this database. Any failure here throws,
+  // so no erasure runs without the holds that should limit it.
+  const mirroredHolds = await mirror.listHolds();
+  if (mirroredHolds.length > 0) {
+    const applyHold = o.applyHold ?? (await engineApplyHold());
+    for (const hold of mirroredHolds) {
+      const outcome = await applyHold(db, hold, { apply: o.apply === true });
+      if (outcome === 'unchanged') continue;
+      if (o.apply) result.holds.applied += 1;
+      else result.holds.pending += 1;
+    }
+  }
+
   let replay = o.replay;
 
   for (const entry of entries) {

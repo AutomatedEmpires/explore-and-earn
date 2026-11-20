@@ -2,11 +2,16 @@
 // private `privacy-exports` bucket; the finalize step zips the parts, deletes them and tells the
 // person. A download is a fresh 300-second signed URL each time, and stops after the TTL.
 //
+// An export can be running when the person deletes their account. A step and the finalize
+// step therefore lock the request row from their status check to their last write, and the
+// privacy eraser takes the same lock before it stops the request and removes its files. So a
+// write either lands before the eraser cleans up, or never happens.
+//
 // Export contents are personal data. They are written to storage and nowhere else: never to a
 // log, an audit row, an outbox payload or an error message.
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import type { Db } from '@/lib/db';
+import type { Db, Tx } from '@/lib/db';
 import { conflict, gone, notFound, rateLimited } from '@/lib/errors';
 import { getEnv } from '@/lib/env';
 import { newId } from '@/lib/ids';
@@ -27,11 +32,13 @@ import {
   isUniqueViolation,
   loadRequest,
   loadStep,
+  OPEN_STATUSES,
   privacySettingsUrl,
   requireRequester,
   resolveRegistry,
   subjectOf,
   UUID,
+  type RequestRow,
 } from './requests';
 import { privacyRequestSteps, privacyRequests } from './schema';
 import { buildZip, textBytes } from './zip';
@@ -89,25 +96,35 @@ async function readPart(
   return storedPart.parse(JSON.parse(new TextDecoder().decode(bytes)));
 }
 
-/** Deletes every part of a request. Safe to repeat: a part that is gone is skipped. */
-export async function removeExportParts(
-  storage: Storage,
-  requestId: string,
-  modules: readonly string[],
-): Promise<void> {
-  for (const mod of modules) {
-    const part = await readPart(storage, requestId, mod);
-    if (!part) continue;
-    for (const name of part.files) {
-      await storage.remove(BUCKET, partFilePath(requestId, mod, name));
-    }
-    await storage.remove(BUCKET, partPath(requestId, mod));
+/**
+ * Deletes the parts of a request and the files copied for them: everything under
+ * `<requestId>/`. It lists storage instead of reading the part files, so a file a step copied
+ * before it wrote its part is found too. Safe to repeat.
+ */
+export async function removeExportParts(storage: Storage, requestId: string): Promise<void> {
+  for (const path of await storage.listUnder(BUCKET, requestId)) {
+    await storage.remove(BUCKET, path);
   }
 }
 
-/** Deletes a finished export's archive. A missing object is not an error. */
-export async function removeExportArchive(storage: Storage, exportPath: string): Promise<void> {
-  await storage.remove(BUCKET, exportPath);
+/** Deletes everything a request ever wrote: its parts and its archive. Safe to repeat. */
+export async function removeExportFiles(storage: Storage, requestId: string): Promise<void> {
+  await removeExportParts(storage, requestId);
+  await storage.remove(BUCKET, zipPath(requestId));
+}
+
+const isOpen = (status: RequestRow['status']) =>
+  (OPEN_STATUSES as readonly string[]).includes(status);
+
+/** The request, with its row locked until the transaction ends (see the header). */
+async function lockRequest(tx: Tx, requestId: string): Promise<RequestRow | null> {
+  if (!UUID.test(requestId)) return null;
+  const [row] = await tx
+    .select()
+    .from(privacyRequests)
+    .where(eq(privacyRequests.id, requestId))
+    .for('update');
+  return row ?? null;
 }
 
 /**
@@ -187,29 +204,36 @@ export async function requestExport(
 }
 
 /**
- * Runs one module's exporter and stores its part. A step that is done, or whose request is no
- * longer running (the account was deleted meanwhile), changes nothing. When the last export
- * step finishes, the finalize job is queued.
+ * Runs one module's exporter and stores its part, with the request row locked from the status
+ * check to the last write. A step that is done, or whose request is no longer open (the account
+ * was deleted meanwhile), changes nothing. When the last export step finishes, the finalize job
+ * is queued.
  */
 export async function runExportStep(db: Db, stepId: string, deps: ExportDeps = {}): Promise<void> {
   const step = await loadStep(db, stepId);
   if (!step || step.phase !== 'export') return;
-  const request = await loadRequest(db, step.requestId);
-  if (!request || request.kind !== 'export' || request.status === 'completed') return;
-  if (request.status === 'failed') return;
+  const storage = deps.storage ?? getStorage();
+  const registry = await resolveRegistry(deps.registry);
 
-  if (step.status !== 'done') {
-    const storage = deps.storage ?? getStorage();
-    const registry = await resolveRegistry(deps.registry);
-    try {
-      const part = await registry.handlerFor(step.module).exportData(db, subjectOf(step));
+  let open: boolean;
+  try {
+    open = await db.transaction(async (tx) => {
+      const request = await lockRequest(tx, step.requestId);
+      if (!request || request.kind !== 'export' || !isOpen(request.status)) return false;
+      const [current] = await tx
+        .select({ status: privacyRequestSteps.status })
+        .from(privacyRequestSteps)
+        .where(eq(privacyRequestSteps.id, step.id));
+      if (!current || current.status === 'done') return true;
+
+      const part = await registry.handlerFor(step.module).exportData(tx, subjectOf(step));
       const stored: StoredPart = { records: part.records, missingFiles: [], files: [] };
       const taken = new Set<string>();
       for (const file of part.files) {
         const name = safeFileName(file.name);
         if (taken.has(name)) continue;
         taken.add(name);
-        const media = await readMediaForExport(db, storage, file.mediaId);
+        const media = await readMediaForExport(tx, storage, file.mediaId);
         if (!media) {
           stored.missingFiles.push(`files/${step.module}/${name}`);
           continue;
@@ -228,25 +252,27 @@ export async function runExportStep(db: Db, stepId: string, deps: ExportDeps = {
         textBytes(JSON.stringify(stored)),
         'application/json',
       );
-      await db
+      await tx
         .update(privacyRequestSteps)
         .set({ status: 'done', lastError: null })
-        .where(and(eq(privacyRequestSteps.id, step.id), ne(privacyRequestSteps.status, 'done')));
-    } catch (err) {
-      await db
-        .update(privacyRequestSteps)
-        .set({ lastError: clipError(safeErrorMessage(err)) })
         .where(eq(privacyRequestSteps.id, step.id));
-      throw err;
-    }
+      return true;
+    });
+  } catch (err) {
+    await db
+      .update(privacyRequestSteps)
+      .set({ lastError: clipError(safeErrorMessage(err)) })
+      .where(and(eq(privacyRequestSteps.id, step.id), ne(privacyRequestSteps.status, 'done')));
+    throw err;
   }
+  if (!open) return;
 
   const [left] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(privacyRequestSteps)
     .where(
       and(
-        eq(privacyRequestSteps.requestId, request.id),
+        eq(privacyRequestSteps.requestId, step.requestId),
         eq(privacyRequestSteps.phase, 'export'),
         ne(privacyRequestSteps.status, 'done'),
       ),
@@ -254,8 +280,8 @@ export async function runExportStep(db: Db, stepId: string, deps: ExportDeps = {
   if ((left?.n ?? 0) === 0) {
     await enqueue(db, {
       topic: EXPORT_FINALIZE_TOPIC,
-      payload: { requestId: request.id },
-      dedupeKey: `privacy_export_finalize:${request.id}`,
+      payload: { requestId: step.requestId },
+      dedupeKey: `privacy_export_finalize:${step.requestId}`,
     });
   }
 }
@@ -282,115 +308,131 @@ function readme(i: {
 
 /**
  * Zips the parts into `privacy-exports/<requestId>.zip`, completes the request and notifies the
- * person once. A retry after the request completed only clears leftover parts.
+ * person once, with the request row locked from the status check to the update. A retry after
+ * the request completed only clears leftover parts; a request the eraser stopped loses
+ * everything it wrote, the archive included.
  */
 export async function finalizeExport(
   db: Db,
   requestId: string,
   deps: ExportDeps = {},
 ): Promise<void> {
-  const request = await loadRequest(db, requestId);
-  if (!request || request.kind !== 'export') return;
   const storage = deps.storage ?? getStorage();
-  const steps = await db
-    .select({ module: privacyRequestSteps.module, status: privacyRequestSteps.status })
-    .from(privacyRequestSteps)
-    .where(
-      and(eq(privacyRequestSteps.requestId, request.id), eq(privacyRequestSteps.phase, 'export')),
-    );
-  const modules = steps.map((step) => step.module).sort();
+  const outcome = await db.transaction(async (tx): Promise<'unknown' | 'stopped' | 'completed'> => {
+    const request = await lockRequest(tx, requestId);
+    if (!request || request.kind !== 'export') return 'unknown';
+    if (request.status === 'completed') return 'completed';
+    if (!isOpen(request.status)) return 'stopped';
 
-  if (request.status === 'completed' || request.status === 'failed') {
-    await removeExportParts(storage, request.id, modules);
-    return;
-  }
-  if (steps.some((step) => step.status !== 'done')) {
-    throw new Error('privacy.export_finalize: export steps are not finished');
-  }
-
-  const now = deps.now ?? new Date();
-  const ttlDays = await getSetting(db, 'privacy.export_ttl_days');
-  const expiresAt = new Date(now.getTime() + ttlDays * DAY_MS);
-  const entries = new Map<string, Uint8Array>();
-  const missing: string[] = [];
-  const included: string[] = [];
-  for (const mod of modules) {
-    const part = await readPart(storage, request.id, mod);
-    if (!part) throw new Error(`privacy.export_finalize: the ${mod} part is missing`);
-    missing.push(...part.missingFiles);
-    if (Object.values(part.records).some((rows) => rows.length > 0)) {
-      entries.set(`${mod}.json`, textBytes(JSON.stringify(part.records, null, 2)));
-      included.push(mod);
-    }
-    for (const name of part.files) {
-      const bytes = await readOrNull(storage, partFilePath(request.id, mod, name));
-      if (bytes) entries.set(`files/${mod}/${name}`, bytes);
-      else missing.push(`files/${mod}/${name}`);
-    }
-  }
-  const archive = buildZip(
-    new Map([
-      [
-        'README.txt',
-        textBytes(
-          readme({
-            createdAt: now,
-            userId: request.userId,
-            missing: missing.sort(),
-            expiresAt,
-            appUrl: getEnv().APP_URL.replace(/\/+$/, ''),
-          }),
-        ),
-      ],
-      ...entries,
-    ]),
-  );
-  await storage.write(BUCKET, zipPath(request.id), archive, 'application/zip');
-
-  await db.transaction(async (tx) => {
-    const completed = await tx
-      .update(privacyRequests)
-      .set({
-        status: 'completed',
-        completedAt: now,
-        exportPath: zipPath(request.id),
-        exportSizeBytes: archive.byteLength,
-        exportExpiresAt: expiresAt,
-        blockedReason: null,
-      })
-      .where(
-        and(
-          eq(privacyRequests.id, request.id),
-          inArray(privacyRequests.status, ['running', 'needs_action']),
-        ),
-      )
-      .returning({ id: privacyRequests.id });
-    if (completed.length === 0) return;
-    await tx
-      .update(privacyRequestSteps)
-      .set({ status: 'done', lastError: null })
+    const steps = await tx
+      .select({ module: privacyRequestSteps.module, status: privacyRequestSteps.status })
+      .from(privacyRequestSteps)
       .where(
         and(
           eq(privacyRequestSteps.requestId, request.id),
-          eq(privacyRequestSteps.phase, 'finalize'),
+          eq(privacyRequestSteps.phase, 'export'),
         ),
       );
-    const user = await findUserById(tx, request.userId);
-    await notify(tx, request.userId, 'privacy.export_ready', {
-      ttlDays,
-      url: privacySettingsUrl(user?.accountType ?? null),
-    });
-    await record(tx, {
-      actorType: 'system',
-      actorId: null,
-      action: 'privacy.export_completed',
-      subjectType: 'privacy_request',
-      subjectId: request.id,
-      data: { bytes: archive.byteLength, modules: included.length },
-    });
+    if (steps.some((step) => step.status !== 'done')) {
+      throw new Error('privacy.export_finalize: export steps are not finished');
+    }
+    const modules = steps.map((step) => step.module).sort();
+
+    const now = deps.now ?? new Date();
+    const ttlDays = await getSetting(tx, 'privacy.export_ttl_days');
+    const expiresAt = new Date(now.getTime() + ttlDays * DAY_MS);
+    const entries = new Map<string, Uint8Array>();
+    const missing: string[] = [];
+    const included: string[] = [];
+    for (const mod of modules) {
+      const part = await readPart(storage, request.id, mod);
+      if (!part) throw new Error(`privacy.export_finalize: the ${mod} part is missing`);
+      missing.push(...part.missingFiles);
+      if (Object.values(part.records).some((rows) => rows.length > 0)) {
+        entries.set(`${mod}.json`, textBytes(JSON.stringify(part.records, null, 2)));
+        included.push(mod);
+      }
+      for (const name of part.files) {
+        const bytes = await readOrNull(storage, partFilePath(request.id, mod, name));
+        if (bytes) entries.set(`files/${mod}/${name}`, bytes);
+        else missing.push(`files/${mod}/${name}`);
+      }
+    }
+    const archive = buildZip(
+      new Map([
+        [
+          'README.txt',
+          textBytes(
+            readme({
+              createdAt: now,
+              userId: request.userId,
+              missing: missing.sort(),
+              expiresAt,
+              appUrl: getEnv().APP_URL.replace(/\/+$/, ''),
+            }),
+          ),
+        ],
+        ...entries,
+      ]),
+    );
+    await storage.write(BUCKET, zipPath(request.id), archive, 'application/zip');
+
+    try {
+      const completed = await tx
+        .update(privacyRequests)
+        .set({
+          status: 'completed',
+          completedAt: now,
+          exportPath: zipPath(request.id),
+          exportSizeBytes: archive.byteLength,
+          exportExpiresAt: expiresAt,
+          blockedReason: null,
+        })
+        .where(
+          and(
+            eq(privacyRequests.id, request.id),
+            inArray(privacyRequests.status, [...OPEN_STATUSES]),
+          ),
+        )
+        .returning({ id: privacyRequests.id });
+      if (completed.length === 0) {
+        // The lock should make this impossible. If the request stopped being open anyway,
+        // nothing will ever point at the archive, so it must not stay.
+        await storage.remove(BUCKET, zipPath(request.id));
+        return 'stopped';
+      }
+      await tx
+        .update(privacyRequestSteps)
+        .set({ status: 'done', lastError: null })
+        .where(
+          and(
+            eq(privacyRequestSteps.requestId, request.id),
+            eq(privacyRequestSteps.phase, 'finalize'),
+          ),
+        );
+      const user = await findUserById(tx, request.userId);
+      await notify(tx, request.userId, 'privacy.export_ready', {
+        ttlDays,
+        url: privacySettingsUrl(user?.accountType ?? null),
+      });
+      await record(tx, {
+        actorType: 'system',
+        actorId: null,
+        action: 'privacy.export_completed',
+        subjectType: 'privacy_request',
+        subjectId: request.id,
+        data: { bytes: archive.byteLength, modules: included.length },
+      });
+    } catch (err) {
+      // The transaction rolls back, so the request would not point at the archive.
+      await storage.remove(BUCKET, zipPath(request.id));
+      throw err;
+    }
+    return 'completed';
   });
 
-  await removeExportParts(storage, request.id, modules);
+  if (outcome === 'stopped') await removeExportFiles(storage, requestId);
+  else if (outcome === 'completed') await removeExportParts(storage, requestId);
 }
 
 /**

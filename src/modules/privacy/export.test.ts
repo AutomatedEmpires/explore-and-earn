@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { queryRows } from '@/lib/db';
+import { queryRows, type Db, type DbOrTx, type Tx } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { memoryStorage, type MemoryStorage } from '@/modules/media';
 import { setSetting } from '@/modules/settings';
@@ -25,13 +25,18 @@ let t: TestDb;
 let storage: MemoryStorage;
 let exported: Record<string, ExportPart>;
 let calls: Record<string, number>;
+/** Runs inside a module's exporter, with the database handle the step gave it. */
+let onExport: ((db: DbOrTx, module: string) => Promise<void>) | undefined;
+/** The transaction the code under test has open, if any (PGlite has one connection). */
+let activeTx: Tx | null = null;
 
 function handler(module: string): PrivacyHandler {
   return {
     module,
     tables: [],
-    async exportData() {
+    async exportData(db) {
       calls[module] = (calls[module] ?? 0) + 1;
+      await onExport?.(db, module);
       return exported[module] ?? { records: {}, files: [] };
     },
     async erase() {
@@ -58,7 +63,53 @@ beforeEach(() => {
   storage = memoryStorage();
   exported = {};
   calls = {};
+  onExport = undefined;
+  activeTx = null;
 });
+
+/** `t.db`, remembering the open transaction so a storage hook can read through it. */
+function tracedDb(): Db {
+  return new Proxy(t.db, {
+    get(target, prop) {
+      if (prop === 'transaction') {
+        return (fn: (tx: Tx) => Promise<unknown>) =>
+          target.transaction(async (tx) => {
+            activeTx = tx;
+            try {
+              return await fn(tx);
+            } finally {
+              activeTx = null;
+            }
+          });
+      }
+      const value: unknown = Reflect.get(target, prop, target);
+      return typeof value === 'function'
+        ? (value as (...args: unknown[]) => unknown).bind(target)
+        : value;
+    },
+  });
+}
+
+/** True when the transaction behind `db` holds the row lock on the request. */
+async function holdsRowLock(db: DbOrTx, requestId: string): Promise<boolean> {
+  const [row] = await queryRows<{ locked: boolean }>(
+    db,
+    sql`select xmax::text = (txid_current() % 4294967296)::text as locked
+        from app.privacy_requests where id = ${requestId}`,
+  );
+  return row?.locked === true;
+}
+
+/** `storage`, with `before` run ahead of every write. */
+function hookedStorage(before: (path: string) => Promise<void>): MemoryStorage {
+  return {
+    ...storage,
+    async write(bucket, path, bytes, contentType) {
+      await before(path);
+      await storage.write(bucket, path, bytes, contentType);
+    },
+  };
+}
 
 /** A host whose module `a` exports one record and one uploaded logo. */
 async function seedExporter(o: { withObject?: boolean } = {}) {
@@ -329,5 +380,111 @@ describe('getExportDownload', () => {
       status: 410,
       message: 'This download has expired. Request a new one from your privacy settings.',
     });
+  });
+});
+
+describe('an export while the account is being deleted (issue 232)', () => {
+  it('holds the request row lock while a step exports and writes its part', async () => {
+    const { userId } = await seedExporter();
+    const { requestId } = await requestExport(t.db, userId, deps());
+    const [a] = await stepIds(requestId);
+    if (!a) throw new Error('step missing');
+
+    const seen: { at: string; locked: boolean }[] = [];
+    onExport = async (db) => {
+      seen.push({ at: 'export', locked: await holdsRowLock(db, requestId) });
+    };
+    const hooked = hookedStorage(async (path) => {
+      seen.push({ at: path, locked: await holdsRowLock(activeTx ?? t.db, requestId) });
+    });
+    await runExportStep(tracedDb(), a, { ...deps(), storage: hooked });
+
+    expect(seen.map((s) => s.at)).toEqual([
+      'export',
+      expect.stringContaining(`${requestId}/parts/files/a/`),
+      `${requestId}/parts/a.json`,
+    ]);
+    expect(seen.every((s) => s.locked)).toBe(true);
+  });
+
+  it('writes nothing for a request the eraser already stopped', async () => {
+    const { userId } = await seedExporter();
+    const { requestId } = await requestExport(t.db, userId, deps());
+    const [a, b] = await stepIds(requestId);
+    if (!a || !b) throw new Error('steps missing');
+    await runExportStep(t.db, b, deps());
+    await t.db.execute(
+      sql`update app.privacy_requests set status = 'failed' where id = ${requestId}`,
+    );
+
+    await runExportStep(t.db, a, deps());
+
+    expect(calls.a).toBeUndefined();
+    expect(storage.list('privacy-exports')).toEqual([`${requestId}/parts/b.json`]);
+    const finalize = await queryRows(
+      t.db,
+      sql`select 1 from app.outbox where dedupe_key = ${`privacy_export_finalize:${requestId}`}`,
+    );
+    expect(finalize).toEqual([]);
+  });
+
+  it('holds the request row lock while finalize writes the archive', async () => {
+    const { userId } = await seedExporter();
+    const { requestId } = await requestExport(t.db, userId, deps());
+    for (const id of await stepIds(requestId)) await runExportStep(t.db, id, deps());
+
+    const seen: boolean[] = [];
+    const hooked = hookedStorage(async (path) => {
+      if (path === `${requestId}.zip`) {
+        seen.push(await holdsRowLock(activeTx ?? t.db, requestId));
+      }
+    });
+    await finalizeExport(tracedDb(), requestId, { ...deps(), storage: hooked });
+
+    expect(seen).toEqual([true]);
+    expect((await requestRow(requestId)).status).toBe('completed');
+  });
+
+  it('deletes the archive it just wrote when the request stopped being open', async () => {
+    const { userId } = await seedExporter();
+    const { requestId } = await requestExport(t.db, userId, deps());
+    for (const id of await stepIds(requestId)) await runExportStep(t.db, id, deps());
+
+    // The eraser stops the request between finalize's check and its update.
+    const hooked = hookedStorage(async (path) => {
+      if (path !== `${requestId}.zip`) return;
+      await (activeTx ?? t.db).execute(
+        sql`update app.privacy_requests set status = 'failed' where id = ${requestId}`,
+      );
+    });
+    await finalizeExport(tracedDb(), requestId, { ...deps(), storage: hooked });
+
+    expect(storage.list('privacy-exports')).toEqual([]);
+    const row = await requestRow(requestId);
+    expect(row.status).toBe('failed');
+    expect(row.export_path).toBeNull();
+    expect(await notified(userId)).toEqual([]);
+  });
+
+  it('clears everything a stopped request left, found by its id and not by a part', async () => {
+    const { userId } = await seedExporter();
+    const { requestId } = await requestExport(t.db, userId, deps());
+    for (const id of await stepIds(requestId)) await runExportStep(t.db, id, deps());
+    // A file a step copied before it wrote its part, and an archive nothing points at.
+    const bytes = new Uint8Array([9]);
+    await storage.write(
+      'privacy-exports',
+      `${requestId}/parts/files/c/late.webp`,
+      bytes,
+      'image/webp',
+    );
+    await storage.write('privacy-exports', `${requestId}.zip`, bytes, 'application/zip');
+    await t.db.execute(
+      sql`update app.privacy_requests set status = 'failed' where id = ${requestId}`,
+    );
+
+    await finalizeExport(t.db, requestId, deps());
+
+    expect(storage.list('privacy-exports')).toEqual([]);
   });
 });

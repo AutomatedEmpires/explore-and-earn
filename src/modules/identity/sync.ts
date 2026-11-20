@@ -13,7 +13,7 @@ import { createHash } from 'node:crypto';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { type Db, type DbOrTx, withTx } from '@/lib/db';
-import { AppError, badRequest, isAppError } from '@/lib/errors';
+import { AppError, badRequest, isAppError, unauthorized } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
 import { record } from '@/modules/audit';
@@ -158,9 +158,14 @@ async function ensureUser(
  * Applies a Clerk user snapshot (a webhook's `data`, or `User.raw` from the Backend API) and
  * returns our user ID. Account type: only `operator` is adopted from public metadata (it comes
  * from an operator invitation); onboarding sets `seeker` and `host`, and nothing changes a set one.
+ *
+ * An erased Clerk user is never given a row again: this throws `unauthorized` and writes
+ * nothing. The webhook path answers such events before it gets here (`ignoredReason`); this
+ * is what stops sign-in from recreating the person while Clerk still has their session.
  */
 export async function applyClerkUser(db: DbOrTx, data: unknown): Promise<string> {
   const u = parse(userSchema, data, 'user');
+  if (await isErasedClerkUser(db, u.id)) throw unauthorized('Account not found');
   const primary =
     u.email_addresses.find((e) => e.id === u.primary_email_address_id) ?? u.email_addresses[0];
 

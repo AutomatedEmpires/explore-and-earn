@@ -5,8 +5,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { queryRows, type Db } from '@/lib/db';
 import { newId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
+import { activeHolds } from '@/modules/privacy';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
-import { makeFakeLedgerMirror } from '../../../tests/fakes/sp8/ledger-mirror';
+import { makeFakeLedgerMirror, type HoldEntry } from '../../../tests/fakes/sp8/ledger-mirror';
 import {
   engineLedgerMirror,
   REPLAY_MARGIN_MS,
@@ -25,6 +26,7 @@ vi.mock('@/modules/privacy', async (original) => ({
 }));
 
 const SINCE = new Date('2026-11-03T02:00:00.000Z');
+const NO_HOLDS = { applied: 0, pending: 0 };
 
 let t: TestDb;
 
@@ -88,7 +90,7 @@ describe('replayDeletions', () => {
 
     const result = await replayDeletions(t.db, mirror, SINCE, { replay });
 
-    expect(result).toEqual({ replayed: 0, skipped: 0, pending: 1, failed: [] });
+    expect(result).toEqual({ replayed: 0, skipped: 0, pending: 1, failed: [], holds: NO_HOLDS });
     expect(replay).not.toHaveBeenCalled();
     expect(await emailOf(userId)).toBe(`${userId}@example.test`);
   });
@@ -108,7 +110,7 @@ describe('replayDeletions', () => {
 
     const first = await replayDeletions(t.db, mirror, SINCE, { apply: true, replay });
 
-    expect(first).toEqual({ replayed: 2, skipped: 0, pending: 0, failed: [] });
+    expect(first).toEqual({ replayed: 2, skipped: 0, pending: 0, failed: [], holds: NO_HOLDS });
     // Oldest first.
     expect(replay.mock.calls.map(([, i]) => i)).toEqual([
       { userId: inMargin, requestId: margin.requestId },
@@ -120,7 +122,7 @@ describe('replayDeletions', () => {
 
     const second = await replayDeletions(t.db, mirror, SINCE, { apply: true, replay });
 
-    expect(second).toEqual({ replayed: 0, skipped: 2, pending: 0, failed: [] });
+    expect(second).toEqual({ replayed: 0, skipped: 2, pending: 0, failed: [], holds: NO_HOLDS });
     expect(replay).toHaveBeenCalledTimes(2);
   });
 
@@ -139,12 +141,14 @@ describe('replayDeletions', () => {
       skipped: 0,
       pending: 1,
       failed: [],
+      holds: NO_HOLDS,
     });
     expect(await replayDeletions(t.db, mirror, SINCE, { apply: true, replay })).toEqual({
       replayed: 1,
       skipped: 0,
       pending: 0,
       failed: [],
+      holds: NO_HOLDS,
     });
     expect(await emailOf(userId)).toBeNull();
   });
@@ -169,7 +173,7 @@ describe('replayDeletions', () => {
 
     const result = await replayDeletions(t.db, mirror, SINCE, { apply: true });
 
-    expect(result).toEqual({ replayed: 1, skipped: 0, pending: 0, failed: [] });
+    expect(result).toEqual({ replayed: 1, skipped: 0, pending: 0, failed: [], holds: NO_HOLDS });
     expect(engine.replayErasure).toHaveBeenCalledWith(t.db, {
       userId,
       requestId: mirrored.requestId,
@@ -195,7 +199,7 @@ describe('replayDeletions', () => {
 
     const result = await replayDeletions(t.db, mirror, SINCE, { apply: true, replay });
 
-    expect(result).toEqual({ replayed: 0, skipped: 1, pending: 0, failed: [] });
+    expect(result).toEqual({ replayed: 0, skipped: 1, pending: 0, failed: [], holds: NO_HOLDS });
     expect(replay).not.toHaveBeenCalled();
   });
 
@@ -214,7 +218,7 @@ describe('replayDeletions', () => {
 
     const result = await replayDeletions(t.db, mirror, SINCE, { apply: true, replay });
 
-    expect(result).toEqual({ replayed: 1, skipped: 0, pending: 0, failed: [first.ledgerId] });
+    expect(result).toEqual({ replayed: 1, skipped: 0, pending: 0, failed: [first.ledgerId], holds: NO_HOLDS });
     expect(await emailOf(fine)).toBeNull();
     expect(JSON.stringify(error.mock.calls)).not.toContain('@example.test');
   });
@@ -230,6 +234,102 @@ describe('replayDeletions', () => {
     engine.getLedgerMirror.mockReturnValue(mirror);
 
     expect(await engineLedgerMirror()).toBe(mirror);
+  });
+});
+
+describe('replayDeletions and legal holds (issue 232)', () => {
+  /** A hold an operator placed on `userId` after the backup was taken. */
+  function mirroredHold(userId: string, createdBy: string): HoldEntry {
+    return {
+      holdId: newId(),
+      userId,
+      orgId: null,
+      scope: 'all',
+      reviewAt: '2026-12-18',
+      createdBy,
+      createdAt: '2026-11-03T10:00:00.000Z',
+      releasedAt: null,
+      releasedBy: null,
+    };
+  }
+
+  it('puts the mirrored holds back before it replays, so the replay keeps what is held', async () => {
+    // The backup is from 02:00. At 10:00 an operator placed a hold; at 11:00 the person deleted
+    // their account. The restored database has neither the hold nor the erasure.
+    const userId = await seedUser();
+    const operatorId = await seedUser();
+    const mirror = makeFakeLedgerMirror();
+    await mirror.putHold(mirroredHold(userId, operatorId));
+    await mirror.put(entry(userId, '2026-11-03T11:00:00.000Z'));
+    const seen: string[][] = [];
+    const replay = vi.fn(async (db: Db, i: { userId: string; requestId: string }) => {
+      seen.push(await activeHolds(db, { kind: 'user', userId: i.userId }));
+      return erase(db, i);
+    });
+
+    const result = await replayDeletions(t.db, mirror, SINCE, { apply: true, replay });
+
+    expect(result).toEqual({
+      replayed: 1,
+      skipped: 0,
+      pending: 0,
+      failed: [],
+      holds: { applied: 1, pending: 0 },
+    });
+    expect(seen).toEqual([['all']]);
+
+    // A second run finds the hold in place.
+    const again = await replayDeletions(t.db, mirror, SINCE, { apply: true, replay });
+    expect(again.holds).toEqual({ applied: 0, pending: 0 });
+  });
+
+  it('a dry run reports the holds it would put back and writes none', async () => {
+    const userId = await seedUser();
+    const mirror = makeFakeLedgerMirror();
+    await mirror.putHold(mirroredHold(userId, await seedUser()));
+    await mirror.put(entry(userId, '2026-11-03T11:00:00.000Z'));
+
+    const result = await replayDeletions(t.db, mirror, SINCE);
+
+    expect(result).toEqual({
+      replayed: 0,
+      skipped: 0,
+      pending: 1,
+      failed: [],
+      holds: { applied: 0, pending: 1 },
+    });
+    expect(await activeHolds(t.db, { kind: 'user', userId })).toEqual([]);
+  });
+
+  it('stops before replaying anything when a hold cannot be put back', async () => {
+    const userId = await seedUser();
+    const mirror = makeFakeLedgerMirror();
+    await mirror.putHold(mirroredHold(userId, await seedUser()));
+    await mirror.put(entry(userId, '2026-11-03T11:00:00.000Z'));
+    const replay = vi.fn(erase);
+    const applyHold = vi.fn(async () => {
+      throw new Error('hold table is not writable');
+    });
+
+    await expect(
+      replayDeletions(t.db, mirror, SINCE, { apply: true, replay, applyHold }),
+    ).rejects.toThrow(/hold table is not writable/);
+
+    expect(replay).not.toHaveBeenCalled();
+    expect(await emailOf(userId)).toBe(`${userId}@example.test`);
+  });
+
+  it('stops before replaying when the mirror cannot list its holds', async () => {
+    const userId = await seedUser();
+    const mirror = makeFakeLedgerMirror();
+    await mirror.put(entry(userId, '2026-11-03T11:00:00.000Z'));
+    vi.spyOn(mirror, 'listHolds').mockRejectedValue(new Error('ledger mirror: list failed'));
+    const replay = vi.fn(erase);
+
+    await expect(replayDeletions(t.db, mirror, SINCE, { apply: true, replay })).rejects.toThrow(
+      /list failed/,
+    );
+    expect(replay).not.toHaveBeenCalled();
   });
 });
 

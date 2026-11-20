@@ -2,6 +2,11 @@
 // backup taken before someone was erased, the ledger says who must be erased again; the mirror
 // is the copy of the ledger that the restore cannot roll back. It holds ids and a time, nothing
 // else.
+//
+// Legal holds are mirrored beside it (`holds/<holdId>.json`): a hold placed after the backup
+// is missing from the restored database too, and replaying a deletion without it would erase
+// what the hold was keeping. A mirrored hold is ids, a scope and times. Its reason, free text
+// an operator wrote, never leaves the main database.
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
@@ -10,17 +15,37 @@ import { z } from 'zod';
 import type { Db } from '@/lib/db';
 import { getEnv, type Env } from '@/lib/env';
 import { logger } from '@/lib/logger';
-import { privacyDeletionLedger } from './schema';
+import { privacyDeletionLedger, privacyLegalHolds } from './schema';
+import { HOLD_SCOPES, type HoldScope } from './types';
 
 export type LedgerEntry = { ledgerId: string; userId: string; requestId: string; erasedAt: string };
+
+/** One mirrored legal hold. `reviewAt` is a day (`YYYY-MM-DD`); the times are ISO. */
+export type HoldEntry = {
+  holdId: string;
+  userId: string | null;
+  orgId: string | null;
+  scope: HoldScope;
+  reviewAt: string;
+  createdBy: string;
+  createdAt: string;
+  releasedAt: string | null;
+  releasedBy: string | null;
+};
 
 export interface LedgerMirror {
   put(e: LedgerEntry): Promise<void>;
   listSince(since: Date): Promise<LedgerEntry[]>;
+  /** Stores the hold as it is now, replacing an earlier copy. */
+  putHold(e: HoldEntry): Promise<void>;
+  /** Every mirrored hold, released ones included. A copy that cannot be read throws. */
+  listHolds(): Promise<HoldEntry[]>;
 }
 
 const LEDGER_BUCKET = 'ledger';
 const LOCAL_DIR = '.data/backup/ledger';
+const HOLDS_FOLDER = 'holds';
+const LIST_PAGE = 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const storedEntry = z.object({
@@ -28,6 +53,25 @@ const storedEntry = z.object({
   requestId: z.uuid(),
   erasedAt: z.iso.datetime({ offset: true }),
 });
+
+const storedHold = z.object({
+  holdId: z.uuid(),
+  userId: z.uuid().nullable(),
+  orgId: z.uuid().nullable(),
+  scope: z.enum(HOLD_SCOPES),
+  reviewAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  createdBy: z.uuid(),
+  createdAt: z.iso.datetime({ offset: true }),
+  releasedAt: z.iso.datetime({ offset: true }).nullable(),
+  releasedBy: z.uuid().nullable(),
+});
+
+/** A hold must never be skipped, so a copy that does not parse stops the caller. */
+function parseHold(name: string, text: string): HoldEntry {
+  const parsed = storedHold.safeParse(JSON.parse(text));
+  if (!parsed.success) throw new Error(`ledger mirror: the hold copy ${name} is not valid`);
+  return parsed.data;
+}
 
 const dayOf = (iso: string) => iso.slice(0, 10);
 const body = (e: LedgerEntry) =>
@@ -60,6 +104,13 @@ export const NOOP_LEDGER_MIRROR: LedgerMirror = {
     logger.warn('ledger mirror not configured');
     return [];
   },
+  async putHold() {
+    logger.warn('ledger mirror not configured');
+  },
+  async listHolds() {
+    logger.warn('ledger mirror not configured');
+    return [];
+  },
 };
 
 /** Dev: one JSON file per entry under `.data/backup/ledger/<day>/`. */
@@ -87,10 +138,32 @@ export function localLedgerMirror(dir: string = LOCAL_DIR): LedgerMirror {
       }
       return entries;
     },
+    async putHold(e) {
+      const folder = path.join(dir, HOLDS_FOLDER);
+      await mkdir(folder, { recursive: true });
+      await writeFile(path.join(folder, `${e.holdId}.json`), JSON.stringify(e), 'utf8');
+    },
+    async listHolds() {
+      const folder = path.join(dir, HOLDS_FOLDER);
+      let names: string[];
+      try {
+        names = await readdir(folder);
+      } catch {
+        return [];
+      }
+      const holds: HoldEntry[] = [];
+      for (const name of names.filter((n) => n.endsWith('.json')).sort()) {
+        holds.push(parseHold(name, await readFile(path.join(folder, name), 'utf8')));
+      }
+      return holds;
+    },
   };
 }
 
-/** The backup project's `ledger` bucket: `<day of erasedAt>/<ledgerId>.json`. */
+/**
+ * The backup project's `ledger` bucket: `<day of erasedAt>/<ledgerId>.json` for an erasure,
+ * `holds/<holdId>.json` for a legal hold.
+ */
 export function supabaseLedgerMirror(url: string, serviceRoleKey: string): LedgerMirror {
   let client: ReturnType<typeof createClient> | undefined;
   const bucket = () => {
@@ -132,6 +205,33 @@ export function supabaseLedgerMirror(url: string, serviceRoleKey: string): Ledge
         }
       }
       return entries;
+    },
+    async putHold(e) {
+      const { error } = await bucket().upload(
+        `${HOLDS_FOLDER}/${e.holdId}.json`,
+        JSON.stringify(e),
+        { contentType: 'application/json', upsert: true },
+      );
+      if (error) throw new Error(`ledger mirror: hold write failed (${error.name})`);
+    },
+    async listHolds() {
+      const holds: HoldEntry[] = [];
+      for (let offset = 0; ; offset += LIST_PAGE) {
+        const { data, error } = await bucket().list(HOLDS_FOLDER, {
+          limit: LIST_PAGE,
+          offset,
+          sortBy: { column: 'name', order: 'asc' },
+        });
+        if (error) throw new Error(`ledger mirror: hold list failed (${error.name})`);
+        for (const object of data) {
+          if (!object.name.endsWith('.json')) continue;
+          const file = await bucket().download(`${HOLDS_FOLDER}/${object.name}`);
+          if (file.error) throw new Error(`ledger mirror: hold read failed (${file.error.name})`);
+          holds.push(parseHold(object.name, await file.data.text()));
+        }
+        if (data.length < LIST_PAGE) break;
+      }
+      return holds;
     },
   };
 }
@@ -178,4 +278,28 @@ export async function mirrorLedgerEntry(
     .update(privacyDeletionLedger)
     .set({ mirroredAt: deps.now ?? new Date() })
     .where(eq(privacyDeletionLedger.id, row.id));
+}
+
+/**
+ * The `privacy.hold_mirror` job: copies one legal hold, as it is now, to the mirror. It runs
+ * when a hold is set and again when it is released. The reason is not copied.
+ */
+export async function mirrorLegalHold(
+  db: Db,
+  holdId: string,
+  deps: { mirror?: LedgerMirror } = {},
+): Promise<void> {
+  const [row] = await db.select().from(privacyLegalHolds).where(eq(privacyLegalHolds.id, holdId));
+  if (!row) return;
+  await (deps.mirror ?? getLedgerMirror()).putHold({
+    holdId: row.id,
+    userId: row.userId,
+    orgId: row.orgId,
+    scope: row.scope,
+    reviewAt: row.reviewAt,
+    createdBy: row.createdBy,
+    createdAt: row.createdAt.toISOString(),
+    releasedAt: row.releasedAt ? row.releasedAt.toISOString() : null,
+    releasedBy: row.releasedBy,
+  });
 }

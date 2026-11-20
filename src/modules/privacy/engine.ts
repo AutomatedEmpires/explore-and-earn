@@ -5,12 +5,14 @@ import { z } from 'zod';
 import { registerDeadLetterHandler, type HandlerMap } from '@/modules/jobs';
 import {
   deactivateRequester,
+  eraseAfterHoldRelease,
   finalizeDeletion,
   handleDeadStep,
   runEraseStep,
 } from './erase';
 import { finalizeExport, runExportStep } from './export';
-import { mirrorLedgerEntry } from './mirror';
+import { HOLD_MIRROR_TOPIC, HOLD_RELEASE_ERASE_TOPIC } from './holds';
+import { mirrorLedgerEntry, mirrorLegalHold } from './mirror';
 import {
   DEACTIVATE_TOPIC,
   ERASE_FINALIZE_TOPIC,
@@ -25,6 +27,9 @@ import { watchRequests } from './watch';
 
 export {
   activeHolds,
+  applyMirroredHold,
+  HOLD_MIRROR_TOPIC,
+  HOLD_RELEASE_ERASE_TOPIC,
   holdsInclude,
   isOnLegalHold,
   listLegalHolds,
@@ -47,8 +52,10 @@ export {
 } from './export';
 export {
   advanceErasure,
+  eraseAfterHoldRelease,
   finalizeDeletion,
   FINALIZE_MODULES,
+  isBeingErased,
   LAST_WAVE_MODULES,
   replayErasure,
   requestDeletion,
@@ -58,7 +65,9 @@ export {
 export {
   getLedgerMirror,
   mirrorLedgerEntry,
+  mirrorLegalHold,
   NOOP_LEDGER_MIRROR,
+  type HoldEntry,
   type LedgerEntry,
   type LedgerMirror,
 } from './mirror';
@@ -67,6 +76,7 @@ export { watchRequests } from './watch';
 const stepPayload = z.object({ stepId: z.uuid() });
 const requestPayload = z.object({ requestId: z.uuid() });
 const ledgerPayload = z.object({ ledgerId: z.uuid() });
+const holdPayload = z.object({ holdId: z.uuid() });
 
 export const engineJobHandlers: HandlerMap = {
   [EXPORT_STEP_TOPIC]: async (payload, { db, now }) => {
@@ -86,6 +96,12 @@ export const engineJobHandlers: HandlerMap = {
   },
   [LEDGER_MIRROR_TOPIC]: async (payload, { db, now }) => {
     await mirrorLedgerEntry(db, ledgerPayload.parse(payload).ledgerId, { now });
+  },
+  [HOLD_MIRROR_TOPIC]: async (payload, { db }) => {
+    await mirrorLegalHold(db, holdPayload.parse(payload).holdId);
+  },
+  [HOLD_RELEASE_ERASE_TOPIC]: async (payload, { db, now }) => {
+    await eraseAfterHoldRelease(db, requestPayload.parse(payload).requestId, { now });
   },
   [REQUEST_WATCH_TOPIC]: async (_payload, { db, now }) => {
     await watchRequests(db, now);

@@ -2,7 +2,8 @@
 // erases again every user whose erasure was mirrored to the backup project from one hour before
 // `--since` (the restore point: the backup's `takenAt`). The hour covers an erasure that
 // committed just after the snapshot with a ledger time just before it; a user the database
-// already shows as erased is skipped.
+// already shows as erased is skipped. Legal holds mirrored to the backup project are put back
+// first, so a replayed erasure keeps what a hold placed after the backup was keeping.
 //
 // DRY RUN BY DEFAULT. Without `--apply` it changes nothing and reports how many erasures it
 // would replay. With `--apply` it erases those users in DATABASE_URL, which cannot be undone.
@@ -59,6 +60,8 @@ try {
     skipped: result.skipped,
     pending: result.pending,
     failed: result.failed.length,
+    holdsApplied: result.holds.applied,
+    holdsPending: result.holds.pending,
   };
   if (summary) writeFileSync(summary, `${JSON.stringify(report, null, 2)}\n`);
   if (apply) logger.info('deletions replayed', report);

@@ -6,6 +6,7 @@ import { createTestDb, type TestDb } from '@tests/helpers/db';
 import { seedHostOrg, seedOperator, seedSeeker } from '@tests/helpers/sp8';
 import {
   activeHolds,
+  applyMirroredHold,
   heldSubjects,
   holdsInclude,
   isOnLegalHold,
@@ -253,5 +254,200 @@ describe('namesUnderLegalHold and heldSubjects', () => {
 
     await releaseLegalHold(t.db, { holdId, operatorId }, NOW);
     expect((await heldSubjects(t.db, 'any')).orgs.has(org)).toBe(false);
+  });
+});
+
+type Kept = { table: string; reason: string; until: null }[];
+const HELD: Kept = [{ table: 'reports', reason: 'legal_hold', until: null }];
+
+/** A deletion request of `userId` with one erase step for `subject` that kept `retained`. */
+async function seedDeletion(
+  userId: string,
+  o: {
+    status: 'running' | 'completed' | 'failed';
+    retained: Kept;
+    subject?: { kind: 'user' | 'org'; id: string };
+  },
+): Promise<string> {
+  const requestId = newId();
+  const subject = o.subject ?? { kind: 'user' as const, id: userId };
+  await t.db.execute(sql`
+    insert into app.privacy_requests (id, user_id, kind, status)
+    values (${requestId}, ${userId}, 'delete', ${o.status})
+  `);
+  await t.db.execute(sql`
+    insert into app.privacy_request_steps
+      (id, request_id, subject_kind, subject_id, module, phase, status, retained)
+    values (${newId()}, ${requestId}, ${subject.kind}, ${subject.id}, 'notes', 'erase', 'done',
+      ${JSON.stringify(o.retained)}::jsonb)
+  `);
+  return requestId;
+}
+
+const reErasures = async (requestId: string) =>
+  (
+    await queryRows<{ n: number }>(
+      t.db,
+      sql`select count(*)::int as n from app.outbox
+          where topic = 'privacy.hold_release_erase' and payload->>'requestId' = ${requestId}`,
+    )
+  )[0]?.n ?? 0;
+
+const mirrorJobs = async (holdId: string) =>
+  (
+    await queryRows<{ n: number }>(
+      t.db,
+      sql`select count(*)::int as n from app.outbox
+          where topic = 'privacy.hold_mirror' and payload->>'holdId' = ${holdId}`,
+    )
+  )[0]?.n ?? 0;
+
+describe('releasing a hold (issue 232)', () => {
+  it('queues a re-erasure of the finished deletion that kept records under a hold', async () => {
+    const userId = (await seedSeeker(t.db)).userId;
+    const { holdId } = await hold({ userId });
+    const requestId = await seedDeletion(userId, { status: 'completed', retained: HELD });
+    expect(await reErasures(requestId)).toBe(0);
+
+    await releaseLegalHold(t.db, { holdId, operatorId }, NOW);
+
+    expect(await reErasures(requestId)).toBe(1);
+  });
+
+  it('queues it for the deletion that kept an organization the hold names', async () => {
+    const org = await seedHostOrg(t.db);
+    const { holdId } = await hold({ orgId: org.orgId, scope: 'all' });
+    const requestId = await seedDeletion(org.owner.userId, {
+      status: 'completed',
+      retained: HELD,
+      subject: { kind: 'org', id: org.orgId },
+    });
+    const unrelated = await seedDeletion((await seedSeeker(t.db)).userId, {
+      status: 'completed',
+      retained: HELD,
+    });
+
+    await releaseLegalHold(t.db, { holdId, operatorId }, NOW);
+
+    expect(await reErasures(requestId)).toBe(1);
+    expect(await reErasures(unrelated)).toBe(0);
+  });
+
+  it('queues nothing when the deletion kept nothing under a hold, or failed', async () => {
+    const userId = (await seedSeeker(t.db)).userId;
+    const { holdId } = await hold({ userId });
+    const nothingHeld = await seedDeletion(userId, {
+      status: 'completed',
+      retained: [{ table: 'reports', reason: 'safety', until: null }],
+    });
+    const failed = await seedDeletion(userId, { status: 'failed', retained: HELD });
+
+    await releaseLegalHold(t.db, { holdId, operatorId }, NOW);
+
+    expect(await reErasures(nothingHeld)).toBe(0);
+    expect(await reErasures(failed)).toBe(0);
+  });
+
+  it('leaves a deletion that is still running to its finalize step', async () => {
+    const userId = (await seedSeeker(t.db)).userId;
+    const { holdId } = await hold({ userId });
+    const running = await seedDeletion(userId, { status: 'running', retained: HELD });
+
+    await releaseLegalHold(t.db, { holdId, operatorId }, NOW);
+
+    expect(await reErasures(running)).toBe(0);
+  });
+});
+
+describe('the hold mirror (issue 232)', () => {
+  it('queues a copy to the mirror when a hold is set and again when it is released', async () => {
+    const userId = (await seedSeeker(t.db)).userId;
+    const { holdId } = await hold({ userId });
+    expect(await mirrorJobs(holdId)).toBe(1);
+    await releaseLegalHold(t.db, { holdId, operatorId }, NOW);
+    expect(await mirrorJobs(holdId)).toBe(2);
+  });
+
+  const mirrored = (over: Partial<Parameters<typeof applyMirroredHold>[1]> = {}) => ({
+    holdId: newId(),
+    userId: null,
+    orgId: null,
+    scope: 'messages' as const,
+    reviewAt: '2026-12-18',
+    createdBy: operatorId,
+    createdAt: '2026-11-18T10:00:00.000Z',
+    releasedAt: null,
+    releasedBy: null,
+    ...over,
+  });
+
+  it('puts back a hold the restored database lacks, and only says so in a dry run', async () => {
+    const userId = (await seedSeeker(t.db)).userId;
+    const entry = mirrored({ userId });
+
+    expect(await applyMirroredHold(t.db, entry, { apply: false })).toBe('added');
+    expect(await activeHolds(t.db, { kind: 'user', userId })).toEqual([]);
+
+    expect(await applyMirroredHold(t.db, entry, { apply: true })).toBe('added');
+    expect(await activeHolds(t.db, { kind: 'user', userId })).toEqual(['messages']);
+    const rows = await queryRows<{ review_at: string; created_by: string; created_at: Date }>(
+      t.db,
+      sql`select review_at::text, created_by::text, created_at
+          from app.privacy_legal_holds where id = ${entry.holdId}`,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.review_at).toBe('2026-12-18');
+    expect(rows[0]?.created_by).toBe(operatorId);
+    expect(new Date(rows[0]?.created_at ?? 0).toISOString()).toBe(entry.createdAt);
+    const audit = await queryRows<{ data: Record<string, unknown> }>(
+      t.db,
+      sql`select data from app.audit_events
+          where action = 'privacy.legal_hold_restored' and subject_id = ${userId}`,
+    );
+    expect(audit).toEqual([{ data: { holdId: entry.holdId, scope: 'messages', subjectKind: 'user' } }]);
+
+    expect(await applyMirroredHold(t.db, entry, { apply: true })).toBe('unchanged');
+  });
+
+  it('releases a hold the mirror shows released, and queues the re-erasure', async () => {
+    const userId = (await seedSeeker(t.db)).userId;
+    const { holdId } = await hold({ userId });
+    const requestId = await seedDeletion(userId, { status: 'completed', retained: HELD });
+    const entry = mirrored({
+      holdId,
+      userId,
+      scope: 'reports',
+      releasedAt: '2026-11-18T11:00:00.000Z',
+      releasedBy: operatorId,
+    });
+
+    expect(await applyMirroredHold(t.db, entry, { apply: false })).toBe('released');
+    expect(await activeHolds(t.db, { kind: 'user', userId })).toEqual(['reports']);
+
+    expect(await applyMirroredHold(t.db, entry, { apply: true })).toBe('released');
+    expect(await activeHolds(t.db, { kind: 'user', userId })).toEqual([]);
+    expect(await reErasures(requestId)).toBe(1);
+    expect(await applyMirroredHold(t.db, entry, { apply: true })).toBe('unchanged');
+  });
+
+  it('records an Owner when the operator who placed the hold is not in the database', async () => {
+    const orgId = (await seedHostOrg(t.db)).orgId;
+    const entry = mirrored({ orgId, createdBy: newId() });
+
+    expect(await applyMirroredHold(t.db, entry, { apply: true })).toBe('added');
+
+    const [row] = await queryRows<{ role: string }>(
+      t.db,
+      sql`select o.role from app.privacy_legal_holds h
+          join app.operators o on o.user_id = h.created_by where h.id = ${entry.holdId}`,
+    );
+    expect(row).toEqual({ role: 'owner' });
+    expect(await activeHolds(t.db, { kind: 'org', orgId })).toEqual(['messages']);
+  });
+
+  it('refuses an entry that names both or neither', async () => {
+    await expect(applyMirroredHold(t.db, mirrored(), { apply: true })).rejects.toThrow(
+      /one user or one organization/,
+    );
   });
 });

@@ -15,6 +15,8 @@ const PRIVACY_TOPICS = [
   'privacy.erase_step',
   'privacy.erase_finalize',
   'privacy.ledger_mirror',
+  'privacy.hold_mirror',
+  'privacy.hold_release_erase',
   'privacy.retention_sweep',
   'privacy.retention_rule',
   'privacy.request_watch',

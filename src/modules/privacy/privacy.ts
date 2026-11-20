@@ -1,13 +1,13 @@
 // The privacy module's own handler. Requests, their steps and the deletion ledger are the
 // proof that a request was honored, so they are kept (ids only); the export archives a person
 // asked for, and the links from consent records to them, are erased.
-import { and, desc, eq, inArray, isNotNull, or } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
 import { getStorage } from '@/modules/media';
 import { CONSENT_TABLES, eraseConsentLinks, exportConsent } from './consent';
-import { removeExportArchive, removeExportParts } from './export';
+import { removeExportFiles } from './export';
 import { OPEN_STATUSES } from './requests';
-import { privacyLegalHolds, privacyRequestSteps, privacyRequests } from './schema';
+import { privacyLegalHolds, privacyRequests } from './schema';
 import type { EraseResult, PrivacyHandler, PrivacySubject } from './types';
 
 type Retained = EraseResult['retained'];
@@ -74,52 +74,38 @@ export const privacyHandler: PrivacyHandler = {
 
         // The archives of earlier exports, and the parts of one still being built, hold
         // everything about the person. The request rows stay; the files go.
-        const exportsWithFiles = await tx
+        //
+        // Each request row is locked first. An export step or finalize step that is writing
+        // holds the same lock (export.ts), so this waits for it and then removes what it wrote;
+        // one that starts afterwards finds the request stopped and writes nothing. The files
+        // are found by the request id, not through a part or `export_path`: a step may have
+        // copied files before writing its part, and finalize may have written the archive
+        // before storing its path.
+        const exports = await tx
           .select({
             id: privacyRequests.id,
             status: privacyRequests.status,
             exportPath: privacyRequests.exportPath,
           })
           .from(privacyRequests)
-          .where(
-            and(
-              eq(privacyRequests.userId, s.userId),
-              eq(privacyRequests.kind, 'export'),
-              or(
-                inArray(privacyRequests.status, OPEN_STATUSES),
-                isNotNull(privacyRequests.exportPath),
-              ),
-            ),
-          );
+          .where(and(eq(privacyRequests.userId, s.userId), eq(privacyRequests.kind, 'export')))
+          .orderBy(asc(privacyRequests.id))
+          .for('update');
         const storage = getStorage();
-        for (const request of exportsWithFiles) {
+        for (const request of exports) {
           const open = (OPEN_STATUSES as readonly string[]).includes(request.status);
-          if (open) {
-            const steps = await tx
-              .select({ module: privacyRequestSteps.module })
-              .from(privacyRequestSteps)
-              .where(
-                and(
-                  eq(privacyRequestSteps.requestId, request.id),
-                  eq(privacyRequestSteps.phase, 'export'),
-                ),
-              );
-            await removeExportParts(
-              storage,
-              request.id,
-              steps.map((step) => step.module),
-            );
+          if (open || request.exportPath !== null) {
+            await tx
+              .update(privacyRequests)
+              .set({
+                exportPath: null,
+                exportSizeBytes: null,
+                ...(open ? { status: 'failed' as const, blockedReason: null } : {}),
+              })
+              .where(eq(privacyRequests.id, request.id));
+            erased += 1;
           }
-          if (request.exportPath) await removeExportArchive(storage, request.exportPath);
-          await tx
-            .update(privacyRequests)
-            .set({
-              exportPath: null,
-              exportSizeBytes: null,
-              ...(open ? { status: 'failed' as const, blockedReason: null } : {}),
-            })
-            .where(eq(privacyRequests.id, request.id));
-          erased += 1;
+          await removeExportFiles(storage, request.id);
         }
       }
     }

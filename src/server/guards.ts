@@ -18,6 +18,7 @@ import {
   findUserByClerkId,
   findUserById,
   getOperator,
+  isErasedClerkUser,
   syncClerkUser,
   userHasPasskey,
   userHasStrongAuth,
@@ -27,6 +28,7 @@ import {
 } from '@/modules/identity';
 import { getActiveSanction } from '@/modules/operator';
 import { findHostMembership } from '@/modules/orgs';
+import { isBeingErased } from '@/modules/privacy';
 
 export type { CurrentUser, OrgRole };
 
@@ -84,9 +86,24 @@ async function assertNotSuspended(userId: string): Promise<void> {
 }
 
 /**
+ * Refuses an account whose deletion is running. The Clerk ban ends new sign-ins, but a session
+ * token already issued stays valid for up to a minute (longer when the ban call failed), and a
+ * write in that window would land after its module was erased. Once the deletion has finished
+ * the account row is marked deleted, which the caller checks first.
+ */
+async function assertNotBeingErased(userId: string): Promise<void> {
+  if (await isBeingErased(getDb(), userId)) {
+    throw unauthorized('Account not found', { reason: 'account_deleted' });
+  }
+}
+
+/**
  * The signed-in user. If Clerk's webhook for a new user hasn't arrived yet (or can't, as with
  * keyless development), the user is provisioned from Clerk's Backend API, the same way.
  * In perf mode a valid `x-perf-user` header selects that user without Clerk.
+ *
+ * A Clerk user we erased is never provisioned again, and an account whose deletion is running
+ * or finished is refused (`unauthorized`).
  */
 export async function requireUser(): Promise<CurrentUser> {
   const env = getEnv();
@@ -96,6 +113,7 @@ export async function requireUser(): Promise<CurrentUser> {
     if (userId) {
       const user = await findUserById(getDb(), userId);
       if (!user || user.deletedAt) throw unauthorized('Account not found');
+      await assertNotBeingErased(user.id);
       await assertNotSuspended(user.id);
       return toCurrentUser(user);
     }
@@ -107,12 +125,16 @@ export async function requireUser(): Promise<CurrentUser> {
   const db = getDb();
   let user = await findUserByClerkId(db, clerkUserId);
   if (!user) {
+    // After finalize the row no longer carries the Clerk id, and Clerk may not have deleted
+    // the user yet. Their session must not create a second row.
+    if (await isErasedClerkUser(db, clerkUserId)) throw unauthorized('Account not found');
     const raw = await clerkUserJson();
     if (!raw) throw unauthorized();
     await syncClerkUser(db, raw);
     user = await findUserByClerkId(db, clerkUserId);
   }
   if (!user || user.deletedAt) throw unauthorized('Account not found');
+  await assertNotBeingErased(user.id);
   await assertNotSuspended(user.id);
 
   return toCurrentUser(user);

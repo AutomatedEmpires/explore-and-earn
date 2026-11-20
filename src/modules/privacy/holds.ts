@@ -1,17 +1,48 @@
 // Legal holds (SP8 spec section 3). A hold never blocks a privacy request: the erasers skip
 // the held scopes and report them as `legal_hold`. The reason is free text an operator wrote,
 // so it stays in this table and never reaches the audit log, an export or an email.
-import { and, desc, eq, inArray, isNull, lt, sql, type SQL } from 'drizzle-orm';
-import type { Db, DbOrTx } from '@/lib/db';
+//
+// Releasing a hold ends the reason to keep what it kept. So a release queues the erasure
+// again for every finished deletion that kept records under a hold for that person or
+// organization (lead decision 2026-11-19). Each set and release is also copied to the
+// backup project beside the deletion ledger, so a restore from an older backup can put
+// the holds back before it replays deletions.
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  ne,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
+import type { Db, DbOrTx, Tx } from '@/lib/db';
 import { badRequest, conflict, notFound } from '@/lib/errors';
 import { newId } from '@/lib/ids';
 import { record } from '@/modules/audit';
-import { privacyLegalHolds } from './schema';
+import { findUserById, listActiveOperators } from '@/modules/identity';
+import { enqueue } from '@/modules/jobs';
+import type { HoldEntry } from './mirror';
+import { privacyLegalHolds, privacyRequestSteps, privacyRequests } from './schema';
 import { HOLD_SCOPES, type HoldScope, type PrivacySubject } from './types';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const PAGE_SIZE = 50;
+
+/** The job that erases again what a released hold kept. Payload: `{ requestId }`. */
+export const HOLD_RELEASE_ERASE_TOPIC = 'privacy.hold_release_erase';
+/** The job that copies a hold to the backup project. Payload: `{ holdId }`. */
+export const HOLD_MIRROR_TOPIC = 'privacy.hold_mirror';
+
+/** The reason stored on a hold put back from the mirror, which never holds the real one. */
+const RESTORED_REASON =
+  'Put back from the hold mirror after a database restore. The reason was not mirrored.';
 
 export type LegalHoldRow = {
   id: string;
@@ -87,11 +118,72 @@ export async function setLegalHold(
         subjectKind: i.userId ? 'user' : 'org',
       },
     });
+    await enqueue(tx, {
+      topic: HOLD_MIRROR_TOPIC,
+      payload: { holdId },
+      dedupeKey: `privacy_hold_mirror:${holdId}:set`,
+    });
   });
   return { holdId };
 }
 
-/** Releases a hold. An already released hold is a `conflict`. */
+type HoldSubject = Pick<typeof privacyLegalHolds.$inferSelect, 'id' | 'userId' | 'orgId'>;
+
+/**
+ * Queues the erasure again for each finished deletion that kept records under a hold for the
+ * hold's person or organization. A deletion's steps name every subject it erased, so the
+ * organization only the requester ran is found through them.
+ *
+ * The request rows are locked. A finalize step completing one of them right now holds the
+ * same lock, so this waits and then sees it `completed`. A deletion that is still running is
+ * left alone: its finalize step sees the released hold and queues the job itself.
+ */
+async function queueReErasure(tx: Tx, hold: HoldSubject): Promise<void> {
+  const subjectId = hold.userId ?? hold.orgId;
+  if (!subjectId) return;
+  const subjectKind = hold.userId ? 'user' : 'org';
+  const requests = await tx
+    .select({ id: privacyRequests.id, status: privacyRequests.status })
+    .from(privacyRequests)
+    .where(
+      and(
+        eq(privacyRequests.kind, 'delete'),
+        ne(privacyRequests.status, 'failed'),
+        sql`exists (
+          select 1 from app.privacy_request_steps step
+          where step.request_id = ${privacyRequests.id}
+            and step.subject_kind = ${subjectKind}
+            and step.subject_id = ${subjectId}::uuid
+        )`,
+      ),
+    )
+    .orderBy(asc(privacyRequests.id))
+    .for('update');
+  for (const request of requests) {
+    if (request.status !== 'completed') continue;
+    const [held] = await tx
+      .select({ id: privacyRequestSteps.id })
+      .from(privacyRequestSteps)
+      .where(
+        and(
+          eq(privacyRequestSteps.requestId, request.id),
+          sql`${privacyRequestSteps.retained} @> '[{"reason":"legal_hold"}]'::jsonb`,
+        ),
+      )
+      .limit(1);
+    if (!held) continue;
+    await enqueue(tx, {
+      topic: HOLD_RELEASE_ERASE_TOPIC,
+      payload: { requestId: request.id },
+      dedupeKey: `privacy_hold_release_erase:${request.id}:${hold.id}`,
+    });
+  }
+}
+
+/**
+ * Releases a hold, and queues the erasure again for what it kept (see the header). An
+ * already released hold is a `conflict`.
+ */
 export async function releaseLegalHold(
   db: Db,
   i: { holdId: string; operatorId: string },
@@ -120,6 +212,93 @@ export async function releaseLegalHold(
       subjectId: hold.userId ?? hold.orgId,
       data: { holdId: hold.id, scope: hold.scope, subjectKind: hold.userId ? 'user' : 'org' },
     });
+    await queueReErasure(tx, hold);
+    await enqueue(tx, {
+      topic: HOLD_MIRROR_TOPIC,
+      payload: { holdId: hold.id },
+      dedupeKey: `privacy_hold_mirror:${hold.id}:released`,
+    });
+  });
+}
+
+/** `operatorId` when that account is in this database, else an Owner's. */
+async function knownOperator(tx: Tx, operatorId: string): Promise<string> {
+  if (await findUserById(tx, operatorId)) return operatorId;
+  const owner = (await listActiveOperators(tx)).find((operator) => operator.role === 'owner');
+  if (!owner) throw new Error('hold mirror: no operator account to record the hold under');
+  return owner.userId;
+}
+
+/**
+ * Brings one hold in a restored database in line with its mirrored copy. A hold the database
+ * lacks (placed after the backup) is put back, with its id, scope and dates; a hold the mirror
+ * shows released is released, which queues the erasure of what it kept as a release does.
+ * Returns what changed. With `apply: false` nothing is written and the answer is what would
+ * change. Safe to repeat.
+ *
+ * The mirror never holds the reason, so a hold put back carries a note saying so. If the
+ * operator who placed it is not in the restored database, it is recorded under an Owner.
+ */
+export async function applyMirroredHold(
+  db: Db,
+  e: HoldEntry,
+  o: { apply: boolean },
+): Promise<'added' | 'released' | 'unchanged'> {
+  const subjectId = e.userId ?? e.orgId;
+  if ((e.userId === null) === (e.orgId === null) || !subjectId || !UUID.test(subjectId)) {
+    throw new Error('hold mirror: a hold names one user or one organization');
+  }
+  if (!UUID.test(e.holdId) || !(HOLD_SCOPES as readonly string[]).includes(e.scope)) {
+    throw new Error('hold mirror: the entry is not a hold');
+  }
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .select()
+      .from(privacyLegalHolds)
+      .where(eq(privacyLegalHolds.id, e.holdId))
+      .for('update');
+    if (!row) {
+      if (!o.apply) return 'added';
+      await tx.insert(privacyLegalHolds).values({
+        id: e.holdId,
+        userId: e.userId,
+        orgId: e.orgId,
+        scope: e.scope,
+        reason: RESTORED_REASON,
+        reviewAt: e.reviewAt,
+        createdBy: await knownOperator(tx, e.createdBy),
+        createdAt: new Date(e.createdAt),
+        releasedAt: e.releasedAt ? new Date(e.releasedAt) : null,
+        releasedBy: e.releasedAt ? e.releasedBy : null,
+      });
+      await record(tx, {
+        actorType: 'system',
+        actorId: null,
+        orgId: e.orgId,
+        action: 'privacy.legal_hold_restored',
+        subjectType: e.userId ? 'user' : 'organization',
+        subjectId,
+        data: { holdId: e.holdId, scope: e.scope, subjectKind: e.userId ? 'user' : 'org' },
+      });
+      return 'added';
+    }
+    if (row.releasedAt || !e.releasedAt) return 'unchanged';
+    if (!o.apply) return 'released';
+    await tx
+      .update(privacyLegalHolds)
+      .set({ releasedAt: new Date(e.releasedAt), releasedBy: e.releasedBy })
+      .where(eq(privacyLegalHolds.id, row.id));
+    await record(tx, {
+      actorType: 'system',
+      actorId: null,
+      orgId: row.orgId,
+      action: 'privacy.legal_hold_released',
+      subjectType: row.userId ? 'user' : 'organization',
+      subjectId: row.userId ?? row.orgId,
+      data: { holdId: row.id, scope: row.scope, subjectKind: row.userId ? 'user' : 'org' },
+    });
+    await queueReErasure(tx, row);
+    return 'released';
   });
 }
 
@@ -137,6 +316,32 @@ export async function activeHolds(db: DbOrTx, s: PrivacySubject): Promise<HoldSc
     .where(and(subjectFilter(s), isNull(privacyLegalHolds.releasedAt)));
   const held = new Set(rows.map((row) => row.scope));
   return HOLD_SCOPES.filter((scope) => held.has(scope));
+}
+
+/**
+ * True when a hold on one of `subjects` was released at or after `since`. Both times are the
+ * database's: the row's `updated_at` is stamped by the release itself.
+ */
+export async function holdReleasedSince(
+  db: DbOrTx,
+  subjects: readonly PrivacySubject[],
+  since: Date,
+): Promise<boolean> {
+  for (const subject of subjects) {
+    const [row] = await db
+      .select({ id: privacyLegalHolds.id })
+      .from(privacyLegalHolds)
+      .where(
+        and(
+          subjectFilter(subject),
+          isNotNull(privacyLegalHolds.releasedAt),
+          gte(privacyLegalHolds.updatedAt, since),
+        ),
+      )
+      .limit(1);
+    if (row) return true;
+  }
+  return false;
 }
 
 /** True when `scope` is held, directly or by a hold on everything. */

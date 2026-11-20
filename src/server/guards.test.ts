@@ -5,7 +5,9 @@ import { type Db, queryRows } from '@/lib/db';
 import { resetEnvCache } from '@/lib/env';
 import { perfUserHeaderValue } from '@/lib/perf-mode';
 import { AppError } from '@/lib/errors';
+import { newId } from '@/lib/ids';
 import {
+  clerkIdHash,
   handleClerkEvent,
   makeFakeClerkAdmin,
   setAccountType,
@@ -197,6 +199,64 @@ describe('requireUser', () => {
       data: { id: 'user_1', deleted: true },
     });
     await expectDenied(requireUser(), 'unauthorized');
+  });
+
+  // Issue 232: the Clerk ban is not the only thing that stops an account being erased.
+  for (const status of ['pending', 'running', 'needs_action'] as const) {
+    it(`refuses an account whose deletion is ${status}`, async () => {
+      const userId = await signIn(clerkUser('user_1'));
+      await t.db.execute(sql`
+        insert into app.privacy_requests (id, user_id, kind, status)
+        values (${newId()}, ${userId}, 'delete', ${status})
+      `);
+      await expectDenied(requireUser(), 'unauthorized', { reason: 'account_deleted' });
+    });
+  }
+
+  it('lets an account in after its deletion failed, or while only an export runs', async () => {
+    const userId = await signIn(clerkUser('user_1'));
+    await t.db.execute(sql`
+      insert into app.privacy_requests (id, user_id, kind, status)
+      values (${newId()}, ${userId}, 'delete', 'failed'), (${newId()}, ${userId}, 'export', 'running')
+    `);
+    expect((await requireUser()).id).toBe(userId);
+  });
+
+  it('refuses the perf-mode user whose deletion is running', async () => {
+    const id = await signIn(clerkUser('user_perf'));
+    await t.db.execute(sql`
+      insert into app.privacy_requests (id, user_id, kind, status)
+      values (${newId()}, ${id}, 'delete', 'running')
+    `);
+    clerk.session = { userId: null };
+    const secret = 'p'.repeat(32);
+    vi.stubEnv('PERF_MODE', '1');
+    vi.stubEnv('PERF_SECRET', secret);
+    resetEnvCache();
+    headerJar.current = new Headers({ 'x-perf-user': perfUserHeaderValue(id, secret) });
+    try {
+      await expectDenied(requireUser(), 'unauthorized', { reason: 'account_deleted' });
+    } finally {
+      vi.unstubAllEnvs();
+      resetEnvCache();
+    }
+  });
+
+  it('never creates a new row for an erased Clerk user whose session is still valid', async () => {
+    // Finalize pseudonymized the Clerk id; Clerk has not deleted the user yet.
+    const erasedId = newId();
+    await t.db.execute(sql`
+      insert into app.users (id, clerk_user_id, display_name, erased_clerk_id_sha256, deleted_at)
+      values (${erasedId}, ${`deleted:${erasedId}`}, 'Deleted user',
+        ${clerkIdHash('user_gone')}, now())
+    `);
+    clerkUser('user_gone');
+    clerk.session = { userId: 'user_gone' };
+
+    await expectDenied(requireUser(), 'unauthorized');
+
+    const rows = await queryRows<{ id: string }>(t.db, sql`select id::text from app.users`);
+    expect(rows).toEqual([{ id: erasedId }]);
   });
 });
 

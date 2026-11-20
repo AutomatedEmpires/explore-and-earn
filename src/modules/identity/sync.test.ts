@@ -5,7 +5,7 @@ import { AppError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { findHostMembership } from '@/modules/orgs';
 import { createTestDb, type TestDb } from '../../../tests/helpers/db';
-import { clerkIdHash, handleClerkEvent, mapClerkRole } from './sync';
+import { applyClerkUser, clerkIdHash, handleClerkEvent, mapClerkRole, syncClerkUser } from './sync';
 import { newId } from '@/lib/ids';
 
 // Clerk webhook payload builders (snake_case JSON, as Clerk sends it). Timestamps are ms.
@@ -757,6 +757,31 @@ describe('erased Clerk ids', () => {
     expect(people.some((row) => row.clerk_user_id === 'user_abc' || row.email === 'maya@example.test')).toBe(
       false,
     );
+  });
+
+  it('refuses to sync an erased Clerk user at sign-in, and inserts nothing (issue 232)', async () => {
+    const clerkUserId = `user_erased_signin_${newId()}`;
+    const erasedId = newId();
+    await t.db.execute(sql`
+      insert into app.users (id, clerk_user_id, erased_clerk_id_sha256, deleted_at)
+      values (${erasedId}, ${`deleted:${erasedId}`}, ${clerkIdHash(clerkUserId)}, now())
+    `);
+    const snapshot = userJson({
+      id: clerkUserId,
+      email: 'back-again@example.test',
+      updatedAt: '2026-11-18T00:00:00Z',
+    });
+
+    await expect(syncClerkUser(t.db, snapshot)).rejects.toMatchObject({ code: 'unauthorized' });
+    await expect(applyClerkUser(t.db, snapshot)).rejects.toMatchObject({ code: 'unauthorized' });
+
+    expect(
+      await queryRows(
+        t.db,
+        sql`select 1 from app.users
+            where clerk_user_id = ${clerkUserId} or email = 'back-again@example.test'`,
+      ),
+    ).toEqual([]);
   });
 
   it('does not restore an owner from an erased created_by, and skips a membership on a deleted org', async () => {
