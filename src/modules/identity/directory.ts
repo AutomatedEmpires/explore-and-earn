@@ -1,7 +1,7 @@
 // Lookups of users and operators for other modules. app.users and app.operators belong to this
 // module, so everything outside it reads and writes them only through these functions (typed,
 // so a schema change here fails typecheck where it matters instead of at runtime).
-import { and, asc, eq, inArray, isNull, notInArray, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, notInArray, or, sql } from 'drizzle-orm';
 import type { DbOrTx } from '@/lib/db';
 import { type AccountType, type OperatorRole, operators, users } from './schema';
 
@@ -38,6 +38,36 @@ export async function getUserContact(db: DbOrTx, userId: string): Promise<UserCo
   if (!row) return null;
   const { deletedAt, ...rest } = row;
   return { ...rest, deleted: deletedAt !== null };
+}
+
+/** The most ids one page of `pageUserIdsByAccountType` returns. */
+export const USER_PAGE_MAX = 1000;
+
+/**
+ * The ids of live (not deleted) seekers or hosts, in id order after `afterId`, at most `limit`
+ * (1 to USER_PAGE_MAX). For work that reaches every person of a type in chunks, such as the
+ * legal.updated notice (SP8 W5).
+ */
+export async function pageUserIdsByAccountType(
+  db: DbOrTx,
+  i: { types: readonly ('seeker' | 'host')[]; afterId: string | null; limit: number },
+): Promise<string[]> {
+  if (i.types.length === 0) return [];
+  const limit = Math.min(Math.max(Math.trunc(i.limit), 1), USER_PAGE_MAX);
+  const after = i.afterId && UUID.test(i.afterId) ? i.afterId : null;
+  const rows = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(
+      and(
+        inArray(users.accountType, [...i.types]),
+        isNull(users.deletedAt),
+        after ? gt(users.id, after) : undefined,
+      ),
+    )
+    .orderBy(asc(users.id))
+    .limit(limit);
+  return rows.map((row) => row.id);
 }
 
 /** An operator whose account isn't deleted. */

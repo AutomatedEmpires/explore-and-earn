@@ -51,7 +51,7 @@ vi.mock('@sentry/nextjs', async (importOriginal) => ({
 
 // The Global Privacy Control stamp goes through the real identity function, which a test can
 // make fail.
-const optOut = vi.hoisted(() => ({ fail: false }));
+const optOut = vi.hoisted(() => ({ fail: false, readFail: false }));
 vi.mock('@/modules/identity', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/modules/identity')>();
   return {
@@ -62,6 +62,10 @@ vi.mock('@/modules/identity', async (importOriginal) => {
         return actual.recordAnalyticsOptOut(...args);
       },
     ),
+    isAnalyticsOptedOut: vi.fn(async (...args: Parameters<typeof actual.isAnalyticsOptedOut>) => {
+      if (optOut.readFail) throw new Error('database unavailable');
+      return actual.isAnalyticsOptedOut(...args);
+    }),
   };
 });
 
@@ -584,6 +588,45 @@ describe('apiRoute and Global Privacy Control', () => {
         'Could not record the Global Privacy Control opt-out',
         expect.objectContaining({ err: expect.any(Error) }),
       ),
+    );
+    warned.mockRestore();
+  });
+});
+
+// SP8 W5 (#149, lead note 6993004832): a recorded opt-out (users.analytics_opt_out_at) is a
+// refusal on every later request of that account, from a browser that sends no signal too.
+describe('apiRoute and a recorded analytics opt-out', () => {
+  let userId: string;
+  const route = apiRoute({
+    auth: 'user',
+    handler: async () => ({ analyticsAllowed: getRequestContext()?.analyticsAllowed ?? null }),
+  });
+  const read = () =>
+    route(
+      new Request(`${APP_URL}/api/v1/thing`, { headers: { 'x-vercel-ip-country': 'US' } }),
+    ).then((res) => res.json());
+
+  beforeEach(async () => {
+    optOut.fail = false;
+    optOut.readFail = false;
+    userId = newId();
+    await t.db.insert(users).values({ id: userId, clerkUserId: `user_optout_${userId}` });
+    vi.mocked(requireUser).mockResolvedValue({ ...user, id: userId });
+  });
+
+  it('allows analytics until the account is stamped, then refuses it without the signal', async () => {
+    expect(await read()).toEqual({ analyticsAllowed: true });
+    await recordAnalyticsOptOut(t.db, userId);
+    expect(await read()).toEqual({ analyticsAllowed: false });
+  });
+
+  it('refuses analytics, and still answers, when the opt-out cannot be read', async () => {
+    optOut.readFail = true;
+    const warned = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    expect(await read()).toEqual({ analyticsAllowed: false });
+    expect(warned).toHaveBeenCalledWith(
+      'Could not read the analytics opt-out; analytics is off for this request',
+      expect.objectContaining({ err: expect.any(Error) }),
     );
     warned.mockRestore();
   });

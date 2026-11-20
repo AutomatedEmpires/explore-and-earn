@@ -6,6 +6,14 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryRows, type Db } from '@/lib/db';
+import { newId } from '@/lib/ids';
+import {
+  LEGAL_TITLES,
+  recordCounselApproval,
+  saveLegalDraft,
+  scheduleLegal,
+  type LegalSlug,
+} from '@/modules/content';
 import { syncClerkUser, type CurrentUser } from '@/modules/identity';
 import { createTestDb, type TestDb } from '../../../../../tests/helpers/db';
 
@@ -29,9 +37,21 @@ vi.mock('@/server/guards', () => ({
   }),
 }));
 
+// A fresh fake Clerk admin per call; a test can make its next call fail.
+const clerk = vi.hoisted(() => ({
+  failNext: null as 'setPublicMetadata' | 'createOrganization' | null,
+}));
 vi.mock('@/modules/identity', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/modules/identity')>();
-  return { ...actual, clerkAdmin: () => actual.makeFakeClerkAdmin() };
+  return {
+    ...actual,
+    clerkAdmin: () => {
+      const fake = actual.makeFakeClerkAdmin();
+      if (clerk.failNext) fake.failNext(clerk.failNext);
+      clerk.failNext = null;
+      return fake;
+    },
+  };
 });
 
 type Route = typeof import('./route');
@@ -297,5 +317,171 @@ describe('POST /api/v1/onboarding: a refusal holds on the account', () => {
     session.user = { id, clerkUserId: 'user_other_adult', accountType: null, email: null };
     await expect(send(SEEKER)).resolves.toMatchObject({ status: 200 });
     expect(await accountType()).toBe('seeker');
+  });
+});
+
+// SP8 plan Task 24 (spec 8.5): the documents an account type accepts at onboarding, once
+// published, must be accepted at their published version; the acceptances commit with the
+// account type. While nothing is published (every test above), nothing is required.
+describe('POST /api/v1/onboarding: legal acceptance', () => {
+  const operatorId = newId();
+  const REFUSAL = {
+    error: { code: 'forbidden', details: { reason: 'signup_refused' } },
+  };
+
+  async function publish(slug: LegalSlug): Promise<void> {
+    const doc = await saveLegalDraft(t.db, {
+      slug,
+      title: LEGAL_TITLES[slug],
+      bodyMd: `The ${slug} text.`,
+      summaryOfChanges: '',
+      counselQuestions: '',
+      material: true,
+      submitForCounsel: true,
+      operatorId,
+    });
+    await recordCounselApproval(t.db, { documentId: doc.id, note: 'Counsel signed.', operatorId });
+    await scheduleLegal(t.db, { documentId: doc.id, effectiveAt: new Date(), operatorId });
+  }
+
+  async function acceptances(): Promise<{ slug: string; version: number }[]> {
+    return queryRows(
+      t.db,
+      sql`select slug, version from app.legal_acceptances
+          where user_id = ${session.user?.id ?? ''} order by slug`,
+    );
+  }
+
+  beforeEach(async () => {
+    await t.db.execute(sql`delete from app.legal_documents`);
+  });
+
+  afterAll(async () => {
+    await t.db.execute(sql`delete from app.legal_documents`);
+  });
+
+  it('refuses a seeker who has not accepted a published document, and saves nothing', async () => {
+    await publish('community');
+    const res = await post(SEEKER);
+    expect(res).toMatchObject({
+      status: 400,
+      json: {
+        error: {
+          code: 'bad_request',
+          message: 'Agree to the terms to continue.',
+          details: {
+            reason: 'legal_acceptance_required',
+            missing: [{ slug: 'community', version: 1 }],
+          },
+        },
+      },
+    });
+    expect(await accountType()).toBeNull();
+    expect(await acceptances()).toEqual([]);
+
+    // An older or unknown version is not an acceptance of the published one.
+    await expect(
+      post({ ...SEEKER, acceptedLegal: [{ slug: 'community', version: 2 }] }),
+    ).resolves.toMatchObject({ status: 400 });
+    expect(await accountType()).toBeNull();
+  });
+
+  it('records the three seeker acceptances with the account type', async () => {
+    for (const slug of ['terms', 'privacy', 'community', 'host-terms'] as const)
+      await publish(slug);
+    const accepted = [
+      { slug: 'terms', version: 1 },
+      { slug: 'privacy', version: 1 },
+      { slug: 'community', version: 1 },
+    ];
+    await expect(post({ ...SEEKER, acceptedLegal: accepted })).resolves.toEqual({
+      status: 200,
+      json: { redirectTo: '/' },
+    });
+    expect(await accountType()).toBe('seeker');
+    expect(await acceptances()).toEqual([
+      { slug: 'community', version: 1 },
+      { slug: 'privacy', version: 1 },
+      { slug: 'terms', version: 1 },
+    ]);
+  });
+
+  it('records nothing when Clerk fails, so the seeker can try again', async () => {
+    for (const slug of ['terms', 'privacy', 'community'] as const) await publish(slug);
+    const accepted = [
+      { slug: 'terms', version: 1 },
+      { slug: 'privacy', version: 1 },
+      { slug: 'community', version: 1 },
+    ];
+    clerk.failNext = 'setPublicMetadata';
+    const failed = await post({ ...SEEKER, acceptedLegal: accepted });
+    expect(failed.status).toBe(500);
+    expect(await accountType()).toBeNull();
+    expect(await acceptances()).toEqual([]);
+
+    await expect(post({ ...SEEKER, acceptedLegal: accepted })).resolves.toMatchObject({
+      status: 200,
+    });
+    expect(await acceptances()).toHaveLength(3);
+  });
+
+  it('asks a host for the Host Terms once they are published', async () => {
+    for (const slug of ['terms', 'privacy', 'host-terms'] as const) await publish(slug);
+    const res = await post({
+      ...HOST,
+      acceptedLegal: [
+        { slug: 'terms', version: 1 },
+        { slug: 'privacy', version: 1 },
+      ],
+    });
+    expect(res).toMatchObject({
+      status: 400,
+      json: { error: { details: { missing: [{ slug: 'host-terms', version: 1 }] } } },
+    });
+    expect(await queryRows(t.db, sql`select id from app.organizations`)).toEqual([]);
+
+    await expect(
+      post({
+        ...HOST,
+        acceptedLegal: [
+          { slug: 'terms', version: 1 },
+          { slug: 'host-terms', version: 1 },
+          { slug: 'privacy', version: 1 },
+        ],
+      }),
+    ).resolves.toEqual({ status: 200, json: { redirectTo: '/host' } });
+    expect(await acceptances()).toEqual([
+      { slug: 'host-terms', version: 1 },
+      { slug: 'privacy', version: 1 },
+      { slug: 'terms', version: 1 },
+    ]);
+  });
+
+  it('keeps the age screen: a refused account gets the refusal, accepted documents or not', async () => {
+    for (const slug of ['terms', 'privacy', 'community'] as const) await publish(slug);
+    const accepted = [
+      { slug: 'terms', version: 1 },
+      { slug: 'privacy', version: 1 },
+      { slug: 'community', version: 1 },
+    ];
+    // Under age, with every document accepted: refused, and no acceptance is kept.
+    await expect(send({ ...CHILD, acceptedLegal: accepted })).resolves.toMatchObject({
+      status: 403,
+      json: REFUSAL,
+    });
+    expect(await acceptances()).toEqual([]);
+
+    // The refusal holds on the account even when the retry accepts nothing.
+    await expect(send(SEEKER, { cookie: 'theme=dark' })).resolves.toMatchObject({
+      status: 403,
+      json: REFUSAL,
+    });
+    await expect(send(HOST)).resolves.toMatchObject({ status: 403, json: REFUSAL });
+    // And for the rest of the browser session, by its cookie.
+    await expect(send(SEEKER, { cookie: 'ee_signup_refused=1' })).resolves.toMatchObject({
+      status: 403,
+      json: REFUSAL,
+    });
+    expect(await accountType()).toBeNull();
   });
 });

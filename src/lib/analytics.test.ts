@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { allowedByConsent, readConsent } from '@/modules/privacy';
 import { runWithRequestContext } from '@/server/request-context';
-import { resetAnalyticsForTests, scrubProps, track } from './analytics';
+import { isAnalyticsAllowed, resetAnalyticsForTests, scrubProps, track } from './analytics';
 import { initAnalytics, trackClient } from './analytics-client';
 import { scrubClientProps } from './analytics-scrub';
 import { resetEnvCache } from './env';
@@ -51,21 +51,25 @@ afterEach(() => {
   resetAnalyticsForTests();
 });
 
+// Outside a request these tests pass `{ allowed: true }`, as a caller that knows the person's
+// consent does (Plan decision 19).
+const ALLOWED = { allowed: true } as const;
+
 describe('track', () => {
   it('drops personal-data props before sending', () => {
-    track('x', { email: 'a@b', listingId: '1' });
+    track('x', { email: 'a@b', listingId: '1' }, undefined, ALLOWED);
     expect(sent.events).toHaveLength(1);
     expect(sent.events[0]).toMatchObject({ event: 'x', properties: { listingId: '1' } });
     expect((sent.events[0] as { properties: object }).properties).toEqual({ listingId: '1' });
   });
 
   it('uses the given distinct id (an internal user id)', () => {
-    track('listing.saved', { listingId: '1' }, 'user-123');
+    track('listing.saved', { listingId: '1' }, 'user-123', ALLOWED);
     expect(sent.events[0]).toMatchObject({ distinctId: 'user-123', event: 'listing.saved' });
   });
 
   it('turns off GeoIP, since server events carry the server address', () => {
-    track('x');
+    track('x', undefined, undefined, ALLOWED);
     expect(sent.options[0]).toMatchObject({ disableGeoip: true });
   });
 
@@ -73,7 +77,44 @@ describe('track', () => {
     vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', '');
     resetEnvCache();
     resetAnalyticsForTests();
-    track('x', { listingId: '1' });
+    track('x', { listingId: '1' }, undefined, ALLOWED);
+    expect(sent.events).toHaveLength(0);
+  });
+});
+
+// SP8 Plan decision 19: an event is sent only on an explicit yes, from the request's verdict
+// or the caller. A job, cron run or webhook has no request context, so it sends nothing unless
+// it passes `{ allowed: true }` (trackForUser does, from the person's consent record).
+describe('track and consent', () => {
+  it('sends inside a request that allows analytics, and never in one that refuses it', () => {
+    runWithRequestContext({ requestId: 'req-test-0003', analyticsAllowed: true }, () =>
+      track('listing.saved', { listingId: '1' }, 'user-123'),
+    );
+    expect(sent.events).toHaveLength(1);
+    expect(isAnalyticsAllowed()).toBe(false);
+
+    runWithRequestContext({ requestId: 'req-test-0004', analyticsAllowed: false }, () => {
+      expect(isAnalyticsAllowed()).toBe(false);
+      // An explicit yes never overrides a request that refused (Global Privacy Control).
+      track('listing.saved', { listingId: '1' }, 'user-123', { allowed: true });
+    });
+    expect(sent.events).toHaveLength(1);
+  });
+
+  it('drops an event outside a request, unless the caller allows it', () => {
+    track('resume_import_finished', { status: 'merged' }, 'user-123');
+    expect(sent.events).toHaveLength(0);
+    track('resume_import_finished', { status: 'merged' }, 'user-123', { allowed: false });
+    expect(sent.events).toHaveLength(0);
+    track('resume_import_finished', { status: 'merged' }, 'user-123', { allowed: true });
+    expect(sent.events).toHaveLength(1);
+  });
+
+  it('drops an event in a request context that has no verdict yet', () => {
+    runWithRequestContext({ requestId: 'req-test-0005' }, () => {
+      expect(isAnalyticsAllowed()).toBe(false);
+      track('x', { listingId: '1' });
+    });
     expect(sent.events).toHaveLength(0);
   });
 });
@@ -232,9 +273,23 @@ describe('scrubClientProps', () => {
   });
 });
 
+/**
+ * A page outside the EU where the visitor has not refused analytics: the root layout's
+ * `<meta name="ee-consent" content="other:unset:0">`, which initAnalytics reads before it loads
+ * PostHog (Plan decision 19). analytics-client.test.tsx covers the other consent states.
+ */
+function browserOutsideTheEu(): void {
+  vi.stubGlobal('window', {});
+  vi.stubGlobal('document', {
+    readyState: 'complete',
+    querySelector: (selector: string) =>
+      selector === 'meta[name="ee-consent"]' ? { getAttribute: () => 'other:unset:0' } : null,
+  });
+}
+
 describe('initAnalytics', () => {
   it('masks URL tokens at the source and strips URLs again before sending', () => {
-    vi.stubGlobal('window', {});
+    browserOutsideTheEu();
 
     initAnalytics();
 
@@ -262,7 +317,7 @@ describe('initAnalytics', () => {
   // SP3 regression: discovery URLs carry the search text and coordinates in the query string
   // (spec section 10), and before_send must keep cutting every URL back to origin and path.
   it('never sends discovery search text or coordinates from a page URL', () => {
-    vi.stubGlobal('window', {});
+    browserOutsideTheEu();
 
     initAnalytics();
 
@@ -284,7 +339,7 @@ describe('initAnalytics', () => {
 
   // Legal review 4.5: session replay is off in production, and so in every environment.
   it('never records a session, records no element text and sends no message text', () => {
-    vi.stubGlobal('window', {});
+    browserOutsideTheEu();
 
     initAnalytics();
 
@@ -300,7 +355,7 @@ describe('initAnalytics', () => {
   });
 
   it('does not load PostHog when the browser sends Global Privacy Control', () => {
-    vi.stubGlobal('window', {});
+    browserOutsideTheEu();
     vi.stubGlobal('navigator', { globalPrivacyControl: true });
 
     initAnalytics();
@@ -309,7 +364,7 @@ describe('initAnalytics', () => {
   });
 
   it('loads PostHog when the browser does not send the signal', () => {
-    vi.stubGlobal('window', {});
+    browserOutsideTheEu();
     vi.stubGlobal('navigator', { globalPrivacyControl: false });
 
     initAnalytics();
