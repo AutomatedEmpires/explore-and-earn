@@ -216,12 +216,16 @@ Set every key from `.env.local.example` on each Vercel target. Use the Vercel da
 | `EMAIL_PROVIDER`, `RESEND_API_KEY` | `resend` | `resend` |
 | `EMAIL_FROM` | `Explore&Earn <noreply@<domain>>` (a domain verified in Resend) | same |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | this environment's pair (section 5) | its own pair |
-| `JOBS_SECRET`, `UNSUBSCRIBE_SECRET` | `openssl rand -base64 48`, one each | new values |
+| `JOBS_SECRET`, `UNSUBSCRIBE_SECRET`, `ANALYTICS_HASH_SECRET` | `openssl rand -base64 48`, one each | new values |
 | `SENTRY_DSN` | the Sentry project DSN | same |
 | `NEXT_PUBLIC_POSTHOG_KEY` | the PostHog project key | same |
 
 - **Production refuses to start** when any provider is `stub` or `local`, or a required key is
   missing. The startup error names the variable (`src/lib/env.ts`).
+- **A missing key fails every request, in preview too.** The proxy (`src/proxy.ts`) reads the
+  environment on each request. Set a new key on every target before the code that needs it
+  deploys. For example, SP3 adds `ANALYTICS_HASH_SECRET`, the HMAC key for view dedupe and the
+  guest viewer key.
 - **Leave unset in the cloud:** `LOCAL_STORAGE_DIR` and `CHILD_SAFETY_STUB_HASHES`, which are
   for development only.
 - **Branch previews** use `ee-dev` values with `APP_ENV=preview`.

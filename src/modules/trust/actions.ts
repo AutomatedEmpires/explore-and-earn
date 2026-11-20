@@ -394,7 +394,8 @@ async function applyDecision(
     secondOperatorId: string | null;
   },
 ): Promise<void> {
-  await a.handler(tx, item.subjectId, a.data);
+  // Handlers learn which item decided them (a subject with two open items needs both approved).
+  await a.handler(tx, item.subjectId, { ...a.data, reviewItemId: item.id });
 
   const now = new Date();
   await tx

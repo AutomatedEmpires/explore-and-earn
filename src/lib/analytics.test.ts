@@ -165,4 +165,28 @@ describe('initAnalytics', () => {
       $pathname: '/sign-up',
     });
   });
+
+  // SP3 regression: discovery URLs carry the search text and coordinates in the query string
+  // (spec section 10), and before_send must keep cutting every URL back to origin and path.
+  it('never sends discovery search text or coordinates from a page URL', () => {
+    vi.stubGlobal('window', {});
+    browser.init.mockClear();
+
+    initAnalytics();
+
+    const config = browser.init.mock.calls[0]?.[1] ?? {};
+    const beforeSend = config.before_send as (e: { properties: Record<string, unknown> }) => {
+      properties: Record<string, unknown>;
+    };
+    const url =
+      'https://exploreandearn.com/map?q=lift+operator&cat=farm&lat=39.74&lng=-104.99&bbox=-125,24,-66,50';
+    const event = beforeSend({
+      properties: { $current_url: url, $referrer: url, $pathname: '/map' },
+    });
+    expect(event.properties).toEqual({
+      $current_url: 'https://exploreandearn.com/map',
+      $referrer: 'https://exploreandearn.com/map',
+      $pathname: '/map',
+    });
+  });
 });

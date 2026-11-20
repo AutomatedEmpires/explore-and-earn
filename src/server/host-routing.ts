@@ -67,9 +67,12 @@ export function onboardingState(claims: unknown): OnboardingState {
   return typeof type === 'string' && ACCOUNT_TYPES.has(type) ? 'done' : 'needed';
 }
 
-/** Paths a signed-in user without an account type may still reach. */
+/**
+ * Paths a signed-in user without an account type may still reach. `/join/<token>` lets an
+ * invitee accept a team invitation, which sets their account type.
+ */
 const ONBOARDING_EXEMPT =
-  /^\/(?:onboarding|sign-in|sign-up|sign-out|sso-callback|api|_next|design-system)(?:\/|$)/;
+  /^\/(?:onboarding|sign-in|sign-up|sign-out|sso-callback|api|_next|design-system|join)(?:\/|$)/;
 
 /** Whether the proxy sends this signed-in user to /onboarding before anything else. */
 export function shouldRedirectToOnboarding(i: {

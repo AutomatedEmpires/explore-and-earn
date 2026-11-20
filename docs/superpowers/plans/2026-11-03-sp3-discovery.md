@@ -64,6 +64,7 @@ Read the SP3 spec before any task.
   - Touch targets ≥ 44 px, visible focus, `prefers-reduced-motion`, and an `aria-label` on every icon-only control.
 - **Module rules (spec 3):**
   - `src/modules/discovery/index.ts` starts with `import 'server-only'`.
+    Scripts and Playwright helpers that import a module load `scripts/register-server-only.mjs` first (package.json and `playwright.config.ts` already do).
   - `landing` depends on `discovery`; `discovery` never imports `landing`.
   - `src/lib/discovery/` has no database imports.
   - `src/ui/**` never imports `@/modules/*`.
@@ -530,6 +531,7 @@ tests/e2e/fixtures/* (incl. sp2-writes.ts) scripts/e2e-seed-discovery.ts tests/p
   - dependencies: `mapbox-gl` (latest 3.x, exact, if absent)
   - devDependencies: `@lhci/cli` (exact)
   - scripts: `discovery:seed-synthetic` (`tsx scripts/seed-synthetic.ts`), `discovery:rebuild` (`tsx scripts/discovery-rebuild.ts`), `icons:gen` (`tsx scripts/gen-icons.ts`), `e2e:seed` (`tsx scripts/e2e-seed-discovery.ts`)
+  - Every `tsx` script runs as `tsx --import ./scripts/register-server-only.mjs scripts/<x>.ts`, and `playwright.config.ts` imports the same file. It resolves `server-only` to its empty entry, so scripts and e2e helpers can import `@/modules/discovery` and `@/modules/landing` (plain tsx throws on `import 'server-only'`).
 - **Operator Sidebar:** one item "Landing pages" linking to the console path of `/admin/content/landing`, using the existing items' href convention.
 - **Apply placeholder:** `/apply/[listingId]` renders Foundation `Placeholder` with "Coming in sub-project 4: Seeker", which is hidden in prod.
 

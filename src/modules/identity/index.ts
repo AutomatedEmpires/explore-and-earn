@@ -40,6 +40,7 @@ export {
   userHasPasskey,
   userHasStrongAuth,
   type ClerkAdmin,
+  type ClerkOrgRole,
   type FakeClerkAdmin,
   type OperatorInviteRole,
 } from './clerk-admin';
