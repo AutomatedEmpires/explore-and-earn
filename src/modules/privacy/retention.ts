@@ -74,6 +74,8 @@ export const RETENTION_HOLD_COVERAGE: Readonly<Record<string, string>> = {
     'Skips a report whose reporter (person or organization) or subject has a hold on reports or all, as the safety eraser does. The subject counts as an organization or seeker on the row, or through its owners as the owning module names them: the organization of a listing, the organization and seeker of a thread, and the organization, seeker and sender of a message.',
   'trust.checks_12m':
     'Skips a check about a person or organization with a hold of any scope: directly, or through what the check or a review item on it is about, whose owners the owning module names: a file, listing revision, message, bulk message, invite, interview or offer.',
+  'trust.review_items_12m':
+    'Skips a review item, with its notes and decisions, about a person or organization with a hold of any scope: directly, or through what the item or the check it was opened on is about, whose owners the owning module names: a file, listing, listing revision, thread, message, bulk message, invite, interview or offer.',
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;

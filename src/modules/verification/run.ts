@@ -245,8 +245,9 @@ const runPayload = z.object({ verificationId: z.uuid() });
 
 /**
  * A confirmed fake host's ban (legal review 7 item 6): bans the print of the card on file.
- * Queued by the `business_verification` ban (subjects.ts) and run after it commits, because it
- * reads Stripe. Idempotent.
+ * Queued by the `business_verification` ban (subjects.ts) and by billing's ban on an
+ * `organization` fraud item (billing/org-subject.ts), and run after the decision commits,
+ * because it reads Stripe. Idempotent.
  */
 export const BAN_FINGERPRINTS_TOPIC = 'verification.ban_fingerprints';
 

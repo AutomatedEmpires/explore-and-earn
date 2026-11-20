@@ -146,6 +146,44 @@ describe('sanctionOrg', () => {
   });
 });
 
+describe('a ban decided on an organization fraud item (issue 233)', () => {
+  const printJobs = () =>
+    queryRows<{ payload: string; dedupe_key: string | null }>(
+      t.db,
+      sql`select payload::text, dedupe_key from app.outbox
+        where topic = 'verification.ban_fingerprints' and payload->>'orgId' = ${org.orgId}`,
+    );
+
+  const fraudItem = async () =>
+    (
+      await openReviewItem(t.db, {
+        queue: 'fraud',
+        subjectType: 'organization',
+        subjectId: org.orgId,
+        reason: 'repeated_scam_text',
+      })
+    ).id;
+
+  it('bans the org and queues the ban of the card on file, once per decision', async () => {
+    const itemId = await fraudItem();
+    await decide(t.db, itemId, operatorId, 'ban');
+
+    expect(await orgStatus()).toBe('banned');
+    expect(await cancelJobs()).toHaveLength(1);
+    const jobs = await printJobs();
+    expect(jobs).toHaveLength(1);
+    expect(JSON.parse(jobs[0]?.payload ?? '{}')).toEqual({ orgId: org.orgId });
+    expect(jobs[0]?.dedupe_key).toBe(`ban-prints:${org.orgId}:${itemId}`);
+  });
+
+  it('queues nothing for a suspension', async () => {
+    await decide(t.db, await fraudItem(), operatorId, 'suspend');
+
+    expect(await orgStatus()).toBe('suspended');
+    expect(await printJobs()).toEqual([]);
+  });
+});
+
 describe('cancelSubscriptionNow', () => {
   it('does nothing without a current subscription', async () => {
     await cancelSubscriptionNow(t.db, org.orgId, gw);

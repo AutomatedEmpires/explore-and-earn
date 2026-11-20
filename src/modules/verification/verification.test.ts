@@ -609,6 +609,61 @@ describe('operator decisions (subject organization)', () => {
   });
 });
 
+describe('a ban decided on an organization fraud item (issue 233)', () => {
+  it('bans the card on file, so the same card no longer passes bannedFingerprint', async () => {
+    const org = await seedOrg();
+    const print = `Fp${short()}Scam`;
+    const card = { hasCard: true, cvcCheck: 'pass', postalCheck: 'pass', fingerprint: print } as const;
+    billingFake.setCardChecks(org.orgId, card);
+    // What the message scan opens after repeated scam text (messaging/scan.ts).
+    const { id: itemId } = await openReviewItem(t.db, {
+      queue: 'fraud',
+      subjectType: 'organization',
+      subjectId: org.orgId,
+      reason: 'repeated_scam_text',
+    });
+
+    // Before the ban the card is clean: a new host with it is verified without a review.
+    const before = await seedOrg({ website: 'https://www.kettle-lodge.com' });
+    billingFake.setCardChecks(before.orgId, card);
+    expect((await verify(before.orgId)).signals).toMatchObject({ bannedFingerprint: false });
+
+    await decide(t.db, itemId, operatorId, 'ban');
+    const [status] = await queryRows<{ status: string }>(
+      t.db,
+      sql`select status from app.organizations where id = ${org.orgId}`,
+    );
+    expect(status?.status).toBe('banned');
+    const jobs = await queryRows<{ id: string }>(
+      t.db,
+      sql`select id from app.outbox where topic = 'verification.ban_fingerprints'
+        and payload->>'orgId' = ${org.orgId}`,
+    );
+    expect(jobs).toHaveLength(1);
+    await runWorker(t.db, {
+      handlers: {
+        'verification.ban_fingerprints': must(jobHandlers['verification.ban_fingerprints']),
+      },
+    });
+    expect(
+      await queryRows<{ kind: string; value: string }>(
+        t.db,
+        sql`select kind, value from app.verification_banned_fingerprints where value = ${print}`,
+      ),
+    ).toEqual([{ kind: 'card', value: print }]);
+
+    // The same person signs up again with the same card: it now fails bannedFingerprint.
+    const again = await seedOrg({ website: 'https://www.kettle-lodge.com' });
+    billingFake.setCardChecks(again.orgId, card);
+    const run = await verify(again.orgId);
+    expect(run.status).toBe('needs_review');
+    expect(run.signals).toMatchObject({ bannedFingerprint: true });
+    expect(await items(again.orgId)).toEqual([
+      expect.objectContaining({ reason: 'manual_review:banned_fingerprint' }),
+    ]);
+  });
+});
+
 describe('submitVerificationInfo', () => {
   it('answers an info request and sends it back to the fraud queue', async () => {
     const org = await seedOrg();
